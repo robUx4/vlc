@@ -192,6 +192,11 @@ char *vlc_path2uri (const char *path, const char *scheme)
         }
     }
     else
+#if VLC_WINSTORE_APP
+    if ((!strncmp(path, "file://{", 8) || path[0] == '{') && strlen(path) > 32)
+        return strdup( path );
+    else
+#endif
     if (!strncmp (path, "\\\\", 2))
     {   /* Windows UNC paths */
         /* \\host\share\path -> file://host/share/path */
