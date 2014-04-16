@@ -350,7 +350,7 @@ int libvlc_video_set_subtitle_file( libvlc_media_player_t *p_mi,
 
     if( p_input_thread )
     {
-        if( !input_AddSubtitle( p_input_thread, psz_subtitle, true ) )
+        if( !input_AddSubtitle( p_input_thread, psz_subtitle, false) )
             b_ret = true;
         vlc_object_release( p_input_thread );
     }
