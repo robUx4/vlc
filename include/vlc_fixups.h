@@ -349,8 +349,13 @@ static inline locale_t newlocale(int mask, const char * locale, locale_t base)
 #endif
 
 /* libintl support */
-#define _(str)            vlc_gettext (str)
-#define N_(str)           gettext_noop (str)
+#ifndef _
+#	define _(str)            vlc_gettext (str)
+#endif
+
+#ifndef N_
+# 	define N_(str)           gettext_noop (str)
+#endif
 #define gettext_noop(str) (str)
 
 #ifdef __cplusplus
