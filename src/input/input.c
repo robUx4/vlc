@@ -1123,7 +1123,7 @@ static void LoadSlaves( input_thread_t *p_input )
                SlaveCompare );
 
     /* add all detected slaves */
-    bool p_forced[2] = {};
+    bool p_forced[2] = {0,0};
     static_assert( SLAVE_TYPE_AUDIO <= 1 && SLAVE_TYPE_SPU <= 1,
                    "slave type size mismatch");
     for( int i = 0; i < i_slaves && pp_slaves[i] != NULL; i++ )
