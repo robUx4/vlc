@@ -255,6 +255,7 @@ static void Prepare(vout_display_t *vd, picture_t *pic, subpicture_t *subpic)
     picture_resource_t rsc = { .p_sys = NULL };
     void *planes[PICTURE_PLANE_MAX];
 
+    picture_t **pictures = alloca(count * sizeof(*pictures));
     sys->pic_opaque = sys->lock(sys->opaque, planes);
 
     for (unsigned i = 0; i < PICTURE_PLANE_MAX; i++) {

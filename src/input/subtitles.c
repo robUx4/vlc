@@ -284,9 +284,9 @@ int subtitles_Detect( input_thread_t *p_this, char *psz_path, const char *psz_na
             if( psz_name[0] == '.' || !subtitles_Filter( psz_name ) )
                 continue;
 
-            char tmp_fname_noext[strlen( psz_name ) + 1];
-            char tmp_fname_trim[strlen( psz_name ) + 1];
-            char tmp_fname_ext[strlen( psz_name ) + 1];
+            char *tmp_fname_noext = alloca(strlen( psz_name ) + 1);
+            char *tmp_fname_trim = alloca(strlen( psz_name ) + 1);
+            char *tmp_fname_ext = alloca(strlen( psz_name ) + 1);
             const char *tmp;
             int i_prio = 0;
 
