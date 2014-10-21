@@ -442,6 +442,9 @@ static void LoopInput( playlist_t *p_playlist )
         input_Stop( p_input );
     }
 
+#ifndef _MSC_VER
+# warning Unsynchronized access to *p_input flags...
+#endif
     switch( var_GetInteger( p_input, "state" ) )
     {
     case END_S:
