@@ -392,7 +392,7 @@ int OpenDemux( vlc_object_t *p_this )
                 fmt.video.p_palette = xmalloc( sizeof(video_palette_t) );
                 *fmt.video.p_palette = *(video_palette_t *)cc->palctrl;
             }
-#else
+#elif !defined(_MSC_VER)
 # warning FIXME: implement palette transmission
 #endif
             psz_type = "video";

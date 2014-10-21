@@ -522,7 +522,9 @@ static void *Run( void *data )
                 var_AddCallback( p_sys->p_input, "intf-event", InputEvent, p_intf );
             }
         }
-#warning This is not reliable...
+#ifndef _MSC_VER
+# warning This is not reliable...
+#endif
         else if( p_sys->p_input->b_dead )
         {
             var_DelCallback( p_sys->p_input, "intf-event", InputEvent, p_intf );
