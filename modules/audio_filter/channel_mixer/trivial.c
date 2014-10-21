@@ -105,7 +105,7 @@ static block_t *Downmix( filter_t *p_filter, block_t *p_buf )
     const float *p_src = p_dest;
     const int *channel_map = p_filter->p_sys->channel_map;
     /* Use an extra buffer to avoid overlapping */
-    float buffer[i_output_nb];
+    float *buffer = alloca(i_output_nb * sizeof(float));
 
     for( size_t i = 0; i < p_buf->i_nb_samples; i++ )
     {

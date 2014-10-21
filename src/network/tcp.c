@@ -272,7 +272,7 @@ int net_Accept (vlc_object_t *p_this, int *pi_fd)
     while (pi_fd[n] != -1)
         n++;
 
-    struct pollfd ufd[n];
+    struct pollfd *ufd = alloca(n * sizeof(*ufd));
     /* Initialize file descriptor set */
     for (unsigned i = 0; i < n; i++)
     {
