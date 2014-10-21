@@ -170,7 +170,7 @@ static void *Thread( void *p_data )
             p_hotkey->psz_action != NULL;
             p_hotkey++ )
     {
-        char varname[12 + strlen( p_hotkey->psz_action )];
+        char *varname = alloca(12 + strlen( p_hotkey->psz_action ));
         sprintf( varname, "global-key-%s", p_hotkey->psz_action );
 
         char *key = var_InheritString( p_intf, varname );

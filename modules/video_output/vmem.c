@@ -282,7 +282,7 @@ static picture_pool_t *Pool(vout_display_t *vd, unsigned count)
     if (count > sys->count)
         count = sys->count;
 
-    picture_t *pictures[count];
+    picture_t **pictures = alloca(count * sizeof(*pictures));
 
     for (unsigned i = 0; i < count; i++) {
         picture_sys_t *picsys = malloc(sizeof (*picsys));
