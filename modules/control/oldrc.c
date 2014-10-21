@@ -141,7 +141,7 @@ VLC_FORMAT(2, 3)
 static void msg_rc( intf_thread_t *p_intf, const char *psz_fmt, ... )
 {
     va_list args;
-    char fmt_eol[strlen (psz_fmt) + 3];
+    char *fmt_eol = alloca(strlen (psz_fmt) + 3);
 
     snprintf (fmt_eol, sizeof (fmt_eol), "%s\r\n", psz_fmt);
     va_start( args, psz_fmt );
