@@ -194,7 +194,7 @@ static void Display(vout_display_t *vd, picture_t *picture, subpicture_t *subpic
     if (unlikely(iovcnt > iovmax))
         return;
 
-    struct iovec iov[iovcnt];
+    struct iovec *iov=alloca(iovcnt * sizeof(struct iovec));
     iov[0].iov_base = buffer;
     iov[0].iov_len = header_len;
 

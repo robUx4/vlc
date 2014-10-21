@@ -525,7 +525,7 @@ int rtsp_connect( rtsp_client_t *rtsp, const char *psz_mrl,
     if( pathbegin < strlen(mrl_ptr) ) s->path = strdup(mrl_ptr+pathbegin+1);
     if( colon != slash )
     {
-        char buffer[pathbegin-hostend];
+        char *buffer = alloca(pathbegin-hostend);
 
         strncpy( buffer, mrl_ptr+hostend+1, pathbegin-hostend-1 );
         buffer[pathbegin-hostend-1] = 0;
