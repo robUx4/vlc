@@ -249,7 +249,7 @@ static int write_buffer_eac3( filter_t *p_filter, block_t *p_in_buf )
 {
     filter_sys_t *p_sys = p_filter->p_sys;
 
-    vlc_a52_header_t a52 = { };
+    vlc_a52_header_t a52 = { 0 };
     if( vlc_a52_header_Parse( &a52, p_in_buf->p_buffer, p_in_buf->i_buffer )
         != VLC_SUCCESS || a52.i_size > p_in_buf->i_buffer )
         return SPDIF_ERROR;
