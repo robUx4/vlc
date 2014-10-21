@@ -760,7 +760,7 @@ static picture_pool_t *Pool(vout_display_t *vd, unsigned pool_size)
     pool_size += 2;
 
     vout_display_sys_t *sys = vd->sys;
-    ID3D11Texture2D  *textures[pool_size * D3D11_MAX_SHADER_VIEW];
+    ID3D11Texture2D  **textures = alloca((pool_size * D3D11_MAX_SHADER_VIEW)*sizeof(*textures));
     picture_t **pictures = NULL;
     picture_t *picture;
     unsigned  plane;

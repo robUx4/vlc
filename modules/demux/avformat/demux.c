@@ -320,7 +320,7 @@ int OpenDemux( vlc_object_t *p_this )
     free( psz_url );
 
     char *psz_opts = var_InheritString( p_demux, "avformat-options" );
-    AVDictionary *options[p_sys->ic->nb_streams ? p_sys->ic->nb_streams : 1];
+    AVDictionary **options = alloca((p_sys->ic->nb_streams ? p_sys->ic->nb_streams : 1) * sizeof(*options));
     options[0] = NULL;
     unsigned int nb_streams = p_sys->ic->nb_streams;
     for (unsigned i = 1; i < nb_streams; i++)

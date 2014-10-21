@@ -1492,7 +1492,7 @@ static enum PixelFormat ffmpeg_GetFormat( AVCodecContext *p_context,
             can_hwaccel = true;
     }
 #if defined(_WIN32) && LIBAVUTIL_VERSION_CHECK(54, 13, 1, 24, 100)
-    enum PixelFormat p_fmts[i+1];
+    enum PixelFormat *p_fmts=alloca((i+1)*sizeof(enum PixelFormat));
     if (i > 1 && pi_fmt[0] == AV_PIX_FMT_DXVA2_VLD && pi_fmt[1] == AV_PIX_FMT_D3D11VA_VLD)
     {
         /* favor D3D11VA over DXVA2 as the order will decide which vout will be

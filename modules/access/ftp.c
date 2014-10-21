@@ -158,7 +158,7 @@ static int ftp_SendCommand( vlc_object_t *obj, access_sys_t *sys,
                             const char *fmt, ... )
 {
     size_t fmtlen = strlen( fmt );
-    char fmtbuf[fmtlen + 3];
+    char *fmtbuf = alloca(fmtlen + 3);
 
     memcpy( fmtbuf, fmt, fmtlen );
     memcpy( fmtbuf + fmtlen, "\r\n", 3 );

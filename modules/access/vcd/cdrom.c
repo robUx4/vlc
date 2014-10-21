@@ -1281,7 +1281,7 @@ static int CdTextRead( vlc_object_t *p_object, const vcddev_t *p_vcddev,
     TOCEx.Format = CDROM_READ_TOC_EX_FORMAT_CDTEXT;
 
     const int i_header_size = __MAX( 4, MINIMUM_CDROM_READ_TOC_EX_SIZE );
-    uint8_t header[i_header_size];
+    uint8_t *header = alloca(i_header_size);
     DWORD i_read;
     if( !DeviceIoControl( p_vcddev->h_device_handle, IOCTL_CDROM_READ_TOC_EX,
                           &TOCEx, sizeof(TOCEx), header, i_header_size, &i_read, 0 ) )
