@@ -991,13 +991,12 @@ void matroska_segment_c::ParseChapterAtom( int i_level, KaxChapterAtom *ca, chap
         else if( MKV_IS_ID( l, KaxChapterSegmentEditionUID ) )
         {
             chapters.p_segment_edition_uid = new KaxChapterSegmentEditionUID( *static_cast<KaxChapterSegmentEditionUID*>(l) );
-            msg_Dbg( &sys.demuxer, "|   |   |   |   + ChapterSegmentEditionUID= %u",
 #if LIBMATROSKA_VERSION < 0x010300
-                     *(uint32*)chapters.p_segment_edition_uid->GetBuffer()
+            uint32 uuid = *(uint32*)chapters.p_segment_edition_uid->GetBuffer();
 #else
-                     *(uint32*)chapters.p_segment_edition_uid
+            uint32 uuid = *(uint32*)chapters.p_segment_edition_uid;
 #endif
-                   );
+            msg_Dbg( &sys.demuxer, "|   |   |   |   + ChapterSegmentEditionUID= %u", uuid );
         }
         else if( MKV_IS_ID( l, KaxChapterTimeStart ) )
         {
