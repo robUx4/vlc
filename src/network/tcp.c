@@ -3,7 +3,11 @@
  *****************************************************************************
  * Copyright (C) 2004-2005 VLC authors and VideoLAN
  * Copyright (C) 2005-2006 Rémi Denis-Courmont
+<<<<<<< .mine
  * $Id$
+=======
+ * $Id$
+>>>>>>> .theirs
  *
  * Authors: Laurent Aimar <fenrir@videolan.org>
  *          Rémi Denis-Courmont <rem # videolan.org>
@@ -275,6 +279,11 @@ int net_Accept (vlc_object_t *p_this, int *pi_fd)
     unsigned n = 0;
     while (pi_fd[n] != -1)
         n++;
+<<<<<<< .mine
+    struct pollfd *ufd = alloca((n + 1) * sizeof(*ufd));
+=======
+
+>>>>>>> .theirs
 
     struct pollfd ufd[n];
     /* Initialize file descriptor set */
