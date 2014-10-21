@@ -629,14 +629,15 @@ static int Open( vlc_object_t * p_this )
             case MAJOR_3gp5:
             case MAJOR_3gp6:
             case MAJOR_3gp7:
-                msg_Dbg( p_demux, "3GPP Media file Release: %c",
+            {
 #ifdef WORDS_BIGENDIAN
-                        BOXDATA(p_ftyp)->i_major_brand
+                uint32_t mb = BOXDATA(p_ftyp)->i_major_brand;
 #else
-                        BOXDATA(p_ftyp)->i_major_brand >> 24
+                uint32_t mb = BOXDATA(p_ftyp)->i_major_brand >> 24;
 #endif
-                        );
+                msg_Dbg( p_demux, "3GPP Media file Release: %c", mb);
                 break;
+            }
             case MAJOR_qt__:
                 msg_Dbg( p_demux, "Apple QuickTime file" );
                 break;
