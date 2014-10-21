@@ -40,7 +40,7 @@
 
 static void ArtCacheCreateDir( const char *psz_dir )
 {
-    char newdir[strlen( psz_dir ) + 1];
+    char* newdir = alloca(strlen( psz_dir ) + 1);
     strcpy( newdir, psz_dir );
     char * psz_newdir = newdir;
     char * psz = psz_newdir;

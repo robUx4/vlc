@@ -45,7 +45,7 @@
  *****************************************************************************/
 static char *AuthGetParam( const char *psz_header, const char *psz_param )
 {
-    char psz_what[strlen(psz_param)+3];
+    char *psz_what = alloca(strlen(psz_param)+3);
     sprintf( psz_what, "%s=\"", psz_param );
     psz_header = strstr( psz_header, psz_what );
     if ( psz_header )
@@ -65,7 +65,7 @@ static char *AuthGetParam( const char *psz_header, const char *psz_param )
 
 static char *AuthGetParamNoQuotes( const char *psz_header, const char *psz_param )
 {
-    char psz_what[strlen(psz_param)+2];
+    char *psz_what = alloca(strlen(psz_param)+2);
     sprintf( psz_what, "%s=", psz_param );
     psz_header = strstr( psz_header, psz_what );
     if ( psz_header )
