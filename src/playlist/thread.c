@@ -444,7 +444,9 @@ static void LoopInput( playlist_t *p_playlist )
         input_Stop( p_input );
     }
 
-#warning Unsynchronized access to *p_input flags...
+#ifndef _MSC_VER
+# warning Unsynchronized access to *p_input flags...
+#endif
     /* This input is dead. Remove it ! */
     if( p_input->b_dead )
     {
