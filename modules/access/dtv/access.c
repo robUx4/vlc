@@ -245,13 +245,17 @@ vlc_module_begin ()
     set_subcategory (SUBCAT_INPUT_ACCESS)
     set_capability ("access", 0)
     set_callbacks (Open, Close)
+
+#ifdef _WIN32
+# define EXTRA_SHORTCUT  ,"dvbt"
+#else
+# define EXTRA_SHORTCUT
+#endif
     add_shortcut ("dtv", "tv", "dvb", /* "radio", "dab",*/
                   "cable", "dvb-c", "cqam", "isdb-c",
                   "satellite", "dvb-s", "dvb-s2", "isdb-s",
                   "terrestrial", "dvb-t", "dvb-t2", "isdb-t", "atsc"
-#ifdef _WIN32
-                  ,"dvbt"
-#endif
+                  EXTRA_SHORTCUT
                  )
 
 #ifdef HAVE_LINUX_DVB
