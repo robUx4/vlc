@@ -1273,7 +1273,9 @@ static void Ogg_DecodePacket( demux_t *p_demux,
             }
             else
             {
+#ifndef _MSC_VER
 #warning Memory leak
+#endif
                 p_stream->i_headers = 0;
                 p_stream->p_headers = NULL;
                 free( p_org );

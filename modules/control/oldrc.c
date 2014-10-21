@@ -524,6 +524,9 @@ static void *Run( void *data )
                 var_AddCallback( p_sys->p_input, "intf-event", InputEvent, p_intf );
             }
         }
+#ifndef _MSC_VER
+# warning This is not reliable...
+#endif
 
         int state;
         if( p_sys->p_input != NULL

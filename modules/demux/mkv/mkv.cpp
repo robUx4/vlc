@@ -192,6 +192,10 @@ static int Open( vlc_object_t * p_this )
                             // test whether this file belongs to our family
                             const uint8_t *p_peek;
                             bool          file_ok = false;
+#ifndef _MSC_VER
+#warning Memory leak!
+#endif
+
                             char          *psz_url = vlc_path2uri( s_filename.c_str(), "file" );
                             stream_t      *p_file_stream = stream_UrlNew(
                                                             p_demux,
