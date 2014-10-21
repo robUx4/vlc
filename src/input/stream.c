@@ -264,7 +264,7 @@ stream_t *stream_UrlNew( vlc_object_t *p_parent, const char *psz_url )
     if( !psz_url )
         return NULL;
 
-    char psz_dup[strlen( psz_url ) + 1];
+    char *psz_dup = alloca(strlen( psz_url ) + 1);
     strcpy( psz_dup, psz_url );
     input_SplitMRL( &psz_access, &psz_demux, &psz_path, &psz_anchor, psz_dup );
 
