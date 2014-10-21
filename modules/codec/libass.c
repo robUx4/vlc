@@ -457,7 +457,7 @@ static void SubpictureUpdate( subpicture_t *p_subpic,
      * it looks ugly (text unaligned).
      */
     const int i_max_region = 4;
-    rectangle_t region[i_max_region];
+    rectangle_t *region = alloca(i_max_region * sizeof(*region));
     const int i_region = BuildRegions( region, i_max_region, p_img, fmt.i_width, fmt.i_height );
 
     if( i_region <= 0 )
@@ -562,7 +562,7 @@ static int BuildRegions( rectangle_t *p_region, int i_max_region, ASS_Image *p_i
     int i_maxh = i_w_inc;
     int i_maxw = i_h_inc;
     int i_region;
-    rectangle_t region[i_max_region+1];
+    rectangle_t *region = alloca((i_max_region+1) * sizeof(*region));
 
     i_region = 0;
     for( int i_used = 0; i_used < i_count; )

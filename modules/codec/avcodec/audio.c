@@ -487,7 +487,7 @@ static block_t * ConvertAVFrame( decoder_t *p_dec, AVFrame *frame )
         p_block = block_Alloc(frame->linesize[0] * ctx->channels);
         if ( likely(p_block) )
         {
-            const void *planes[ctx->channels];
+            const void **planes = alloca(ctx->channels * sizeof(void*));
             for (int i = 0; i < ctx->channels; i++)
                 planes[i] = frame->extended_data[i];
 
@@ -590,7 +590,7 @@ static void SetupOutputFormat( decoder_t *p_dec, bool b_trust )
     }
 
     const unsigned i_order_max = sizeof(pi_channels_map)/sizeof(*pi_channels_map);
-    uint32_t pi_order_src[i_order_max];
+    uint32_t *pi_order_src = alloca(i_order_max * sizeof(*pi_order_src));
 
     int i_channels_src = 0;
     int64_t channel_layout =

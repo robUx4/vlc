@@ -1011,7 +1011,7 @@ void input_item_SetEpgOffline( input_item_t *p_item )
     const int i_epg_info = p_item->i_epg;
     if( i_epg_info > 0 )
     {
-        char *ppsz_epg_info[i_epg_info];
+        char **ppsz_epg_info = alloca(i_epg_info * sizeof(char*));
         for( int i = 0; i < p_item->i_epg; i++ )
         {
             const vlc_epg_t *p_epg = p_item->pp_epg[i];
