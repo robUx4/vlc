@@ -765,7 +765,7 @@ static picture_pool_t *Pool(vout_display_t *vd, unsigned pool_size)
     picture_t *picture;
     unsigned  plane;
     unsigned  picture_count = 0;
-    picture_pool_configuration_t pool_cfg = {};
+    picture_pool_configuration_t pool_cfg = {0};
 
     if (sys->sys.pool)
         return sys->sys.pool;
