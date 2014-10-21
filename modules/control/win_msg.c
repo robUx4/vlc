@@ -92,7 +92,9 @@ static LRESULT CALLBACK WMCOPYWNDPROC(HWND hwnd, UINT uMsg,
                     i_options++;
                 }
 
-#warning URI conversion must be done in calling process instead!
+#ifndef _MSC_VER
+# warning URI conversion must be done in calling process instead!
+#endif
                 /* FIXME: This breaks relative paths if calling vlc.exe is
                  * started from a different working directory. */
                 char *psz_URI = NULL;
