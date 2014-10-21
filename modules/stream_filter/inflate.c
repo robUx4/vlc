@@ -47,7 +47,7 @@ static ssize_t Read(stream_t *stream, void *buf, size_t buflen)
 
     if (buf == NULL)
     {
-        char dummy[buflen > 4096 ? 4096 : buflen];
+        char *dummy = alloca(buflen > 4096 ? 4096 : buflen);
 
         return Read(stream, dummy, sizeof (dummy));
     }

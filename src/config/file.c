@@ -278,7 +278,7 @@ int config_CreateDir( vlc_object_t *p_this, const char *psz_dirname )
         case ENOENT:
         {
             /* Let's try to create the parent directory */
-            char psz_parent[strlen( psz_dirname ) + 1], *psz_end;
+            char *psz_parent = alloca(strlen( psz_dirname ) + 1), *psz_end;
             strcpy( psz_parent, psz_dirname );
 
             psz_end = strrchr( psz_parent, DIR_SEP_CHAR );

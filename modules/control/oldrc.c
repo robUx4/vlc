@@ -141,9 +141,10 @@ VLC_FORMAT(2, 3)
 static void msg_rc( intf_thread_t *p_intf, const char *psz_fmt, ... )
 {
     va_list args;
-    char fmt_eol[strlen (psz_fmt) + 3];
+    size_t fmt_len = strlen (psz_fmt);
+    char *fmt_eol = alloca(fmt_len + 3);
 
-    snprintf (fmt_eol, sizeof (fmt_eol), "%s\r\n", psz_fmt);
+    snprintf (fmt_eol, fmt_len + 3, "%s\r\n", psz_fmt);
     va_start( args, psz_fmt );
 
     if( p_intf->p_sys->i_socket == -1 )

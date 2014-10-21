@@ -279,8 +279,9 @@ void config_ChainParse( vlc_object_t *p_this, const char *psz_prefix,
         if (optname[0] == '*')
             optname++;
 
-        char name[plen + strlen( optname )];
-        snprintf( name, sizeof (name), "%s%s", psz_prefix, optname );
+        size_t optname_len = strlen( optname );
+        char *name = alloca(plen + optname_len);
+        snprintf( name, plen + optname_len, "%s%s", psz_prefix, optname );
         if( var_Create( p_this, name,
                         config_GetType( p_this, name ) | VLC_VAR_DOINHERIT ) )
             return /* VLC_xxx */;
@@ -330,9 +331,10 @@ void config_ChainParse( vlc_object_t *p_this, const char *psz_prefix,
         }
 
         /* create name */
-        char name[plen + strlen( ppsz_options[i] )];
+        size_t name_len = strlen( ppsz_options[i] );
+        char *name = alloca(plen + name_len);
         const char *psz_name = name;
-        snprintf( name, sizeof (name), "%s%s", psz_prefix,
+        snprintf( name, plen + name_len, "%s%s", psz_prefix,
                   b_once ? (ppsz_options[i] + 1) : ppsz_options[i] );
 
         /* Check if the option is deprecated */

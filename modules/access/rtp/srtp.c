@@ -215,7 +215,7 @@ do_ctr_crypt (gcry_cipher_hd_t hd, const void *ctr, uint8_t *data, size_t len)
     if (d.rem)
     {
         /* Truncated last block */
-        uint8_t dummy[ctrlen];
+        uint8_t *dummy = alloca(ctrlen);
         data += d.quot * ctrlen;
         memcpy (dummy, data, d.rem);
         memset (dummy + d.rem, 0, ctrlen - d.rem);
