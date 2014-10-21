@@ -2298,7 +2298,9 @@ static int InputSourceInit( input_thread_t *p_input,
         }
 
         /* Access-forced demuxer (PARENTAL ADVISORY: EXPLICIT HACK) */
+#ifndef _MSC_VER
 #warning FIXME: parse content type
+#endif
 
         /* Create the stream_t */
         stream_t *p_stream = stream_AccessNew( p_access );
