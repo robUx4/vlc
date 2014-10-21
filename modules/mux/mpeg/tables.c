@@ -289,7 +289,7 @@ void BuildPMT( dvbpsi_t *p_dvbpsi, vlc_object_t *p_object,
         size_t provlen = VLC_CLIP(strlen(psz_sdtprov), 0, 255);
         size_t servlen = VLC_CLIP(strlen(psz_sdtserv), 0, 255);
 
-        uint8_t psz_sdt_desc[3 + provlen + servlen];
+        uint8_t *psz_sdt_desc = alloca(3 + provlen + servlen);
 
         psz_sdt_desc[0] = 0x01; /* digital television service */
 
