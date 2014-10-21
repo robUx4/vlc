@@ -921,8 +921,11 @@ static int WaveoutVolumeSet( audio_output_t *p_aout, float volume )
     {
         const HWAVEOUT hwo = sys->h_waveout;
 
+#ifndef _MSC_VER
         uint32_t vol = lroundf( volume * 0x7fff.fp0 );
-
+#else
+        uint32_t vol = lroundf( volume * 32767.937500 );
+#endif
         if( !sys->b_mute )
         {
             if( vol > 0xffff )
@@ -966,8 +969,11 @@ static int WaveoutMuteSet( audio_output_t * p_aout, bool mute )
     {
 
         const HWAVEOUT hwo = sys->h_waveout;
+#ifndef _MSC_VER
         uint32_t vol = mute ? 0 : lroundf( sys->f_volume * 0x7fff.fp0 );
-
+#else
+        uint32_t vol = mute ? 0 : lroundf( sys->f_volume * 32767.937500 );
+#endif
         if( vol > 0xffff )
             vol = 0xffff;
 
@@ -1001,7 +1007,11 @@ static void WaveoutPollVolume( void * aout )
     }
 
     float volume = (float) ( vol & UINT32_C( 0xffff ) );
+#ifndef _MSC_VER
     volume /= 0x7fff.fp0;
+#else
+    volume /= 32767.937500;
+#endif
 
     vlc_mutex_lock(&p_aout->sys->lock);
     if( !p_aout->sys->b_mute && volume != p_aout->sys->f_volume )
