@@ -354,7 +354,7 @@ static block_t *DecodeAudio( decoder_t *p_dec, block_t **pp_block )
         if (unlikely(p_block == NULL))
             goto drop;
 
-        const void *planes[ctx->channels];
+        const void **planes = alloca(ctx->channels * sizeof(*planes));
         for (int i = 0; i < ctx->channels; i++)
             planes[i] = frame->extended_data[i];
 
@@ -477,7 +477,7 @@ static void SetupOutputFormat( decoder_t *p_dec, bool b_trust )
      * FIXME should we use fmt_in.audio.i_physical_channels or not ?
      */
     const unsigned i_order_max = 8 * sizeof(p_sys->p_context->channel_layout);
-    uint32_t pi_order_src[i_order_max];
+    uint32_t *pi_order_src = alloca(i_order_max * sizeof(*pi_order_src));
     int i_channels_src = 0;
 
     if( p_sys->p_context->channel_layout )
