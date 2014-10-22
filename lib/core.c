@@ -46,7 +46,7 @@ libvlc_instance_t * libvlc_new( int argc, const char *const *argv )
     if (unlikely(p_new == NULL))
         return NULL;
 
-    const char *my_argv[argc + 2];
+    const char **my_argv = alloca((argc + 2) * sizeof(*my_argv));
     my_argv[0] = "libvlc"; /* dummy arg0, skipped by getopt() et al */
     for( int i = 0; i < argc; i++ )
          my_argv[i + 1] = argv[i];
