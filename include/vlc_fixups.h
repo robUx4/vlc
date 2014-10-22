@@ -331,6 +331,9 @@ struct if_nameindex
 #endif
 
 /* search.h */
+#ifdef _MSC_VER
+#undef HAVE_SEARCH_H // MSVC doesn't provide some of the stuff we're interested in
+#endif
 #ifndef HAVE_SEARCH_H
 typedef struct entry {
     char *key;
@@ -353,10 +356,12 @@ void *tfind( const void *key, const void **rootp, int(*cmp)(const void *, const 
 void *tdelete( const void *key, void **rootp, int(*cmp)(const void *, const void *) );
 void twalk( const void *root, void(*action)(const void *nodep, VISIT which, int depth) );
 void tdestroy( void *root, void (*free_node)(void *nodep) );
-#else // HAVE_SEARCH_H
-# ifndef HAVE_TDESTROY
-#  define tdestroy vlc_tdestroy
-# endif
+
+#endif
+
+// MSVC doesn't provide a valid search.h, nor a tdestroy implementation
+#ifndef HAVE_TDESTROY
+# define tdestroy vlc_tdestroy
 #endif
 
 /* Random numbers */
