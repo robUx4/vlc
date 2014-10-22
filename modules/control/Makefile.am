@@ -13,8 +13,8 @@ control_LTLIBRARIES = \
 	libdummy_plugin.la \
 	libgestures_plugin.la \
 	libhotkeys_plugin.la \
-	libnetsync_plugin.la \
-	liboldrc_plugin.la
+	libnetsync_plugin.la
+#	liboldrc_plugin.la
 
 liblirc_plugin_la_SOURCES = control/lirc.c
 liblirc_plugin_la_LIBADD = -llirc_client
@@ -60,11 +60,11 @@ if HAVE_XCB_KEYSYMS
 control_LTLIBRARIES += libxcb_hotkeys_plugin.la
 endif
 
-libntservice_plugin_la_SOURCES = control/ntservice.c
+#libntservice_plugin_la_SOURCES = control/ntservice.c
 libwin_hotkeys_plugin_la_SOURCES = control/globalhotkeys/win32.c
 libwin_msg_plugin_la_SOURCES = control/win_msg.c
 if HAVE_WIN32
-control_LTLIBRARIES += libntservice_plugin.la
+#control_LTLIBRARIES += libntservice_plugin.la
 if !HAVE_WINSTORE
 control_LTLIBRARIES += libwin_hotkeys_plugin.la libwin_msg_plugin.la
 endif
