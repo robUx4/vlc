@@ -27,7 +27,11 @@ ifndef HAVE_FPU
 OPUS_CONF += --enable-fixed-point
 endif
 
+ifdef HAVE_VISUALSTUDIO
+OPUS_CFLAGS=-DUSE_ALLOCA
+endif
+
 .opus: opus
-	cd $< && $(HOSTVARS) ./configure $(HOSTCONF) $(OPUS_CONF)
+	cd $< && $(HOSTVARS) ./configure $(HOSTCONF) $(OPUS_CONF) CFLAGS="$(OPUS_CFLAGS)"
 	cd $< && $(MAKE) install
 	touch $@
