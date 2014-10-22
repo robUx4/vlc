@@ -464,6 +464,9 @@ ssize_t sendmsg(int, const struct msghdr *, int);
 #endif
 
 /* search.h */
+#ifdef _MSC_VER
+#undef HAVE_SEARCH_H // MSVC doesn't provide some of the stuff we're interested in
+#endif
 #ifndef HAVE_SEARCH_H
 typedef struct entry {
     char *key;
