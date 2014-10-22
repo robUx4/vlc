@@ -27,6 +27,10 @@
  *             a window and the handling of its messages (events).
  *****************************************************************************/
 
+#ifdef _MSC_VER
+# define HAVE_STRUCT_POLLFD
+#endif
+
 #ifdef HAVE_CONFIG_H
 # include "config.h"
 #endif
