@@ -12,7 +12,7 @@ libpanoramix_plugin_la_SOURCES = video_splitter/panoramix.c
 libpanoramix_plugin_la_CFLAGS = $(AM_CFLAGS)
 libpanoramix_plugin_la_LIBADD = $(LIBM)
 if HAVE_WIN32
-splitter_LTLIBRARIES += libpanoramix_plugin.la
+#splitter_LTLIBRARIES += libpanoramix_plugin.la
 else
 if HAVE_XCB_RANDR
 libpanoramix_plugin_la_CFLAGS += $(XCB_RANDR_CFLAGS)

@@ -49,12 +49,12 @@ libpuzzle_plugin_la_SOURCES = \
 libpuzzle_plugin_la_LIBADD = $(LIBM)
 libripple_plugin_la_SOURCES = video_filter/ripple.c
 libripple_plugin_la_LIBADD = $(LIBM)
-librotate_plugin_la_SOURCES = video_filter/rotate.c
-librotate_plugin_la_LIBADD = libvlc_motion.la $(LIBM)
-librotate_plugin_la_LDFLAGS = $(AM_LDFLAGS) -rpath '$(video_filterdir)'
-if HAVE_DARWIN
-librotate_plugin_la_LDFLAGS += -Wl,-framework,IOKit,-framework,CoreFoundation
-endif
+#librotate_plugin_la_SOURCES = video_filter/rotate.c
+#librotate_plugin_la_LIBADD = libvlc_motion.la $(LIBM)
+#librotate_plugin_la_LDFLAGS = $(AM_LDFLAGS) -rpath '$(video_filterdir)'
+#if HAVE_DARWIN
+#librotate_plugin_la_LDFLAGS += -Wl,-framework,IOKit,-framework,CoreFoundation
+#endif
 libscale_plugin_la_SOURCES = video_filter/scale.c
 libscene_plugin_la_SOURCES = video_filter/scene.c
 libscene_plugin_la_LIBADD = $(LIBM)
@@ -103,8 +103,8 @@ video_filter_LTLIBRARIES = \
 	libvhs_plugin.la \
 	libfps_plugin.la \
 	libfreeze_plugin.la \
-	libpuzzle_plugin.la \
-	librotate_plugin.la
+	libpuzzle_plugin.la
+#	librotate_plugin.la
 
 libatmo_plugin_la_SOURCES = video_filter/atmo/atmo.cpp \
 	video_filter/atmo/AtmoDefs.h \
@@ -138,9 +138,7 @@ libdeinterlace_plugin_la_SOURCES = \
 	video_filter/deinterlace/helpers.c video_filter/deinterlace/helpers.h \
 	video_filter/deinterlace/algo_basic.c video_filter/deinterlace/algo_basic.h \
 	video_filter/deinterlace/algo_x.c video_filter/deinterlace/algo_x.h \
-	video_filter/deinterlace/algo_yadif.c video_filter/deinterlace/algo_yadif.h \
-	video_filter/deinterlace/yadif.h video_filter/deinterlace/yadif_template.h \
-	video_filter/deinterlace/algo_phosphor.c video_filter/deinterlace/algo_phosphor.h \
+    video_filter/deinterlace/algo_phosphor.c video_filter/deinterlace/algo_phosphor.h \
 	video_filter/deinterlace/algo_ivtc.c video_filter/deinterlace/algo_ivtc.h
 # inline ASM doesn't build with -O0
 libdeinterlace_plugin_la_CFLAGS = $(AM_CFLAGS) -O2
