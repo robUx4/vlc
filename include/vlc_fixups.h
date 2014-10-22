@@ -44,6 +44,14 @@
 # include <time.h> /* time_t */
 #endif
 
+#ifndef HAVE_GETTIMEOFDAY
+#ifdef _WIN32
+#include <winsock2.h>
+#else
+#include <sys/time.h>
+#endif
+#endif
+
 #ifndef HAVE_LLDIV
 typedef struct
 {
@@ -192,6 +200,18 @@ struct tm *gmtime_r (const time_t *, struct tm *);
 
 #ifndef HAVE_LOCALTIME_R
 struct tm *localtime_r (const time_t *, struct tm *);
+#endif
+
+/* sys/time.h */
+#ifndef HAVE_GETTIMEOFDAY
+#ifdef _MSC_VER
+#pragma warning(push)
+#pragma warning(disable:4115)
+#endif
+int gettimeofday(struct timeval *, struct timezone *);
+#ifdef _MSC_VER
+#pragma warning(pop)
+#endif
 #endif
 
 /* unistd.h */
