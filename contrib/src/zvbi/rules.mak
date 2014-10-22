@@ -26,7 +26,12 @@ ifdef HAVE_ANDROID
 endif
 	$(MOVE)
 
-DEPS_zvbi = pthreads iconv $(DEPS_iconv)
+DEPS_zvbi = iconv $(DEPS_iconv)
+ifdef HAVE_WIN32
+ifdef HAVE_VISUALSTUDIO
+DEPS_zvbi += pthreads
+endif
+endif
 
 ZVBI_CFLAGS := $(CFLAGS)
 ZVBICONF := \
