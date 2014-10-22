@@ -184,7 +184,7 @@ static void SetFilterMethod( filter_t *p_filter, const char *mode, bool pack )
                  " for packed format", mode );
         mode = "blend";
     }
-    else if( !strcmp( mode, "yadif" ) )
+    /*else if( !strcmp( mode, "yadif" ) )
     {
         p_sys->i_mode = DEINTERLACE_YADIF;
         p_sys->b_use_frame_history = true;
@@ -194,7 +194,7 @@ static void SetFilterMethod( filter_t *p_filter, const char *mode, bool pack )
         p_sys->i_mode = DEINTERLACE_YADIF2X;
         p_sys->b_double_rate = true;
         p_sys->b_use_frame_history = true;
-    }
+    }*/
     else if( p_sys->chroma->pixel_size > 1 )
     {
         msg_Err( p_filter, "unknown or incompatible deinterlace mode \"%s\""
@@ -472,7 +472,7 @@ picture_t *Deinterlace( filter_t *p_filter, picture_t *p_pic )
             RenderX( p_dst[0], p_pic );
             break;
 
-        case DEINTERLACE_YADIF:
+        /*case DEINTERLACE_YADIF:
             if( RenderYadif( p_filter, p_dst[0], p_pic, 0, 0 ) )
                 goto drop;
             break;
@@ -485,7 +485,7 @@ picture_t *Deinterlace( filter_t *p_filter, picture_t *p_pic )
             if( p_dst[2] )
                 RenderYadif( p_filter, p_dst[2], p_pic, 2, !b_top_field_first );
             break;
-
+        */
         case DEINTERLACE_PHOSPHOR:
             if( RenderPhosphor( p_filter, p_dst[0], 0,
                                 !b_top_field_first ) )
@@ -504,6 +504,8 @@ picture_t *Deinterlace( filter_t *p_filter, picture_t *p_pic )
             if( RenderIVTC( p_filter, p_dst[0] ) )
                 goto drop;
             break;
+        default:
+            assert(false);
     }
 
     /* Set output timestamps, if the algorithm didn't request CUSTOM_PTS
