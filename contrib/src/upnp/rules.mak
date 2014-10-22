@@ -12,7 +12,9 @@ $(TARBALLS)/libupnp-$(UPNP_VERSION).tar.bz2:
 .sum-upnp: libupnp-$(UPNP_VERSION).tar.bz2
 
 ifdef HAVE_WIN32
+ifndef HAVE_VISUALSTUDIO
 DEPS_upnp += pthreads $(DEPS_pthreads)
+endif
 LIBUPNP_ECFLAGS = -DPTW32_STATIC_LIB
 endif
 ifdef HAVE_WINSTORE
