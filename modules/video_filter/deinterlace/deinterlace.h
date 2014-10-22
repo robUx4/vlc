@@ -39,7 +39,7 @@ struct vlc_object_t;
 /* Local algorithm headers */
 #include "algo_basic.h"
 #include "algo_x.h"
-#include "algo_yadif.h"
+//#include "algo_yadif.h"
 #include "algo_phosphor.h"
 #include "algo_ivtc.h"
 
