@@ -10,6 +10,11 @@ ifeq ($(call need_pkg,"libmpeg2"),)
 PKGS_FOUND += libmpeg2
 endif
 
+CONF=--without-x --disable-sdl
+ifdef HAVE_VISUALSTUDIO
+CONF += --disable-asm
+endif
+
 $(TARBALLS)/libmpeg2-$(LIBMPEG2_VERSION).tar.gz:
 	$(call download,$(LIBMPEG2_URL))
 
@@ -23,7 +28,7 @@ libmpeg2: libmpeg2-$(LIBMPEG2_VERSION).tar.gz .sum-libmpeg2
 	$(MOVE)
 
 .libmpeg2: libmpeg2
-	cd $< && $(HOSTVARS) ./configure $(HOSTCONF) --without-x --disable-sdl
+	cd $< && $(HOSTVARS) ./configure $(HOSTCONF) $(CONF)
 	cd $</libmpeg2 && $(MAKE) && $(MAKE) install
 	cd $</include && $(MAKE) && $(MAKE) install
 	touch $@
