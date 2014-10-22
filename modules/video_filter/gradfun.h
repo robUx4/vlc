@@ -38,6 +38,7 @@ struct vf_priv_s {
                       uint8_t *src, int sstride, int width);
 };
 
+#ifndef _MSC_VER
 static const uint16_t __attribute__((aligned(16))) pw_7f[8] = {127,127,127,127,127,127,127,127};
 static const uint16_t __attribute__((aligned(16))) pw_ff[8] = {255,255,255,255,255,255,255,255};
 static const uint16_t __attribute__((aligned(16))) dither[8][8] = {
@@ -50,6 +51,20 @@ static const uint16_t __attribute__((aligned(16))) dither[8][8] = {
     { 20,116, 12,108, 18,114, 10,106 },
     { 84, 52, 76, 44, 82, 50, 74, 42 },
 };
+#else
+static const __declspec(align(16)) uint16_t pw_7f[8] = {127,127,127,127,127,127,127,127};
+static const __declspec(align(16)) uint16_t pw_ff[8] = {255,255,255,255,255,255,255,255};
+static const __declspec(align(16)) uint16_t dither[8][8] = {
+    {  0, 96, 24,120,  6,102, 30,126 },
+    { 64, 32, 88, 56, 70, 38, 94, 62 },
+    { 16,112,  8,104, 22,118, 14,110 },
+    { 80, 48, 72, 40, 86, 54, 78, 46 },
+    {  4,100, 28,124,  2, 98, 26,122 },
+    { 68, 36, 92, 60, 66, 34, 90, 58 },
+    { 20,116, 12,108, 18,114, 10,106 },
+    { 84, 52, 76, 44, 82, 50, 74, 42 },
+};
+#endif
 
 static void filter_line_c(uint8_t *dst, uint8_t *src, uint16_t *dc,
                           int width, int thresh, const uint16_t *dithers)
