@@ -43,8 +43,15 @@ endif
 	touch $@
 
 .mpcdec: musepack toolchain.cmake
+ifdef HAVE_VISUALSTUDIO	
+	cd $< && $(HOSTVARS_PIC) $(CMAKE) -DSHARED=OFF -G "Visual Studio 12 2013 ARM" .
+	cd $< && msbuild.exe -p:Configuration=Release -p:Platform=ARM INSTALL.vcxproj
+	cd $< && cp libmpcdec/Release/mpcdec_static.lib "$(PREFIX)/lib/mpcdec.lib"
+	cd $< && cp "$(PREFIX)/lib/mpcdec.lib" "$(PREFIX)/lib/libmpcdec.a"
+else
 	cd $< && $(HOSTVARS_PIC) $(CMAKE) -DSHARED=OFF .
 	cd $< && $(MAKE) install
 	mkdir -p -- "$(PREFIX)/lib"
 	cd $< && cp libmpcdec/libmpcdec_static.a "$(PREFIX)/lib/libmpcdec.a"
+endif
 	touch $@
