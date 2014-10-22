@@ -31,6 +31,11 @@
 # include <windows.h>
 # include <winuser.h>
 
+#ifdef _MSC_VER
+// Since we temporarily forced windows version to Vista, poll() is now available
+# define HAVE_STRUCT_POLLFD
+#endif
+
 #ifdef HAVE_CONFIG_H
 # include "config.h"
 #endif
