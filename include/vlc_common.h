@@ -398,6 +398,9 @@ typedef enum
 #       define PATH_MAX MAX_PATH
 #   endif
 #   include <windows.h>
+#   ifdef _MSC_VER
+#    include <winsock2.h>
+#   endif
 #endif
 
 #ifdef __SYMBIAN32__
