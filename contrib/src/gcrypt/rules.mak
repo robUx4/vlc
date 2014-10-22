@@ -24,6 +24,9 @@ GCRYPT_CONF = \
 ifdef HAVE_WIN64
 GCRYPT_CONF += --disable-asm
 endif
+ifdef HAVE_VISUALSTUDIO
+GCRYPT_CONF += --disable-asm
+endif
 ifdef HAVE_IOS
 GCRYPT_EXTRA_CFLAGS = -fheinous-gnu-extensions
 else
