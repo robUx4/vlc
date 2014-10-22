@@ -109,7 +109,7 @@ int WINAPI WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance,
     if (wargv == NULL)
         return 1;
 
-    char *argv[argc + 4];
+    char **argv = alloca((argc + 4) * sizeof(*argv));
     BOOL crash_handling = TRUE;
     int j = 0;
     char *lang = NULL;
