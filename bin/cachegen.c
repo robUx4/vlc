@@ -29,7 +29,7 @@
 #ifdef HAVE_GETOPT_H
 # include <getopt.h>
 #endif
-#ifdef WIN32
+#ifdef _WIN32
 # include <windows.h>
 #endif
 
@@ -49,9 +49,10 @@ static void usage (const char *path)
 
 int main (int argc, char *argv[])
 {
-#ifdef WIN32
+#ifdef _WIN32
     SetErrorMode(SEM_FAILCRITICALERRORS);
 #endif
+#ifdef HAVE_GETOPT_H
     static const struct option opts[] =
     {
         { "force",      no_argument,       NULL, 'f' },
@@ -79,6 +80,10 @@ int main (int argc, char *argv[])
                 usage (argv[0]);
                 return 1;
         }
+#else
+    int optind = 1;
+    bool force = true;
+#endif
 
     for (int i = optind; i < argc; i++)
     {
