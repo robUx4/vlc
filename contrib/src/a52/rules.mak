@@ -26,4 +26,7 @@ endif
 	cd $< && $(HOSTVARS) ./configure $(HOSTCONF)
 	cd $</liba52 && $(MAKE) install
 	cd $</include && $(MAKE) install
+ifdef HAVE_VISUALSTUDIO
+	cp $(PREFIX)/lib/a52.lib $(PREFIX)/lib/liba52.a
+endif
 	touch $@
