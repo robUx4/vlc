@@ -50,8 +50,10 @@ DEPS_fontconfig = freetype2 $(DEPS_freetype2) libxml2 $(DEPS_libxml2)
 
 .fontconfig: fontconfig
 ifdef HAVE_WIN32
-	$(RECONF)
-endif
+	cd $< && $(MAKE) -C src install
+	sed -e 's%/usr/lib/libiconv.la%%' -i.orig $(PREFIX)/lib/libfontconfig.la
+	cp $</fontconfig.pc $(PREFIX)/lib/pkgconfig/
+else
 	cd $< && $(FONTCONFIG_ENV) ./configure $(FONTCONFIG_CONF)
 	cd $< && $(MAKE)
 ifndef HAVE_MACOSX
@@ -61,5 +63,6 @@ else
 	cd $</fontconfig && $(MAKE) install-data
 	sed -e 's%/usr/lib/libiconv.la%%' -i.orig $(PREFIX)/lib/libfontconfig.la
 	cp $</fontconfig.pc $(PREFIX)/lib/pkgconfig/
+endif
 endif
 	touch $@
