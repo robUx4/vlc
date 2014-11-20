@@ -29,7 +29,7 @@
 #ifndef _WIN32
 # include <sys/socket.h>
 #else
-# include <winsock2.h>
+# include <vlc_winsock2.h>
 # undef EAFNOSUPPORT
 # define EAFNOSUPPORT WSAEAFNOSUPPORT
 #endif

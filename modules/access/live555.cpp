@@ -47,7 +47,8 @@
 
 
 #if defined( _WIN32 )
-#   include <winsock2.h>
+#   include <vlc_winsock2.h>
+#   include <vlc_ws2tcpip.h>
 #endif
 
 #include <UsageEnvironment.hh>
