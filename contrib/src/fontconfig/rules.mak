@@ -49,12 +49,12 @@ endif
 DEPS_fontconfig = freetype2 $(DEPS_freetype2) libxml2 $(DEPS_libxml2)
 
 .fontconfig: fontconfig
+	cd $< && $(FONTCONFIG_ENV) ./configure $(FONTCONFIG_CONF)
 ifdef HAVE_WIN32
 	cd $< && $(MAKE) -C src install
 	sed -e 's%/usr/lib/libiconv.la%%' -i.orig $(PREFIX)/lib/libfontconfig.la
 	cp $</fontconfig.pc $(PREFIX)/lib/pkgconfig/
 else
-	cd $< && $(FONTCONFIG_ENV) ./configure $(FONTCONFIG_CONF)
 	cd $< && $(MAKE)
 ifndef HAVE_MACOSX
 	cd $< && $(MAKE) install
