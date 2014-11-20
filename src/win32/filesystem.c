@@ -36,7 +36,7 @@
 #include <dirent.h>
 #include <sys/stat.h>
 #include <fcntl.h>
-#include <winsock2.h>
+#include <vlc_winsock2.h>
 #include <direct.h>
 
 #include <vlc_common.h>

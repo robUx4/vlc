@@ -399,7 +399,7 @@ typedef enum
 #   endif
 #   include <windows.h>
 #   ifdef _MSC_VER
-#    include <winsock2.h>
+#    include <vlc_winsock2.h>
 #   endif
 #endif
 

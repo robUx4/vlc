@@ -1,5 +1,5 @@
 /*****************************************************************************
- * gettimeofday.c: gettimeofday() replacement
+ * vlc_winsock2.c
  *****************************************************************************
  * Copyright © 2014 VLC authors and VideoLAN
  *
@@ -17,43 +17,34 @@
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston MA 02110-1301, USA.
  *****************************************************************************/
+ 
+#ifndef VLC_WINSOCK2_H
+# define VLC_WINSOCK2_H
 
-#ifdef HAVE_CONFIG_H
-# include <config.h>
+#ifndef _WIN32_WINNT
+# error _WIN32_WINNT should have been defined
 #endif
 
-#ifdef _MSC_VER
+#pragma push_macro("_WIN32_WINNT")
+#undef _WIN32_WINNT
+#define _WIN32_WINNT 0x0502
 
-/* Taken from postgresql */
-#include <sys/time.h>
-#include <vlc_winsock2.h>
+#ifdef WINAPI_FAMILY
+# pragma push_macro("WINAPI_FAMILY")
+# define POP_WINAPI_FAMILY
+# undef WINAPI_FAMILY
+#endif
 
-/* FILETIME of Jan 1 1970 00:00:00. */
-static const unsigned __int64 epoch = 116444736000000000;
+#define WINAPI_FAMILY WINAPI_FAMILY_DESKTOP_APP
 
-/*
- * timezone information is stored outside the kernel so tzp isn't used anymore.
- *
- * Note: this function is not for Win32 high precision timing purpose. See
- * elapsed_time().
- */
-int
-gettimeofday(struct timeval * tp, struct timezone * tzp)
-{
-	FILETIME	file_time;
-	SYSTEMTIME	system_time;
-	ULARGE_INTEGER ularge;
+#include <Winsock2.h>
 
-	GetSystemTime(&system_time);
-	SystemTimeToFileTime(&system_time, &file_time);
-	ularge.LowPart = file_time.dwLowDateTime;
-	ularge.HighPart = file_time.dwHighDateTime;
+#ifdef POP_WINAPI_FAMILY
+# pragma pop_macro("WINAPI_FAMILY")
+#else
+# undef WINAPI_FAMILY
+#endif
 
-	tp->tv_sec = (long) ((ularge.QuadPart - epoch) / 10000000L);
-	tp->tv_usec = (long) (system_time.wMilliseconds * 1000);
-
-	return 0;
-}
-
+#pragma pop_macro("_WIN32_WINNT")
 
 #endif

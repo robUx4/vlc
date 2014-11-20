@@ -35,8 +35,8 @@
 #if defined( _WIN32 )
 #   define _NO_OLDNAMES 1
 #   include <io.h>
-#   include <winsock2.h>
-#   include <ws2tcpip.h>
+#   include <vlc_winsock2.h>
+#   include <vlc_ws2tcpip.h>
 #   define net_errno (WSAGetLastError())
 
 struct iovec
