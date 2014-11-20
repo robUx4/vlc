@@ -30,5 +30,6 @@ endif
 
 .speex: speex
 	cd $< && $(HOSTVARS) ./configure $(HOSTCONF) $(SPEEX_CONF)
-	cd $< && $(MAKE) install
+	cd $< && $(MAKE) -C libspeex install
+	cd $< && $(MAKE) -C include install
 	touch $@
