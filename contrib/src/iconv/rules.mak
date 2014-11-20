@@ -28,6 +28,7 @@ ifdef HAVE_IOS
 	$(APPLY) $(SRC)/iconv/libiconv-android-ios.patch
 endif
 ifdef HAVE_WINRT
+	$(APPLY) $(SRC)/iconv/libiconv-android-ios.patch
 	$(APPLY) $(SRC)/iconv/libiconv-winrt.patch
 endif
 	$(UPDATE_AUTOCONFIG) && cd $(UNPACK_DIR) && mv config.guess config.sub build-aux
@@ -37,4 +38,8 @@ endif
 .iconv: iconv
 	cd $< && $(HOSTVARS) ./configure $(HOSTCONF) --disable-nls
 	cd $< && $(MAKE) install
+ifdef HAVE_VISUALSTUDIO
+	# VLC doesn't use libtool values to test linking libs
+	cp $(PREFIX)/lib/iconv.lib $(PREFIX)/lib/libiconv.a
+endif
 	touch $@
