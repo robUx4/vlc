@@ -27,7 +27,8 @@ endif
 ifdef HAVE_IOS
 	$(APPLY) $(SRC)/iconv/libiconv-android-ios.patch
 endif
-ifdef HAVE_WINRT
+ifdef HAVE_VISUALSTUDIO
+	$(APPLY) $(SRC)/iconv/libiconv-android-ios.patch
 	$(APPLY) $(SRC)/iconv/libiconv-winrt.patch
 endif
 	$(UPDATE_AUTOCONFIG) && cd $(UNPACK_DIR) && mv config.guess config.sub build-aux
@@ -36,5 +37,11 @@ endif
 
 .iconv: iconv
 	cd $< && $(HOSTVARS) ./configure $(HOSTCONF) --disable-nls
+ifdef HAVE_VISUALSTUDIO
+	$(APPLY) $(SRC)/iconv/msvc.patch
+endif
 	cd $< && $(MAKE) install
+ifdef HAVE_VISUALSTUDIO
+	cp $(PREFIX)/lib/iconv.lib $(PREFIX)/lib/libiconv.a
+endif
 	touch $@
