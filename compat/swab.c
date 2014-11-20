@@ -22,6 +22,8 @@
 # include <config.h>
 #endif
 
+#ifndef HAVE_SWAB
+
 #include <stdlib.h>
 #include <stdint.h>
 
@@ -41,3 +43,4 @@ void swab( const void *p_src_, void *p_dst_, ssize_t n )
     }
 }
 
+#endif

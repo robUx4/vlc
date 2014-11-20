@@ -22,6 +22,8 @@
 # include <config.h>
 #endif
 
+#ifndef HAVE_GETPID
+
 #include <sys/types.h>
 #ifdef _WIN32
 # include <windows.h>
@@ -37,3 +39,5 @@ pid_t getpid (void)
 # error Unimplemented!
 #endif
 }
+
+#endif
