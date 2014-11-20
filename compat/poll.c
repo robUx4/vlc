@@ -32,7 +32,7 @@
 #  error Header inclusion order compromised!
 # endif
 # define FD_SETSIZE 0
-# include <winsock2.h>
+# include <vlc_winsock2.h>
 #else
 # include <sys/time.h>
 # include <sys/select.h>
