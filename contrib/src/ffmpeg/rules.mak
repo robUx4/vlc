@@ -148,8 +148,10 @@ FFMPEGCONF += --enable-w32threads --enable-dxva2
 
 ifdef HAVE_WIN64
 FFMPEGCONF += --cpu=athlon64 --arch=x86_64
-else # !WIN64
-FFMPEGCONF+= --cpu=i686 --arch=x86
+endif
+
+ifdef HAVE_VISUALSTUDIO
+FFMPEGCONF += --toolchain=msvc
 endif
 
 else # !Windows
