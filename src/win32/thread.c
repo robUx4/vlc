@@ -82,7 +82,7 @@ static DWORD vlc_WaitForMultipleObjects (DWORD count, const HANDLE *handles,
             ret = WaitForMultipleObjectsEx (count, handles, FALSE, new_delay, TRUE);
             if (delay != INFINITE)
                 delay -= new_delay;
-            if (isCancelled())
+            if (ret == WAIT_TIMEOUT && isCancelled())
                 ret = WAIT_IO_COMPLETION;
         } while (delay && ret == WAIT_TIMEOUT);
 #else
