@@ -22,8 +22,12 @@ png: libpng-$(PNG_VERSION).tar.xz .sum-png
 
 DEPS_png = zlib $(DEPS_zlib)
 
+ifdef HAVE_VISUALSTUDIO
+CONF = --disable-arm-neon
+endif
+
 .png: png
 	$(RECONF)
-	cd $< && $(HOSTVARS) ./configure $(HOSTCONF)
+	cd $< && $(HOSTVARS) ./configure $(HOSTCONF) $(CONF)
 	cd $< && $(MAKE) install
 	touch $@
