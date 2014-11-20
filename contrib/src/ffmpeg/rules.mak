@@ -14,6 +14,10 @@ FFMPEG_SNAPURL := http://git.libav.org/?p=libav.git;a=snapshot;h=$(HASH);sf=tgz
 FFMPEG_GITURL := git://git.libav.org/libav.git
 endif
 
+ifdef HAVE_VISUALSTUDIO
+CC:=cl
+endif
+
 FFMPEGCONF = \
 	--cc="$(CC)" \
 	--pkg-config="$(PKG_CONFIG)" \
@@ -149,7 +153,19 @@ FFMPEGCONF += --enable-w32threads --enable-dxva2
 ifdef HAVE_WIN64
 FFMPEGCONF += --cpu=athlon64 --arch=x86_64
 else # !WIN64
+ifdef HAVE_WINPHONE
+FFMPEGCONF += --arch=arm --cpu=armv7-a --target-os=win32 --extra-cflags='-DWINAPI_FAMILY=WINAPI_FAMILY_PHONE_APP -MD -D__ARM_PCS_VFP -D_WIN32_WINNT=0x602' --disable-dxva2 --as=armasm
+else
+ifdef HAVE_WINDOWSRT
+FFMPEGCONF += --arch=arm --cpu=armv7-a --target-os=win32 --extra-cflags='-DWINAPI_FAMILY=WINAPI_FAMILY_APP -MD -D__ARM_PCS_VFP -D_WIN32_WINNT=0x602' --disable-dxva2 --as=armasm
+else
 FFMPEGCONF+= --cpu=i686 --arch=x86
+endif
+endif
+endif
+
+ifdef HAVE_VISUALSTUDIO
+FFMPEGCONF += --toolchain=msvc
 endif
 
 else # !Windows
