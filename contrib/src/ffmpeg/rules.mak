@@ -197,6 +197,10 @@ endif
 endif
 endif
 
+ifdef HAVE_VISUALSTUDIO
+FFMPEGCONF += --toolchain=msvc
+endif
+
 else # !Windows
 FFMPEGCONF += --enable-pthreads
 endif
