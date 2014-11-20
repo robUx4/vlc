@@ -38,6 +38,13 @@
 #   include <vlc_winsock2.h>
 #   include <vlc_ws2tcpip.h>
 #   define net_errno (WSAGetLastError())
+#   undef gai_strerror
+#   ifdef UNICODE
+#       include <vlc_charset.h>
+#       define gai_strerror(a) FromWide(gai_strerrorW)
+#   else
+#       define gai_strerror gai_strerrorA
+#   endif
 
 struct iovec
 {
@@ -227,11 +234,6 @@ VLC_API ssize_t net_vaPrintf( vlc_object_t *p_this, int fd, const char *psz_fmt,
 #endif
 #ifndef AI_IDN
 # define AI_IDN 0 /* GNU/libc extension */
-#endif
-
-#ifdef _WIN32
-# undef gai_strerror
-# define gai_strerror gai_strerrorA
 #endif
 
 #ifdef __OS2__
