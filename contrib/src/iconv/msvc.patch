@@ -1,0 +1,22 @@
+--- iconv/lib/Makefile	2015-02-05 17:48:56.635091900 +0100
++++ iconv/lib/Makefile.orig	2015-02-05 17:48:53.793121800 +0100
+@@ -21,7 +21,7 @@
+ INCLUDES = -I. -I$(srcdir) -I../include -I$(srcdir)/../include -I.. -I$(srcdir)/..
+ # -DBUILDING_LIBICONV: Change expansion of LIBICONV_DLL_EXPORTED macro.
+ # -DBUILDING_DLL: Change expansion of RELOCATABLE_DLL_EXPORTED macro.
+-DEFS = -DLIBDIR=\"$(libdir)\" -DBUILDING_LIBICONV -DBUILDING_DLL \
++DEFS = -DLIBDIR=\"$(libdir)\" -DBUILDING_LIBICONV \
+ -DENABLE_RELOCATABLE=1 -DIN_LIBRARY -DINSTALLDIR=\"$(libdir)\" -DNO_XMALLOC \
+ -Dset_relocation_prefix=libiconv_set_relocation_prefix \
+ -Drelocate=libiconv_relocate -DHAVE_CONFIG_H
+--- iconv/libcharset/lib/Makefile.orig	2015-02-05 18:00:40.608066800 +0100
++++ iconv/libcharset/lib/Makefile	2015-02-05 18:00:47.905317000 +0100
+@@ -19,7 +19,7 @@
+ INCLUDES = -I. -I$(srcdir) -I.. -I$(srcdir)/.. -I../include
+ # -DBUILDING_LIBCHARSET: Change expansion of LIBCHARSET_DLL_EXPORTED macro.
+ # -DBUILDING_DLL: Change expansion of RELOCATABLE_DLL_EXPORTED macro.
+-DEFS = -DLIBDIR=\"$(libdir)\" -DBUILDING_LIBCHARSET -DBUILDING_DLL \
++DEFS = -DLIBDIR=\"$(libdir)\" -DBUILDING_LIBCHARSET \
+ -DENABLE_RELOCATABLE=1 -DIN_LIBRARY -DINSTALLDIR=\"$(libdir)\" -DNO_XMALLOC \
+ -Dset_relocation_prefix=libcharset_set_relocation_prefix \
+ -Drelocate=libcharset_relocate -DHAVE_CONFIG_H
