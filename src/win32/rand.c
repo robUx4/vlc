@@ -32,6 +32,17 @@
 # include <winstring.h>
 # include <roapi.h>
 # include <windows.security.cryptography.h>
+# ifdef _MSC_VER
+#  ifndef __cplusplus
+typedef __x_ABI_CWindows_CSecurity_CCryptography_CICryptographicBufferStatics ICryptographicBufferStatics;
+typedef __x_ABI_CWindows_CStorage_CStreams_CIBuffer IBuffer;
+#   define ICryptographicBufferStatics_Release __x_ABI_CWindows_CSecurity_CCryptography_CICryptographicBufferStatics_Release
+#   define ICryptographicBufferStatics_CopyToByteArray __x_ABI_CWindows_CSecurity_CCryptography_CICryptographicBufferStatics_CopyToByteArray
+#   define IBuffer_Release __x_ABI_CWindows_CStorage_CStreams_CIBuffer_Release
+#   define ICryptographicBufferStatics_GenerateRandom __x_ABI_CWindows_CSecurity_CCryptography_CICryptographicBufferStatics_GenerateRandom
+#  endif
+DEFINE_GUID(IID_ICryptographicBufferStatics, 0x320b7e22, 0x3cb0, 0x4cdf, 0x86,0x63, 0x1d,0x28,0x91,0x00,0x65,0xeb);
+# endif
 #else
 # include <wincrypt.h>
 #endif
