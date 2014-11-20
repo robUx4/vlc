@@ -26,7 +26,14 @@
 #include <string.h>
 #include <errno.h>
 
-#ifndef _WIN32
+#ifdef _WIN32
+# ifdef FD_SETSIZE
+/* Too late for #undef FD_SETSIZE to work: fd_set is already defined. */
+#  error Header inclusion order compromised!
+# endif
+# define FD_SETSIZE 0
+# include <vlc_winsock2.h>
+#else
 # include <sys/time.h>
 # include <sys/select.h>
 # include <fcntl.h>

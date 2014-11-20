@@ -51,7 +51,7 @@
 #endif
 
 #if defined(_WIN32)
-#   include <winsock2.h>
+#   include <vlc_winsock2.h>
 #else
 #   include <sys/socket.h>
 #endif

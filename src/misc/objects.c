@@ -58,8 +58,8 @@
 # include <unistd.h>    // close(), write()
 #elif defined(_WIN32)
 # include <io.h>
-# include <winsock2.h>
-# include <ws2tcpip.h>
+# include <vlc_winsock2.h>
+# include <vlc_ws2tcpip.h>
 # undef  read
 # define read( a, b, c )  recv (a, b, c, 0)
 # undef  write
