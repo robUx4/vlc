@@ -72,6 +72,30 @@ vlc_module_begin()
     set_callbacks(Open, Close)
 vlc_module_end()
 
+#ifdef VLC_WINSTORE_APP
+typedef struct __WIDL_mfobjects_generated_name_00000016 {
+    GUID guidMajorType;
+    GUID guidSubtype;
+} MFT_REGISTER_TYPE_INFO;
+
+enum _MFT_ENUM_FLAG {
+    MFT_ENUM_FLAG_SYNCMFT = 0x00000001,
+    MFT_ENUM_FLAG_ASYNCMFT = 0x00000002,
+    MFT_ENUM_FLAG_HARDWARE = 0x00000004,
+    MFT_ENUM_FLAG_FIELDOFUSE = 0x00000008,
+    MFT_ENUM_FLAG_LOCALMFT = 0x00000010,
+    MFT_ENUM_FLAG_TRANSCODE_ONLY = 0x00000020,
+    MFT_ENUM_FLAG_SORTANDFILTER = 0x00000040,
+    MFT_ENUM_FLAG_SORTANDFILTER_APPROVED_ONLY = 0x000000c0,
+    MFT_ENUM_FLAG_SORTANDFILTER_WEB_ONLY = 0x00000140,
+    MFT_ENUM_FLAG_ALL = 0x0000003f
+  };
+
+DEFINE_GUID (MF_MT_ORIGINAL_WAVE_FORMAT_TAG, 0x8cbbc843, 0x9fd9, 0x49c2, 0x88, 0x2f, 0xa7, 0x25, 0x86, 0xc4, 0x08, 0xad);
+
+STDAPI MFTEnumEx (GUID guidCategory, UINT32 Flags, const MFT_REGISTER_TYPE_INFO *pInputType, const MFT_REGISTER_TYPE_INFO *pOutputType, IMFActivate ***pppMFTActivate, UINT32 *pnumMFTActivate);
+#endif
+
 typedef struct
 {
     HINSTANCE mfplat_dll;
