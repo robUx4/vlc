@@ -64,7 +64,7 @@
 #endif
 
 /* Try to fix format strings for all versions of mingw and mingw64 */
-#if defined( _WIN32 ) && defined( __USE_MINGW_ANSI_STDIO )
+#if defined( _WIN32 ) && defined( __USE_MINGW_ANSI_STDIO ) && !defined( _MSC_VER )
  #undef PRId64
  #define PRId64 "lld"
  #undef PRIi64
