@@ -526,7 +526,7 @@ static char *vlc_idna_to_ascii (const char *idn)
         return NULL;
     return adn;
 
-#elif defined (_WIN32) && (_WIN32_WINNT >= 0x0601)
+#elif defined (_WIN32) && (_WIN32_WINNT >= 0x0601) && !defined(VLC_WINSTORE_APP)
     char *ret = NULL;
 
     wchar_t *wide = ToWide (idn);
