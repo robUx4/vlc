@@ -1,0 +1,10 @@
+--- libdca/libdca/Makefile.am.orig	2015-01-08 16:49:51.219945400 +0100
++++ libdca/libdca/Makefile.am	2015-01-08 16:50:13.927927800 +0100
+@@ -14,7 +14,6 @@
+ EXTRA_DIST = configure.incl
+ 
+ install-exec-hook:
+-	ln -sf "$(libdir)/libdca.a" "$(DESTDIR)$(libdir)/libdts.a"
+ 
+ uninstall-hook:
+ 	unlink "$(DESTDIR)$(libdir)/libdts.a"
