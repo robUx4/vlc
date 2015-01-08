@@ -21,10 +21,16 @@ libdca: libdca-$(DCA_VERSION).tar.bz2 .sum-dca
 	$(UNPACK)
 	#$(APPLY) $(SRC)/dca/libdca-llvm-gcc.patch
 	$(APPLY) $(SRC)/dca/libdca-inline.patch
+ifdef HAVE_VISUALSTUDIO
+	$(APPLY) $(SRC)/dca/msvc.patch
+endif
 	$(UPDATE_AUTOCONFIG) && cd $(UNPACK_DIR) && mv config.guess config.sub autotools
 	$(MOVE)
 
 .dca: libdca
+ifdef HAVE_VISUALSTUDIO
+	$(RECONF)
+endif
 	cd $< && $(HOSTVARS) CFLAGS="$(CFLAGS) -std=gnu89" ./configure $(HOSTCONF)
 	cd $< && $(MAKE) -C include install
 	cd $< && $(MAKE) -C libdca install
