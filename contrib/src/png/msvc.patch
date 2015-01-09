@@ -1,0 +1,13 @@
+--- png/configure.ac.orig	2016-05-17 21:15:40.999248600 +0200
++++ png/configure.ac	2016-05-17 21:16:27.167817500 +0200
+@@ -118,8 +118,8 @@ AC_C_RESTRICT
+ 
+ # Checks for library functions.
+ AC_FUNC_STRTOD
+-AC_CHECK_FUNCS([memset], , AC_MSG_ERROR(memset not found in libc))
+-AC_CHECK_FUNCS([pow], , AC_CHECK_LIB(m, pow, , AC_MSG_ERROR(cannot find pow)) )
++#AC_CHECK_FUNCS([memset], , AC_MSG_ERROR(memset not found in libc))
++#AC_CHECK_FUNCS([pow], , AC_CHECK_LIB(m, pow, , AC_MSG_ERROR(cannot find pow)) )
+ AC_ARG_WITH(zlib-prefix,
+    AS_HELP_STRING([[[--with-zlib-prefix]]],
+       [prefix that may have been used in installed zlib]),
