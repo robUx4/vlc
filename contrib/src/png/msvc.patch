@@ -1,0 +1,13 @@
+--- png/configure.ac	2017-04-14 14:46:55.933729800 +0200
++++ png/configure.ac.msvc	2017-04-14 14:45:35.668126300 +0200
+@@ -144,8 +144,8 @@ AC_C_RESTRICT
+ 
+ # Checks for library functions.
+ AC_FUNC_STRTOD
+-AC_CHECK_FUNCS([memset], , AC_MSG_ERROR(memset not found in libc))
+-AC_CHECK_FUNCS([pow], , AC_CHECK_LIB(m, pow, , AC_MSG_ERROR(cannot find pow)) )
++#AC_CHECK_FUNCS([memset], , AC_MSG_ERROR(memset not found in libc))
++#AC_CHECK_FUNCS([pow], , AC_CHECK_LIB(m, pow, , AC_MSG_ERROR(cannot find pow)) )
+ 
+ # Some later POSIX 1003.1 functions are required for test programs, failure here
+ # is soft (the corresponding test program is not built).
