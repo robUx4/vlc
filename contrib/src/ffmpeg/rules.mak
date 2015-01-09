@@ -231,6 +231,9 @@ ffmpeg: ffmpeg-$(FFMPEG_BASENAME).tar.xz .sum-ffmpeg
 ifdef USE_FFMPEG
 	$(APPLY) $(SRC)/ffmpeg/force-unicode.patch
 endif
+ifdef HAVE_VISUALSTUDIO
+	$(APPLY) $(SRC)/ffmpeg/msvc.patch
+endif
 	$(MOVE)
 
 .ffmpeg: ffmpeg
