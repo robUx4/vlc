@@ -1,0 +1,11 @@
+--- png/configure.ac	2015-01-09 17:52:30.523005900 +0100
++++ /home/vlc/vlc/contrib/windowsphone/png/configure.ac	2015-01-09 17:55:37.592513500 +0100
+@@ -118,8 +118,6 @@
+ 
+ # Checks for library functions.
+ AC_FUNC_STRTOD
+-AC_CHECK_FUNCS([memset], , AC_MSG_ERROR(memset not found in libc))
+-AC_CHECK_FUNCS([pow], , AC_CHECK_LIB(m, pow, , AC_MSG_ERROR(cannot find pow)) )
+ AC_ARG_WITH(zlib-prefix,
+    AS_HELP_STRING([[[--with-zlib-prefix]]],
+       [prefix that may have been used in installed zlib]),
