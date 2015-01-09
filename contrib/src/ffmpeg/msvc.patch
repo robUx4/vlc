@@ -1,0 +1,22 @@
+--- ffmpeg/configure	2015-01-08 12:58:43.000000000 +0100
++++ /home/vlc/vlc/contrib/windowsphone/ffmpeg/configure	2014-12-15 16:56:13.022084500 +0100
+@@ -2705,7 +2702,7 @@
+             -lavifil32)           echo vfw32.lib ;;
+             -lavicap32)           echo vfw32.lib user32.lib ;;
+             -l*)                  echo ${flag#-l}.lib ;;
+-            -L*)                  echo -libpath:${flag#-L} ;;
++            -L*)                  echo -LIBPATH:`cygpath -w ${flag#-L}` ;;
+             *)                    echo $flag ;;
+         esac
+     done
+@@ -3044,6 +3041,10 @@
+ add_host_ldflags $_flags $_ldflags
+ HOSTLD_O=${_ld_o-$HOSTLD_O}
+ 
++_ldflags=$LDFLAGS
++LDFLAGS=
++add_ldflags $_ldflags
++
+ if [ -z "$CC_DEPFLAGS" ] && [ "$dep_cc" != "$cc" ]; then
+     probe_cc depcc "$dep_cc"
+     CCDEP=${_DEPCMD:-$DEPCMD}
