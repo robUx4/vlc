@@ -1,0 +1,24 @@
+diff --git a/configure b/configure
+index b10715f..3d26996 100755
+--- a/configure
++++ b/configure
+@@ -2821,7 +2821,7 @@
+             -lavifil32)           echo vfw32.lib ;;
+             -lavicap32)           echo vfw32.lib user32.lib ;;
+             -l*)                  echo ${flag#-l}.lib ;;
+-            -L*)                  echo -libpath:${flag#-L} ;;
++            -L*)                  echo -libpath:`cygpath -w ${flag#-L}` ;;
+             *)                    echo $flag ;;
+         esac
+     done
+@@ -3154,6 +3154,10 @@
+ add_host_ldflags $_flags $_ldflags
+ HOSTLD_O=${_ld_o-$HOSTLD_O}
+ 
++_ldflags=$LDFLAGS
++LDFLAGS=
++add_ldflags $_ldflags
++
+ if [ -z "$CC_DEPFLAGS" ] && [ "$dep_cc" != "$cc" ]; then
+     probe_cc depcc "$dep_cc"
+     CCDEP=${_DEPCMD:-$DEPCMD}

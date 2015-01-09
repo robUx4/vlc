@@ -181,6 +181,9 @@ ffmpeg: ffmpeg-$(HASH).tar.xz .sum-ffmpeg
 	rm -Rf $@ $@-$(HASH)
 	mkdir -p $@-$(HASH)
 	$(XZCAT) "$<" | (cd $@-$(HASH) && tar xv --strip-components=1)
+ifdef HAVE_VISUALSTUDIO
+	$(APPLY) $(SRC)/ffmpeg/msvc.patch
+endif
 	$(MOVE)
 
 .ffmpeg: ffmpeg
