@@ -1,0 +1,38 @@
+--- ffmpeg-HEAD/configure.orig	2016-03-02 10:04:49.000000000 +0100
++++ ffmpeg-HEAD/configure	2016-03-02 10:52:00.656762000 +0100
+@@ -3481,6 +3481,8 @@ case "$toolchain" in
+         ld_default="$source_path/compat/windows/mslink"
+         nm_default="dumpbin -symbols"
+         ar_default="lib"
++        LIBPREF=""
++        LIBSUF=".lib"
+         case "$arch" in
+         arm*)
+             as_default="armasm"
+@@ -3682,13 +3684,13 @@ msvc_common_flags(){
+             -fPIC)                ;;
+             -mthumb)              ;;
+             -march=*)             ;;
+-            -lz)                  echo zlib.lib ;;
++            -lz)                  echo z.lib ;;
+             -lavifil32)           echo vfw32.lib ;;
+             -lavicap32)           echo vfw32.lib user32.lib ;;
+             -lx264)               echo libx264.lib ;;
+             -l*)                  echo ${flag#-l}.lib ;;
+             -LARGEADDRESSAWARE)   echo $flag ;;
+-            -L*)                  echo -libpath:${flag#-L} ;;
++            -L*)                  echo -libpath:`cygpath -w ${flag#-L}` ;;
+             *)                    echo $flag ;;
+         esac
+     done
+@@ -4059,6 +4061,10 @@ host_ldflags_filter=$_flags_filter
+ add_host_ldflags $_flags $_ldflags
+ HOSTLD_O=${_ld_o-$HOSTLD_O}
+ 
++_ldflags=$LDFLAGS
++LDFLAGS=
++add_ldflags $_ldflags
++
+ if [ -z "$CC_DEPFLAGS" ] && [ "$dep_cc" != "$cc" ]; then
+     probe_cc depcc "$dep_cc"
+     CCDEP=${_DEPCMD:-$DEPCMD}
