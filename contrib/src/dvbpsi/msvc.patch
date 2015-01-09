@@ -1,0 +1,56 @@
+--- libdvbpsi/src/tables/tot.h	2014-04-16 10:44:37.000000000 +0200
++++ /home/vlc/vlc/contrib/windowsphone/libdvbpsi/src/tables/tot.h	2014-12-15 16:55:24.965089500 +0100
+@@ -55,6 +55,7 @@
+  * \typedef struct dvbpsi_tot_s dvbpsi_tot_t
+  * \brief dvbpsi_tot_t type definition.
+  */
++#pragma pack(push, 1)
+ typedef struct dvbpsi_tot_s
+ {
+     uint8_t                   i_table_id;         /*!< table id */
+@@ -68,7 +69,8 @@
+ 
+     dvbpsi_descriptor_t *     p_first_descriptor; /*!< descriptor list */
+ 
+-} __attribute__((packed)) dvbpsi_tot_t;
++} dvbpsi_tot_t;
++#pragma pack(pop)
+ 
+ /*****************************************************************************
+  * dvbpsi_tot_callback
+--- libdvbpsi/src/tables/sis.h	2014-04-16 10:44:40.000000000 +0200
++++ /home/vlc/vlc/contrib/windowsphone/libdvbpsi/src/tables/sis.h	2014-12-15 16:55:25.012093500 +0100
+@@ -51,6 +51,7 @@
+  * \typedef struct dvbpsi_sis_s dvbpsi_sis_t
+  * \brief dvbpsi_sis_t type definition.
+  */
++#pragma pack(push, 1)
+ typedef struct dvbpsi_sis_s
+ {
+   /* section */
+@@ -100,7 +101,8 @@
+   /* FIXME: alignment stuffing */
+   uint32_t i_ecrc; /*!< CRC 32 of decrypted splice_info_section */
+ 
+-} __attribute__((packed)) dvbpsi_sis_t;
++} dvbpsi_sis_t;
++#pragma pack(pop)
+ 
+ /*****************************************************************************
+  * Splice Commands
+@@ -119,6 +121,7 @@
+  */
+ typedef struct dvbpsi_sis_cmd_splice_null_s
+ {
++    bool keep_vs_happy;
+     /* nothing */
+ } dvbpsi_sis_cmd_splice_null_t;
+ 
+@@ -333,6 +336,7 @@
+  */
+ typedef struct dvbpsi_sis_cmd_bandwidth_reservation_s
+ {
++bool keep_vs_happy;
+     /* nothing */
+ } dvbpsi_sis_cmd_bandwidth_reservation_t;
+ 
