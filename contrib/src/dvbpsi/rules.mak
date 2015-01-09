@@ -18,6 +18,9 @@ dvbpsi: libdvbpsi-$(DVBPSI_VERSION).tar.bz2 .sum-dvbpsi
 	$(UPDATE_AUTOCONFIG) && cd $(UNPACK_DIR) && mv config.guess config.sub .auto
 	$(APPLY) $(SRC)/dvbpsi/dvbpsi-noexamples.patch
 	$(APPLY) $(SRC)/dvbpsi/dvbpsi-sys-types.patch
+ifdef HAVE_VISUALSTUDIO
+	$(APPLY) $(SRC)/dvbpsi/msvc.patch
+endif
 	$(MOVE)
 
 .dvbpsi: dvbpsi
