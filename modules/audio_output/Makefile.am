@@ -62,7 +62,9 @@ libmmdevice_plugin_la_LIBADD = -lole32 $(LIBM)
 libwinstore_plugin_la_SOURCES = audio_output/winstore.c audio_output/mmdevice.h
 libwinstore_plugin_la_LIBADD = -lole32
 libwasapi_plugin_la_SOURCES = audio_output/wasapi.c
-libwasapi_plugin_la_LIBADD = -lole32 -lksuser
+libwasapi_plugin_la_LIBADD = -lole32
+# FIXME
+#libwasapi_plugin_la_LIBADD += -lksuser
 if HAVE_WASAPI
 aout_LTLIBRARIES += libwasapi_plugin.la
 if !HAVE_WINSTORE
