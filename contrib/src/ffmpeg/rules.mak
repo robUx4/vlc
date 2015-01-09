@@ -232,6 +232,9 @@ ffmpeg: ffmpeg-$(FFMPEG_BASENAME).tar.xz .sum-ffmpeg
 	rm -Rf $@ $@-$(FFMPEG_BASENAME)
 	mkdir -p $@-$(FFMPEG_BASENAME)
 	tar xvJf "$<" --strip-components=1 -C $@-$(FFMPEG_BASENAME)
+ifdef HAVE_VISUALSTUDIO
+	$(APPLY) $(SRC)/ffmpeg/msvc.patch
+endif
 	$(MOVE)
 
 .ffmpeg: ffmpeg
