@@ -46,8 +46,108 @@ static vlc_cond_t  super_variable;
 
 /*** Common helpers ***/
 #if VLC_WINSTORE_APP
+#define MAX_SIMULTANEOUS_THREADS 128
 static bool isCancelled(void);
+struct {
+    const HANDLE *p_obj;
+    vlc_mutex_t mutex;
+} s_condvars[MAX_SIMULTANEOUS_THREADS];
+static int s_nbthreads;
 #endif
+
+/** Per-thread data */
+struct vlc_thread
+{
+    HANDLE         id;
+
+    bool           killable;
+#if !VLC_WINSTORE_APP
+    bool           killed;
+#else
+    atomic_bool    killed;
+    int            uid;
+#endif
+    vlc_cleanup_t *cleaners;
+
+    void        *(*entry) (void *);
+    void          *data;
+};
+
+/*** Thread-specific variables (TLS) ***/
+struct vlc_threadvar
+{
+    DWORD                 id;
+    void(*destroy) (void *);
+    struct vlc_threadvar *prev;
+    struct vlc_threadvar *next;
+} *vlc_threadvar_last = NULL;
+
+int vlc_threadvar_create(vlc_threadvar_t *p_tls, void(*destr) (void *))
+{
+    struct vlc_threadvar *var = malloc(sizeof(*var));
+    if (unlikely(var == NULL))
+        return errno;
+
+    var->id = TlsAlloc();
+    if (var->id == TLS_OUT_OF_INDEXES)
+    {
+        free(var);
+        return EAGAIN;
+    }
+    var->destroy = destr;
+    var->next = NULL;
+    *p_tls = var;
+
+    vlc_mutex_lock(&super_mutex);
+    var->prev = vlc_threadvar_last;
+    if (var->prev)
+        var->prev->next = var;
+
+    vlc_threadvar_last = var;
+    vlc_mutex_unlock(&super_mutex);
+    return 0;
+}
+
+void vlc_threadvar_delete(vlc_threadvar_t *p_tls)
+{
+    struct vlc_threadvar *var = *p_tls;
+
+    vlc_mutex_lock(&super_mutex);
+    if (var->prev != NULL)
+        var->prev->next = var->next;
+
+    if (var->next != NULL)
+        var->next->prev = var->prev;
+    else
+        vlc_threadvar_last = var->prev;
+
+    vlc_mutex_unlock(&super_mutex);
+
+    TlsFree(var->id);
+    free(var);
+}
+
+int vlc_threadvar_set(vlc_threadvar_t key, void *value)
+{
+    int saved = GetLastError();
+    int val = TlsSetValue(key->id, value) ? ENOMEM : 0;
+
+    if (val == 0)
+        SetLastError(saved);
+    return val;
+}
+
+void *vlc_threadvar_get(vlc_threadvar_t key)
+{
+    int saved = GetLastError();
+    void *value = TlsGetValue(key->id);
+
+    SetLastError(saved);
+    return value;
+}
+
+/*** Threads ***/
+static vlc_threadvar_t thread_key;
 
 static DWORD vlc_WaitForMultipleObjects (DWORD count, const HANDLE *handles,
                                          DWORD delay)
@@ -73,18 +173,25 @@ static DWORD vlc_WaitForMultipleObjects (DWORD count, const HANDLE *handles,
         if (ret == 0)
             ret = WAIT_TIMEOUT;
     }
-    else {
+    else 
+    {
 #if VLC_WINSTORE_APP
-        do {
-            DWORD new_delay = 50;
-            if (new_delay > delay)
-                new_delay = delay;
-            ret = WaitForMultipleObjectsEx (count, handles, FALSE, new_delay, TRUE);
-            if (delay != INFINITE)
-                delay -= new_delay;
-            if (ret == WAIT_TIMEOUT && isCancelled())
-                ret = WAIT_IO_COMPLETION;
-        } while (delay && ret == WAIT_TIMEOUT);
+        struct vlc_thread *th = vlc_threadvar_get(thread_key);
+        if (th != NULL)
+        {
+            vlc_mutex_lock(&s_condvars[th->uid].mutex);
+            s_condvars[th->uid].p_obj = handles[0];
+            mutex_cleanup_push(&s_condvars[th->uid].mutex);
+            vlc_testcancel();
+            vlc_cleanup_run();
+        }
+        ret = WaitForMultipleObjectsEx(count, handles, FALSE, delay, TRUE);
+        if (th != NULL)
+        {
+            vlc_mutex_lock(&s_condvars[th->uid].mutex);
+            s_condvars[th->uid].p_obj = NULL;
+            vlc_mutex_unlock(&s_condvars[th->uid].mutex);
+        }
 #else
         ret = WaitForMultipleObjectsEx (count, handles, FALSE, delay, TRUE);
 #endif
@@ -192,6 +299,10 @@ void vlc_mutex_unlock (vlc_mutex_t *p_mutex)
 
     LeaveCriticalSection (&p_mutex->mutex);
 }
+
+
+
+
 
 /*** Condition variables ***/
 enum
@@ -347,99 +458,6 @@ void vlc_sem_wait (vlc_sem_t *sem)
     while (result == WAIT_IO_COMPLETION);
 }
 
-/*** Thread-specific variables (TLS) ***/
-struct vlc_threadvar
-{
-    DWORD                 id;
-    void                (*destroy) (void *);
-    struct vlc_threadvar *prev;
-    struct vlc_threadvar *next;
-} *vlc_threadvar_last = NULL;
-
-int vlc_threadvar_create (vlc_threadvar_t *p_tls, void (*destr) (void *))
-{
-    struct vlc_threadvar *var = malloc (sizeof (*var));
-    if (unlikely(var == NULL))
-        return errno;
-
-    var->id = TlsAlloc();
-    if (var->id == TLS_OUT_OF_INDEXES)
-    {
-        free (var);
-        return EAGAIN;
-    }
-    var->destroy = destr;
-    var->next = NULL;
-    *p_tls = var;
-
-    vlc_mutex_lock (&super_mutex);
-    var->prev = vlc_threadvar_last;
-    if (var->prev)
-        var->prev->next = var;
-
-    vlc_threadvar_last = var;
-    vlc_mutex_unlock (&super_mutex);
-    return 0;
-}
-
-void vlc_threadvar_delete (vlc_threadvar_t *p_tls)
-{
-    struct vlc_threadvar *var = *p_tls;
-
-    vlc_mutex_lock (&super_mutex);
-    if (var->prev != NULL)
-        var->prev->next = var->next;
-
-    if (var->next != NULL)
-        var->next->prev = var->prev;
-    else
-        vlc_threadvar_last = var->prev;
-
-    vlc_mutex_unlock (&super_mutex);
-
-    TlsFree (var->id);
-    free (var);
-}
-
-int vlc_threadvar_set (vlc_threadvar_t key, void *value)
-{
-    int saved = GetLastError ();
-    int val = TlsSetValue (key->id, value) ? ENOMEM : 0;
-
-    if (val == 0)
-        SetLastError(saved);
-    return val;
-}
-
-void *vlc_threadvar_get (vlc_threadvar_t key)
-{
-    int saved = GetLastError ();
-    void *value = TlsGetValue (key->id);
-
-    SetLastError(saved);
-    return value;
-}
-
-/*** Threads ***/
-static vlc_threadvar_t thread_key;
-
-/** Per-thread data */
-struct vlc_thread
-{
-    HANDLE         id;
-
-    bool           killable;
-#if !VLC_WINSTORE_APP
-    bool           killed;
-#else
-    atomic_bool    killed;
-#endif
-    vlc_cleanup_t *cleaners;
-
-    void        *(*entry) (void *);
-    void          *data;
-};
-
 #if VLC_WINSTORE_APP
 static bool isCancelled(void)
 {
@@ -470,6 +488,7 @@ retry:
         }
     }
     vlc_mutex_unlock (&super_mutex);
+    s_condvars[th->uid].p_obj = NULL;
 
     if (th->id == NULL) /* Detached thread */
         free (th);
@@ -521,6 +540,7 @@ static int vlc_clone_attr (vlc_thread_t *p_handle, bool detached,
     }
     else
         th->id = (HANDLE)h;
+    th->uid = atomic_fetch_add(&s_nbthreads, 1) % MAX_SIMULTANEOUS_THREADS;
 
     if (p_handle != NULL)
         *p_handle = th;
@@ -584,7 +604,14 @@ void vlc_cancel (vlc_thread_t th)
 #if !VLC_WINSTORE_APP
     QueueUserAPC (vlc_cancel_self, th->id, (uintptr_t)th);
 #else
-    atomic_store (&th->killed, true);
+    vlc_mutex_lock(&s_condvars[th->uid].mutex);
+    atomic_store(&th->killed, true);
+    const HANDLE* obj = s_condvars[th->uid].p_obj;
+    if (obj != NULL)
+    {
+        SetEvent(obj);
+    }
+    vlc_mutex_unlock(&s_condvars[th->uid].mutex);
 #endif
 }
 
@@ -1028,9 +1055,17 @@ BOOL WINAPI DllMain (HINSTANCE hinstDll, DWORD fdwReason, LPVOID lpvReserved)
             vlc_threadvar_create (&thread_key, NULL);
             vlc_rwlock_init (&config_lock);
             vlc_CPU_init ();
+#if VLC_WINSTORE_APP
+            for (int i = 0; i < MAX_SIMULTANEOUS_THREADS; ++i)
+                vlc_mutex_init(&s_condvars[i].mutex);
+#endif
             break;
 
         case DLL_PROCESS_DETACH:
+#if VLC_WINSTORE_APP
+            for (int i = 0; i < MAX_SIMULTANEOUS_THREADS; ++i)
+                vlc_mutex_destroy(&s_condvars[i].mutex);
+#endif
             vlc_rwlock_destroy (&config_lock);
             vlc_threadvar_delete (&thread_key);
             vlc_cond_destroy (&super_variable);
