@@ -30,7 +30,6 @@
 # define COBJMACROS
 # define INITGUID
 # include <winstring.h>
-# include <roapi.h>
 # include <windows.security.cryptography.h>
 # ifdef _MSC_VER
 #  ifndef __cplusplus
