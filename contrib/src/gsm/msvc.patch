@@ -1,0 +1,10 @@
+--- /home/vlc/vlc/contrib/windowsphone/gsm/Makefile	2014-12-15 16:54:29.228707100 +0100
++++ gsm/Makefile	2015-01-09 14:00:05.380843300 +0100
+@@ -270,6 +270,7 @@
+ 
+ .c.o:
+ 		$(CC) $(CFLAGS) $?
++		@-cp `$(BASENAME) $(shell echo $@ | sed 's/\.o/\.obj/')` $@ 
+ 		@-mv `$(BASENAME) $@` $@ > /dev/null 2>&1
+ 
+ # Target rules
