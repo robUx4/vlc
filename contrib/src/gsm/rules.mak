@@ -12,6 +12,9 @@ gsm: libgsm_$(GSM_VERSION).tar.gz .sum-gsm
 	mv gsm-1.0-* libgsm_$(GSM_VERSION)
 	$(APPLY) $(SRC)/gsm/gsm-cross.patch
 	$(APPLY) $(SRC)/gsm/gsm-missing-include.patch
+ifdef HAVE_VISUALSTUDIO
+	$(APPLY) $(SRC)/gsm/msvc.patch
+endif
 	sed -e 's/^CFLAGS.*=/CFLAGS+=/' -i.orig libgsm_$(GSM_VERSION)/Makefile
 	$(MOVE)
 
@@ -19,5 +22,9 @@ gsm: libgsm_$(GSM_VERSION).tar.gz .sum-gsm
 	cd $< && $(HOSTVARS_PIC) $(MAKE)
 	mkdir -p "$(PREFIX)/include/gsm" "$(PREFIX)/lib"
 	cp $</inc/gsm.h "$(PREFIX)/include/gsm/"
+ifdef HAVE_VISUALSTUDIO
+	cp $</lib/gsm.lib "$(PREFIX)/lib/"
+else
 	cp $</lib/libgsm.a "$(PREFIX)/lib/"
+endif
 	touch $@
