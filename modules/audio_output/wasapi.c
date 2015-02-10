@@ -584,7 +584,11 @@ static HRESULT Restart(aout_stream_t *s, audio_sample_format_t *restrict pfmt,
     hr = IAudioClient_Initialize(sys->client, shared_mode, 0, buffer_duration,
                                  0, pwf, sid);
     CoTaskMemFree(pwf_closest);
-    if (FAILED(hr))
+    if (FAILED(hr)
+#if VLC_WINSTORE_APP
+        && hr != AUDCLNT_E_ALREADY_INITIALIZED
+#endif
+        )
     {
         msg_Err(s, "cannot initialize audio client (error 0x%lx)", hr);
         goto error;
