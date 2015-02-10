@@ -413,7 +413,7 @@ static HRESULT Start(aout_stream_t *s, audio_sample_format_t *restrict fmt,
                                  AOUT_MAX_PREPARE_TIME * 10, 0,
                                  (hr == S_OK) ? &wf.Format : pwf, sid);
     CoTaskMemFree(pwf);
-    if (FAILED(hr))
+    if (FAILED(hr) && hr != AUDCLNT_E_ALREADY_INITIALIZED)
     {
         msg_Err(s, "cannot initialize audio client (error 0x%lx)", hr);
         goto error;
