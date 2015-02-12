@@ -21,4 +21,7 @@ MATROSKA_EXTRA_FLAGS = CXXFLAGS="${CXXFLAGS} -fvisibility=hidden"
 .matroska: libmatroska
 	cd $< && $(HOSTVARS) ./configure $(HOSTCONF) $(MATROSKA_EXTRA_FLAGS)
 	cd $< && $(MAKE) install
+ifdef HAVE_VISUALSTUDIO
+	cp $(PREFIX)/lib/matroska.lib $(PREFIX)/lib/libmatroska.a
+endif
 	touch $@
