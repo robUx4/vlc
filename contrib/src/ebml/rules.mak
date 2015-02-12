@@ -20,4 +20,7 @@ EBML_EXTRA_FLAGS = CXXFLAGS="${CXXFLAGS} -fexceptions -fvisibility=hidden" \
 .ebml: libebml
 	cd $< && $(HOSTVARS) ./configure $(HOSTCONF) $(EBML_EXTRA_FLAGS)
 	cd $< && $(MAKE) install
+ifdef HAVE_VISUALSTUDIO
+	cp $(PREFIX)/lib/ebml.lib $(PREFIX)/lib/libebml.a
+endif
 	touch $@
