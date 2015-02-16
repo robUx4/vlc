@@ -1059,6 +1059,13 @@ static HRESULT ActivateDevice(void *opaque, REFIID iid, PROPVARIANT *actparms,
     return IMMDevice_Activate(dev, iid, CLSCTX_ALL, actparms, pv);
 }
 
+static void DeactivateDevice(void* pv)
+{
+    IAudioClient *device = (IAudioClient*)pv;
+    IAudioClient_Stop(device); /* should not be needed */
+    IAudioClient_Release(device);
+}
+
 static int aout_stream_Start(void *func, va_list ap)
 {
     aout_stream_start_t start = func;
@@ -1093,6 +1100,7 @@ static int Start(audio_output_t *aout, audio_sample_format_t *restrict fmt)
 
     s->owner.device = sys->dev;
     s->owner.activate = ActivateDevice;
+    s->owner.deactivate = DeactivateDevice;
 
     EnterMTA();
     for (;;)
@@ -1131,6 +1139,7 @@ static void Stop(audio_output_t *aout)
 
     vlc_object_release(sys->stream);
     sys->stream = NULL;
+    IAudioClient_Release(sys->client);
 }
 
 static int Open(vlc_object_t *obj)
