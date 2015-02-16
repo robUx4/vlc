@@ -40,6 +40,7 @@ struct aout_stream
     {
         void *device;
         HRESULT (*activate)(void *device, REFIID, PROPVARIANT *, void **);
+        void(*deactivate)(void*);
     } owner;
 };
 
@@ -91,5 +92,12 @@ HRESULT aout_stream_Activate(aout_stream_t *s, REFIID iid,
                              PROPVARIANT *actparms, void **pv)
 {
     return s->owner.activate(s->owner.device, iid, actparms, pv);
+}
+
+static inline
+void aout_stream_Deactivate(aout_stream_t *s, void *dev)
+{
+    if (s->owner.deactivate != NULL)
+        s->owner.deactivate(dev);
 }
 #endif
