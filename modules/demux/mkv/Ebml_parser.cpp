@@ -150,12 +150,13 @@ void EbmlParser::Reset( demux_t *p_demux )
 // Define a special Segment context that doesn't allow void/crc32 elements
 static const EbmlSemanticContext & GetEbmlNoGlobal_Context();
 static const EbmlSemanticContext Context_EbmlNoGlobal = EbmlSemanticContext(0, NULL, NULL, *GetEbmlNoGlobal_Context, NULL);
-static const EbmlSemantic EbmlNoGlobal_ContextList[0] =
+static const EbmlSemantic EbmlNoGlobal_ContextList[] =
 {
   //EbmlSemantic(false, false, EBML_INFO(EbmlCrc32)),   ///< EbmlCrc32
   //EbmlSemantic(false, false, EBML_INFO(EbmlVoid)),    ///< EbmlVoid
+  EbmlSemantic(false, false, EBML_INFO(EbmlVoid)), //Dummy element to keep compiler happy
 };
-static const EbmlSemanticContext EbmlNoGlobal_Context = EbmlSemanticContext(countof(EbmlNoGlobal_ContextList), EbmlNoGlobal_ContextList, NULL, *GetEbmlNoGlobal_Context, NULL);
+static const EbmlSemanticContext EbmlNoGlobal_Context = EbmlSemanticContext(countof(EbmlNoGlobal_ContextList) - 1, EbmlNoGlobal_ContextList, NULL, *GetEbmlNoGlobal_Context, NULL);
 static const EbmlSemanticContext & GetEbmlNoGlobal_Context()
 {
   return EbmlNoGlobal_Context;
