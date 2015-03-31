@@ -181,13 +181,17 @@ int picture_Setup( picture_t *p_picture, const video_format_t *restrict fmt )
     i_modulo_h = LCM( i_modulo_h, 32 );
 
     const int i_width_aligned  = ( fmt->i_width  + i_modulo_w - 1 ) / i_modulo_w * i_modulo_w;
-    const int i_height_aligned = ( fmt->i_height + i_modulo_h - 1 ) / i_modulo_h * i_modulo_h;
-    const int i_height_extra   = 2 * i_ratio_h; /* This one is a hack for some ASM functions */
+    int i_height_aligned = ( fmt->i_height + i_modulo_h - 1 ) / i_modulo_h * i_modulo_h;
+    if( i_height_aligned - fmt->i_height < 2 * i_ratio_h )
+    {
+        /* This one is a hack for some ASM functions */
+        i_height_aligned += 2 * i_ratio_h;
+    }
     for( unsigned i = 0; i < p_dsc->plane_count; i++ )
     {
         plane_t *p = &p_picture->p[i];
 
-        p->i_lines         = (i_height_aligned + i_height_extra ) * p_dsc->p[i].h.num / p_dsc->p[i].h.den;
+        p->i_lines         = i_height_aligned * p_dsc->p[i].h.num / p_dsc->p[i].h.den;
         p->i_visible_lines = fmt->i_visible_height * p_dsc->p[i].h.num / p_dsc->p[i].h.den;
         p->i_pitch         = i_width_aligned * p_dsc->p[i].w.num / p_dsc->p[i].w.den * p_dsc->pixel_size;
         p->i_visible_pitch = fmt->i_visible_width * p_dsc->p[i].w.num / p_dsc->p[i].w.den * p_dsc->pixel_size;
