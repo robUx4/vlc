@@ -396,19 +396,18 @@ int InitVideoDec( decoder_t *p_dec, AVCodecContext *p_context,
             break;
     }
 
+# if defined(_WIN32)
     /* Workaround: frame multithreading is not compatible with
      * DXVA2. When a frame is being copied to host memory, the frame
      * is locked and cannot be used as a reference frame
      * simultaneously and thus decoding fails for some frames. This
      * causes major image corruption. */
-# if defined(_WIN32)
-    char *avcodec_hw = var_InheritString( p_dec, "avcodec-hw" );
-    if( avcodec_hw == NULL || strcasecmp( avcodec_hw, "none" ) )
+    enum PixelFormat test_formats[] = { AV_PIX_FMT_DXVA2_VLD, AV_PIX_FMT_NONE };
+    if( AV_PIX_FMT_DXVA2_VLD == ffmpeg_GetFormat( p_context, &test_formats ) )
     {
         msg_Warn( p_dec, "threaded frame decoding is not compatible with DXVA2, disabled" );
         p_context->thread_type &= ~FF_THREAD_FRAME;
     }
-    free( avcodec_hw );
 # endif
 
     if( p_context->thread_type & FF_THREAD_FRAME )
