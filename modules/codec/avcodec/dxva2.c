@@ -390,9 +390,6 @@ static int Extract(vlc_va_t *va, picture_t *picture, void *opaque,
         return VLC_EGENERIC;
 
     /* */
-    assert(sys->output == MAKEFOURCC('Y','V','1','2'));
-
-    /* */
     D3DLOCKED_RECT lock;
     if (FAILED(IDirect3DSurface9_LockRect(d3d, &lock, NULL, D3DLOCK_READONLY))) {
         msg_Err(va, "Failed to lock surface");
@@ -403,6 +400,8 @@ static int Extract(vlc_va_t *va, picture_t *picture, void *opaque,
         sys->render == MAKEFOURCC('I','M','C','3')) {
         bool imc3 = sys->render == MAKEFOURCC('I','M','C','3');
         size_t chroma_pitch = imc3 ? lock.Pitch : (lock.Pitch / 2);
+
+        assert(sys->output == MAKEFOURCC('Y','V','1','2'));
 
         size_t pitch[3] = {
             lock.Pitch,
@@ -434,8 +433,16 @@ static int Extract(vlc_va_t *va, picture_t *picture, void *opaque,
             lock.Pitch,
             lock.Pitch,
         };
-        CopyFromNv12(picture, plane, pitch, sys->width, sys->height,
-                     &sys->surface_cache);
+        if( sys->output == MAKEFOURCC('Y','V','1','2') )
+        {
+            CopyFromNv12(picture, plane, pitch, sys->width, sys->height,
+                         &sys->surface_cache);
+        }
+        else if( sys->output == MAKEFOURCC('N','V','1','2') )
+        {
+            CopyFromNv12(picture, plane, pitch, sys->width, sys->height,
+                         &sys->surface_cache);
+        }
     }
 
     /* */
@@ -1031,7 +1038,6 @@ static int DxResetVideoDecoder(vlc_va_t *va)
 static void DxCreateVideoConversion(vlc_va_sys_t *va)
 {
     switch (va->render) {
-    case MAKEFOURCC('N','V','1','2'):
     case MAKEFOURCC('I','M','C','3'):
         va->output = MAKEFOURCC('Y','V','1','2');
         break;
