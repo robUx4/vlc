@@ -447,7 +447,7 @@ static HRESULT Start(aout_stream_t *s, audio_sample_format_t *restrict fmt,
     return S_OK;
 error:
     if (sys->client != NULL)
-        aout_stream_Deactivate(s, sys->client);
+        IAudioClient_Release(sys->client);
     free(sys);
     return hr;
 }
@@ -456,7 +456,8 @@ static void Stop(aout_stream_t *s)
 {
     aout_stream_sys_t *sys = s->sys;
 
-    aout_stream_Deactivate(s, sys->client);
+    IAudioClient_Stop(sys->client); /* should not be needed */
+    IAudioClient_Release(sys->client);
 
     free(sys);
 }

@@ -109,12 +109,6 @@ static HRESULT ActivateDevice(void *opaque, REFIID iid, PROPVARIANT *actparms,
     return S_OK;
 }
 
-static void DeactivateDevice(void* device)
-{
-    IAudioClient_Stop((IAudioClient*)device);
-    IAudioClient_Release((IAudioClient*) device);
-}
-
 static int aout_stream_Start(void *func, va_list ap)
 {
     aout_stream_start_t start = func;
@@ -145,7 +139,6 @@ static int Start(audio_output_t *aout, audio_sample_format_t *restrict fmt)
 
     s->owner.device = sys->client;
     s->owner.activate = ActivateDevice;
-    s->owner.deactivate = DeactivateDevice;
 
     EnterMTA();
     sys->module = vlc_module_load(s, "aout stream", NULL, false,
