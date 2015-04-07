@@ -1358,7 +1358,28 @@ static enum PixelFormat ffmpeg_GetFormat( AVCodecContext *p_context,
     vlc_va_t *p_va = p_sys->p_va;
 
     if( p_va != NULL )
+    {
+        for( size_t i = 0; pi_fmt[i] != PIX_FMT_NONE; i++ )
+        {
+            if( p_va->pix_fmt != pi_fmt[i] )
+                continue;
+
+            if( p_context->width <= 0 || p_context->height <= 0
+             || !vlc_va_Setup( p_va, p_context, &p_dec->fmt_out.video.i_chroma ) )
+            {
+                msg_Err( p_dec, "reusing acceleration failed" );
+                break;
+            }
+
+            if( p_va->description )
+                msg_Info( p_dec, "Reusing %s for hardware decoding.",
+                          p_va->description );
+
+            return pi_fmt[i];
+        }
+
         vlc_va_Delete( p_va, p_context );
+    }
 
     /* Enumerate available formats */
     bool can_hwaccel = false;
