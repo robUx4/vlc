@@ -374,7 +374,11 @@ int InitVideoDec( decoder_t *p_dec, AVCodecContext *p_context,
     i_thread_count = __MIN( i_thread_count, 16 );
     msg_Dbg( p_dec, "allowing %d thread(s) for decoding", i_thread_count );
     p_context->thread_count = i_thread_count;
+# if defined(_WIN32)
+    p_context->thread_safe_callbacks = false;
+# else
     p_context->thread_safe_callbacks = true;
+# endif
 
     switch( p_codec->id )
     {
@@ -395,21 +399,6 @@ int InitVideoDec( decoder_t *p_dec, AVCodecContext *p_context,
         default:
             break;
     }
-
-    /* Workaround: frame multithreading is not compatible with
-     * DXVA2. When a frame is being copied to host memory, the frame
-     * is locked and cannot be used as a reference frame
-     * simultaneously and thus decoding fails for some frames. This
-     * causes major image corruption. */
-# if defined(_WIN32)
-    char *avcodec_hw = var_InheritString( p_dec, "avcodec-hw" );
-    if( avcodec_hw == NULL || strcasecmp( avcodec_hw, "none" ) )
-    {
-        msg_Warn( p_dec, "threaded frame decoding is not compatible with DXVA2, disabled" );
-        p_context->thread_type &= ~FF_THREAD_FRAME;
-    }
-    free( avcodec_hw );
-# endif
 
     if( p_context->thread_type & FF_THREAD_FRAME )
         p_dec->i_extra_picture_buffers = 2 * p_context->thread_count;
@@ -1313,7 +1302,28 @@ static enum PixelFormat ffmpeg_GetFormat( AVCodecContext *p_context,
     vlc_va_t *p_va = p_sys->p_va;
 
     if( p_va != NULL )
+    {
+        for( size_t i = 0; pi_fmt[i] != PIX_FMT_NONE; i++ )
+        {
+            if( p_va->pix_fmt != pi_fmt[i] )
+                continue;
+
+            if( p_context->width <= 0 || p_context->height <= 0
+             || vlc_va_Setup( p_va, p_context, &p_dec->fmt_out.video.i_chroma ) )
+            {
+                msg_Err( p_dec, "reusing acceleration failed" );
+                break;
+            }
+
+            if( p_va->description )
+                msg_Info( p_dec, "Reusing %s for hardware decoding.",
+                          p_va->description );
+
+            return pi_fmt[i];
+        }
+
         vlc_va_Delete( p_va, p_context );
+    }
 
     /* Enumerate available formats */
     bool can_hwaccel = false;
