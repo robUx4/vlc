@@ -422,6 +422,8 @@ ok:
 static int Extract(vlc_va_t *va, picture_t *picture, void *opaque,
                    uint8_t *data)
 {
+    VLC_UNUSED( opaque );
+
     vlc_va_sys_t *sys = va->sys;
     LPDIRECT3DSURFACE9 d3d = (LPDIRECT3DSURFACE9)(uintptr_t)data;
 
@@ -538,12 +540,13 @@ static int Get(vlc_va_t *va, void **opaque, uint8_t **data)
 
 static void Release(void *opaque, uint8_t *data)
 {
+    VLC_UNUSED( data );
+
     vlc_va_surface_t *surface = opaque;
     if ( surface->p_lock )
         vlc_mutex_lock( surface->p_lock );
 
     surface->refcount--;
-    (void) data;
 
     if ( surface->p_lock )
         vlc_mutex_unlock( surface->p_lock );
@@ -551,9 +554,10 @@ static void Release(void *opaque, uint8_t *data)
 
 static void Close(vlc_va_t *va, AVCodecContext *ctx)
 {
+    VLC_UNUSED( ctx );
+
     vlc_va_sys_t *sys = va->sys;
 
-    (void) ctx;
     DxDestroyVideoConversion(sys);
     DxDestroyVideoDecoder(sys);
     DxDestroyVideoService(sys);
@@ -573,6 +577,8 @@ static void Close(vlc_va_t *va, AVCodecContext *ctx)
 
 static int Open(vlc_va_t *va, AVCodecContext *ctx, const es_format_t *fmt)
 {
+    VLC_UNUSED( fmt );
+
     vlc_va_sys_t *sys = calloc(1, sizeof (*sys));
     if (unlikely(sys == NULL))
         return VLC_ENOMEM;
@@ -580,7 +586,6 @@ static int Open(vlc_va_t *va, AVCodecContext *ctx, const es_format_t *fmt)
     va->sys = sys;
     sys->codec_id = ctx->codec_id;
     sys->i_profile = ctx->profile;
-    VLC_UNUSED(fmt);
 
     sys->b_thread_safe = ctx->thread_safe_callbacks;
     if ( sys->b_thread_safe )
