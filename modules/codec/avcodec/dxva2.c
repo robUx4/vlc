@@ -486,7 +486,7 @@ static int Extract(vlc_va_t *va, picture_t *picture, void *opaque,
 
     /* */
     IDirect3DSurface9_UnlockRect(d3d);
-    VLC_UNUSED(opaque);
+    (void) opaque;
     return VLC_SUCCESS;
 }
 
@@ -543,7 +543,7 @@ static void Release(void *opaque, uint8_t *data)
         vlc_mutex_lock( surface->p_lock );
 
     surface->refcount--;
-    VLC_UNUSED(data);
+    (void) data;
 
     if ( surface->p_lock )
         vlc_mutex_unlock( surface->p_lock );
@@ -587,7 +587,6 @@ static int Open(vlc_va_t *va, AVCodecContext *ctx, const es_format_t *fmt)
         vlc_mutex_init( &sys->surface_lock );
 
     /* Load dll*/
-    /* FIXME might not work in Win10 */
     sys->hd3d9_dll = LoadLibrary(TEXT("D3D9.DLL"));
     if (!sys->hd3d9_dll) {
         msg_Warn(va, "cannot load d3d9.dll");
