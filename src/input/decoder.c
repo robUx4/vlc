@@ -400,7 +400,7 @@ static int vout_update_format( decoder_t *p_dec )
             break;
         }
         p_vout = input_resource_RequestVout( p_owner->p_resource,
-                                             p_vout, &fmt,
+                                             p_vout, &fmt, p_dec->p_sys,
                                              &p_dec->fmt_out_pool_setup,
                                              dpb_size +
                                              p_dec->i_extra_picture_buffers + 1,

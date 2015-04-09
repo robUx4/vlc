@@ -916,7 +916,7 @@ static int ThreadDisplayRenderPicture(vout_thread_t *vout, bool is_forced)
      * - be sure to end up with a direct buffer.
      * - blend subtitles, and in a fast access buffer
      */
-    bool is_direct = vout->p->decoder_pool == vout->p->display_pool;
+    bool is_direct = true; //vout->p->decoder_pool == vout->p->display_pool;
     picture_t *todisplay = filtered;
     if (do_early_spu && subpic && vout->p->spu_blend) {
         picture_t *blent = picture_pool_Get(vout->p->private_pool);

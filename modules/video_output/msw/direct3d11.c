@@ -421,10 +421,10 @@ static int Open(vlc_object_t *object)
     }
 
     vout_display_info_t info  = vd->info;
-    info.is_slow              = true;
+    info.is_slow              = false; //true;
     info.has_double_click     = true;
     info.has_hide_mouse       = false;
-    info.has_pictures_invalid = true;
+    info.has_pictures_invalid = false; // true
     info.has_event_thread     = true;
 
     /* TODO : subtitle support */

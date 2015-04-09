@@ -49,6 +49,7 @@
 #include <d3d9.h>
 
 #include "common.h"
+#include "direct3d9.h"
 #include "builtin_shaders.h"
 #include "../../codec/avcodec/video.h"
 
@@ -281,6 +282,12 @@ static picture_pool_t *Pool(vout_display_t *vd, unsigned count)
     else
         vd->sys->pool = picture_pool_NewFromFormat( &vd->fmt, count);
 
+    if ( !vd->sys->pool && vd->fmt.i_chroma == VLC_CODEC_DXVA_D3D9_OPAQUE)
+    {
+        /* create the pool of DXVA buffers that is shared with the decoder */
+        vd->sys->pool = picture_pool_New( count, NULL );
+    }
+
     return vd->sys->pool;
 }
 
@@ -363,6 +370,7 @@ static void Display(vout_display_t *vd, picture_t *picture, subpicture_t *subpic
     }
 
     /* XXX See Prepare() */
+#endif
     picture_Release(picture);
     if (subpicture)
         subpicture_Delete(subpicture);
@@ -529,6 +537,17 @@ static HINSTANCE Direct3D9LoadShaderLibrary(void)
 static int Direct3D9Create(vout_display_t *vd)
 {
     vout_display_sys_t *sys = vd->sys;
+
+#if DIRECT_DXVA
+    if ( vd->cfg->p_dec_sys != NULL )
+    {
+        const vlc_va_t *p_va = vd->cfg->p_dec_sys->p_va;
+        if ( p_va != NULL && p_va->sys != NULL )
+        {
+            sys->d3dobj = p_va->sys->d3dobj;
+        }
+    }
+#endif
 
     sys->hd3d9_dll = LoadLibrary(TEXT("D3D9.DLL"));
     if (!sys->hd3d9_dll) {
@@ -873,21 +892,12 @@ static int Direct3D9CheckConversion(vout_display_t *vd,
     return VLC_SUCCESS;
 }
 
-typedef struct
-{
-    const char   *name;
-    D3DFORMAT    format;    /* D3D format */
-    vlc_fourcc_t fourcc;    /* VLC fourcc */
-    uint32_t     rmask;
-    uint32_t     gmask;
-    uint32_t     bmask;
-} d3d_format_t;
-
 static const d3d_format_t d3d_formats[] = {
     /* YV12 is always used for planar 420, the planes are then swapped in Lock() */
     { "YV12",       MAKEFOURCC('Y','V','1','2'),    VLC_CODEC_YV12,  0,0,0 },
     { "YV12",       MAKEFOURCC('Y','V','1','2'),    VLC_CODEC_I420,  0,0,0 },
     { "YV12",       MAKEFOURCC('Y','V','1','2'),    VLC_CODEC_J420,  0,0,0 },
+    { "DXVA_NV12",  MAKEFOURCC('N','V','1','2'),    VLC_CODEC_DXVA_D3D9_OPAQUE,  0,0,0 },
     { "NV12",       MAKEFOURCC('N','V','1','2'),    VLC_CODEC_NV12,  0,0,0 },
     { "DXVANV12",   MAKEFOURCC('N','V','1','2'),    VLC_CODEC_DXVA_N_OPAQUE,  0,0,0 },
     { "DXVAYV12",   MAKEFOURCC('Y','V','1','2'),    VLC_CODEC_DXVA_Y_OPAQUE,  0,0,0 },
@@ -902,6 +912,8 @@ static const d3d_format_t d3d_formats[] = {
 
     { NULL, 0, 0, 0,0,0}
 };
+
+static const vlc_fourcc_t d3d_dxva2_opaque[] = { VLC_CODEC_DXVA_D3D9_OPAQUE, 0 };
 
 /**
  * It returns the format (closest to chroma) that can be converted to target */

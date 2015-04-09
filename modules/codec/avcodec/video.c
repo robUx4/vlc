@@ -679,7 +679,7 @@ static picture_t *DecodeVideo( decoder_t *p_dec, block_t **pp_block )
         if( !p_sys->p_va && !p_sys->p_ff_pic->linesize[0] )
             continue;
 
-        if( p_sys->p_va != NULL || p_sys->p_ff_pic->opaque == NULL )
+        if( p_sys->p_va != NULL || p_sys->p_ff_pic->p_opaque == NULL )
         {
             /* Get a new picture */
             p_pic = ffmpeg_NewPictBuf( p_dec, p_context );
@@ -699,7 +699,7 @@ static picture_t *DecodeVideo( decoder_t *p_dec, block_t **pp_block )
         }
         else
         {
-            p_pic = (picture_t *)p_sys->p_ff_pic->opaque;
+            p_pic = (picture_t *)p_sys->p_ff_pic->p_opaque;
             picture_Hold( p_pic );
         }
 
@@ -855,7 +855,7 @@ static void ffmpeg_CopyPicture( decoder_t *p_dec,
 
     if( p_sys->p_va )
     {
-        vlc_va_Extract( p_sys->p_va, p_pic, p_ff_pic->opaque,
+        vlc_va_Extract( p_sys->p_va, p_pic, p_ff_pic->p_opaque,
                         p_ff_pic->data[3] );
     }
     else if( FindVlcChroma( p_sys->p_context->pix_fmt ) )
@@ -915,7 +915,7 @@ static int lavc_va_GetFrame(struct AVCodecContext *ctx, AVFrame *frame,
         msg_Err(dec, "hardware acceleration setup failed");
         return -1;
     }
-    if (vlc_va_Get(va, &frame->opaque, &frame->data[0]))
+    if (vlc_va_Get(va, &frame->p_opaque, &frame->data[0]))
     {
         msg_Err(dec, "hardware acceleration picture allocation failed");
         return -1;
@@ -925,10 +925,10 @@ static int lavc_va_GetFrame(struct AVCodecContext *ctx, AVFrame *frame,
     frame->data[3] = frame->data[0];
 
     frame->buf[0] = av_buffer_create(frame->data[0], 0, va->release,
-                                     frame->opaque, 0);
+                                     frame->p_opaque, 0);
     if (unlikely(frame->buf[0] == NULL))
     {
-        vlc_va_Release(va, frame->opaque, frame->data[0]);
+        vlc_va_Release(va, frame->p_opaque, frame->data[0]);
         return -1;
     }
     assert(frame->data[0] != NULL);
@@ -1047,7 +1047,7 @@ static int lavc_GetFrame(struct AVCodecContext *ctx, AVFrame *frame, int flags)
     if (sys->p_va != NULL)
         return lavc_va_GetFrame(ctx, frame, flags);
 
-    frame->opaque = NULL;
+    frame->p_opaque = NULL;
     if (!sys->b_direct_rendering)
         return avcodec_default_get_buffer2(ctx, frame, flags);
 
@@ -1073,7 +1073,7 @@ static int lavc_GetFrame(struct AVCodecContext *ctx, AVFrame *frame, int flags)
     }
     post_mt(sys);
 
-    frame->opaque = pic;
+    frame->p_opaque = pic;
     static_assert(PICTURE_PLANE_MAX <= AV_NUM_DATA_POINTERS, "Oops!");
     for (unsigned i = 0; i < PICTURE_PLANE_MAX; i++)
     {
