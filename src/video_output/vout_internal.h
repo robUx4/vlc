@@ -55,6 +55,7 @@ struct vout_thread_sys_t
     /* */
     video_format_t  original;   /* Original format ie coming from the decoder */
     unsigned        dpb_size;
+    decoder_sys_t   *p_dec_sys;
 
     /* Snapshot interface */
     vout_snapshot_t snapshot;

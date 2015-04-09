@@ -76,6 +76,7 @@ static const d3d_format_t d3d_formats[] = {
     { "I420",     DXGI_FORMAT_NV12,           VLC_CODEC_I420,     DXGI_FORMAT_R8_UNORM,           DXGI_FORMAT_R8G8_UNORM },
     { "YV12",     DXGI_FORMAT_NV12,           VLC_CODEC_YV12,     DXGI_FORMAT_R8_UNORM,           DXGI_FORMAT_R8G8_UNORM },
     { "NV12",     DXGI_FORMAT_NV12,           VLC_CODEC_NV12,     DXGI_FORMAT_R8_UNORM,           DXGI_FORMAT_R8G8_UNORM },
+    { "DXVA",     DXGI_FORMAT_NV12,           VLC_CODEC_DXVA_D3D9_OPAQUE, DXGI_FORMAT_R8_UNORM,           DXGI_FORMAT_R8G8_UNORM },
 #ifdef BROKEN_PIXEL
     { "YUY2",     DXGI_FORMAT_YUY2,           VLC_CODEC_I422,     DXGI_FORMAT_R8G8B8A8_UNORM,     0 },
     { "AYUV",     DXGI_FORMAT_AYUV,           VLC_CODEC_YUVA,     DXGI_FORMAT_R8G8B8A8_UNORM,     0 },
@@ -415,10 +416,10 @@ static int Open(vlc_object_t *object)
     }
 
     vout_display_info_t info  = vd->info;
-    info.is_slow              = true;
+    info.is_slow              = false; //true;
     info.has_double_click     = true;
     info.has_hide_mouse       = false;
-    info.has_pictures_invalid = true;
+    info.has_pictures_invalid = false; // true
     info.has_event_thread     = true;
 
     /* TODO : subtitle support */
@@ -989,8 +990,8 @@ static int Direct3D11CreateResources(vout_display_t *vd, video_format_t *fmt)
     texDesc.MipLevels = texDesc.ArraySize = 1;
     texDesc.Format = sys->d3dFormatTex;
     texDesc.SampleDesc.Count = 1;
-    texDesc.Usage = D3D11_USAGE_DYNAMIC;
-    texDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+    texDesc.Usage = D3D11_USAGE_DYNAMIC; // D3D11_USAGE_DEFAULT
+    texDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE; // | D3D11_BIND_RENDER_TARGET;
     texDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
     texDesc.MiscFlags = 0;
 

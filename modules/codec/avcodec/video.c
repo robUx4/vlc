@@ -41,48 +41,7 @@
 
 #include "avcodec.h"
 #include "va.h"
-
-/*****************************************************************************
- * decoder_sys_t : decoder descriptor
- *****************************************************************************/
-struct decoder_sys_t
-{
-    AVCODEC_COMMON_MEMBERS
-
-    /* Video decoder specific part */
-    mtime_t i_pts;
-
-    AVFrame          *p_ff_pic;
-
-    /* for frame skipping algo */
-    bool b_hurry_up;
-    enum AVDiscard i_skip_frame;
-
-    /* how many decoded frames are late */
-    int     i_late_frames;
-    mtime_t i_late_frames_start;
-
-    /* for direct rendering */
-    bool b_direct_rendering;
-    int  i_direct_rendering_used;
-
-    bool b_has_b_frames;
-
-    /* Hack to force display of still pictures */
-    bool b_first_frame;
-
-
-    /* */
-    bool palette_sent;
-
-    /* */
-    bool b_flush;
-
-    /* VA API */
-    vlc_va_t *p_va;
-
-    vlc_sem_t sem_mt;
-};
+#include "video.h"
 
 #ifdef HAVE_AVCODEC_MT
 #   define wait_mt(s) vlc_sem_wait( &s->sem_mt )
@@ -457,7 +416,6 @@ static picture_t *DecodeVideo( decoder_t *p_dec, block_t **pp_block )
 {
     decoder_sys_t *p_sys = p_dec->p_sys;
     AVCodecContext *p_context = p_sys->p_context;
-    int b_drawpicture;
     block_t *p_block;
 
     if( !pp_block )
@@ -522,53 +480,43 @@ static picture_t *DecodeVideo( decoder_t *p_dec, block_t **pp_block )
         return NULL;
     }
 
-    /* A good idea could be to decode all I pictures and see for the other */
-    if( !p_dec->b_pace_control &&
-        p_sys->b_hurry_up &&
-        (p_sys->i_late_frames > 4) )
+    if ( p_sys->b_hurry_up )
     {
-        b_drawpicture = 0;
-        if( p_sys->i_late_frames < 12 )
+        /* A good idea could be to decode all I pictures and see for the other */
+        if( !p_dec->b_pace_control &&
+            (p_sys->i_late_frames > 4) )
         {
-            p_context->skip_frame =
-                    (p_sys->i_skip_frame <= AVDISCARD_NONREF) ?
-                    AVDISCARD_NONREF : p_sys->i_skip_frame;
+            if ( p_sys->i_late_frames < 12 )
+            {
+                msg_Warn( p_dec, "More than 4 late frames, skip coming non-ref frames" );
+                p_context->skip_frame = __MAX( p_sys->i_skip_frame, AVDISCARD_NONREF );
+            }
+            else if ( p_sys->i_late_frames < 48 )
+            {
+                msg_Warn( p_dec, "More than 12 late frames, skip coming non-key frames" );
+                p_context->skip_frame = __MAX( p_sys->i_skip_frame, AVDISCARD_NONKEY );
+            }
+            else if ( !p_block ||
+                      !( p_block->i_flags & ( BLOCK_FLAG_TYPE_I|BLOCK_FLAG_PREROLL ) ) )
+            {
+                /* picture too late, won't decode
+                 * but break picture until a new I, and for mpeg4 ...*/
+                //p_sys->i_late_frames--; /* needed else it will never be decrease */
+                msg_Warn( p_dec, "More than 48 late frames, dropping non-key frame" );
+                if( p_block )
+                    block_Release( p_block );
+                return NULL;
+            }
         }
         else
         {
-            /* picture too late, won't decode
-             * but break picture until a new I, and for mpeg4 ...*/
-            p_sys->i_late_frames--; /* needed else it will never be decrease */
-            if( p_block )
-                block_Release( p_block );
-            msg_Warn( p_dec, "More than 4 late frames, dropping frame" );
-            return NULL;
-        }
-    }
-    else
-    {
-        if( p_sys->b_hurry_up )
             p_context->skip_frame = p_sys->i_skip_frame;
-        if( !p_block || !(p_block->i_flags & BLOCK_FLAG_PREROLL) )
-            b_drawpicture = 1;
-        else
-            b_drawpicture = 0;
-    }
+        }
 
-    if( p_context->width <= 0 || p_context->height <= 0 )
-    {
-        if( p_sys->b_hurry_up )
+        if( p_context->width <= 0 || p_context->height <= 0 )
+        {
             p_context->skip_frame = p_sys->i_skip_frame;
-    }
-    else if( !b_drawpicture )
-    {
-        /* It creates broken picture
-         * FIXME either our parser or ffmpeg is broken */
-#if 0
-        if( p_sys->b_hurry_up )
-            p_context->skip_frame = __MAX( p_context->skip_frame,
-                                                  AVDISCARD_NONREF );
-#endif
+        }
     }
 
     /*
@@ -645,9 +593,8 @@ static picture_t *DecodeVideo( decoder_t *p_dec, block_t **pp_block )
 
             if( i_used < 0 )
             {
-                if( b_drawpicture )
-                    msg_Warn( p_dec, "cannot decode one frame (%zu bytes)",
-                            p_block->i_buffer );
+                msg_Warn( p_dec, "cannot decode one frame (%zu bytes)",
+                        p_block->i_buffer );
                 block_Release( p_block );
                 return NULL;
             }
@@ -725,12 +672,14 @@ static picture_t *DecodeVideo( decoder_t *p_dec, block_t **pp_block )
         else
         {
             p_sys->i_late_frames = 0;
+            if ( p_sys->b_hurry_up )
+                p_context->skip_frame = p_sys->i_skip_frame;
         }
 
-        if( !b_drawpicture || ( !p_sys->p_va && !p_sys->p_ff_pic->linesize[0] ) )
+        if( !p_sys->p_va && !p_sys->p_ff_pic->linesize[0] )
             continue;
 
-        if( p_sys->p_va != NULL || p_sys->p_ff_pic->opaque == NULL )
+        if( p_sys->p_va != NULL || p_sys->p_ff_pic->p_opaque == NULL )
         {
             /* Get a new picture */
             p_pic = ffmpeg_NewPictBuf( p_dec, p_context );
@@ -747,7 +696,7 @@ static picture_t *DecodeVideo( decoder_t *p_dec, block_t **pp_block )
         }
         else
         {
-            p_pic = (picture_t *)p_sys->p_ff_pic->opaque;
+            p_pic = (picture_t *)p_sys->p_ff_pic->p_opaque;
             picture_Hold( p_pic );
         }
 
@@ -900,7 +849,7 @@ static void ffmpeg_CopyPicture( decoder_t *p_dec,
 
     if( p_sys->p_va )
     {
-        vlc_va_Extract( p_sys->p_va, p_pic, p_ff_pic->opaque,
+        vlc_va_Extract( p_sys->p_va, p_pic, p_ff_pic->p_opaque,
                         p_ff_pic->data[3] );
     }
     else if( FindVlcChroma( p_sys->p_context->pix_fmt ) )
@@ -960,7 +909,7 @@ static int lavc_va_GetFrame(struct AVCodecContext *ctx, AVFrame *frame,
         msg_Err(dec, "hardware acceleration setup failed");
         return -1;
     }
-    if (vlc_va_Get(va, &frame->opaque, &frame->data[0]))
+    if (vlc_va_Get(va, &frame->p_opaque, &frame->data[0]))
     {
         msg_Err(dec, "hardware acceleration picture allocation failed");
         return -1;
@@ -970,10 +919,10 @@ static int lavc_va_GetFrame(struct AVCodecContext *ctx, AVFrame *frame,
     frame->data[3] = frame->data[0];
 
     frame->buf[0] = av_buffer_create(frame->data[0], 0, va->release,
-                                     frame->opaque, 0);
+                                     frame->p_opaque, 0);
     if (unlikely(frame->buf[0] == NULL))
     {
-        vlc_va_Release(va, frame->opaque, frame->data[0]);
+        vlc_va_Release(va, frame->p_opaque, frame->data[0]);
         return -1;
     }
     assert(frame->data[0] != NULL);
@@ -1092,7 +1041,7 @@ static int lavc_GetFrame(struct AVCodecContext *ctx, AVFrame *frame, int flags)
     if (sys->p_va != NULL)
         return lavc_va_GetFrame(ctx, frame, flags);
 
-    frame->opaque = NULL;
+    frame->p_opaque = NULL;
     if (!sys->b_direct_rendering)
         return avcodec_default_get_buffer2(ctx, frame, flags);
 
@@ -1118,7 +1067,7 @@ static int lavc_GetFrame(struct AVCodecContext *ctx, AVFrame *frame, int flags)
     }
     post_mt(sys);
 
-    frame->opaque = pic;
+    frame->p_opaque = pic;
     static_assert(PICTURE_PLANE_MAX <= AV_NUM_DATA_POINTERS, "Oops!");
     for (unsigned i = 0; i < PICTURE_PLANE_MAX; i++)
     {

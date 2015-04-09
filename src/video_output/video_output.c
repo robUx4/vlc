@@ -131,6 +131,7 @@ static vout_thread_t *VoutCreate(vlc_object_t *object,
 
     vout->p->original = original;
     vout->p->dpb_size = cfg->dpb_size;
+    vout->p->p_dec_sys = cfg->p_dec_sys;
 
     vout_control_Init(&vout->p->control);
     vout_control_PushVoid(&vout->p->control, VOUT_CONTROL_INIT);
@@ -586,6 +587,7 @@ static void VoutGetDisplayCfg(vout_thread_t *vout, vout_display_cfg_t *cfg, cons
         cfg->align.vertical = VOUT_DISPLAY_ALIGN_TOP;
     else if (align_mask & 0x8)
         cfg->align.vertical = VOUT_DISPLAY_ALIGN_BOTTOM;
+    cfg->p_dec_sys = vout->p->p_dec_sys;
 }
 
 vout_window_t *vout_NewDisplayWindow(vout_thread_t *vout, unsigned type)
@@ -930,7 +932,7 @@ static int ThreadDisplayRenderPicture(vout_thread_t *vout, bool is_forced)
      * - be sure to end up with a direct buffer.
      * - blend subtitles, and in a fast access buffer
      */
-    bool is_direct = vout->p->decoder_pool == vout->p->display_pool;
+    bool is_direct = true; //vout->p->decoder_pool == vout->p->display_pool;
     picture_t *todisplay = filtered;
     if (do_early_spu && subpic) {
         picture_t *blent = picture_pool_Get(vout->p->private_pool);

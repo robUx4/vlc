@@ -110,6 +110,8 @@ typedef struct {
         int den;
     } zoom;
 
+    decoder_sys_t *p_dec_sys;
+
 } vout_display_cfg_t;
 
 /**

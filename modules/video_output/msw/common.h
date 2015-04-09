@@ -23,6 +23,9 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston MA 02110-1301, USA.
  *****************************************************************************/
 
+#ifndef MSW_COMMON_H_
+#define MSW_COMMON_H_
+
 #ifdef MODULE_NAME_IS_directdraw
 # include <ddraw.h>
 #endif
@@ -263,3 +266,5 @@ picture_pool_t *CommonPool(vout_display_t *, unsigned);
 #define DX_POSITION_CHANGE 0x1000
 #define DX_WALLPAPER_CHANGE 0x2000
 #define DX_DESKTOP_CHANGE 0x4000
+
+#endif /* MSW_COMMON_H_ */

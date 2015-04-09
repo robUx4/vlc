@@ -22,6 +22,9 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston MA 02110-1301, USA.
  *****************************************************************************/
 
+#ifndef MSW_EVENTS_H_
+#define MSW_EVENTS_H_
+
 #include <vlc_vout_window.h>
 
 /**
@@ -62,3 +65,4 @@ void            EventThreadUpdateSourceAndPlace( event_thread_t *p_event,
 void            EventThreadUseOverlay( event_thread_t *, bool b_used );
 bool            EventThreadGetAndResetHasMoved( event_thread_t * );
 
+#endif /* MSW_EVENTS_H_*/
