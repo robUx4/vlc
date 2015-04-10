@@ -30,8 +30,6 @@
 # include "config.h"
 #endif
 
-#define DEBUG_SURFACE 1
-
 # if _WIN32_WINNT < 0x600
 /* dxva2 needs Vista support */
 #  undef _WIN32_WINNT

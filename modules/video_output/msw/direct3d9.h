@@ -43,6 +43,9 @@
 #define DEBUG_SURFACE 1
 #define DIRECT_DXVA 1
 
+#define LOCK_SURFACE 1 || !DIRECT_DXVA
+
+
 #ifdef HAVE_CONFIG_H
 # include "config.h"
 #endif
@@ -79,6 +82,7 @@ struct picture_sys_t
     unsigned int       index;
     vlc_mutex_t        *p_lock;
     const d3d_format_t *p_ouput;
+    bool               b_lockrect;
 #if DEBUG_SURFACE
     vlc_va_t          *va;
 #endif

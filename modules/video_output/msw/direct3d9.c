@@ -315,7 +315,7 @@ static void Prepare(vout_display_t *vd, picture_t *picture, subpicture_t *subpic
      * the vout doesn't keep a reference). But because of the vout
      * wrapper, we can't */
 
-#if !DIRECT_DXVA
+#if LOCK_SURFACE
     Direct3D9UnlockSurface(picture);
 #endif
     //Direct3D9LockSurface(picture);
@@ -323,7 +323,7 @@ static void Prepare(vout_display_t *vd, picture_t *picture, subpicture_t *subpic
 
     d3d_region_t picture_region;
     if (!Direct3D9ImportPicture(vd, &picture_region, surface)) {
-        msg_Dbg(vd, "Prepared picture 0x%p at %d surface 0x%p date %"PRId64, picture, picture->p_sys->index, surface, picture->date );
+        msg_Dbg(vd, "%lx Prepared picture 0x%p at %d surface 0x%p date %"PRId64, GetCurrentThreadId(), picture, picture->p_sys->index, surface, picture->date );
         picture_region.width = picture->format.i_visible_width;
         picture_region.height = picture->format.i_visible_height;
         int subpicture_region_count     = 0;
@@ -359,7 +359,7 @@ static void Display(vout_display_t *vd, picture_t *picture, subpicture_t *subpic
     // No stretching should happen here !
     const RECT src = sys->rect_dest_clipped;
     const RECT dst = sys->rect_dest_clipped;
-    msg_Dbg(vd, "Present picture 0x%p at %d surface 0x%p", picture, picture->p_sys->index, picture->p_sys->surface );
+    msg_Dbg(vd, "%lx Present picture 0x%p at %d surface 0x%p", GetCurrentThreadId(), picture, picture->p_sys->index, picture->p_sys->surface );
 
     HRESULT hr = IDirect3DDevice9_Present(d3ddev, &src, &dst, sys->hvideownd, NULL);
     if (FAILED(hr)) {
@@ -371,7 +371,7 @@ static void Display(vout_display_t *vd, picture_t *picture, subpicture_t *subpic
 #else
     /* XXX See Prepare() */
     //Direct3D9UnlockSurface(picture);
-#if !DIRECT_DXVA
+#if 0 //LOCK_SURFACE && !DIRECT_DXVA
     Direct3D9LockSurface(picture);
 #endif
     picture_Release(picture);
@@ -953,6 +953,10 @@ static const d3d_format_t *Direct3DFindFormat(vout_display_t *vd, vlc_fourcc_t c
  */
 static int Direct3D9LockSurface(picture_t *picture)
 {
+#if DEBUG_SURFACE
+    msg_Dbg( picture->p_sys->va, "%lx d3d9 lock locked %d pts: %"PRId64" surface %d 0x%p", GetCurrentThreadId(), picture->p_sys->b_lockrect, picture->date, picture->p_sys->index, picture->p_sys->surface );
+#endif
+
     /* Lock the surface to get a valid pointer to the picture buffer */
     D3DLOCKED_RECT d3drect;
     // FIXME D3DLOCK_READONLY
@@ -961,6 +965,7 @@ static int Direct3D9LockSurface(picture_t *picture)
         //msg_Dbg(vd, "Failed IDirect3DSurface9_LockRect: 0x%0lx", hr);
         return CommonUpdatePicture(picture, &picture->p_sys->fallback, NULL, 0);
     }
+    picture->p_sys->b_lockrect = true;
 
     CommonUpdatePicture(picture, NULL, d3drect.pBits, d3drect.Pitch);
     return VLC_SUCCESS;
@@ -971,10 +976,14 @@ static int Direct3D9LockSurface(picture_t *picture)
 static void Direct3D9UnlockSurface(picture_t *picture)
 {
     /* Unlock the Surface */
+#if DEBUG_SURFACE
+    msg_Dbg( picture->p_sys->va, "%lx d3d9 unlock locked %d pts: %"PRId64" surface %d 0x%p", GetCurrentThreadId(), picture->p_sys->b_lockrect, picture->date, picture->p_sys->index, picture->p_sys->surface );
+#endif
     HRESULT hr = IDirect3DSurface9_UnlockRect(picture->p_sys->surface);
     if (FAILED(hr)) {
         //msg_Dbg(vd, "Failed IDirect3DSurface9_UnlockRect: 0x%0lx", hr);
     }
+    picture->p_sys->b_lockrect = false;
 }
 
 /**
@@ -1061,7 +1070,7 @@ static int Direct3D9CreatePool(vout_display_t *vd, video_format_t *fmt)
         memset(&pool_cfg, 0, sizeof(pool_cfg));
         pool_cfg.picture_count = 1;
         pool_cfg.picture       = &picture;
-#if DIRECT_DXVA
+#if !LOCK_SURFACE
         if( fmt->i_chroma != VLC_CODEC_DXVA_D3D9_OPAQUE)
 #endif
         {
@@ -1528,10 +1537,12 @@ static int Direct3D9ImportPicture(vout_display_t *vd,
         return VLC_EGENERIC;
     }
 
+#if 0
     IDirect3DDevice9 *pSourceDevice;
     hr = IDirect3DResource9_GetDevice( source, &pSourceDevice );
     IDirect3DDevice9 *pDestDevice;
     hr = IDirect3DResource9_GetDevice( destination, &pDestDevice );
+#endif
 
     /* Copy picture surface into texture surface
      * color space conversion happen here */
