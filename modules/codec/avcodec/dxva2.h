@@ -92,7 +92,7 @@ struct vlc_va_sys_t
     int          width;
     int          height;
 
-    bool            b_thread_safe;
+    bool            b_need_thread_safe;
     vlc_mutex_t     surface_lock;
 
     /* DLL */

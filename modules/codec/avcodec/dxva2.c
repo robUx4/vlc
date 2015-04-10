@@ -28,6 +28,7 @@
 #endif
 
 #define EXTRACT_LOCKS 0
+#define GET_DECODER_SURFACE 0
 
 # if _WIN32_WINNT < 0x600
 /* dxva2 needs Vista support */
@@ -378,7 +379,7 @@ static int Extract(vlc_va_t *va, picture_t *picture, void *opaque,
         return VLC_EGENERIC;
 
     /* */
-#if !DIRECT_DXVA || EXTRACT_LOCKS
+#if !DIRECT_DXVA || EXTRACT_LOCKS || GET_DECODER_SURFACE
     D3DLOCKED_RECT lock;
     if (FAILED(IDirect3DSurface9_LockRect(d3d, &lock, NULL, D3DLOCK_READONLY))) {
         msg_Err(va, "Failed to lock surface");
@@ -391,7 +392,7 @@ static int Extract(vlc_va_t *va, picture_t *picture, void *opaque,
 #endif
 
 #if DIRECT_DXVA
-#if EXTRACT_LOCKS
+#if EXTRACT_LOCKS || GET_DECODER_SURFACE
     picture->p_sys = p_picture;
 #else
     D3DSURFACE_DESC srcDesc;
@@ -461,7 +462,7 @@ static int Extract(vlc_va_t *va, picture_t *picture, void *opaque,
 #endif
 
     /* */
-#if !DIRECT_DXVA || EXTRACT_LOCKS
+#if !DIRECT_DXVA || EXTRACT_LOCKS || GET_DECODER_SURFACE
     IDirect3DSurface9_UnlockRect(d3d);
 #if DEBUG_SURFACE
     msg_Dbg(va, "d3d surface 0x%p at %d 0x%p unlocked", data, p_picture->index, p_picture );
@@ -490,14 +491,18 @@ static int Get(vlc_va_t *va, void **opaque, uint8_t **data)
         return VLC_EGENERIC;
     }
 
-    if ( sys->b_thread_safe )
+    if ( sys->b_need_thread_safe )
         vlc_mutex_lock( &sys->surface_lock );
 
     /* Grab an unused surface, in case none are, try the oldest
      * XXX using the oldest is a workaround in case a problem happens with libavcodec */
     unsigned i, old;
     for (i = 0, old = 0; i < sys->surface_count; i++) {
+#if GET_DECODER_SURFACE
+        picture_sys_t *surface = &sys->decoder_pictures[i];
+#else
         picture_sys_t *surface = &sys->surface[i];
+#endif
 
         if ( surface->refcount == 0 )
             break;
@@ -512,7 +517,11 @@ static int Get(vlc_va_t *va, void **opaque, uint8_t **data)
     }
     //i=0;
 
+#if GET_DECODER_SURFACE
+    picture_sys_t *p_picture = &sys->decoder_pictures[i];
+#else
     picture_sys_t *p_picture = &sys->surface[i];
+#endif
 
 #if 0
     LPDIRECT3DSURFACE9 backBufferSurface;
@@ -534,7 +543,7 @@ static int Get(vlc_va_t *va, void **opaque, uint8_t **data)
 
     IDirect3DSurface9_AddRef( p_picture->surface );
 
-    if ( sys->b_thread_safe )
+    if ( sys->b_need_thread_safe )
         vlc_mutex_unlock( &sys->surface_lock );
 
     return VLC_SUCCESS;
@@ -576,7 +585,7 @@ static void Close(vlc_va_t *va, AVCodecContext *ctx)
         FreeLibrary(sys->hdxva2_dll);
     if (sys->hd3d9_dll)
         FreeLibrary(sys->hd3d9_dll);
-    if ( sys->b_thread_safe )
+    if ( sys->b_need_thread_safe )
         vlc_mutex_destroy( &sys->surface_lock );
 
     free((char *)va->description);
@@ -598,8 +607,8 @@ static int Open(vlc_va_t *va, AVCodecContext *ctx, const es_format_t *fmt)
     sys->codec_id = ctx->codec_id;
     sys->i_profile = ctx->profile;
 
-    sys->b_thread_safe = true;//ctx->thread_safe_callbacks;
-    if ( sys->b_thread_safe )
+    sys->b_need_thread_safe = ctx->thread_safe_callbacks;
+    if ( sys->b_need_thread_safe )
         vlc_mutex_init( &sys->surface_lock );
 
     /* Load dll*/
@@ -1074,7 +1083,7 @@ static int DxCreateVideoDecoder(vlc_va_t *va, int codec_id,
         p_picture->index = i;
         p_picture->order = i;
         p_picture->p_ouput = sys->p_render;
-        if ( sys->b_thread_safe )
+        if ( sys->b_need_thread_safe )
             p_picture->p_lock = &sys->surface_lock;
 #if DEBUG_SURFACE
         p_picture->va = va;
