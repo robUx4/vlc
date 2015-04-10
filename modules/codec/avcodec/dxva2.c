@@ -41,6 +41,7 @@
 #include <vlc_codec.h>
 #include <vlc_cpu.h>
 #include <vlc_plugin.h>
+#include <vlc_codecs.h>
 #include <vlc_filter.h>
 
 #include <libavcodec/avcodec.h>
@@ -51,7 +52,6 @@
 #include "avcodec.h"
 #include "va.h"
 #include "../../video_chroma/copy.h"
-#include "../../demux/asf/libasf_guid.h"
 #include "dxva2.h"
 
 static int Open(vlc_va_t *, AVCodecContext *, const es_format_t *);
