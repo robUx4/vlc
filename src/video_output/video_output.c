@@ -965,6 +965,7 @@ static int ThreadDisplayRenderPicture(vout_thread_t *vout, bool is_forced)
          * subject to invalidation...). Since there are no filters, copying
          * pictures from the decoder to the output is unavoidable. */
         VideoFormatCopyCropAr(&direct->format, &todisplay->format);
+        msg_Dbg(vout, "copy picture 0x%p into 0x%p %"PRId64, todisplay, direct, direct->date );
         picture_Copy(direct, todisplay);
         picture_Release(todisplay);
         todisplay = direct;

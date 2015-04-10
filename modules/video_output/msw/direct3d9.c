@@ -323,7 +323,7 @@ static void Prepare(vout_display_t *vd, picture_t *picture, subpicture_t *subpic
 
     d3d_region_t picture_region;
     if (!Direct3D9ImportPicture(vd, &picture_region, surface)) {
-        msg_Dbg(vd, "Prepared picture 0x%p surface 0x%p", picture, surface );
+        msg_Dbg(vd, "Prepared picture 0x%p at %d surface 0x%p date %"PRId64, picture, picture->p_sys->index, surface, picture->date );
         picture_region.width = picture->format.i_visible_width;
         picture_region.height = picture->format.i_visible_height;
         int subpicture_region_count     = 0;
@@ -359,7 +359,7 @@ static void Display(vout_display_t *vd, picture_t *picture, subpicture_t *subpic
     // No stretching should happen here !
     const RECT src = sys->rect_dest_clipped;
     const RECT dst = sys->rect_dest_clipped;
-    msg_Dbg(vd, "Present picture 0x%p surface 0x%p", picture, picture->p_sys->surface );
+    msg_Dbg(vd, "Present picture 0x%p at %d surface 0x%p", picture, picture->p_sys->index, picture->p_sys->surface );
 
     HRESULT hr = IDirect3DDevice9_Present(d3ddev, &src, &dst, sys->hvideownd, NULL);
     if (FAILED(hr)) {
@@ -893,7 +893,7 @@ static const d3d_format_t d3d_formats[] = {
     { "YV12",       MAKEFOURCC('Y','V','1','2'),    VLC_CODEC_YV12,  0,0,0 },
     { "YV12",       MAKEFOURCC('Y','V','1','2'),    VLC_CODEC_I420,  0,0,0 },
     { "YV12",       MAKEFOURCC('Y','V','1','2'),    VLC_CODEC_J420,  0,0,0 },
-    { "DXVA_NV12",  MAKEFOURCC('N','V','1','2'),    VLC_CODEC_DXVA_D3D9_OPAQUE,  0,0,0 },
+    { "DXVAS9",     MAKEFOURCC('N','V','1','2'),    VLC_CODEC_DXVA_D3D9_OPAQUE,  0,0,0 },
     { "NV12",       MAKEFOURCC('N','V','1','2'),    VLC_CODEC_NV12,  0,0,0 },
     { "UYVY",       D3DFMT_UYVY,    VLC_CODEC_UYVY,  0,0,0 },
     { "YUY2",       D3DFMT_YUY2,    VLC_CODEC_YUYV,  0,0,0 },

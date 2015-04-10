@@ -41,7 +41,7 @@
 #define MSW_DIRECT3D9_H_
 
 #define DEBUG_SURFACE 1
-#define DIRECT_DXVA 0
+#define DIRECT_DXVA 1
 
 #ifdef HAVE_CONFIG_H
 # include "config.h"

@@ -141,6 +141,12 @@ struct vlc_va_sys_t
 
     picture_sys_t surface[VA_DXVA2_MAX_SURFACE_COUNT];
     LPDIRECT3DSURFACE9 hw_surface[VA_DXVA2_MAX_SURFACE_COUNT];
+
+    int decoder_surface_num;
+    int decoder_surface_idx;
+    LPDIRECT3DSURFACE9 decoder_surface[VA_DXVA2_MAX_SURFACE_COUNT];
+    picture_sys_t decoder_pictures[VA_DXVA2_MAX_SURFACE_COUNT];
+
 };
 
 #endif /* AVCODEC_DXVA2_H_ */
