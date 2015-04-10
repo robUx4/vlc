@@ -65,6 +65,8 @@
 
 #include <initguid.h> /* must be last included to not redefine existing GUIDs */
 
+#define DECODER_SURFACE 1
+
 /* dxva2api.h GUIDs: http://msdn.microsoft.com/en-us/library/windows/desktop/ms697067(v=vs100).aspx
  * assume that they are declared in dxva2api.h */
 #define MS_GUID(name, l, w1, w2, b1, b2, b3, b4, b5, b6, b7, b8)
@@ -140,11 +142,12 @@ struct vlc_va_sys_t
     picture_sys_t surface[VA_DXVA2_MAX_SURFACE_COUNT];
     LPDIRECT3DSURFACE9 hw_surface[VA_DXVA2_MAX_SURFACE_COUNT];
 
+#if DECODER_SURFACE
     int decoder_surface_num;
     int decoder_surface_idx;
     LPDIRECT3DSURFACE9 decoder_surface[VA_DXVA2_MAX_SURFACE_COUNT];
     picture_sys_t decoder_pictures[VA_DXVA2_MAX_SURFACE_COUNT];
-
+#endif
 };
 
 #endif /* AVCODEC_DXVA2_H_ */

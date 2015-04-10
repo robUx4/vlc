@@ -371,7 +371,7 @@ static void Display(vout_display_t *vd, picture_t *picture, subpicture_t *subpic
 #else
     /* XXX See Prepare() */
     //Direct3D9UnlockSurface(picture);
-#if 0 //LOCK_SURFACE && !DIRECT_DXVA
+#if !LOCK_SURFACE && !DIRECT_DXVA
     Direct3D9LockSurface(picture);
 #endif
     picture_Release(picture);
@@ -953,6 +953,9 @@ static const d3d_format_t *Direct3DFindFormat(vout_display_t *vd, vlc_fourcc_t c
  */
 static int Direct3D9LockSurface(picture_t *picture)
 {
+    if ( picture->p_sys->p_lock )
+        vlc_mutex_lock( picture->p_sys->p_lock );
+
 #if DEBUG_SURFACE
     msg_Dbg( picture->p_sys->va, "%lx d3d9 lock locked %d pts: %"PRId64" surface %d 0x%p", GetCurrentThreadId(), picture->p_sys->b_lockrect, picture->date, picture->p_sys->index, picture->p_sys->surface );
 #endif
@@ -968,6 +971,10 @@ static int Direct3D9LockSurface(picture_t *picture)
     picture->p_sys->b_lockrect = true;
 
     CommonUpdatePicture(picture, NULL, d3drect.pBits, d3drect.Pitch);
+
+    if ( picture->p_sys->p_lock )
+        vlc_mutex_unlock( picture->p_sys->p_lock );
+
     return VLC_SUCCESS;
 }
 /**
@@ -975,6 +982,9 @@ static int Direct3D9LockSurface(picture_t *picture)
  */
 static void Direct3D9UnlockSurface(picture_t *picture)
 {
+    if ( picture->p_sys->p_lock )
+        vlc_mutex_lock( picture->p_sys->p_lock );
+
     /* Unlock the Surface */
 #if DEBUG_SURFACE
     msg_Dbg( picture->p_sys->va, "%lx d3d9 unlock locked %d pts: %"PRId64" surface %d 0x%p", GetCurrentThreadId(), picture->p_sys->b_lockrect, picture->date, picture->p_sys->index, picture->p_sys->surface );
@@ -984,6 +994,9 @@ static void Direct3D9UnlockSurface(picture_t *picture)
         //msg_Dbg(vd, "Failed IDirect3DSurface9_UnlockRect: 0x%0lx", hr);
     }
     picture->p_sys->b_lockrect = false;
+
+    if ( picture->p_sys->p_lock )
+        vlc_mutex_unlock( picture->p_sys->p_lock );
 }
 
 /**
