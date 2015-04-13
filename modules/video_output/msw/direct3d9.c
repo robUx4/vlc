@@ -370,7 +370,10 @@ static void Display(vout_display_t *vd, picture_t *picture, subpicture_t *subpic
     }
 
     /* XXX See Prepare() */
+<<<<<<< HEAD
 #endif
+=======
+>>>>>>> 563754c... DIRECT_DXVA is always set
     picture_Release(picture);
     if (subpicture)
         subpicture_Delete(subpicture);
@@ -538,7 +541,6 @@ static int Direct3D9Create(vout_display_t *vd)
 {
     vout_display_sys_t *sys = vd->sys;
 
-#if DIRECT_DXVA
     if ( vd->cfg->p_dec_sys != NULL )
     {
         const vlc_va_t *p_va = vd->cfg->p_dec_sys->p_va;
@@ -547,7 +549,6 @@ static int Direct3D9Create(vout_display_t *vd)
             sys->d3dobj = p_va->sys->d3dobj;
         }
     }
-#endif
 
     sys->hd3d9_dll = LoadLibrary(TEXT("D3D9.DLL"));
     if (!sys->hd3d9_dll) {
@@ -690,9 +691,13 @@ static int Direct3D9Open(vout_display_t *vd, video_format_t *fmt)
     if (Direct3D9FillPresentationParameters(vd))
         return VLC_EGENERIC;
 
+<<<<<<< HEAD
     if ( vlc_format_is_DXVA( vd->fmt.i_chroma ) &&
          vd->cfg->p_pool_setup != NULL &&
          vd->cfg->p_pool_setup->p_sys != NULL )
+=======
+    if ( vd->cfg->p_dec_sys && vd->cfg->p_dec_sys->p_va && vd->cfg->p_dec_sys->p_va->sys )
+>>>>>>> 563754c... DIRECT_DXVA is always set
     {
         sys->d3ddev = vd->cfg->p_pool_setup->p_sys->d3ddev;
         sys->d3dpp  = vd->cfg->p_pool_setup->p_sys->d3dpp;

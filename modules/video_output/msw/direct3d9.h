@@ -41,7 +41,13 @@
 #define MSW_DIRECT3D9_H_
 
 #define DEBUG_SURFACE 1
+<<<<<<< HEAD
 #define DIRECT_DXVA 0
+=======
+
+#define LOCK_SURFACE 1
+
+>>>>>>> 563754c... DIRECT_DXVA is always set
 
 #ifdef HAVE_CONFIG_H
 # include "config.h"

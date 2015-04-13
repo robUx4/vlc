@@ -53,10 +53,39 @@ struct picture_pool_setup_sys_t {
     D3DPRESENT_PARAMETERS  d3dpp;
 };
 
+<<<<<<< HEAD
 struct picture_sys_t
 {
     LPDIRECT3DSURFACE9 surface;
     LPDIRECT3DDEVICE9  d3ddev; // TODO not needed anymore ?
+=======
+    /* Device manager */
+    UINT                     token;
+    IDirect3DDeviceManager9  *devmng;
+    HANDLE                   device;
+
+    /* Video service */
+    IDirectXVideoDecoderService  *vs;
+    GUID                         input;
+    const d3d_format_t           *p_render;
+
+    /* Video decoder */
+    DXVA2_ConfigPictureDecode    cfg;
+    IDirectXVideoDecoder         *decoder;
+
+    /* Option conversion */
+    D3DFORMAT                    output;
+
+    /* */
+    struct dxva_context hw;
+
+    /* */
+    unsigned     surface_count;
+    unsigned     surface_order;
+    int          surface_width;
+    int          surface_height;
+    vlc_fourcc_t surface_chroma;
+>>>>>>> 563754c... DIRECT_DXVA is always set
 
     picture_t          *fallback;
 
