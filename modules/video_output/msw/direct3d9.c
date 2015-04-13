@@ -551,6 +551,9 @@ static int Direct3D9Create(vout_display_t *vd)
            return VLC_EGENERIC;
         }
         sys->d3dobj = d3dobj;
+        sys->b_ext_d3dobj = false;
+    } else {
+        sys->b_ext_d3dobj = true;
     }
 
     sys->hd3d9x_dll = Direct3D9LoadShaderLibrary();
@@ -585,7 +588,7 @@ static void Direct3D9Destroy(vout_display_t *vd)
 {
     vout_display_sys_t *sys = vd->sys;
 
-    if (sys->d3dobj)
+    if (sys->d3dobj && !sys->b_ext_d3dobj)
        IDirect3D9_Release(sys->d3dobj);
     if (sys->hd3d9_dll)
         FreeLibrary(sys->hd3d9_dll);
@@ -712,6 +715,9 @@ static int Direct3D9Open(vout_display_t *vd, video_format_t *fmt)
            return VLC_EGENERIC;
         }
         sys->d3ddev = d3ddev;
+        sys->b_ext_d3ddev = false;
+    } else {
+        sys->b_ext_d3ddev = true;
     }
 
     UpdateRects(vd, NULL, NULL, true);
@@ -737,7 +743,7 @@ static void Direct3D9Close(vout_display_t *vd)
 
     Direct3D9DestroyResources(vd);
 
-    if (sys->d3ddev)
+    if (sys->d3ddev && !sys->b_ext_d3ddev)
        IDirect3DDevice9_Release(sys->d3ddev);
 
     sys->d3ddev = NULL;
