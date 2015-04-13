@@ -1525,10 +1525,10 @@ static int Direct3D9ImportPicture(vout_display_t *vd,
     }
 
 #if 0
-    IDirect3DDevice9 *pSourceDevice;
-    hr = IDirect3DResource9_GetDevice( source, &pSourceDevice );
-    IDirect3DDevice9 *pDestDevice;
-    hr = IDirect3DResource9_GetDevice( destination, &pDestDevice );
+    D3DSURFACE_DESC pSourceDevice;
+    hr = IDirect3DSurface9_GetDesc( source, &pSourceDevice );
+    D3DSURFACE_DESC pDestDevice;
+    hr = IDirect3DSurface9_GetDesc( destination, &pDestDevice );
 #endif
 
     /* Copy picture surface into texture surface
