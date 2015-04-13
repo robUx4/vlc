@@ -951,10 +951,10 @@ static int DxCreateVideoDecoder(vlc_va_t *va, int codec_id,
     if ( i_threading )
         surface_count += sys->thread_count;
 
-    if (surface_count + 2 * sys->thread_count > VA_DXVA2_MAX_SURFACE_COUNT)
+    if (surface_count + surface_count > VA_DXVA2_MAX_SURFACE_COUNT)
         return VLC_EGENERIC;
     sys->surface_count = surface_count;
-    sys->decoder_surface_num = 2 * sys->thread_count;
+    sys->decoder_surface_num = surface_count;
 
     if (FAILED(IDirectXVideoDecoderService_CreateSurface(sys->vs,
                                                          sys->surface_width,
