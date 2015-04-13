@@ -366,16 +366,8 @@ static void Display(vout_display_t *vd, picture_t *picture, subpicture_t *subpic
         msg_Dbg(vd, "Failed IDirect3DDevice9_Present: 0x%0lx", hr);
     }
 
-#if 0
-    VLC_UNUSED(picture);
-#else
     /* XXX See Prepare() */
-    //Direct3D9UnlockSurface(picture);
-#if !LOCK_SURFACE && !DIRECT_DXVA
-    Direct3D9LockSurface(picture);
-#endif
     picture_Release(picture);
-#endif
     if (subpicture)
         subpicture_Delete(subpicture);
 
@@ -542,7 +534,6 @@ static int Direct3D9Create(vout_display_t *vd)
 {
     vout_display_sys_t *sys = vd->sys;
 
-#if DIRECT_DXVA
     if ( vd->cfg->p_dec_sys != NULL )
     {
         const vlc_va_t *p_va = vd->cfg->p_dec_sys->p_va;
@@ -551,7 +542,6 @@ static int Direct3D9Create(vout_display_t *vd)
             sys->d3dobj = p_va->sys->d3dobj;
         }
     }
-#endif
 
     sys->hd3d9_dll = LoadLibrary(TEXT("D3D9.DLL"));
     if (!sys->hd3d9_dll) {
@@ -685,7 +675,6 @@ static int Direct3D9Open(vout_display_t *vd, video_format_t *fmt)
     if (Direct3D9FillPresentationParameters(vd))
         return VLC_EGENERIC;
 
-#if DIRECT_DXVA
     if ( vd->cfg->p_dec_sys && vd->cfg->p_dec_sys->p_va && vd->cfg->p_dec_sys->p_va->sys )
     {
         const vlc_va_t *p_va = vd->cfg->p_dec_sys->p_va;
@@ -694,7 +683,6 @@ static int Direct3D9Open(vout_display_t *vd, video_format_t *fmt)
         sys->d3dpp = p_va->sys->d3dpp;
 //        sys->hvideownd = sys->d3dpp->hDeviceWindow; /* TODO need to recall CommonInit() ? */
     }
-#endif
 
     if ( sys->d3ddev == NULL )
     {

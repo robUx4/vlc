@@ -119,7 +119,6 @@ struct vlc_va_sys_t
 
     /* Option conversion */
     D3DFORMAT                    output;
-    copy_cache_t                 surface_cache;
 
     /* */
     struct dxva_context hw;

@@ -48,7 +48,6 @@
 
 #include "avcodec.h"
 #include "va.h"
-#include "../../video_chroma/copy.h"
 #include "../../demux/asf/libasf_guid.h"
 #include "../../video_output/msw/direct3d9.h"
 #include "dxva2.h"
@@ -310,9 +309,6 @@ static int DxCreateVideoDecoder(vlc_va_t *,
 static void DxDestroyVideoDecoder(vlc_va_sys_t *);
 static int DxResetVideoDecoder(vlc_va_t *);
 
-static void DxCreateVideoConversion(vlc_va_sys_t *);
-static void DxDestroyVideoConversion(vlc_va_sys_t *);
-
 /* */
 static int Setup(vlc_va_t *va, AVCodecContext *avctx, vlc_fourcc_t *chroma)
 {
@@ -327,7 +323,6 @@ static int Setup(vlc_va_t *va, AVCodecContext *avctx, vlc_fourcc_t *chroma)
              sys->width, sys->height, sys->decoder );
 #endif
     /* */
-    DxDestroyVideoConversion(sys);
     DxDestroyVideoDecoder(sys);
 
     avctx->hwaccel_context = NULL;
@@ -350,16 +345,12 @@ static int Setup(vlc_va_t *va, AVCodecContext *avctx, vlc_fourcc_t *chroma)
     sys->hw.surface = sys->hw_surface;
 
     /* */
-    DxCreateVideoConversion(sys);
+    sys->output = sys->p_render->format;
 
     /* */
 ok:
     avctx->hwaccel_context = &sys->hw;
     *chroma = VLC_CODEC_DXVA_D3D9_OPAQUE;
-#if !DIRECT_DXVA
-    const d3d_format_t *output = D3dFindFormat(sys->output);
-    *chroma = output->fourcc;
-#endif
 
     return VLC_SUCCESS;
 }
@@ -374,14 +365,11 @@ static int Extract(vlc_va_t *va, picture_t *picture, void *opaque,
     vlc_va_sys_t *sys = va->sys;
     LPDIRECT3DSURFACE9 source = (LPDIRECT3DSURFACE9)(uintptr_t)data;
 
-    if (!sys->surface_cache.buffer)
-        return VLC_EGENERIC;
-
     /* */
     if ( p_picture_sys->p_lock )
         vlc_mutex_lock( p_picture_sys->p_lock );
 
-#if !DIRECT_DXVA || EXTRACT_LOCKS || GET_DECODER_SURFACE || !LOCK_SURFACE
+#if EXTRACT_LOCKS || GET_DECODER_SURFACE || !LOCK_SURFACE
     D3DLOCKED_RECT lock;
     if (FAILED(IDirect3DSurface9_LockRect(source, &lock, NULL, D3DLOCK_READONLY))) {
         msg_Err(va, "Failed to lock surface");
@@ -397,7 +385,6 @@ static int Extract(vlc_va_t *va, picture_t *picture, void *opaque,
 
 #endif
 
-#if DIRECT_DXVA
     D3DSURFACE_DESC srcDesc;
     HRESULT hr = IDirect3DSurface9_GetDesc( source, &srcDesc);
     D3DSURFACE_DESC dstDesc;
@@ -424,57 +411,6 @@ static int Extract(vlc_va_t *va, picture_t *picture, void *opaque,
     }
     picture->p_sys->b_lockrect = true;
 #endif
-#else
-    if (sys->p_render->format == MAKEFOURCC('Y','V','1','2') ||
-        sys->p_render->format == MAKEFOURCC('I','M','C','3')) {
-        bool imc3 = sys->p_render->format == MAKEFOURCC('I','M','C','3');
-        size_t chroma_pitch = imc3 ? lock.Pitch : (lock.Pitch / 2);
-
-        assert(sys->output == MAKEFOURCC('Y','V','1','2'));
-
-        size_t pitch[3] = {
-            lock.Pitch,
-            chroma_pitch,
-            chroma_pitch,
-        };
-
-        uint8_t *plane[3] = {
-            (uint8_t*)lock.pBits,
-            (uint8_t*)lock.pBits + pitch[0] * sys->surface_height,
-            (uint8_t*)lock.pBits + pitch[0] * sys->surface_height
-                                 + pitch[1] * sys->surface_height / 2,
-        };
-
-        if (imc3) {
-            uint8_t *V = plane[1];
-            plane[1] = plane[2];
-            plane[2] = V;
-        }
-        CopyFromYv12(picture, plane, pitch, sys->width, sys->height,
-                     &sys->surface_cache);
-    } else {
-        assert(sys->p_render->format == MAKEFOURCC('N','V','1','2'));
-        uint8_t *plane[2] = {
-            lock.pBits,
-            (uint8_t*)lock.pBits + lock.Pitch * sys->surface_height
-        };
-        size_t  pitch[2] = {
-            lock.Pitch,
-            lock.Pitch,
-        };
-        if( sys->output == MAKEFOURCC('Y','V','1','2') )
-        {
-            CopyFromNv12(picture, plane, pitch, sys->width, sys->height,
-                         &sys->surface_cache);
-        }
-        else if( sys->output == MAKEFOURCC('N','V','1','2') )
-        {
-            CopyFromNv12(picture, plane, pitch, sys->width, sys->height,
-                         &sys->surface_cache);
-            msg_Dbg(va, "d3d planes copied to picture %d 0x%p", picture->p_sys ? picture->p_sys->index : -1, picture );
-        }
-    }
-#endif
 
 #if DEBUG_SURFACE
     msg_Dbg(va, "%lx Extracted pts: %"PRId64" surface %d 0x%p from dxva surface %d 0x%p", GetCurrentThreadId(), picture->date, picture->p_sys->index, picture->p_sys->surface, p_picture_sys->index, source);
@@ -483,7 +419,7 @@ static int Extract(vlc_va_t *va, picture_t *picture, void *opaque,
 #endif
 
     /* */
-#if !DIRECT_DXVA || EXTRACT_LOCKS || GET_DECODER_SURFACE || !LOCK_SURFACE
+#if EXTRACT_LOCKS || GET_DECODER_SURFACE || !LOCK_SURFACE
     IDirect3DSurface9_UnlockRect(source);
     p_picture_sys->b_lockrect = false;
 #if DEBUG_SURFACE
@@ -600,7 +536,6 @@ static void Close(vlc_va_t *va, AVCodecContext *ctx)
 
     vlc_va_sys_t *sys = va->sys;
 
-    DxDestroyVideoConversion(sys);
     DxDestroyVideoDecoder(sys);
     DxDestroyVideoService(sys);
     D3dDestroyDeviceManager(sys);
@@ -1247,23 +1182,4 @@ static int DxResetVideoDecoder(vlc_va_t *va)
 {
     msg_Err(va, "DxResetVideoDecoder unimplemented");
     return VLC_EGENERIC;
-}
-
-static void DxCreateVideoConversion(vlc_va_sys_t *va)
-{
-    switch (va->p_render->format) {
-    case MAKEFOURCC('I','M','C','3'):
-        /* TODO */
-        va->output = MAKEFOURCC('Y','V','1','2');
-        break;
-    default:
-        va->output = va->p_render->format;
-        break;
-    }
-    CopyInitCache(&va->surface_cache, va->surface_width);
-}
-
-static void DxDestroyVideoConversion(vlc_va_sys_t *va)
-{
-    CopyCleanCache(&va->surface_cache);
 }

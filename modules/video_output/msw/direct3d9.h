@@ -41,9 +41,8 @@
 #define MSW_DIRECT3D9_H_
 
 #define DEBUG_SURFACE 1
-#define DIRECT_DXVA 1
 
-#define LOCK_SURFACE 1 || !DIRECT_DXVA
+#define LOCK_SURFACE 1
 
 
 #ifdef HAVE_CONFIG_H
