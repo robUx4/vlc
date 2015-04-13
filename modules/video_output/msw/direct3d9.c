@@ -306,21 +306,6 @@ static void Prepare(vout_display_t *vd, picture_t *picture, subpicture_t *subpic
         return;
     }
 
-#if 0
-    picture_Release(picture);
-#else
-    /* FIXME it is a bit ugly, we need the surface to be unlocked for
-     * rendering.
-     *  The clean way would be to release the picture (and ensure that
-     * the vout doesn't keep a reference). But because of the vout
-     * wrapper, we can't */
-
-#if LOCK_SURFACE
-    Direct3D9UnlockSurface(picture);
-#endif
-    //Direct3D9LockSurface(picture);
-#endif
-
     d3d_region_t picture_region;
     if (!Direct3D9ImportPicture(vd, &picture_region, surface)) {
         msg_Dbg(vd, "%lx Prepared picture 0x%p at %d surface 0x%p date %"PRId64, GetCurrentThreadId(), picture, picture->p_sys->index, surface, picture->date );
@@ -1071,13 +1056,8 @@ static int Direct3D9CreatePool(vout_display_t *vd, video_format_t *fmt)
         memset(&pool_cfg, 0, sizeof(pool_cfg));
         pool_cfg.picture_count = 1;
         pool_cfg.picture       = &picture;
-#if !LOCK_SURFACE
-        if( fmt->i_chroma != VLC_CODEC_DXVA_D3D9_OPAQUE)
-#endif
-        {
-            pool_cfg.lock          = Direct3D9LockSurface;
-            pool_cfg.unlock        = Direct3D9UnlockSurface;
-        }
+        pool_cfg.lock          = Direct3D9LockSurface;
+        pool_cfg.unlock        = Direct3D9UnlockSurface;
 
         sys->pool = picture_pool_NewExtended(&pool_cfg);
         if (!sys->pool) {

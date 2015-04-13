@@ -42,9 +42,6 @@
 
 #define DEBUG_SURFACE 1
 
-#define LOCK_SURFACE 1
-
-
 #ifdef HAVE_CONFIG_H
 # include "config.h"
 #endif

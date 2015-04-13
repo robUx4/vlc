@@ -369,7 +369,7 @@ static int Extract(vlc_va_t *va, picture_t *picture, void *opaque,
     if ( p_picture_sys->p_lock )
         vlc_mutex_lock( p_picture_sys->p_lock );
 
-#if EXTRACT_LOCKS || GET_DECODER_SURFACE || !LOCK_SURFACE
+#if EXTRACT_LOCKS || GET_DECODER_SURFACE
     D3DLOCKED_RECT lock;
     if (FAILED(IDirect3DSurface9_LockRect(source, &lock, NULL, D3DLOCK_READONLY))) {
         msg_Err(va, "Failed to lock surface");
@@ -400,18 +400,6 @@ static int Extract(vlc_va_t *va, picture_t *picture, void *opaque,
     }
     picture->p_sys = &sys->decoder_pictures[sys->decoder_surface_idx++];
 
-#if LOCK_SURFACE
-    D3DLOCKED_RECT lock;
-    if (FAILED(IDirect3DSurface9_LockRect(picture->p_sys->surface, &lock, NULL, D3DLOCK_READONLY))) {
-        msg_Err(va, "Failed to lock surface");
-        if ( p_picture_sys->p_lock )
-            vlc_mutex_unlock( p_picture_sys->p_lock );
-
-        return VLC_EGENERIC;
-    }
-    picture->p_sys->b_lockrect = true;
-#endif
-
 #if DEBUG_SURFACE
     msg_Dbg(va, "%lx Extracted pts: %"PRId64" surface %d 0x%p from dxva surface %d 0x%p", GetCurrentThreadId(), picture->date, picture->p_sys->index, picture->p_sys->surface, p_picture_sys->index, source);
 #elif 0
@@ -419,7 +407,7 @@ static int Extract(vlc_va_t *va, picture_t *picture, void *opaque,
 #endif
 
     /* */
-#if EXTRACT_LOCKS || GET_DECODER_SURFACE || !LOCK_SURFACE
+#if EXTRACT_LOCKS || GET_DECODER_SURFACE
     IDirect3DSurface9_UnlockRect(source);
     p_picture_sys->b_lockrect = false;
 #if DEBUG_SURFACE
