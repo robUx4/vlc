@@ -149,8 +149,25 @@ VLC_API int vout_GetSnapshot( vout_thread_t *p_vout,
 VLC_API void vout_ChangeAspectRatio( vout_thread_t *p_vout,
                                      unsigned int i_num, unsigned int i_den );
 
-/* */
+/**
+ * It retreives a picture from the vout or NULL if no pictures are
+ * available yet.
+ *
+ * You MUST call vout_PutPicture or picture_Release on it.
+ *
+ * You may use picture_Hold() (paired with picture_Release()) to keep a
+ * read-only reference.
+ */
 VLC_API picture_t * vout_GetPicture( vout_thread_t * );
+
+/**
+ * It gives to the vout a picture to be displayed.
+ *
+ * The given picture MUST comes from vout_GetPicture.
+ *
+ * Becareful, after vout_PutPicture is called, picture_t::p_next cannot be
+ * read/used.
+ */
 VLC_API void vout_PutPicture( vout_thread_t *, picture_t * );
 
 /* */
