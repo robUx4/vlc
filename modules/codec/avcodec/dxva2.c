@@ -52,7 +52,6 @@
 #include "../../video_output/msw/direct3d9.h"
 #include "dxva2.h"
 
-#define EXTRACT_LOCKS 0
 #define GET_DECODER_SURFACE 0
 
 static int Open(vlc_va_t *, AVCodecContext *, const es_format_t *);
@@ -369,7 +368,7 @@ static int Extract(vlc_va_t *va, picture_t *picture, void *opaque,
     if ( p_picture_sys->p_lock )
         vlc_mutex_lock( p_picture_sys->p_lock );
 
-#if EXTRACT_LOCKS || GET_DECODER_SURFACE
+#if GET_DECODER_SURFACE
     D3DLOCKED_RECT lock;
     if (FAILED(IDirect3DSurface9_LockRect(source, &lock, NULL, D3DLOCK_READONLY))) {
         msg_Err(va, "Failed to lock surface");
@@ -407,7 +406,7 @@ static int Extract(vlc_va_t *va, picture_t *picture, void *opaque,
 #endif
 
     /* */
-#if EXTRACT_LOCKS || GET_DECODER_SURFACE
+#if GET_DECODER_SURFACE
     IDirect3DSurface9_UnlockRect(source);
     p_picture_sys->b_lockrect = false;
 #if DEBUG_SURFACE
