@@ -371,11 +371,10 @@ static int Extract(vlc_va_t *va, picture_t *picture, void *opaque,
     D3DSURFACE_DESC dstDesc;
     if ( sys->decoder_surface_idx >= sys->decoder_surface_num )
         sys->decoder_surface_idx = 0;
-//sys->decoder_surface_idx = p_picture_sys->index;
     hr = IDirect3DSurface9_GetDesc( sys->decoder_pictures[sys->decoder_surface_idx].surface, &dstDesc);
-    // TODO find an unused "decoder" surface/picture and copy the lock surface to it
+// TODO find an unused "decoder" surface/picture and copy the lock surface to it
+//sys->decoder_surface_idx = p_picture_sys->index;
     hr = IDirect3DDevice9_StretchRect( sys->d3ddev, source, NULL, sys->decoder_pictures[sys->decoder_surface_idx].surface, NULL, D3DTEXF_LINEAR);
-    //hr = IDirect3DDevice9_UpdateSurface( sys->d3ddev, d3d, NULL, sys->decoder_surface[0], NULL );
     if (FAILED(hr)) {
         msg_Err(va, "Failed to copy the hw surface to the decoder surface locked %d", sys->decoder_pictures[sys->decoder_surface_idx].b_lockrect );
     }
@@ -952,15 +951,17 @@ static int DxCreateVideoDecoder(vlc_va_t *va, int codec_id,
         surface_count += 2;
 
     if ( i_threading )
-        surface_count += 2 * sys->thread_count;
+        surface_count += sys->thread_count;
 
-    if (surface_count > VA_DXVA2_MAX_SURFACE_COUNT)
+    if (surface_count + 2 * sys->thread_count > VA_DXVA2_MAX_SURFACE_COUNT)
         return VLC_EGENERIC;
     sys->surface_count = surface_count;
+    sys->decoder_surface_num = 2 * sys->thread_count;
+
     if (FAILED(IDirectXVideoDecoderService_CreateSurface(sys->vs,
                                                          sys->surface_width,
                                                          sys->surface_height,
-                                                         sys->surface_count - 1,
+                                                         sys->surface_count + sys->decoder_surface_num - 1,
                                                          sys->p_render->format,
                                                          D3DPOOL_DEFAULT,
                                                          0,
@@ -969,24 +970,9 @@ static int DxCreateVideoDecoder(vlc_va_t *va, int codec_id,
                                                          NULL))) {
         msg_Err(va, "IDirectXVideoAccelerationService_CreateSurface failed");
         sys->surface_count = 0;
+        sys->decoder_surface_num = 0;
         return VLC_EGENERIC;
     }
-
-    if (FAILED(IDirectXVideoDecoderService_CreateSurface(sys->vs,
-                                                         sys->surface_width,
-                                                         sys->surface_height,
-                                                         sys->surface_count - 1,
-                                                         sys->p_render->format,
-                                                         D3DPOOL_DEFAULT,
-                                                         0,
-                                                         DXVA2_VideoDecoderRenderTarget,
-                                                         sys->decoder_surface,
-                                                         NULL))) {
-        msg_Err(va, "IDirectXVideoAccelerationService_CreateSurface decoder failed");
-        sys->surface_count = 0;
-        return VLC_EGENERIC;
-    }
-    sys->decoder_surface_num = sys->surface_count;
 
     for (unsigned i = 0; i < sys->surface_count; i++) {
         picture_sys_t *p_picture = &sys->surface[i];
@@ -1001,9 +987,10 @@ static int DxCreateVideoDecoder(vlc_va_t *va, int codec_id,
         p_picture->va = va;
         msg_Dbg(va, "init dxva surface object %d 0x%p at 0x%p", i, p_picture, p_picture->surface);
 #endif
-
+    }
+    for (unsigned i = 0; i < sys->decoder_surface_num; i++) {
         picture_sys_t *p_dec_picture = &sys->decoder_pictures[i];
-        p_dec_picture->surface = sys->decoder_surface[i];
+        p_dec_picture->surface = sys->hw_surface[sys->surface_count + i];
         p_dec_picture->refcount = 0;
         p_dec_picture->index = i;
         p_dec_picture->order = i;
@@ -1122,12 +1109,16 @@ static void DxDestroyVideoDecoder(vlc_va_sys_t *va)
         msg_Dbg( va->va, "%lx release dxva surface %d 0x%p", GetCurrentThreadId(), va->surface[i].index, va->hw_surface[i] );
 #endif
         IDirect3DSurface9_Release( va->hw_surface[i] );
-#if DEBUG_SURFACE
-        msg_Dbg( va->va, "%lx release decoder surface %d 0x%p", GetCurrentThreadId(), va->decoder_pictures[i].index, va->decoder_surface[i] );
-#endif
-        IDirect3DSurface9_Release( va->decoder_surface[i] );
     }
     va->surface_count = 0;
+    for (unsigned i = 0; i < va->decoder_surface_num; i++)
+    {
+#if DEBUG_SURFACE
+        msg_Dbg( va->va, "%lx release decoder surface %d 0x%p", GetCurrentThreadId(), va->decoder_pictures[i].index, va->decoder_pictures[i].surface );
+#endif
+        IDirect3DSurface9_Release( va->decoder_pictures[i].surface );
+    }
+    va->decoder_surface_num = 0;
 }
 
 static int DxResetVideoDecoder(vlc_va_t *va)
