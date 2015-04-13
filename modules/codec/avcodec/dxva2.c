@@ -52,8 +52,6 @@
 #include "../../video_output/msw/direct3d9.h"
 #include "dxva2.h"
 
-#define GET_DECODER_SURFACE 0
-
 static int Open(vlc_va_t *, AVCodecContext *, const es_format_t *);
 static void Close(vlc_va_t *, AVCodecContext *);
 
@@ -368,22 +366,6 @@ static int Extract(vlc_va_t *va, picture_t *picture, void *opaque,
     if ( p_picture_sys->p_lock )
         vlc_mutex_lock( p_picture_sys->p_lock );
 
-#if GET_DECODER_SURFACE
-    D3DLOCKED_RECT lock;
-    if (FAILED(IDirect3DSurface9_LockRect(source, &lock, NULL, D3DLOCK_READONLY))) {
-        msg_Err(va, "Failed to lock surface");
-        if ( p_picture_sys->p_lock )
-            vlc_mutex_unlock( p_picture_sys->p_lock );
-
-        return VLC_EGENERIC;
-    }
-    p_picture_sys->b_lockrect = true;
-#if DEBUG_SURFACE
-    msg_Dbg(va, "d3d surface 0x%p at %d 0x%p locked", data, p_picture_sys->index, p_picture_sys );
-#endif
-
-#endif
-
     D3DSURFACE_DESC srcDesc;
     HRESULT hr = IDirect3DSurface9_GetDesc( source, &srcDesc);
     D3DSURFACE_DESC dstDesc;
@@ -401,18 +383,9 @@ static int Extract(vlc_va_t *va, picture_t *picture, void *opaque,
 
 #if DEBUG_SURFACE
     msg_Dbg(va, "%lx Extracted pts: %"PRId64" surface %d 0x%p from dxva surface %d 0x%p", GetCurrentThreadId(), picture->date, picture->p_sys->index, picture->p_sys->surface, p_picture_sys->index, source);
-#elif 0
-    msg_Dbg(va, "%lx Extracted pts: %"PRId64" surface %d 0x%p from dxva surface %d 0x%p", GetCurrentThreadId(), picture->date, picture->p_sys->index, picture->p_sys->surface, p_picture_sys->index, source);
 #endif
 
     /* */
-#if GET_DECODER_SURFACE
-    IDirect3DSurface9_UnlockRect(source);
-    p_picture_sys->b_lockrect = false;
-#if DEBUG_SURFACE
-    msg_Dbg(va, "d3d surface 0x%p at %d 0x%p unlocked", data, p_picture_sys->index, p_picture_sys );
-#endif
-#endif
     if ( p_picture_sys->p_lock )
         vlc_mutex_unlock( p_picture_sys->p_lock );
 
@@ -446,11 +419,7 @@ static int Get(vlc_va_t *va, void **opaque, uint8_t **data)
      * XXX using the oldest is a workaround in case a problem happens with libavcodec */
     unsigned i, old;
     for (i = 0, old = 0; i < sys->surface_count; i++) {
-#if GET_DECODER_SURFACE
-        picture_sys_t *surface = &sys->decoder_pictures[i];
-#else
         picture_sys_t *surface = &sys->surface[i];
-#endif
 
         if ( surface->refcount == 0 && !surface->b_lockrect )
             break;
@@ -465,11 +434,7 @@ static int Get(vlc_va_t *va, void **opaque, uint8_t **data)
     }
     //i=0;
 
-#if GET_DECODER_SURFACE
-    picture_sys_t *p_picture_sys = &sys->decoder_pictures[i];
-#else
     picture_sys_t *p_picture_sys = &sys->surface[i];
-#endif
 
 #if 0
     LPDIRECT3DSURFACE9 backBufferSurface;
