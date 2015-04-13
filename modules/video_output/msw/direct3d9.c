@@ -308,7 +308,9 @@ static void Prepare(vout_display_t *vd, picture_t *picture, subpicture_t *subpic
 
     d3d_region_t picture_region;
     if (!Direct3D9ImportPicture(vd, &picture_region, surface)) {
+#if DEBUG_SURFACE
         msg_Dbg(vd, "%lx Prepared picture 0x%p at %d surface 0x%p date %"PRId64, GetCurrentThreadId(), picture, picture->p_sys->index, surface, picture->date );
+#endif
         picture_region.width = picture->format.i_visible_width;
         picture_region.height = picture->format.i_visible_height;
         int subpicture_region_count     = 0;
@@ -344,7 +346,9 @@ static void Display(vout_display_t *vd, picture_t *picture, subpicture_t *subpic
     // No stretching should happen here !
     const RECT src = sys->rect_dest_clipped;
     const RECT dst = sys->rect_dest_clipped;
+#if DEBUG_SURFACE
     msg_Dbg(vd, "%lx Present picture 0x%p at %d surface 0x%p", GetCurrentThreadId(), picture, picture->p_sys->index, picture->p_sys->surface );
+#endif
 
     HRESULT hr = IDirect3DDevice9_Present(d3ddev, &src, &dst, sys->hvideownd, NULL);
     if (FAILED(hr)) {

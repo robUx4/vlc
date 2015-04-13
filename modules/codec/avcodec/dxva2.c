@@ -1106,7 +1106,7 @@ static void DxDestroyVideoDecoder(vlc_va_sys_t *va)
     for (unsigned i = 0; i < va->surface_count; i++)
     {
 #if DEBUG_SURFACE
-        msg_Dbg( va->va, "%lx release dxva surface %d 0x%p", GetCurrentThreadId(), va->surface[i].index, va->hw_surface[i] );
+        msg_Dbg( va->va, "%lx release gpu surface %d 0x%p", GetCurrentThreadId(), va->surface[i].index, va->hw_surface[i] );
 #endif
         IDirect3DSurface9_Release( va->hw_surface[i] );
     }
