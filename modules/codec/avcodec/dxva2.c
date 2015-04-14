@@ -432,27 +432,25 @@ static int Get(vlc_va_t *va, void **opaque, uint8_t **data)
 
     /* Grab an unused surface, in case none are, try the oldest
      * XXX using the oldest is a workaround in case a problem happens with libavcodec */
-    unsigned i, old;
-    for (i = 0, old = 0; i < sys->surface_count; i++) {
-        picture_sys_t *surface = &sys->surface[i];
-
-        if ( surface->refcount == 0 )
-            break;
-
-        if (surface->order < sys->surface[old].order)
-            old = i;
-    }
-    if (i >= sys->surface_count)
-    {
-        msg_Warn(va, "%lx could not find an unused surface, use oldest index %d", GetCurrentThreadId(), old);
-        i = old;
-    }
-    *data = (void *)sys->surface[i].surface;
-    p_output->p_dxva_surface = &sys->surface[i];
-    p_output->p_dxva_surface->refcount++;
-    p_output->p_dxva_surface->order = sys->surface_order++;
-
+    unsigned i;
     picture_sys_t *oldest = NULL;
+    for (i = 0; i < sys->decoder_surface_num; i++) {
+        picture_sys_t *surface = &sys->surface[i];
+        if (!surface->refcount && (!oldest || surface->order < oldest->order))
+           oldest = surface;
+    }
+    if ( oldest == NULL )
+    {
+        msg_Warn(va, "%lx could not find an unused surface, use oldest index", GetCurrentThreadId());
+        oldest = &sys->surface[0];
+    }
+    *data = (void *)oldest->surface;
+    p_output->p_dxva_surface = oldest;
+    p_output->p_dxva_surface->refcount++;
+    assert( p_output->p_dxva_surface->refcount == 1 );
+
+    /* pick the display surface that was last used */
+    oldest = NULL;
     for (i = 0; i < sys->decoder_surface_num; i++) {
         picture_sys_t *surface = &sys->decoder_pictures[i];
         if (!surface->refcount && (!oldest || surface->order < oldest->order))
@@ -489,6 +487,7 @@ static void Release(void *opaque, uint8_t *data)
         vlc_mutex_lock( p_output->p_display_surface->p_lock );
 
     p_output->p_dxva_surface->refcount--;
+    p_output->p_dxva_surface->order = p_output->p_sys->surface_order;
     p_output->p_display_surface->refcount--;
     p_output->p_display_surface->order = p_output->p_sys->surface_order++;
 
