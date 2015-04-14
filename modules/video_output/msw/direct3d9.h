@@ -80,7 +80,7 @@ struct picture_sys_t
     const d3d_format_t *p_ouput;
     bool               b_lockrect;
 #if DEBUG_SURFACE
-    vlc_va_t          *va;
+    vlc_va_t           *p_va;
 #endif
 };
 

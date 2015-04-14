@@ -52,7 +52,6 @@
 #include "direct3d9.h"
 #include "builtin_shaders.h"
 #include "../../codec/avcodec/video.h"
-#include "../../codec/avcodec/dxva2.h"
 
 /*****************************************************************************
  * Module descriptor
@@ -523,19 +522,21 @@ static int Direct3D9Create(vout_display_t *vd)
 {
     vout_display_sys_t *sys = vd->sys;
 
+    sys->hd3d9_dll = LoadLibrary(TEXT("D3D9.DLL"));
+    if (!sys->hd3d9_dll) {
+        msg_Warn(vd, "cannot load d3d9.dll, aborting");
+        return VLC_EGENERIC;
+    }
+
     if ( vd->cfg->p_dec_sys != NULL )
     {
         const vlc_va_t *p_va = vd->cfg->p_dec_sys->p_va;
         if ( p_va != NULL && p_va->sys != NULL )
         {
+            sys->p_va = p_va;
+            vlc_object_hold( sys->p_va );
             sys->d3dobj = p_va->sys->d3dobj;
         }
-    }
-
-    sys->hd3d9_dll = LoadLibrary(TEXT("D3D9.DLL"));
-    if (!sys->hd3d9_dll) {
-        msg_Warn(vd, "cannot load d3d9.dll, aborting");
-        return VLC_EGENERIC;
     }
 
     if ( sys->d3dobj == NULL )
@@ -555,9 +556,8 @@ static int Direct3D9Create(vout_display_t *vd)
            return VLC_EGENERIC;
         }
         sys->d3dobj = d3dobj;
-        sys->b_ext_d3dobj = false;
     } else {
-        sys->b_ext_d3dobj = true;
+        IDirect3D9_AddRef( sys->d3dobj );
     }
 
     sys->hd3d9x_dll = Direct3D9LoadShaderLibrary();
@@ -592,16 +592,19 @@ static void Direct3D9Destroy(vout_display_t *vd)
 {
     vout_display_sys_t *sys = vd->sys;
 
-    if (sys->d3dobj && !sys->b_ext_d3dobj)
+    if (sys->d3dobj)
        IDirect3D9_Release(sys->d3dobj);
     if (sys->hd3d9_dll)
         FreeLibrary(sys->hd3d9_dll);
     if (sys->hd3d9x_dll)
         FreeLibrary(sys->hd3d9x_dll);
+    if (sys->p_va)
+        vlc_object_release(sys->p_va);
 
     sys->d3dobj = NULL;
     sys->hd3d9_dll = NULL;
     sys->hd3d9x_dll = NULL;
+    sys->p_va = NULL;
 }
 
 
@@ -719,9 +722,8 @@ static int Direct3D9Open(vout_display_t *vd, video_format_t *fmt)
            return VLC_EGENERIC;
         }
         sys->d3ddev = d3ddev;
-        sys->b_ext_d3ddev = false;
     } else {
-        sys->b_ext_d3ddev = true;
+        IDirect3DDevice9_AddRef( sys->d3ddev );
     }
 
     UpdateRects(vd, NULL, NULL, true);
@@ -747,8 +749,8 @@ static void Direct3D9Close(vout_display_t *vd)
 
     Direct3D9DestroyResources(vd);
 
-    if (sys->d3ddev && !sys->b_ext_d3ddev)
-       IDirect3DDevice9_Release(sys->d3ddev);
+    if (sys->d3ddev)
+       IDirect3DDevice9_Release( sys->d3ddev );
 
     sys->d3ddev = NULL;
 }
@@ -940,7 +942,7 @@ static int Direct3D9LockSurface(picture_t *picture)
         vlc_mutex_lock( picture->p_sys->p_lock );
 
 #if DEBUG_SURFACE
-    msg_Dbg( picture->p_sys->va, "%lx d3d9 lock locked %d pts: %"PRId64" surface %d 0x%p", GetCurrentThreadId(), picture->p_sys->b_lockrect, picture->date, picture->p_sys->index, picture->p_sys->surface );
+    msg_Dbg( picture->p_sys->p_va, "%lx d3d9 lock locked %d pts: %"PRId64" surface %d 0x%p", GetCurrentThreadId(), picture->p_sys->b_lockrect, picture->date, picture->p_sys->index, picture->p_sys->surface );
 #endif
 
     /* Lock the surface to get a valid pointer to the picture buffer */
@@ -970,7 +972,7 @@ static void Direct3D9UnlockSurface(picture_t *picture)
 
     /* Unlock the Surface */
 #if DEBUG_SURFACE
-    msg_Dbg( picture->p_sys->va, "%lx d3d9 unlock locked %d pts: %"PRId64" surface %d 0x%p", GetCurrentThreadId(), picture->p_sys->b_lockrect, picture->date, picture->p_sys->index, picture->p_sys->surface );
+    msg_Dbg( picture->p_sys->p_va, "%lx d3d9 unlock locked %d pts: %"PRId64" surface %d 0x%p", GetCurrentThreadId(), picture->p_sys->b_lockrect, picture->date, picture->p_sys->index, picture->p_sys->surface );
 #endif
     HRESULT hr = IDirect3DSurface9_UnlockRect(picture->p_sys->surface);
     if (FAILED(hr)) {

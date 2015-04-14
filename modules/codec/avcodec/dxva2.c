@@ -475,7 +475,7 @@ static void Release(void *opaque, uint8_t *data)
         vlc_mutex_unlock( p_picture->p_lock );
 
 #if DEBUG_SURFACE
-    msg_Dbg( p_picture->va, "%lx pool release picture_t 0x%p dxva surface %d at 0x%p refcount=%d", GetCurrentThreadId(), opaque, p_picture->index, data, p_picture->refcount );
+    msg_Dbg( p_picture->p_va, "%lx pool release picture_t 0x%p dxva surface %d at 0x%p refcount=%d", GetCurrentThreadId(), opaque, p_picture->index, data, p_picture->refcount );
 #endif
 }
 
@@ -982,7 +982,7 @@ static int DxCreateVideoDecoder(vlc_va_t *va, int codec_id,
         if ( sys->b_need_thread_safe )
             p_picture->p_lock = &sys->surface_lock;
 #if DEBUG_SURFACE
-        p_picture->va = va;
+        p_picture->p_va = va;
         msg_Dbg(va, "init dxva surface object %d 0x%p at 0x%p", i, p_picture, p_picture->surface);
 #endif
     }
@@ -993,7 +993,7 @@ static int DxCreateVideoDecoder(vlc_va_t *va, int codec_id,
         p_dec_picture->index = i;
         p_dec_picture->order = i;
 #if DEBUG_SURFACE
-        p_dec_picture->va = va;
+        p_dec_picture->p_va = va;
         msg_Dbg(va, "init decoder surface object %d 0x%p at 0x%p", i, p_dec_picture, p_dec_picture->surface);
 #endif
     }
