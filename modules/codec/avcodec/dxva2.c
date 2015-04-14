@@ -446,32 +446,23 @@ static int Get(vlc_va_t *va, void **opaque, uint8_t **data)
     }
     p_output->p_dxva_surface = &sys->surface[i];
     p_output->p_dxva_surface->refcount++;
-    p_output->p_dxva_surface->order = sys->surface_order;
-#if 0
-    for (i = 0, old = 0; i < sys->decoder_surface_num; i++) {
-        picture_sys_t *surface = &sys->decoder_pictures[i];
+    p_output->p_dxva_surface->order = sys->surface_order++;
 
-        if ( surface->refcount == 0 && !surface->b_lockrect )
-            break;
-
-        if (surface->order < sys->surface[old].order)
-            old = i;
-    }
-    if (i >= sys->decoder_surface_num)
+    do
     {
-        msg_Warn(va, "%lx could not find an unused surface, use oldest index %d", GetCurrentThreadId(), old);
-        i = old;
-    }
-#endif
-    p_output->p_display_surface = &sys->decoder_pictures[i];
-    p_output->p_display_surface->refcount++;
-    p_output->p_display_surface->order = sys->surface_order++;
+        sys->decoder_surface_idx++;
+        if ( sys->decoder_surface_idx >= sys->decoder_surface_num )
+            sys->decoder_surface_idx = 0;
+    } while ( sys->decoder_pictures[sys->decoder_surface_idx].refcount );
 
-    /* has to be a LPDIRECT3DSURFACE9 from the pool passed to the decoder */
+    p_output->p_display_surface = &sys->decoder_pictures[sys->decoder_surface_idx];
+    p_output->p_display_surface->refcount++;
+    assert( p_output->p_display_surface->refcount == 1 );
+
     *data = (void *)p_output->p_dxva_surface->surface;
     *opaque = p_output;
 #if DEBUG_SURFACE
-    msg_Dbg( va, "%lx pool get picture_sys_t 0x%p dxva surface %d 0x%p", GetCurrentThreadId(), p_output->p_display_surface, i, p_output->p_display_surface->surface );
+    msg_Dbg( va, "%lx pool get picture_sys_t 0x%p dxva surface %d 0x%p", GetCurrentThreadId(), p_output->p_dxva_surface, i, p_output->p_dxva_surface->surface );
 #endif
 
     IDirect3DSurface9_AddRef( p_output->p_display_surface->surface );
@@ -499,7 +490,7 @@ static void Release(void *opaque, uint8_t *data)
         vlc_mutex_unlock( p_output->p_dxva_surface->p_lock );
 
 #if DEBUG_SURFACE
-    msg_Dbg( p_output->p_display_surface->p_va, "%lx pool release picture_t 0x%p dxva surface %d at 0x%p refcount=%d", GetCurrentThreadId(), opaque, p_output->p_display_surface->index, data, p_output->p_display_surface->refcount );
+    msg_Dbg( p_output->p_dxva_surface->p_va, "%lx pool release picture_t 0x%p dxva surface %d at 0x%p refcount=%d", GetCurrentThreadId(), opaque, p_output->p_dxva_surface->index, data, p_output->p_dxva_surface->refcount );
 #endif
 
     free( p_output );
@@ -542,7 +533,7 @@ static int Open(vlc_va_t *va, AVCodecContext *ctx, const es_format_t *fmt)
     sys->codec_id = ctx->codec_id;
     sys->i_profile = ctx->profile;
 
-    sys->b_need_thread_safe = true; //ctx->thread_safe_callbacks;
+    sys->b_need_thread_safe = ctx->thread_safe_callbacks;
     if ( sys->b_need_thread_safe )
         vlc_mutex_init( &sys->surface_lock );
 
