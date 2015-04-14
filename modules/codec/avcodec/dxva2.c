@@ -354,6 +354,7 @@ struct dxva_opaque
 {
     picture_sys_t *p_dxva_surface;
     picture_sys_t *p_display_surface;
+    vlc_va_sys_t  *p_sys;
 };
 
 static int Extract(vlc_va_t *va, picture_t *picture, void *opaque,
@@ -387,7 +388,7 @@ static int Extract(vlc_va_t *va, picture_t *picture, void *opaque,
 #endif
     hr = IDirect3DDevice9_StretchRect( sys->d3ddev, source, NULL, output, NULL, D3DTEXF_NONE);
     if (FAILED(hr)) {
-        msg_Err(va, "Failed to copy the hw surface to the decoder surface (hr=0x%0lx) locked %d", hr, sys->decoder_pictures[sys->decoder_surface_idx].b_lockrect );
+        msg_Err(va, "Failed to copy the hw surface to the decoder surface (hr=0x%0lx) locked %d", hr, p_output->p_display_surface->b_lockrect );
     }
     picture->p_sys = p_output->p_display_surface;
 
@@ -423,6 +424,7 @@ static int Get(vlc_va_t *va, void **opaque, uint8_t **data)
     }
 
     struct dxva_opaque *p_output = malloc(sizeof(*p_output));
+    p_output->p_sys = sys;
 
     if ( sys->b_need_thread_safe )
         vlc_mutex_lock( &sys->surface_lock );
@@ -448,14 +450,19 @@ static int Get(vlc_va_t *va, void **opaque, uint8_t **data)
     p_output->p_dxva_surface->refcount++;
     p_output->p_dxva_surface->order = sys->surface_order++;
 
-    do
+    picture_sys_t *oldest = NULL;
+    for (i = 0; i < sys->decoder_surface_num; i++) {
+        picture_sys_t *surface = &sys->decoder_pictures[i];
+        if (!surface->refcount && (!oldest || surface->order < oldest->order))
+           oldest = surface;
+    }
+    if ( oldest == NULL )
     {
-        sys->decoder_surface_idx++;
-        if ( sys->decoder_surface_idx >= sys->decoder_surface_num )
-            sys->decoder_surface_idx = 0;
-    } while ( sys->decoder_pictures[sys->decoder_surface_idx].refcount );
+        msg_Warn(va, "no free d3d surface found" );
+        oldest = &sys->decoder_pictures[0];
+    }
 
-    p_output->p_display_surface = &sys->decoder_pictures[sys->decoder_surface_idx];
+    p_output->p_display_surface = oldest;
     p_output->p_display_surface->refcount++;
     assert( p_output->p_display_surface->refcount == 1 );
 
@@ -483,6 +490,7 @@ static void Release(void *opaque, uint8_t *data)
 
     p_output->p_dxva_surface->refcount--;
     p_output->p_display_surface->refcount--;
+    p_output->p_display_surface->order = p_output->p_sys->surface_order++;
 
     IDirect3DSurface9_Release( p_output->p_display_surface->surface );
 
@@ -1016,6 +1024,7 @@ static int DxCreateVideoDecoder(vlc_va_t *va, int codec_id,
         msg_Dbg(va, "init decoder surface object %d 0x%p at 0x%p", i, p_dec_picture, p_dec_picture->surface);
 #endif
     }
+    sys->surface_order = sys->decoder_surface_num;
     msg_Dbg(va, "IDirectXVideoAccelerationService_CreateSurface succeed with %d surfaces (%dx%d)",
             sys->surface_count, fmt->i_width, fmt->i_height);
 
