@@ -369,8 +369,8 @@ static int Extract(vlc_va_t *va, picture_t *picture, void *opaque,
     assert(source == p_output->p_dxva_surface->surface);
 
     /* */
-    if ( p_output->p_dxva_surface->p_lock )
-        vlc_mutex_lock( p_output->p_dxva_surface->p_lock );
+    if ( p_output->p_display_surface->p_lock )
+        vlc_mutex_lock( p_output->p_display_surface->p_lock );
 
     HRESULT hr;
 #if 0
@@ -397,8 +397,8 @@ static int Extract(vlc_va_t *va, picture_t *picture, void *opaque,
 #endif
 
     /* */
-    if ( p_output->p_dxva_surface->p_lock )
-        vlc_mutex_unlock( p_output->p_dxva_surface->p_lock );
+    if ( p_output->p_display_surface->p_lock )
+        vlc_mutex_unlock( p_output->p_display_surface->p_lock );
 
     return VLC_SUCCESS;
 }
@@ -424,6 +424,7 @@ static int Get(vlc_va_t *va, void **opaque, uint8_t **data)
     }
 
     struct dxva_opaque *p_output = malloc(sizeof(*p_output));
+    *opaque = p_output;
     p_output->p_sys = sys;
 
     if ( sys->b_need_thread_safe )
@@ -435,7 +436,7 @@ static int Get(vlc_va_t *va, void **opaque, uint8_t **data)
     for (i = 0, old = 0; i < sys->surface_count; i++) {
         picture_sys_t *surface = &sys->surface[i];
 
-        if ( surface->refcount == 0 && !surface->b_lockrect )
+        if ( surface->refcount == 0 )
             break;
 
         if (surface->order < sys->surface[old].order)
@@ -446,6 +447,7 @@ static int Get(vlc_va_t *va, void **opaque, uint8_t **data)
         msg_Warn(va, "%lx could not find an unused surface, use oldest index %d", GetCurrentThreadId(), old);
         i = old;
     }
+    *data = (void *)sys->surface[i].surface;
     p_output->p_dxva_surface = &sys->surface[i];
     p_output->p_dxva_surface->refcount++;
     p_output->p_dxva_surface->order = sys->surface_order++;
@@ -453,7 +455,9 @@ static int Get(vlc_va_t *va, void **opaque, uint8_t **data)
     picture_sys_t *oldest = NULL;
     for (i = 0; i < sys->decoder_surface_num; i++) {
         picture_sys_t *surface = &sys->decoder_pictures[i];
-        if (!surface->refcount && (!oldest || surface->order < oldest->order))
+        if (surface->b_lockrect)
+            assert( surface->refcount);
+        if (!surface->refcount && !surface->b_lockrect && (!oldest || surface->order < oldest->order))
            oldest = surface;
     }
     if ( oldest == NULL )
@@ -466,8 +470,6 @@ static int Get(vlc_va_t *va, void **opaque, uint8_t **data)
     p_output->p_display_surface->refcount++;
     assert( p_output->p_display_surface->refcount == 1 );
 
-    *data = (void *)p_output->p_dxva_surface->surface;
-    *opaque = p_output;
 #if DEBUG_SURFACE
     msg_Dbg( va, "%lx pool get picture_sys_t 0x%p dxva surface %d 0x%p", GetCurrentThreadId(), p_output->p_dxva_surface, i, p_output->p_dxva_surface->surface );
 #endif
@@ -485,8 +487,8 @@ static void Release(void *opaque, uint8_t *data)
     VLC_UNUSED( data );
 
     struct dxva_opaque *p_output = opaque;
-    if ( p_output->p_dxva_surface->p_lock )
-        vlc_mutex_lock( p_output->p_dxva_surface->p_lock );
+    if ( p_output->p_display_surface->p_lock )
+        vlc_mutex_lock( p_output->p_display_surface->p_lock );
 
     p_output->p_dxva_surface->refcount--;
     p_output->p_display_surface->refcount--;
@@ -494,11 +496,11 @@ static void Release(void *opaque, uint8_t *data)
 
     IDirect3DSurface9_Release( p_output->p_display_surface->surface );
 
-    if ( p_output->p_dxva_surface->p_lock )
-        vlc_mutex_unlock( p_output->p_dxva_surface->p_lock );
+    if ( p_output->p_display_surface->p_lock )
+        vlc_mutex_unlock( p_output->p_display_surface->p_lock );
 
 #if DEBUG_SURFACE
-    msg_Dbg( p_output->p_dxva_surface->p_va, "%lx pool release picture_t 0x%p dxva surface %d at 0x%p refcount=%d", GetCurrentThreadId(), opaque, p_output->p_dxva_surface->index, data, p_output->p_dxva_surface->refcount );
+    msg_Dbg( p_output->p_display_surface->p_va, "%lx pool release picture_t 0x%p dxva surface %d at 0x%p refcount=%d", GetCurrentThreadId(), opaque, p_output->p_display_surface->index, data, p_output->p_display_surface->refcount );
 #endif
 
     free( p_output );
