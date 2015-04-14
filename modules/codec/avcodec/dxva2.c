@@ -374,7 +374,7 @@ static int Extract(vlc_va_t *va, picture_t *picture, void *opaque,
 //sys->decoder_surface_idx = p_picture_sys->index;
     hr = IDirect3DDevice9_StretchRect( sys->d3ddev, source, NULL, sys->decoder_pictures[sys->decoder_surface_idx].surface, NULL, D3DTEXF_NONE);
     if (FAILED(hr)) {
-        msg_Err(va, "Failed to copy the hw surface to the decoder surface locked %d", sys->decoder_pictures[sys->decoder_surface_idx].b_lockrect );
+        msg_Err(va, "Failed to copy the hw surface to the decoder surface (hr=0x%0lx) locked %d", hr, sys->decoder_pictures[sys->decoder_surface_idx].b_lockrect );
     }
     picture->p_sys = &sys->decoder_pictures[sys->decoder_surface_idx++];
 
