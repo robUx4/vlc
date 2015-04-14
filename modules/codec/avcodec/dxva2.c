@@ -434,7 +434,7 @@ static int Get(vlc_va_t *va, void **opaque, uint8_t **data)
      * XXX using the oldest is a workaround in case a problem happens with libavcodec */
     unsigned i;
     picture_sys_t *oldest = NULL;
-    for (i = 0; i < sys->decoder_surface_num; i++) {
+    for (i = 0; i < sys->surface_count; i++) {
         picture_sys_t *surface = &sys->surface[i];
         if (!surface->refcount && (!oldest || surface->order < oldest->order))
            oldest = surface;
@@ -975,10 +975,11 @@ static int DxCreateVideoDecoder(vlc_va_t *va, int codec_id,
     if ( i_threading )
         surface_count += sys->thread_count;
 
-    if (surface_count + surface_count > VA_DXVA2_MAX_SURFACE_COUNT)
+    sys->decoder_surface_num = surface_count - 4;
+
+    if (surface_count + sys->decoder_surface_num > VA_DXVA2_MAX_SURFACE_COUNT)
         return VLC_EGENERIC;
     sys->surface_count = surface_count;
-    sys->decoder_surface_num = surface_count;
 
     if (FAILED(IDirectXVideoDecoderService_CreateSurface(sys->vs,
                                                          sys->surface_width,
@@ -1023,7 +1024,7 @@ static int DxCreateVideoDecoder(vlc_va_t *va, int codec_id,
         msg_Dbg(va, "init decoder surface object %d 0x%p at 0x%p", i, p_dec_picture, p_dec_picture->surface);
 #endif
     }
-    sys->surface_order = sys->decoder_surface_num;
+    sys->surface_order = sys->surface_count;
     msg_Dbg(va, "IDirectXVideoAccelerationService_CreateSurface succeed with %d surfaces (%dx%d)",
             sys->surface_count, fmt->i_width, fmt->i_height);
 
