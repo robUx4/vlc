@@ -942,7 +942,7 @@ static int Direct3D9LockSurface(picture_t *picture)
         vlc_mutex_lock( picture->p_sys->p_lock );
 
 #if DEBUG_SURFACE
-    msg_Dbg( picture->p_sys->p_va, "%lx d3d9 lock locked %d pts: %"PRId64" surface %d 0x%p", GetCurrentThreadId(), picture->p_sys->b_lockrect, picture->date, picture->p_sys->index, picture->p_sys->surface );
+    msg_Dbg( picture->p_sys->p_va, "%lx d3d9 lock pts: %"PRId64" surface %d 0x%p", GetCurrentThreadId(), picture->date, picture->p_sys->index, picture->p_sys->surface );
 #endif
 
     /* Lock the surface to get a valid pointer to the picture buffer */
@@ -953,7 +953,6 @@ static int Direct3D9LockSurface(picture_t *picture)
         //msg_Dbg(vd, "Failed IDirect3DSurface9_LockRect: 0x%0lx", hr);
         return CommonUpdatePicture(picture, &picture->p_sys->fallback, NULL, 0);
     }
-    picture->p_sys->b_lockrect = true;
 
     CommonUpdatePicture(picture, NULL, d3drect.pBits, d3drect.Pitch);
 
@@ -972,13 +971,12 @@ static void Direct3D9UnlockSurface(picture_t *picture)
 
     /* Unlock the Surface */
 #if DEBUG_SURFACE
-    msg_Dbg( picture->p_sys->p_va, "%lx d3d9 unlock locked %d pts: %"PRId64" surface %d 0x%p", GetCurrentThreadId(), picture->p_sys->b_lockrect, picture->date, picture->p_sys->index, picture->p_sys->surface );
+    msg_Dbg( picture->p_sys->p_va, "%lx d3d9 unlock pts: %"PRId64" surface %d 0x%p", GetCurrentThreadId(), picture->date, picture->p_sys->index, picture->p_sys->surface );
 #endif
     HRESULT hr = IDirect3DSurface9_UnlockRect(picture->p_sys->surface);
     if (FAILED(hr)) {
         //msg_Dbg(vd, "Failed IDirect3DSurface9_UnlockRect: 0x%0lx", hr);
     }
-    picture->p_sys->b_lockrect = false;
 
     if ( picture->p_sys->p_lock )
         vlc_mutex_unlock( picture->p_sys->p_lock );
