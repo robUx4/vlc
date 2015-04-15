@@ -1432,6 +1432,7 @@ static int ThreadReinit(vout_thread_t *vout,
         state.cfg.zoom.num = 1;
         state.cfg.zoom.den = 1;
     }
+    state.cfg.p_dec_sys = cfg->p_dec_sys;
 
     vout->p->original = original;
     vout->p->dpb_size = cfg->dpb_size;

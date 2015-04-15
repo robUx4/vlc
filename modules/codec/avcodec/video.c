@@ -771,7 +771,10 @@ void EndVideoDec( decoder_t *p_dec )
         avcodec_free_frame( &p_sys->p_ff_pic );
 
     if( p_sys->p_va )
+    {
         vlc_va_Delete( p_sys->p_va, p_sys->p_context );
+        p_sys->p_va = NULL;
+    }
 
     vlc_sem_destroy( &p_sys->sem_mt );
 }
