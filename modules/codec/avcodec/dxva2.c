@@ -1033,7 +1033,6 @@ static int DxCreateVideoDecoder(vlc_va_t *va, int codec_id,
         resource.p_sys = calloc(1, sizeof(picture_sys_t));
         resource.p_sys->surface = display_surfaces[i];
         resource.p_sys->index = i;
-        resource.p_sys->p_ouput = sys->p_render;
         if ( sys->b_need_thread_safe )
             resource.p_sys->p_lock = &sys->surface_lock;
 #if DEBUG_SURFACE
@@ -1059,7 +1058,6 @@ static int DxCreateVideoDecoder(vlc_va_t *va, int codec_id,
         p_picture->refcount = 0;
         p_picture->index = i;
         p_picture->order = i;
-        p_picture->p_ouput = sys->p_render;
         if ( sys->b_need_thread_safe )
             p_picture->p_lock = &sys->surface_lock;
 #if DEBUG_SURFACE

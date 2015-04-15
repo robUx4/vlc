@@ -40,7 +40,7 @@
 #ifndef MSW_DIRECT3D9_H_
 #define MSW_DIRECT3D9_H_
 
-#define DEBUG_SURFACE 1
+#define DEBUG_SURFACE 0
 
 #ifdef HAVE_CONFIG_H
 # include "config.h"
@@ -77,7 +77,6 @@ struct picture_sys_t
     unsigned int       order;
     unsigned int       index;
     vlc_mutex_t        *p_lock;
-    const d3d_format_t *p_ouput;
 #if DEBUG_SURFACE
     vlc_va_t           *p_va;
 #endif
