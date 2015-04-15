@@ -333,11 +333,11 @@ int InitVideoDec( decoder_t *p_dec, AVCodecContext *p_context,
     i_thread_count = __MIN( i_thread_count, 16 );
     msg_Dbg( p_dec, "allowing %d thread(s) for decoding", i_thread_count );
     p_context->thread_count = i_thread_count;
-# if 0 //defined(_WIN32)
-    //p_context->thread_safe_callbacks = false;
-    p_context->thread_type = FF_THREAD_SLICE;
-# endif
     p_context->thread_safe_callbacks = true;
+# if 0 //defined(_WIN32)
+    p_context->thread_safe_callbacks = false;
+    //p_context->thread_type = FF_THREAD_SLICE;
+# endif
 
     switch( p_codec->id )
     {
