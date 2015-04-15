@@ -203,7 +203,7 @@ struct vout_display_sys_t
     D3DCAPS9                d3dcaps;
     LPDIRECT3DDEVICE9       d3ddev;
     D3DPRESENT_PARAMETERS   d3dpp;
-    vlc_va_t                *p_va;
+    const vlc_va_t          *p_va;
 
     // scene objects
     LPDIRECT3DTEXTURE9      d3dtex;

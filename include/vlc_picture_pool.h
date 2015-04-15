@@ -110,6 +110,13 @@ VLC_API picture_pool_t * picture_pool_NewFromFormat(const video_format_t *fmt,
 VLC_API void picture_pool_Release( picture_pool_t * );
 
 /**
+ * Holds an extra reference to a pool.
+ *
+ * @warning The call must be balanced with picture_Release().
+ */
+VLC_API void picture_pool_Hold( picture_pool_t * );
+
+/**
  * Obtains a picture from a pool if any is immediately available.
  *
  * The picture must be released with picture_Release().

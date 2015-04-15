@@ -56,6 +56,13 @@ struct picture_pool_t {
     vlc_mutex_t lock;
 };
 
+void picture_pool_Hold(picture_pool_t *pool)
+{
+    vlc_mutex_lock(&pool->lock);
+    pool->refs++;
+    vlc_mutex_unlock(&pool->lock);
+}
+
 void picture_pool_Release(picture_pool_t *pool)
 {
     bool destroy;

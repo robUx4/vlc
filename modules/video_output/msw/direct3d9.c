@@ -271,12 +271,6 @@ static void Close(vlc_object_t *object)
 static picture_pool_t *Pool(vout_display_t *vd, unsigned count)
 {
     VLC_UNUSED(count);
-    if ( !vd->sys->pool && vd->fmt.i_chroma == VLC_CODEC_DXVA_D3D9_OPAQUE)
-    {
-        /* create the pool of DXVA buffers that is shared with the decoder */
-        vd->sys->pool = picture_pool_New( count, NULL );
-    }
-
     return vd->sys->pool;
 }
 
@@ -1014,45 +1008,48 @@ static int Direct3D9CreatePool(vout_display_t *vd, video_format_t *fmt)
     /* We create one picture.
      * It is useless to create more as we can't be used for direct rendering */
 
-    /* Create a surface */
-    LPDIRECT3DSURFACE9 surface;
-    HRESULT hr = IDirect3DDevice9_CreateOffscreenPlainSurface(d3ddev,
-                                                              fmt->i_visible_width,
-                                                              fmt->i_visible_height,
-                                                              d3dfmt->format,
-                                                              D3DPOOL_DEFAULT,
-                                                              &surface,
-                                                              NULL);
-    if (FAILED(hr)) {
-        msg_Err(vd, "Failed to create picture surface. (hr=0x%lx)", hr);
-        return VLC_EGENERIC;
+    if( fmt->i_chroma == VLC_CODEC_DXVA_D3D9_OPAQUE && sys->p_va->sys->p_decoder_pool != NULL )
+    {
+        sys->pool = sys->p_va->sys->p_decoder_pool;
+        picture_pool_Hold( sys->pool );
     }
+    else
+    {
+        /* Create a surface */
+        LPDIRECT3DSURFACE9 surface;
+        HRESULT hr = IDirect3DDevice9_CreateOffscreenPlainSurface(d3ddev,
+                                                                  fmt->i_visible_width,
+                                                                  fmt->i_visible_height,
+                                                                  d3dfmt->format,
+                                                                  D3DPOOL_DEFAULT,
+                                                                  &surface,
+                                                                  NULL);
+        if (FAILED(hr)) {
+            msg_Err(vd, "Failed to create picture surface. (hr=0x%lx)", hr);
+            return VLC_EGENERIC;
+        }
 
 #ifndef NDEBUG
-    msg_Dbg(vd, "Direct3D created offscreen surface: %ix%i",
-                fmt->i_visible_width, fmt->i_visible_height);
+        msg_Dbg(vd, "Direct3D created offscreen surface: %ix%i",
+                    fmt->i_visible_width, fmt->i_visible_height);
 #endif
 
-    /* fill surface with black color */
-    IDirect3DDevice9_ColorFill(d3ddev, surface, NULL, D3DCOLOR_ARGB(0xFF, 0, 0, 0));
+        /* fill surface with black color */
+        IDirect3DDevice9_ColorFill(d3ddev, surface, NULL, D3DCOLOR_ARGB(0xFF, 0, 0, 0));
 
-    /* Create the associated picture */
-    picture_sys_t *picsys = malloc(sizeof(*picsys));
-    if (unlikely(picsys == NULL)) {
-        IDirect3DSurface9_Release(surface);
-        return VLC_ENOMEM;
-    }
-    memset(picsys, 0, sizeof(*picsys));
-    picsys->surface = surface;
+        /* Create the associated picture */
+        picture_sys_t *picsys = calloc(1, sizeof(*picsys));
+        if (unlikely(picsys == NULL)) {
+            IDirect3DSurface9_Release(surface);
+            return VLC_ENOMEM;
+        }
+        picsys->surface = surface;
 
-    picture_resource_t resource = { .p_sys = picsys };
-    for (int i = 0; i < PICTURE_PLANE_MAX; i++)
-        resource.p[i].i_lines = fmt->i_visible_height / (i > 0 ? 2 : 1);
+        picture_resource_t resource = { .p_sys = picsys };
+        for (int i = 0; i < PICTURE_PLANE_MAX; i++)
+            resource.p[i].i_lines = fmt->i_visible_height / (i > 0 ? 2 : 1);
 
-    if( 1 || fmt->i_chroma != VLC_CODEC_DXVA_D3D9_OPAQUE)
-    {
         picture_t *picture = picture_NewFromResource(fmt, &resource);
-        fmt->i_chroma = d3dfmt->fourcc;
         if (!picture) {
             msg_Err(vd, "Failed to create a picture from resources.");
             IDirect3DSurface9_Release(surface);
@@ -1086,10 +1083,13 @@ static void Direct3D9DestroyPool(vout_display_t *vd)
     vout_display_sys_t *sys = vd->sys;
 
     if (sys->pool) {
-        picture_sys_t *picsys = sys->picsys;
-        IDirect3DSurface9_Release(picsys->surface);
-        if (picsys->fallback)
-            picture_Release(picsys->fallback);
+        if ( sys->p_va == NULL )
+        {
+            picture_sys_t *picsys = sys->picsys;
+            IDirect3DSurface9_Release(picsys->surface);
+            if (picsys->fallback)
+                picture_Release(picsys->fallback);
+        }
         picture_pool_Release(sys->pool);
     }
     sys->pool = NULL;

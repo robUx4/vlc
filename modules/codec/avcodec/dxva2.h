@@ -140,9 +140,7 @@ struct vlc_va_sys_t
     picture_sys_t surface[VA_DXVA2_MAX_SURFACE_COUNT];
     LPDIRECT3DSURFACE9 hw_surface[VA_DXVA2_MAX_SURFACE_COUNT];
 
-    /* pictures in the avcodec user space */
-    unsigned decoder_surface_num;
-    picture_sys_t decoder_pictures[VA_DXVA2_MAX_SURFACE_COUNT];
+    picture_pool_t *p_decoder_pool;
 };
 
 #endif /* AVCODEC_DXVA2_H_ */
