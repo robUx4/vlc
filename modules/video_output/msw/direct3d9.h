@@ -70,6 +70,8 @@ typedef struct
 struct picture_sys_t
 {
     LPDIRECT3DSURFACE9 surface;
+    LPDIRECT3DDEVICE9  d3ddev;
+
     picture_t          *fallback;
 
     /* DXVA stuff */

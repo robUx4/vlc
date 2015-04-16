@@ -1044,6 +1044,7 @@ static int Direct3D9CreatePool(vout_display_t *vd, video_format_t *fmt)
             return VLC_ENOMEM;
         }
         picsys->surface = surface;
+        picsys->d3ddev = d3ddev;
 
         picture_resource_t resource = { .p_sys = picsys };
         for (int i = 0; i < PICTURE_PLANE_MAX; i++)
