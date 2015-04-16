@@ -57,6 +57,7 @@ typedef struct {
     const video_format_t *fmt;
     unsigned             dpb_size;
     decoder_sys_t        *p_dec_sys;
+    format_init_t        *p_fmt_init;
 } vout_configuration_t;
 
 /**

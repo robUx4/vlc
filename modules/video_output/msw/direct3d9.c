@@ -299,6 +299,8 @@ static void Prepare(vout_display_t *vd, picture_t *picture, subpicture_t *subpic
         return;
     }
 
+    //Direct3D9UnlockSurface( picture );
+
     d3d_region_t picture_region;
     if (!Direct3D9ImportPicture(vd, &picture_region, surface)) {
 #if DEBUG_SURFACE
@@ -319,6 +321,8 @@ static void Prepare(vout_display_t *vd, picture_t *picture, subpicture_t *subpic
         sys->d3dregion_count = subpicture_region_count;
         sys->d3dregion       = subpicture_region;
     }
+
+    //Direct3D9LockSurface( picture );
 }
 
 static void Display(vout_display_t *vd, picture_t *picture, subpicture_t *subpicture)
@@ -976,6 +980,33 @@ static void Direct3D9UnlockSurface(picture_t *picture)
         vlc_mutex_unlock( picture->p_sys->p_lock );
 }
 
+static void CopySurface( picture_t *p_dst, picture_t *p_src )
+{
+    picture_sys_t *p_src_sys = p_src->p_sys;
+    picture_sys_t *p_dst_sys = p_dst->p_sys;
+
+    if (!p_dst_sys)
+    {
+#if DEBUG_SURFACE
+        msg_Err( p_src_sys->p_va, "Cannot copy the hw surface to empty output surface" );
+#endif
+        return;
+    }
+
+    LPDIRECT3DSURFACE9 source = p_src_sys->surface;
+    LPDIRECT3DSURFACE9 output = p_dst_sys->surface;
+
+    HRESULT hr = IDirect3DDevice9_StretchRect( p_src_sys->d3ddev, source, NULL, output, NULL, D3DTEXF_NONE);
+    if (FAILED(hr)) {
+#if DEBUG_SURFACE
+        msg_Err( p_src_sys->p_va, "Failed to copy the hw surface to the decoder surface (hr=0x%0lx)", hr );
+#endif
+    }
+#if DEBUG_SURFACE
+    msg_Dbg( p_src_sys->p_va, "Copied hw surface from 0x%p to 0x%p (hr=0x%0lx)", hr, source, output );
+#endif
+}
+
 /**
  * It creates the pool of picture (only 1).
  *
@@ -1007,13 +1038,14 @@ static int Direct3D9CreatePool(vout_display_t *vd, video_format_t *fmt)
 
     /* We create one picture.
      * It is useless to create more as we can't be used for direct rendering */
-
+#if 0
     if( fmt->i_chroma == VLC_CODEC_DXVA_D3D9_OPAQUE && sys->p_va->sys->p_decoder_pool != NULL )
     {
         sys->pool = sys->p_va->sys->p_decoder_pool;
         picture_pool_Hold( sys->pool );
     }
     else
+#endif
     {
         /* Create a surface */
         LPDIRECT3DSURFACE9 surface;
@@ -1058,14 +1090,18 @@ static int Direct3D9CreatePool(vout_display_t *vd, video_format_t *fmt)
             return VLC_ENOMEM;
         }
         sys->picsys = picsys;
+        picture->pf_copy_private = CopySurface;
 
         /* Wrap it into a picture pool */
         picture_pool_configuration_t pool_cfg;
         memset(&pool_cfg, 0, sizeof(pool_cfg));
         pool_cfg.picture_count = 1;
         pool_cfg.picture       = &picture;
-        pool_cfg.lock          = Direct3D9LockSurface;
-        pool_cfg.unlock        = Direct3D9UnlockSurface;
+        if (fmt->i_chroma != VLC_CODEC_DXVA_D3D9_OPAQUE)
+        {
+            pool_cfg.lock          = Direct3D9LockSurface;
+            pool_cfg.unlock        = Direct3D9UnlockSurface;
+        }
 
         sys->pool = picture_pool_NewExtended(&pool_cfg);
         if (!sys->pool) {
@@ -1546,7 +1582,7 @@ static int Direct3D9ImportPicture(vout_display_t *vd,
     hr = IDirect3DDevice9_StretchRect(sys->d3ddev, source, &cropSource, destination, NULL, D3DTEXF_LINEAR);
     IDirect3DSurface9_Release(destination);
     if (FAILED(hr)) {
-        msg_Dbg(vd, "Failed IDirect3DDevice9_StretchRect: 0x%0lx", hr);
+        msg_Dbg(vd, "Failed IDirect3DDevice9_StretchRect: source 0x%p 0x%0lx", source, hr);
         return VLC_EGENERIC;
     }
 

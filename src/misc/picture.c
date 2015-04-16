@@ -360,6 +360,7 @@ void picture_CopyProperties( picture_t *p_dst, const picture_t *p_src )
     p_dst->b_progressive = p_src->b_progressive;
     p_dst->i_nb_fields = p_src->i_nb_fields;
     p_dst->b_top_field_first = p_src->b_top_field_first;
+    p_dst->pf_copy_private = p_src->pf_copy_private;
 }
 
 void picture_CopyPixels( picture_t *p_dst, const picture_t *p_src )
@@ -374,8 +375,8 @@ void picture_CopyPixels( picture_t *p_dst, const picture_t *p_src )
 
 void picture_Copy( picture_t *p_dst, const picture_t *p_src )
 {
-    picture_CopyPixels( p_dst, p_src );
     picture_CopyProperties( p_dst, p_src );
+    picture_CopyPixels( p_dst, p_src );
 }
 
 

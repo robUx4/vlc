@@ -79,7 +79,6 @@ struct picture_sys_t
     unsigned int       order;
     unsigned int       index;
     vlc_mutex_t        *p_lock;
-    picture_t          *p_internal_pic;
 #if DEBUG_SURFACE
     vlc_va_t           *p_va;
 #endif

@@ -32,6 +32,7 @@
 #include <assert.h>
 
 #include <vlc_common.h>
+#include <vlc_codec.h>
 #include <vlc_picture_pool.h>
 
 /*****************************************************************************
@@ -49,6 +50,8 @@ struct picture_pool_t {
     /* */
     unsigned       picture_count;
     picture_t      **picture;
+
+    format_init_t  *p_fmt_init;
 
     int       (*pic_lock)(picture_t *);
     void      (*pic_unlock)(picture_t *);
@@ -83,6 +86,8 @@ void picture_pool_Release(picture_pool_t *pool)
         free(sys);
         free(picture);
     }
+    if (pool->p_fmt_init && pool->p_fmt_init->pf_destroy)
+        pool->p_fmt_init->pf_destroy( pool->p_fmt_init );
 
     vlc_mutex_destroy(&pool->lock);
     free(pool->picture);
@@ -133,6 +138,7 @@ static picture_t *picture_pool_ClonePicture(picture_pool_t *pool,
         clone->gc.p_sys = sys;
     else
         free(sys);
+    clone->pf_copy_private = picture->pf_copy_private;
 
     return clone;
 }
@@ -192,24 +198,40 @@ picture_pool_t *picture_pool_New(unsigned count, picture_t *const *tab)
 picture_pool_t *picture_pool_NewFromFormat(const video_format_t *fmt,
                                            unsigned count)
 {
+    return picture_pool_NewFromFormatSys(fmt, count, NULL);
+}
+
+picture_pool_t *picture_pool_NewFromFormatSys(const video_format_t *fmt,
+                                              unsigned count,
+                                              format_init_t *p_fmt_init)
+{
     picture_t *picture[count ? count : 1];
     unsigned i;
+
+    if (p_fmt_init && p_fmt_init->pf_create)
+        p_fmt_init->pf_create( p_fmt_init, fmt, count );
 
     for (i = 0; i < count; i++) {
         picture[i] = picture_NewFromFormat(fmt);
         if (picture[i] == NULL)
             goto error;
+        if (p_fmt_init && p_fmt_init->pf_source_sys_alloc)
+            p_fmt_init->pf_source_sys_alloc( p_fmt_init, picture[i] );
     }
 
     picture_pool_t *pool = picture_pool_New(count, picture);
     if (!pool)
         goto error;
 
+    pool->p_fmt_init = p_fmt_init;
+
     return pool;
 
 error:
     while (i > 0)
         picture_Release(picture[--i]);
+    if (p_fmt_init && p_fmt_init->pf_destroy)
+        p_fmt_init->pf_destroy( p_fmt_init );
     return NULL;
 }
 

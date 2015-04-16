@@ -111,6 +111,7 @@ typedef struct {
     } zoom;
 
     decoder_sys_t *p_dec_sys;
+    format_init_t   *p_fmt_init;
 
 } vout_display_cfg_t;
 

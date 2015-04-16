@@ -132,6 +132,7 @@ static vout_thread_t *VoutCreate(vlc_object_t *object,
     vout->p->original = original;
     vout->p->dpb_size = cfg->dpb_size;
     vout->p->p_dec_sys = cfg->p_dec_sys;
+    vout->p->p_fmt_init = cfg->p_fmt_init;
 
     vout_control_Init(&vout->p->control);
     vout_control_PushVoid(&vout->p->control, VOUT_CONTROL_INIT);
@@ -571,6 +572,7 @@ static void VoutGetDisplayCfg(vout_thread_t *vout, vout_display_cfg_t *cfg, cons
     else if (align_mask & 0x8)
         cfg->align.vertical = VOUT_DISPLAY_ALIGN_BOTTOM;
     cfg->p_dec_sys = vout->p->p_dec_sys;
+    cfg->p_fmt_init = vout->p->p_fmt_init;
 }
 
 vout_window_t *vout_NewDisplayWindow(vout_thread_t *vout, unsigned type)
@@ -1432,6 +1434,7 @@ static int ThreadReinit(vout_thread_t *vout,
         state.cfg.zoom.den = 1;
     }
     state.cfg.p_dec_sys = cfg->p_dec_sys;
+    state.cfg.p_fmt_init = cfg->p_fmt_init;
 
     vout->p->original = original;
     vout->p->dpb_size = cfg->dpb_size;

@@ -910,7 +910,7 @@ static int lavc_va_GetFrame(struct AVCodecContext *ctx, AVFrame *frame,
     decoder_sys_t *sys = dec->p_sys;
     vlc_va_t *va = sys->p_va;
 
-    if (vlc_va_Setup(va, ctx, &dec->fmt_out.video.i_chroma))
+    if (vlc_va_Setup(va, ctx, &dec->fmt_out.video.i_chroma, &dec->fmt_out_init))
     {
         msg_Err(dec, "hardware acceleration setup failed");
         return -1;
@@ -1264,7 +1264,7 @@ static enum PixelFormat ffmpeg_GetFormat( AVCodecContext *p_context,
                 continue;
 
             if( p_context->width <= 0 || p_context->height <= 0
-             || vlc_va_Setup( p_va, p_context, &p_dec->fmt_out.video.i_chroma ) )
+             || vlc_va_Setup( p_va, p_context, &p_dec->fmt_out.video.i_chroma, &p_dec->fmt_out_init ) )
             {
                 msg_Err( p_dec, "reusing acceleration failed" );
                 break;
@@ -1317,7 +1317,7 @@ static enum PixelFormat ffmpeg_GetFormat( AVCodecContext *p_context,
         /* We try to call vlc_va_Setup when possible to detect errors when
          * possible (later is too late) */
         if( p_context->width > 0 && p_context->height > 0
-         && vlc_va_Setup( p_va, p_context, &p_dec->fmt_out.video.i_chroma ) )
+         && vlc_va_Setup( p_va, p_context, &p_dec->fmt_out.video.i_chroma, &p_dec->fmt_out_init ) )
         {
             msg_Err( p_dec, "acceleration setup failure" );
             break;
