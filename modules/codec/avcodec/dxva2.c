@@ -372,6 +372,15 @@ static void CopySurface( picture_t *p_dst, picture_t *p_src )
     picture_sys_t *p_src_sys = p_src->p_sys;
     picture_sys_t *p_dst_sys = p_dst->p_sys;
 
+    if (!p_dst_sys)
+    {
+#if DEBUG_SURFACE
+        msg_Err( p_src->va, "Canno copy the hw surface to empty output surface" );
+#endif
+        return;
+    }
+
+
     LPDIRECT3DSURFACE9 source = p_src_sys->surface;
     LPDIRECT3DSURFACE9 output = p_dst_sys->surface;
 
