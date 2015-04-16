@@ -917,13 +917,12 @@ static int ThreadDisplayRenderPicture(vout_thread_t *vout, bool is_forced)
      */
     bool is_direct = vout->p->decoder_pool == vout->p->display_pool;
     picture_t *todisplay = filtered;
-    if (do_early_spu && subpic) {
+    if (do_early_spu && subpic && vout->p->spu_blend) {
         picture_t *blent = picture_pool_Get(vout->p->private_pool);
         if (blent) {
             VideoFormatCopyCropAr(&blent->format, &filtered->format);
             picture_Copy(blent, filtered);
-            if (vout->p->spu_blend
-             && picture_BlendSubpicture(blent, vout->p->spu_blend, subpic)) {
+            if (picture_BlendSubpicture(blent, vout->p->spu_blend, subpic)) {
                 picture_Release(todisplay);
                 todisplay = blent;
             } else
