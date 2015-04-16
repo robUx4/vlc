@@ -409,6 +409,11 @@ static int Open(vlc_object_t *object)
     if (CommonInit(vd))
         goto error;
 
+#ifdef DXVA_NO_D3D11
+    if ( vd->fmt.i_chroma == VLC_CODEC_DXVA_D3D9_OPAQUE )
+        goto error;
+#endif
+
     video_format_t fmt;
     if (Direct3D11Open(vd, &fmt)) {
         msg_Err(vd, "Direct3D11 could not be opened");
