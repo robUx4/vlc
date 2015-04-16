@@ -98,6 +98,7 @@ struct picture_t
     /** Private data - the video output plugin might want to put stuff here to
      * keep track of the picture */
     picture_sys_t * p_sys;
+    void (*pf_copy_private)( picture_t *p_dst, picture_t *p_src );
 
     /** This way the picture_Release can be overloaded */
     struct

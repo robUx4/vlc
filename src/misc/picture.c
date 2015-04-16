@@ -368,6 +368,8 @@ void picture_CopyPixels( picture_t *p_dst, const picture_t *p_src )
 
     for( i = 0; i < p_src->i_planes ; i++ )
         plane_CopyPixels( p_dst->p+i, p_src->p+i );
+    if ( p_src->pf_copy_private )
+        p_src->pf_copy_private( p_dst, p_src );
 }
 
 void picture_Copy( picture_t *p_dst, const picture_t *p_src )
