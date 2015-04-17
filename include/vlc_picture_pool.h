@@ -59,6 +59,21 @@ typedef struct {
 } picture_pool_configuration_t;
 
 /**
+ * Private type for picture_pool_setup_t
+ */
+typedef struct picture_pool_setup_sys_t picture_pool_setup_sys_t;
+
+/**
+ * Callback set by the decoder to do special processing when a picture_pool_t
+  * is created.
+ */
+struct picture_pool_setup_t
+{
+    picture_pool_configuration_t *(*pf_create_config) (picture_pool_setup_sys_t *p_sys, const video_format_t *fmt, unsigned count);
+    picture_pool_setup_sys_t     *p_sys;
+};
+
+/**
  * Creates a pool of preallocated pictures. Free pictures can be allocated from
  * the pool, and are returned to the pool when they are no longer referenced.
  *
@@ -119,7 +134,7 @@ VLC_API picture_pool_t * picture_pool_NewFromFormat(const video_format_t *fmt,
  */
 VLC_API picture_pool_t * picture_pool_NewFromFormatSys(const video_format_t *fmt,
                                                        unsigned count,
-                                                       format_init_t *p_fmt_init) VLC_USED;
+                                                       picture_pool_setup_t *p_pool_setup) VLC_USED;
 #endif
 
 /**

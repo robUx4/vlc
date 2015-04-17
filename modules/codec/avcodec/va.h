@@ -37,7 +37,7 @@ struct vlc_va_t {
     const char *description;
     enum PixelFormat pix_fmt;
 
-    int  (*setup)(vlc_va_t *, AVCodecContext *, vlc_fourcc_t *output, struct format_init_t *output_init);
+    int  (*setup)(vlc_va_t *, AVCodecContext *, vlc_fourcc_t *output, picture_pool_setup_t *output_init);
     int  (*get)(vlc_va_t *, void **opaque, uint8_t **data);
     void (*release)(void *opaque, uint8_t *surface);
     int  (*extract)(vlc_va_t *, picture_t *dst, void *opaque, uint8_t *data);
@@ -58,7 +58,8 @@ vlc_va_t *vlc_va_New(vlc_object_t *obj, AVCodecContext *, const es_format_t *fmt
  * @return VLC_SUCCESS on success, otherwise an error code.
  */
 static inline int vlc_va_Setup(vlc_va_t *va, AVCodecContext *avctx,
-                               vlc_fourcc_t *output, struct format_init_t *output_init)
+                               vlc_fourcc_t *output,
+                               picture_pool_setup_t *output_init)
 {
     return va->setup(va, avctx, output, output_init);
 }

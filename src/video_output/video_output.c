@@ -133,7 +133,7 @@ static vout_thread_t *VoutCreate(vlc_object_t *object,
     vout->p->original = original;
     vout->p->dpb_size = cfg->dpb_size;
     vout->p->p_dec_sys = cfg->p_dec_sys;
-    vout->p->p_fmt_init = cfg->p_fmt_init;
+    vout->p->p_pool_setup = cfg->p_pool_setup;
 
     vout_control_Init(&vout->p->control);
     vout_control_PushVoid(&vout->p->control, VOUT_CONTROL_INIT);
@@ -573,7 +573,7 @@ static void VoutGetDisplayCfg(vout_thread_t *vout, vout_display_cfg_t *cfg, cons
     else if (align_mask & 0x8)
         cfg->align.vertical = VOUT_DISPLAY_ALIGN_BOTTOM;
     cfg->p_dec_sys = vout->p->p_dec_sys;
-    cfg->p_fmt_init = vout->p->p_fmt_init;
+    cfg->p_pool_setup = vout->p->p_pool_setup;
 }
 
 vout_window_t *vout_NewDisplayWindow(vout_thread_t *vout, unsigned type)
@@ -1393,14 +1393,14 @@ static void ThreadClean(vout_thread_t *vout)
     vout_control_Dead(&vout->p->control);
 }
 
-static bool VoutSafeInit(format_init_t *p_old, format_init_t *p_new)
+static bool VoutSafePool(picture_pool_setup_t *p_old, picture_pool_setup_t *p_new)
 {
     if (p_new == NULL)
         return p_old == NULL;
     if (p_old == NULL)
         return false;
-    if (p_new->pf_get_pool_config != p_old->pf_get_pool_config ||
-        p_new->p_picture_cookie != p_old->p_picture_cookie)
+    if (p_new->pf_create_config != p_old->pf_create_config ||
+        p_new->p_sys != p_old->p_sys)
         return false;
     return true;
 }
@@ -1410,7 +1410,7 @@ static int ThreadReinit(vout_thread_t *vout,
 {
     video_format_t original;
     if (VoutValidateFormat(&original, cfg->fmt) ||
-        !VoutSafeInit(vout->p->p_fmt_init, cfg->p_fmt_init)) {
+        !VoutSafePool(vout->p->p_pool_setup, cfg->p_pool_setup)) {
         ThreadStop(vout, NULL);
         ThreadClean(vout);
         return VLC_EGENERIC;
@@ -1448,7 +1448,7 @@ static int ThreadReinit(vout_thread_t *vout,
         state.cfg.zoom.den = 1;
     }
     state.cfg.p_dec_sys = cfg->p_dec_sys;
-    state.cfg.p_fmt_init = cfg->p_fmt_init;
+    state.cfg.p_pool_setup = cfg->p_pool_setup;
 
     vout->p->original = original;
     vout->p->dpb_size = cfg->dpb_size;

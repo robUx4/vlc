@@ -194,7 +194,7 @@ static void DisplayVoutTitle( input_resource_t *p_resource,
 static vout_thread_t *RequestVout( input_resource_t *p_resource,
                                    vout_thread_t *p_vout,
                                    video_format_t *p_fmt, decoder_sys_t *p_dec_sys,
-                                   format_init_t *p_fmt_init,
+                                   picture_pool_setup_t *p_pool_setup,
                                    unsigned dpb_size, bool b_recycle )
 {
     vlc_assert_locked( &p_resource->lock );
@@ -231,13 +231,13 @@ static vout_thread_t *RequestVout( input_resource_t *p_resource,
 
         /* */
         vout_configuration_t cfg = {
-            .vout       = p_vout,
-            .input      = VLC_OBJECT(p_resource->p_input),
-            .change_fmt = true,
-            .fmt        = p_fmt,
-            .dpb_size   = dpb_size,
-            .p_dec_sys  = p_dec_sys,
-            .p_fmt_init = p_fmt_init,
+            .vout         = p_vout,
+            .input        = VLC_OBJECT(p_resource->p_input),
+            .change_fmt   = true,
+            .fmt          = p_fmt,
+            .dpb_size     = dpb_size,
+            .p_dec_sys    = p_dec_sys,
+            .p_pool_setup = p_pool_setup,
         };
         p_vout = vout_Request( p_resource->p_parent, &cfg );
         if( !p_vout )
@@ -463,12 +463,12 @@ void input_resource_SetInput( input_resource_t *p_resource, input_thread_t *p_in
 vout_thread_t *input_resource_RequestVout( input_resource_t *p_resource,
                                             vout_thread_t *p_vout,
                                             video_format_t *p_fmt, decoder_sys_t *p_dec_sys,
-                                            format_init_t *p_fmt_init,
+                                            picture_pool_setup_t *p_pool_setup,
                                             unsigned dpb_size,
                                             bool b_recycle )
 {
     vlc_mutex_lock( &p_resource->lock );
-    vout_thread_t *p_ret = RequestVout( p_resource, p_vout, p_fmt, p_dec_sys, p_fmt_init, dpb_size, b_recycle );
+    vout_thread_t *p_ret = RequestVout( p_resource, p_vout, p_fmt, p_dec_sys, p_pool_setup, dpb_size, b_recycle );
     vlc_mutex_unlock( &p_resource->lock );
 
     return p_ret;

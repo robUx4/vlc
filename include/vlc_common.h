@@ -242,7 +242,7 @@ typedef struct video_format_t video_format_t;
 typedef struct subs_format_t subs_format_t;
 typedef struct es_format_t es_format_t;
 typedef struct video_palette_t video_palette_t;
-typedef struct format_init_t format_init_t;
+typedef struct picture_pool_setup_t picture_pool_setup_t;
 
 /* Audio */
 typedef struct audio_output audio_output_t;

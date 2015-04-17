@@ -54,7 +54,7 @@ struct vout_thread_sys_t
 
     /* */
     video_format_t  original;   /* Original format ie coming from the decoder */
-    format_init_t   *p_fmt_init;
+    picture_pool_setup_t   *p_pool_setup;
     unsigned        dpb_size;
     decoder_sys_t   *p_dec_sys;
 

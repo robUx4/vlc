@@ -224,7 +224,7 @@ error:
 #if 0
 picture_pool_t *picture_pool_NewFromFormatSys(const video_format_t *fmt,
                                               unsigned count,
-                                              format_init_t *p_fmt_init)
+                                              picture_pool_setup_t *p_pool_setup)
 {
     picture_t *picture[count ? count : 1];
     unsigned i;

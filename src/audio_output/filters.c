@@ -311,7 +311,8 @@ static int VisualizationCallback (vlc_object_t *obj, const char *var,
 }
 
 vout_thread_t *aout_filter_RequestVout (filter_t *filter, vout_thread_t *vout,
-                                        video_format_t *fmt, format_init_t *p_fmt_init)
+                                        video_format_t *fmt,
+                                        picture_pool_setup_t *p_pool_setup)
 {
     /* NOTE: This only works from aout_filters_t.
      * If you want to use visualization filters from another place, you will
@@ -324,7 +325,7 @@ vout_thread_t *aout_filter_RequestVout (filter_t *filter, vout_thread_t *vout,
     bool recycle = false;
     free (visual);
 
-    return req->pf_request_vout (req->p_private, vout, fmt, p_fmt_init, recycle);
+    return req->pf_request_vout (req->p_private, vout, fmt, p_pool_setup, recycle);
 }
 
 static int AppendFilter(vlc_object_t *obj, const char *type, const char *name,

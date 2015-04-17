@@ -394,9 +394,9 @@ static void DestroySurfacePool(void *p_pool_gc_sys)
     free( p_pool );
 }
 
-static const picture_pool_configuration_t *CreateSurfacePoolConfig(format_init_t *p_this, const video_format_t *fmt, unsigned count)
+static const picture_pool_configuration_t *CreateSurfacePoolConfig(picture_pool_setup_sys_t *p_sys, const video_format_t *fmt, unsigned count)
 {
-    vlc_va_sys_t *sys = p_this->p_picture_cookie;
+    vlc_va_sys_t *sys = (vlc_va_sys_t *) p_sys;
     LPDIRECT3DSURFACE9 hw_surfaces[count];
     picture_sys_t *p_sys_pictures[count];
     picture_pool_configuration_t *p_pool = NULL;
@@ -407,7 +407,6 @@ static const picture_pool_configuration_t *CreateSurfacePoolConfig(format_init_t
     p_pool = calloc(1, sizeof(picture_pool_configuration_t));
     if ( p_pool == NULL )
         goto error;
-    p_this->p_pool_cookie = p_pool;
 
     pictures = calloc(count, sizeof(picture_t*));
     if ( pictures == NULL )
@@ -480,7 +479,7 @@ error:
 }
 
 /* */
-static int Setup(vlc_va_t *va, AVCodecContext *avctx, vlc_fourcc_t *chroma, format_init_t *output_init)
+static int Setup(vlc_va_t *va, AVCodecContext *avctx, vlc_fourcc_t *chroma, picture_pool_setup_t *output_init)
 {
     vlc_va_sys_t *sys = va->sys;
 
@@ -524,12 +523,8 @@ static int Setup(vlc_va_t *va, AVCodecContext *avctx, vlc_fourcc_t *chroma, form
 ok:
     avctx->hwaccel_context = &sys->hw;
     *chroma = VLC_CODEC_DXVA_D3D9_OPAQUE;
-    output_init->pf_get_pool_config = CreateSurfacePoolConfig;
-    //output_init->pf_source_sys_alloc = SettleSurface;
-    //output_init->pf_get_resource = GetSurfaceResource;
-    output_init->p_picture_cookie = sys;
-    //output_init->pf_create = CreateSurfacePool;
-    //output_init->pf_destroy = DestroySurfacePool;
+    output_init->pf_create_config = CreateSurfacePoolConfig;
+    output_init->p_sys = (picture_pool_setup_sys_t *) sys;
 
     return VLC_SUCCESS;
 }

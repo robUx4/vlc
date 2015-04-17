@@ -45,18 +45,6 @@ typedef struct decoder_owner_sys_t decoder_owner_sys_t;
  * @{
  */
 
-struct format_init_t
-{
-    const picture_pool_configuration_t *(*pf_get_pool_config) (format_init_t *p_this, const video_format_t *fmt, unsigned count);
-    void                      *p_picture_cookie;
-    void                      (*pf_source_sys_alloc) (format_init_t *p_this, picture_t *p_pic);
-
-    void                      *p_pool_cookie;
-    int                       (*pf_create)           (format_init_t *p_this, const video_format_t *fmt, unsigned count);
-    const picture_resource_t *(*pf_get_resource)     (format_init_t *p_this, const video_format_t *fmt, unsigned index);
-    void                      (*pf_destroy)          (format_init_t *p_this);
-};
-
 /*
  * BIG FAT WARNING : the code relies in the first 4 members of filter_t
  * and decoder_t to be the same, so if you have anything to add, do it
@@ -75,7 +63,7 @@ struct decoder_t
 
     /* Output format of decoder/packetizer */
     es_format_t         fmt_out;
-    format_init_t       fmt_out_init;
+    picture_pool_setup_t fmt_out_pool_setup;
 
     /* Some decoders only accept packetized data (ie. not truncated) */
     bool                b_need_packetized;
