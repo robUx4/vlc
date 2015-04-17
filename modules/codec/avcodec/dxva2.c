@@ -360,14 +360,6 @@ static void CopySurface( picture_t *p_dst, picture_t *p_src )
 #endif
 }
 
-struct surface_pool_t // TODO replace by picture_pool_configuration_t
-{
-    //unsigned           surface_count;
-    //picture_sys_t      *p_sys_pictures;
-    //picture_resource_t pool_resource;
-    picture_pool_configuration_t pool_config;
-};
-
 void DestroySurface(picture_t *p_pic)
 {
     picture_sys_t *p_pic_sys = p_pic->p_sys;
@@ -376,12 +368,7 @@ void DestroySurface(picture_t *p_pic)
 #endif
     IDirect3DSurface9_Release( p_pic_sys->surface );
     free( p_pic_sys );
-}
-
-static void DestroySurfacePool(format_init_t *p_this)
-{
-    struct surface_pool_t *p_pool = p_this->p_pool_cookie;
-    free(p_pool);
+    p_pic->p_sys = NULL;
 }
 
 static int LockOutputSurface(picture_t *p_pic)
@@ -401,9 +388,9 @@ static void UnlockOutputSurface(picture_t *p_pic)
 #endif
 }
 
-static void DestroyPool(picture_pool_gc_sys_t *p_pool_gc_sys)
+static void DestroySurfacePool(void *p_pool_gc_sys)
 {
-    struct surface_pool_t *p_pool = p_pool_gc_sys;
+    picture_pool_configuration_t *p_pool = p_pool_gc_sys;
     free( p_pool );
 }
 
@@ -412,12 +399,12 @@ static const picture_pool_configuration_t *CreateSurfacePoolConfig(format_init_t
     vlc_va_sys_t *sys = p_this->p_picture_cookie;
     LPDIRECT3DSURFACE9 hw_surfaces[count];
     picture_sys_t *p_sys_pictures[count];
-    struct surface_pool_t *p_pool = NULL;
+    picture_pool_configuration_t *p_pool = NULL;
     picture_t **pictures = NULL;
 
-    memset(p_sys_pictures, 0, count * sizeof(p_sys_pictures[0]));
+    memset(p_sys_pictures, 0, count * sizeof(picture_sys_t *));
 
-    p_pool = calloc(1, sizeof(*p_pool));
+    p_pool = calloc(1, sizeof(picture_pool_configuration_t));
     if ( p_pool == NULL )
         goto error;
     p_this->p_pool_cookie = p_pool;
@@ -439,7 +426,7 @@ static const picture_pool_configuration_t *CreateSurfacePoolConfig(format_init_t
         msg_Err(sys->va, "IDirectXVideoAccelerationService_CreateSurface display failed");
         goto error;
     }
-    p_pool->pool_config.picture_count = count;
+    p_pool->picture_count = count;
 
     for (unsigned i = 0; i < count; ++i)
     {
@@ -464,16 +451,16 @@ static const picture_pool_configuration_t *CreateSurfacePoolConfig(format_init_t
             goto error;
     }
 
-    p_pool->pool_config.picture = pictures;
-    p_pool->pool_config.lock = LockOutputSurface;
-    p_pool->pool_config.unlock = UnlockOutputSurface;
-    p_pool->pool_config.gc.pf_destroy = DestroyPool;
-    p_pool->pool_config.gc.p_sys = p_pool;
+    p_pool->picture = pictures;
+    p_pool->lock = LockOutputSurface;
+    p_pool->unlock = UnlockOutputSurface;
+    p_pool->gc.pf_destroy = DestroySurfacePool;
+    p_pool->gc.p_sys = p_pool;
 
-    return &p_pool->pool_config;
+    return p_pool;
 
 error:
-    for (unsigned i = 0; i < p_pool->pool_config.picture_count; ++i)
+    for (unsigned i = 0; i < p_pool->picture_count; ++i)
     {
         IDirect3DSurface9_Release( hw_surfaces[i] );
     }

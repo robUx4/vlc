@@ -35,14 +35,15 @@
  * Picture pool handle
  */
 typedef struct picture_pool_t picture_pool_t;
-typedef struct picture_pool_gc_t picture_pool_gc_t;
-typedef struct picture_pool_gc_sys_t picture_pool_gc_sys_t;
 
-struct picture_pool_gc_t
+/**
+ * Picture pool destroy callback
+ */
+typedef struct
 {
-    picture_pool_gc_sys_t *p_sys;
-    void (*pf_destroy)(picture_pool_gc_sys_t *);
-};
+    void *p_sys;
+    void (*pf_destroy)(void *);
+} picture_pool_gc_t;
 
 /**
  * Picture pool configuration
