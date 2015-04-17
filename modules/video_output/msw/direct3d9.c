@@ -526,15 +526,11 @@ static int Direct3D9Create(vout_display_t *vd)
         return VLC_EGENERIC;
     }
 
-    if ( vd->cfg->p_dec_sys != NULL )
+    if ( vd->fmt.i_chroma == VLC_CODEC_DXVA_D3D9_OPAQUE &&
+         vd->cfg->p_pool_setup != NULL &&
+         vd->cfg->p_pool_setup->p_sys != NULL )
     {
-        const vlc_va_t *p_va = vd->cfg->p_dec_sys->p_va;
-        if ( p_va != NULL && p_va->sys != NULL )
-        {
-            sys->p_va = p_va;
-            vlc_object_hold( sys->p_va );
-            sys->d3dobj = p_va->sys->d3dobj;
-        }
+        sys->d3dobj = vd->cfg->p_pool_setup->p_sys->p_va_sys->d3dobj;
     }
 
     if ( sys->d3dobj == NULL )
@@ -596,13 +592,10 @@ static void Direct3D9Destroy(vout_display_t *vd)
         FreeLibrary(sys->hd3d9_dll);
     if (sys->hd3d9x_dll)
         FreeLibrary(sys->hd3d9x_dll);
-    if (sys->p_va)
-        vlc_object_release(sys->p_va);
 
     sys->d3dobj = NULL;
     sys->hd3d9_dll = NULL;
     sys->hd3d9x_dll = NULL;
-    sys->p_va = NULL;
 }
 
 
@@ -1120,13 +1113,10 @@ static void Direct3D9DestroyPool(vout_display_t *vd)
     vout_display_sys_t *sys = vd->sys;
 
     if (sys->pool) {
-        if ( sys->p_va == NULL )
-        {
-            picture_sys_t *picsys = sys->picsys;
-            IDirect3DSurface9_Release(picsys->surface);
-            if (picsys->fallback)
-                picture_Release(picsys->fallback);
-        }
+        picture_sys_t *picsys = sys->picsys;
+        IDirect3DSurface9_Release(picsys->surface);
+        if (picsys->fallback)
+            picture_Release(picsys->fallback);
         picture_pool_Release(sys->pool);
     }
     sys->pool = NULL;

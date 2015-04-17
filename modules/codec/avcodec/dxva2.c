@@ -394,9 +394,9 @@ static void DestroySurfacePool(void *p_pool_gc_sys)
     free( p_pool );
 }
 
-static const picture_pool_configuration_t *CreateSurfacePoolConfig(picture_pool_setup_sys_t *p_sys, const video_format_t *fmt, unsigned count)
+static picture_pool_configuration_t *CreateSurfacePoolConfig(picture_pool_setup_sys_t *p_sys, const video_format_t *fmt, unsigned count)
 {
-    vlc_va_sys_t *sys = (vlc_va_sys_t *) p_sys;
+    vlc_va_sys_t *sys = p_sys->p_va_sys;
     LPDIRECT3DSURFACE9 hw_surfaces[count];
     picture_sys_t *p_sys_pictures[count];
     picture_pool_configuration_t *p_pool = NULL;
@@ -524,7 +524,8 @@ ok:
     avctx->hwaccel_context = &sys->hw;
     *chroma = VLC_CODEC_DXVA_D3D9_OPAQUE;
     output_init->pf_create_config = CreateSurfacePoolConfig;
-    output_init->p_sys = (picture_pool_setup_sys_t *) sys;
+    sys->pool_cookie.p_va_sys = sys;
+    output_init->p_sys = &sys->pool_cookie;
 
     return VLC_SUCCESS;
 }
