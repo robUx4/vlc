@@ -45,6 +45,7 @@
 #include <vlc_filter.h>
 #include <vlc_vout_osd.h>
 #include <vlc_image.h>
+#include <vlc_codec.h>
 
 #include <libvlc.h>
 #include "vout_internal.h"
@@ -1392,11 +1393,24 @@ static void ThreadClean(vout_thread_t *vout)
     vout_control_Dead(&vout->p->control);
 }
 
+static bool VoutSafeInit(format_init_t *p_old, format_init_t *p_new)
+{
+    if (p_new == NULL)
+        return p_old == NULL;
+    if (p_old == NULL)
+        return false;
+    if (p_new->pf_get_pool_config != p_old->pf_get_pool_config ||
+        p_new->p_picture_cookie != p_old->p_picture_cookie)
+        return false;
+    return true;
+}
+
 static int ThreadReinit(vout_thread_t *vout,
                         const vout_configuration_t *cfg)
 {
     video_format_t original;
-    if (VoutValidateFormat(&original, cfg->fmt)) {
+    if (VoutValidateFormat(&original, cfg->fmt) ||
+        !VoutSafeInit(vout->p->p_fmt_init, cfg->p_fmt_init)) {
         ThreadStop(vout, NULL);
         ThreadClean(vout);
         return VLC_EGENERIC;
