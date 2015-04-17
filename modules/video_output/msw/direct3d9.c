@@ -198,10 +198,10 @@ static int Open(vlc_object_t *object)
 
     /* */
     vout_display_info_t info = vd->info;
-    info.is_slow = false;//fmt.i_chroma != VLC_CODEC_DXVA_D3D9_OPAQUE;
+    info.is_slow = fmt.i_chroma != VLC_CODEC_DXVA_D3D9_OPAQUE;
     info.has_double_click = true;
     info.has_hide_mouse = false;
-    info.has_pictures_invalid = false;//fmt.i_chroma != VLC_CODEC_DXVA_D3D9_OPAQUE;
+    info.has_pictures_invalid = fmt.i_chroma != VLC_CODEC_DXVA_D3D9_OPAQUE;
     info.has_event_thread = true;
     if (var_InheritBool(vd, "direct3d9-hw-blending") &&
         sys->d3dregion_format != D3DFMT_UNKNOWN &&
@@ -270,7 +270,15 @@ static void Close(vlc_object_t *object)
 /* */
 static picture_pool_t *Pool(vout_display_t *vd, unsigned count)
 {
-    VLC_UNUSED(count);
+    const picture_pool_configuration_t *conf = NULL;
+    if ( vd->sys->pool == NULL && vd->cfg->p_pool_setup->pf_create_config)
+        conf = vd->cfg->p_pool_setup->pf_create_config( vd->cfg->p_pool_setup->p_sys, &vd->fmt, count);
+
+    if ( conf != NULL )
+        vd->sys->pool = picture_pool_NewExtended( conf );
+    else
+        vd->sys->pool = picture_pool_NewFromFormat( &vd->fmt, count);
+
     return vd->sys->pool;
 }
 
@@ -1032,14 +1040,14 @@ static int Direct3D9CreatePool(vout_display_t *vd, video_format_t *fmt)
 
     /* We create one picture.
      * It is useless to create more as we can't be used for direct rendering */
-#if 0
-    if( fmt->i_chroma == VLC_CODEC_DXVA_D3D9_OPAQUE && sys->p_va->sys->p_decoder_pool != NULL )
+    if ( fmt->i_chroma == VLC_CODEC_DXVA_D3D9_OPAQUE &&
+         vd->cfg->p_pool_setup != NULL &&
+         vd->cfg->p_pool_setup->p_sys != NULL &&
+         vd->cfg->p_pool_setup->p_sys->p_va_sys != NULL )
     {
-        sys->pool = sys->p_va->sys->p_decoder_pool;
-        picture_pool_Hold( sys->pool );
+        sys->pool = NULL;
     }
     else
-#endif
     {
         /* Create a surface */
         LPDIRECT3DSURFACE9 surface;
@@ -1115,9 +1123,12 @@ static void Direct3D9DestroyPool(vout_display_t *vd)
 
     if (sys->pool) {
         picture_sys_t *picsys = sys->picsys;
-        IDirect3DSurface9_Release(picsys->surface);
-        if (picsys->fallback)
-            picture_Release(picsys->fallback);
+        if ( picsys != NULL )
+        {
+            IDirect3DSurface9_Release(picsys->surface);
+            if (picsys->fallback)
+                picture_Release(picsys->fallback);
+        }
         picture_pool_Release(sys->pool);
     }
     sys->pool = NULL;
