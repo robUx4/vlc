@@ -982,33 +982,6 @@ static void Direct3D9UnlockSurface(picture_t *picture)
         vlc_mutex_unlock( picture->p_sys->p_lock );
 }
 
-static void CopySurface( picture_t *p_dst, picture_t *p_src )
-{
-    picture_sys_t *p_src_sys = p_src->p_sys;
-    picture_sys_t *p_dst_sys = p_dst->p_sys;
-
-    if (!p_dst_sys)
-    {
-#if DEBUG_SURFACE
-        msg_Err( p_src_sys->p_va, "Cannot copy the hw surface to empty output surface" );
-#endif
-        return;
-    }
-
-    LPDIRECT3DSURFACE9 source = p_src_sys->surface;
-    LPDIRECT3DSURFACE9 output = p_dst_sys->surface;
-
-    HRESULT hr = IDirect3DDevice9_StretchRect( p_src_sys->d3ddev, source, NULL, output, NULL, D3DTEXF_NONE);
-    if (FAILED(hr)) {
-#if DEBUG_SURFACE
-        msg_Err( p_src_sys->p_va, "Failed to copy the hw surface to the decoder surface (hr=0x%0lx)", hr );
-#endif
-    }
-#if DEBUG_SURFACE
-    msg_Dbg( p_src_sys->p_va, "Copied hw surface from 0x%p to 0x%p (hr=0x%0lx)", hr, source, output );
-#endif
-}
-
 /**
  * It creates the pool of picture (only 1).
  *
@@ -1092,7 +1065,6 @@ static int Direct3D9CreatePool(vout_display_t *vd, video_format_t *fmt)
             return VLC_ENOMEM;
         }
         sys->picsys = picsys;
-        picture->pf_copy_private = CopySurface;
 
         /* Wrap it into a picture pool */
         picture_pool_configuration_t pool_cfg;
