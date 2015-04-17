@@ -40,7 +40,7 @@ sout_instance_t *input_resource_RequestSout( input_resource_t *, sout_instance_t
  * This function handles vout request.
  */
 vout_thread_t *input_resource_RequestVout( input_resource_t *, vout_thread_t *,
-                                           video_format_t *, decoder_sys_t *,
+                                           video_format_t *,
                                            picture_pool_setup_t *,
                                            unsigned dpb_size, bool b_recycle );
 

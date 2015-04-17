@@ -661,13 +661,14 @@ static int Direct3D9Open(vout_display_t *vd, video_format_t *fmt)
     if (Direct3D9FillPresentationParameters(vd))
         return VLC_EGENERIC;
 
-    if ( vd->cfg->p_dec_sys && vd->cfg->p_dec_sys->p_va && vd->cfg->p_dec_sys->p_va->sys )
+    if ( vd->fmt.i_chroma == VLC_CODEC_DXVA_D3D9_OPAQUE &&
+         vd->cfg->p_pool_setup != NULL &&
+         vd->cfg->p_pool_setup->p_sys != NULL &&
+         vd->cfg->p_pool_setup->p_sys->p_va_sys != NULL )
     {
-        const vlc_va_t *p_va = vd->cfg->p_dec_sys->p_va;
-        sys->d3ddev = p_va->sys->d3ddev;
-        //sys->d3dpp->hDeviceWindow = sys->hvideownd;
-        sys->d3dpp = p_va->sys->d3dpp;
-//        sys->hvideownd = sys->d3dpp->hDeviceWindow; /* TODO need to recall CommonInit() ? */
+        const vlc_va_sys_t *p_va_sys = vd->cfg->p_pool_setup->p_sys->p_va_sys;
+        sys->d3ddev = p_va_sys->d3ddev;
+        sys->d3dpp = p_va_sys->d3dpp;
     }
 
     if ( sys->d3ddev == NULL )
