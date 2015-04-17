@@ -1138,9 +1138,7 @@ static int DxCreateVideoDecoder(vlc_va_t *va, int codec_id,
     if ( i_threading )
         surface_count += sys->thread_count;
 
-    unsigned display_surface_count = surface_count + 6 + 4; // see vout_InitWrapper()
-
-    if (surface_count + display_surface_count > VA_DXVA2_MAX_SURFACE_COUNT)
+    if (surface_count > VA_DXVA2_MAX_SURFACE_COUNT)
         return VLC_EGENERIC;
     sys->surface_count = surface_count;
 
