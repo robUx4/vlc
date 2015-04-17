@@ -280,9 +280,9 @@ static const dxva2_mode_t *Dxva2FindMode(const GUID *guid)
 
 /* XXX Prefered format must come first */
 static const d3d_format_t d3d_formats[] = {
-    { "YV12",   MAKEFOURCC('Y','V','1','2'),    VLC_CODEC_YV12, 0,0,0 },
+// FIXME support more pixel conversions { "YV12",   MAKEFOURCC('Y','V','1','2'),    VLC_CODEC_YV12, 0,0,0 },
     { "NV12",   MAKEFOURCC('N','V','1','2'),    VLC_CODEC_NV12, 0,0,0 },
-    { "IMC3",   MAKEFOURCC('I','M','C','3'),    VLC_CODEC_YV12, 0,0,0 },
+// FIXME support more pixel conversions { "IMC3",   MAKEFOURCC('I','M','C','3'),    VLC_CODEC_YV12, 0,0,0 },
 
     { NULL, 0, 0, 0,0,0 }
 };
