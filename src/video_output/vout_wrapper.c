@@ -32,6 +32,7 @@
 #include <vlc_plugin.h>
 #include <vlc_vout_wrapper.h>
 #include <vlc_vout.h>
+#include <vlc_codec.h>
 #include <assert.h>
 #include "vout_internal.h"
 #include "display.h"
@@ -146,8 +147,15 @@ int vout_InitWrapper(vout_thread_t *vout)
         const unsigned decoder_pool_size = __MAX(VOUT_MAX_PICTURES,
                                                  reserved_picture + decoder_picture - DISPLAY_PICTURE_COUNT);
         if (vd->cfg->p_fmt_init)
-            sys->decoder_pool = picture_pool_NewFromFormatSys(&source, decoder_pool_size,
-                                                              vd->cfg->p_fmt_init);
+        {
+            const picture_pool_configuration_t *conf = NULL;
+            if (vd->cfg->p_fmt_init->pf_get_pool_config)
+                conf = vd->cfg->p_fmt_init->pf_get_pool_config( vd->cfg->p_fmt_init, &source, decoder_pool_size);
+            if ( conf != NULL )
+                sys->decoder_pool = picture_pool_NewExtended( conf );
+            else
+                sys->decoder_pool = picture_pool_NewFromFormat(&source, decoder_pool_size);
+        }
         else
             sys->decoder_pool = picture_pool_NewFromFormat(&source, decoder_pool_size);
         if (!sys->decoder_pool)

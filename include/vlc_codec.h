@@ -28,6 +28,7 @@
 #include <vlc_es.h>
 #include <vlc_picture.h>
 #include <vlc_subpicture.h>
+#include <vlc_picture_pool.h>
 
 /**
  * \file
@@ -46,12 +47,14 @@ typedef struct decoder_owner_sys_t decoder_owner_sys_t;
 
 struct format_init_t
 {
-    void *p_create_cookie;
-    void (*pf_source_sys_alloc) (format_init_t *p_this, picture_t *p_pic);
+    const picture_pool_configuration_t *(*pf_get_pool_config) (format_init_t *p_this, const video_format_t *fmt, unsigned count);
+    void                      *p_picture_cookie;
+    void                      (*pf_source_sys_alloc) (format_init_t *p_this, picture_t *p_pic);
 
-    void *p_destroy_cookie;
-    int  (*pf_create)           (format_init_t *p_this, const video_format_t *fmt, unsigned count);
-    void (*pf_destroy)          (format_init_t *p_this);
+    void                      *p_pool_cookie;
+    int                       (*pf_create)           (format_init_t *p_this, const video_format_t *fmt, unsigned count);
+    const picture_resource_t *(*pf_get_resource)     (format_init_t *p_this, const video_format_t *fmt, unsigned index);
+    void                      (*pf_destroy)          (format_init_t *p_this);
 };
 
 /*

@@ -35,6 +35,14 @@
  * Picture pool handle
  */
 typedef struct picture_pool_t picture_pool_t;
+typedef struct picture_pool_gc_t picture_pool_gc_t;
+typedef struct picture_pool_gc_sys_t picture_pool_gc_sys_t;
+
+struct picture_pool_gc_t
+{
+    picture_pool_gc_sys_t *p_sys;
+    void (*pf_destroy)(picture_pool_gc_sys_t *);
+};
 
 /**
  * Picture pool configuration
@@ -42,6 +50,8 @@ typedef struct picture_pool_t picture_pool_t;
 typedef struct {
     unsigned  picture_count;
     picture_t *const *picture;
+
+    picture_pool_gc_t gc;
 
     int       (*lock)(picture_t *);
     void      (*unlock)(picture_t *);
@@ -95,6 +105,7 @@ VLC_API picture_pool_t * picture_pool_New(unsigned count,
 VLC_API picture_pool_t * picture_pool_NewFromFormat(const video_format_t *fmt,
                                                     unsigned count) VLC_USED;
 
+#if 0
 /**
  * Allocates pictures from the heap and creates a picture pool with them.
  * This is a convenience wrapper for picture_NewFromFormat() and
@@ -108,6 +119,7 @@ VLC_API picture_pool_t * picture_pool_NewFromFormat(const video_format_t *fmt,
 VLC_API picture_pool_t * picture_pool_NewFromFormatSys(const video_format_t *fmt,
                                                        unsigned count,
                                                        format_init_t *p_fmt_init) VLC_USED;
+#endif
 
 /**
  * Releases a pool created by picture_pool_NewExtended(), picture_pool_New()

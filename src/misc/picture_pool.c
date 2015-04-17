@@ -51,7 +51,7 @@ struct picture_pool_t {
     unsigned       picture_count;
     picture_t      **picture;
 
-    format_init_t  *p_fmt_init;
+    picture_pool_gc_t gc;
 
     int       (*pic_lock)(picture_t *);
     void      (*pic_unlock)(picture_t *);
@@ -86,8 +86,8 @@ void picture_pool_Release(picture_pool_t *pool)
         free(sys);
         free(picture);
     }
-    if (pool->p_fmt_init && pool->p_fmt_init->pf_destroy)
-        pool->p_fmt_init->pf_destroy( pool->p_fmt_init );
+    if (pool->gc.pf_destroy)
+        pool->gc.pf_destroy( pool->gc.p_sys );
 
     vlc_mutex_destroy(&pool->lock);
     free(pool->picture);
@@ -170,6 +170,7 @@ picture_pool_t *picture_pool_NewExtended(const picture_pool_configuration_t *cfg
 
     pool->pic_lock   = cfg->lock;
     pool->pic_unlock = cfg->unlock;
+    pool->gc = cfg->gc;
 
     for (unsigned i = 0; i < cfg->picture_count; i++) {
         picture_t *picture = picture_pool_ClonePicture(pool, cfg->picture[i]);
@@ -198,9 +199,29 @@ picture_pool_t *picture_pool_New(unsigned count, picture_t *const *tab)
 picture_pool_t *picture_pool_NewFromFormat(const video_format_t *fmt,
                                            unsigned count)
 {
-    return picture_pool_NewFromFormatSys(fmt, count, NULL);
+    picture_t *picture[count ? count : 1];
+    unsigned i;
+
+    for (i = 0; i < count; i++) {
+        const picture_resource_t *p_pic_resource = NULL;
+        picture[i] = picture_NewFromResource( fmt, p_pic_resource );
+        if (picture[i] == NULL)
+            goto error;
+    }
+
+    picture_pool_t *pool = picture_pool_New(count, picture);
+    if (!pool)
+        goto error;
+
+    return pool;
+
+error:
+    while (i > 0)
+        picture_Release(picture[--i]);
+    return NULL;
 }
 
+#if 0
 picture_pool_t *picture_pool_NewFromFormatSys(const video_format_t *fmt,
                                               unsigned count,
                                               format_init_t *p_fmt_init)
@@ -212,7 +233,11 @@ picture_pool_t *picture_pool_NewFromFormatSys(const video_format_t *fmt,
         p_fmt_init->pf_create( p_fmt_init, fmt, count );
 
     for (i = 0; i < count; i++) {
-        picture[i] = picture_NewFromFormat(fmt);
+        const picture_resource_t *p_pic_resource = NULL;
+        if (p_fmt_init && p_fmt_init->pf_get_resource)
+            p_pic_resource = p_fmt_init->pf_get_resource( p_fmt_init, fmt, i );
+
+        picture[i] = picture_NewFromResource( fmt, p_pic_resource );
         if (picture[i] == NULL)
             goto error;
         if (p_fmt_init && p_fmt_init->pf_source_sys_alloc)
@@ -234,6 +259,7 @@ error:
         p_fmt_init->pf_destroy( p_fmt_init );
     return NULL;
 }
+#endif
 
 picture_pool_t *picture_pool_Reserve(picture_pool_t *master, unsigned count)
 {
