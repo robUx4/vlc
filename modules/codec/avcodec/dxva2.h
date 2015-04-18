@@ -54,10 +54,14 @@ struct picture_pool_setup_sys_t {
 };
 
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> 818a148... clean the shared includes between dxva2 and d3d9
 struct picture_sys_t
 {
     LPDIRECT3DSURFACE9 surface;
     LPDIRECT3DDEVICE9  d3ddev; // TODO not needed anymore ?
+<<<<<<< HEAD
 =======
     /* Device manager */
     UINT                     token;
@@ -86,6 +90,8 @@ struct picture_sys_t
     int          surface_height;
     vlc_fourcc_t surface_chroma;
 >>>>>>> 563754c... DIRECT_DXVA is always set
+=======
+>>>>>>> 818a148... clean the shared includes between dxva2 and d3d9
 
     picture_t          *fallback;
 

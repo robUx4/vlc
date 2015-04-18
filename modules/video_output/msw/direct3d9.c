@@ -49,7 +49,6 @@
 #include <d3d9.h>
 
 #include "common.h"
-#include "direct3d9.h"
 #include "builtin_shaders.h"
 #include "../../codec/avcodec/video.h"
 
@@ -896,6 +895,16 @@ static int Direct3D9CheckConversion(vout_display_t *vd,
     }
     return VLC_SUCCESS;
 }
+
+typedef struct
+{
+    const char   *name;
+    D3DFORMAT    format;    /* D3D format */
+    vlc_fourcc_t fourcc;    /* VLC fourcc */
+    uint32_t     rmask;
+    uint32_t     gmask;
+    uint32_t     bmask;
+} d3d_format_t;
 
 static const d3d_format_t d3d_formats[] = {
     /* YV12 is always used for planar 420, the planes are then swapped in Lock() */

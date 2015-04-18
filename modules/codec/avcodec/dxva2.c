@@ -52,10 +52,15 @@
 #include "avcodec.h"
 #include "va.h"
 <<<<<<< HEAD
+<<<<<<< HEAD
 #include "../../video_chroma/copy.h"
 =======
 #include "../../video_output/msw/direct3d9.h"
 >>>>>>> 563754c... DIRECT_DXVA is always set
+=======
+#include "../../video_chroma/copy.h"
+#include "../../demux/asf/libasf_guid.h"
+>>>>>>> 818a148... clean the shared includes between dxva2 and d3d9
 #include "dxva2.h"
 
 static int Open(vlc_va_t *, AVCodecContext *, const es_format_t *);
