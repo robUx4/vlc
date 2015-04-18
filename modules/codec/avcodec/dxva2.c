@@ -50,8 +50,8 @@
 
 #include "avcodec.h"
 #include "va.h"
+#include "../../video_chroma/copy.h"
 #include "../../demux/asf/libasf_guid.h"
-#include "../../video_output/msw/direct3d9.h"
 #include "dxva2.h"
 
 static int Open(vlc_va_t *, AVCodecContext *, const es_format_t *);
@@ -276,6 +276,16 @@ static const dxva2_mode_t *Dxva2FindMode(const GUID *guid)
     }
     return NULL;
 }
+
+typedef struct
+{
+    const char   *name;
+    D3DFORMAT    format;    /* D3D format */
+    vlc_fourcc_t fourcc;    /* VLC fourcc */
+    uint32_t     rmask;
+    uint32_t     gmask;
+    uint32_t     bmask;
+} d3d_format_t;
 
 
 /* XXX Prefered format must come first */
