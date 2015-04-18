@@ -149,6 +149,8 @@ static void Direct3D9RenderScene(vout_display_t *vd, d3d_region_t *, int, d3d_re
 /* */
 static int DesktopCallback(vlc_object_t *, char const *, vlc_value_t, vlc_value_t, void *);
 
+#define vlc_format_is_DXVA(fmt) (fmt == VLC_CODEC_DXVA_D3D9_OPAQUE)
+
 /**
  * It creates a Direct3D vout display.
  */
@@ -198,10 +200,10 @@ static int Open(vlc_object_t *object)
 
     /* */
     vout_display_info_t info = vd->info;
-    info.is_slow = fmt.i_chroma != VLC_CODEC_DXVA_D3D9_OPAQUE;
+    info.is_slow = !vlc_format_is_DXVA( fmt.i_chroma );
     info.has_double_click = true;
     info.has_hide_mouse = false;
-    info.has_pictures_invalid = fmt.i_chroma != VLC_CODEC_DXVA_D3D9_OPAQUE;
+    info.has_pictures_invalid = !vlc_format_is_DXVA( fmt.i_chroma );
     info.has_event_thread = true;
     if (var_InheritBool(vd, "direct3d9-hw-blending") &&
         sys->d3dregion_format != D3DFMT_UNKNOWN &&
@@ -534,7 +536,7 @@ static int Direct3D9Create(vout_display_t *vd)
         return VLC_EGENERIC;
     }
 
-    if ( vd->fmt.i_chroma == VLC_CODEC_DXVA_D3D9_OPAQUE &&
+    if ( vlc_format_is_DXVA( vd->fmt.i_chroma ) &&
          vd->cfg->p_pool_setup != NULL &&
          vd->cfg->p_pool_setup->p_sys != NULL )
     {
@@ -669,7 +671,7 @@ static int Direct3D9Open(vout_display_t *vd, video_format_t *fmt)
     if (Direct3D9FillPresentationParameters(vd))
         return VLC_EGENERIC;
 
-    if ( vd->fmt.i_chroma == VLC_CODEC_DXVA_D3D9_OPAQUE &&
+    if ( vlc_format_is_DXVA( vd->fmt.i_chroma ) &&
          vd->cfg->p_pool_setup != NULL &&
          vd->cfg->p_pool_setup->p_sys != NULL &&
          vd->cfg->p_pool_setup->p_sys->p_va_sys != NULL )
@@ -902,7 +904,7 @@ static const d3d_format_t *Direct3DFindFormat(vout_display_t *vd, vlc_fourcc_t c
     for (unsigned pass = 0; pass < 2; pass++) {
         const vlc_fourcc_t *list;
 
-        if (pass == 0 && chroma == VLC_CODEC_DXVA_D3D9_OPAQUE)
+        if (pass == 0 && vlc_format_is_DXVA( chroma ))
             list = d3d_dxva2_opaque;
         else if (pass == 0 && sys->allow_hw_yuv && vlc_fourcc_IsYUV(chroma))
             list = vlc_fourcc_GetYUVFallback(chroma);
@@ -1013,7 +1015,7 @@ static int Direct3D9CreatePool(vout_display_t *vd, video_format_t *fmt)
 
     /* We create one picture.
      * It is useless to create more as we can't be used for direct rendering */
-    if ( fmt->i_chroma == VLC_CODEC_DXVA_D3D9_OPAQUE &&
+    if ( vlc_format_is_DXVA( fmt->i_chroma ) &&
          vd->cfg->p_pool_setup != NULL &&
          vd->cfg->p_pool_setup->p_sys != NULL &&
          vd->cfg->p_pool_setup->p_sys->p_va_sys != NULL )
@@ -1071,7 +1073,7 @@ static int Direct3D9CreatePool(vout_display_t *vd, video_format_t *fmt)
         memset(&pool_cfg, 0, sizeof(pool_cfg));
         pool_cfg.picture_count = 1;
         pool_cfg.picture       = &picture;
-        if (fmt->i_chroma != VLC_CODEC_DXVA_D3D9_OPAQUE)
+        if (!vlc_format_is_DXVA( fmt->i_chroma ))
         {
             pool_cfg.lock          = Direct3D9LockSurface;
             pool_cfg.unlock        = Direct3D9UnlockSurface;
