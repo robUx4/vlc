@@ -83,66 +83,11 @@
 #endif /* __MINGW32__ */
 
 struct picture_pool_setup_sys_t {
-    vlc_va_sys_t *p_va_sys;
-};
-
-#define VA_DXVA2_MAX_SURFACE_COUNT (64)
-struct vlc_va_sys_t
-{
-    int          codec_id;
-    int          i_profile;
-    int          width;
-    int          height;
-
-    bool            b_need_thread_safe;
-    vlc_mutex_t     surface_lock;
-
-    /* DLL */
-    HINSTANCE             hd3d9_dll;
-    HINSTANCE             hdxva2_dll;
-
-    /* Direct3D */
-    D3DPRESENT_PARAMETERS  d3dpp;
+    vlc_va_sys_t           *p_va_sys;
+    /* shared objects between the decoder and the d3d9 vout */
     LPDIRECT3D9            d3dobj;
-    D3DADAPTER_IDENTIFIER9 d3dai;
     LPDIRECT3DDEVICE9      d3ddev;
-
-    /* Device manager */
-    UINT                     token;
-    IDirect3DDeviceManager9  *devmng;
-    HANDLE                   device;
-
-    /* Video service */
-    IDirectXVideoDecoderService  *vs;
-    GUID                         input;
-    const d3d_format_t           *p_render;
-
-    /* Video decoder */
-    DXVA2_ConfigPictureDecode    cfg;
-    IDirectXVideoDecoder         *decoder;
-
-    /* Option conversion */
-    D3DFORMAT                    output;
-
-    /* */
-    struct dxva_context hw;
-
-    /* */
-    unsigned     surface_count;
-    unsigned     surface_order;
-    int          surface_width;
-    int          surface_height;
-    vlc_fourcc_t surface_chroma;
-
-    int          thread_count;
-
-    vlc_va_t          *va;
-
-    /* surfaces in the GPU user space */
-    picture_sys_t surface[VA_DXVA2_MAX_SURFACE_COUNT];
-    LPDIRECT3DSURFACE9 hw_surface[VA_DXVA2_MAX_SURFACE_COUNT];
-
-    picture_pool_setup_sys_t pool_cookie;
+    D3DPRESENT_PARAMETERS  d3dpp;
 };
 
 #endif /* AVCODEC_DXVA2_H_ */

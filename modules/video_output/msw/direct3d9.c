@@ -541,7 +541,7 @@ static int Direct3D9Create(vout_display_t *vd)
          vd->cfg->p_pool_setup != NULL &&
          vd->cfg->p_pool_setup->p_sys != NULL )
     {
-        sys->d3dobj = vd->cfg->p_pool_setup->p_sys->p_va_sys->d3dobj;
+        sys->d3dobj = vd->cfg->p_pool_setup->p_sys->d3dobj;
     }
 
     if ( sys->d3dobj == NULL )
@@ -674,12 +674,10 @@ static int Direct3D9Open(vout_display_t *vd, video_format_t *fmt)
 
     if ( vlc_format_is_DXVA( vd->fmt.i_chroma ) &&
          vd->cfg->p_pool_setup != NULL &&
-         vd->cfg->p_pool_setup->p_sys != NULL &&
-         vd->cfg->p_pool_setup->p_sys->p_va_sys != NULL )
+         vd->cfg->p_pool_setup->p_sys != NULL )
     {
-        const vlc_va_sys_t *p_va_sys = vd->cfg->p_pool_setup->p_sys->p_va_sys;
-        sys->d3ddev = p_va_sys->d3ddev;
-        sys->d3dpp = p_va_sys->d3dpp;
+        sys->d3ddev = vd->cfg->p_pool_setup->p_sys->d3ddev;
+        sys->d3dpp  = vd->cfg->p_pool_setup->p_sys->d3dpp;
     }
 
     if ( sys->d3ddev == NULL )
