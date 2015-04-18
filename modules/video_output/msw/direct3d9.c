@@ -149,7 +149,8 @@ static void Direct3D9RenderScene(vout_display_t *vd, d3d_region_t *, int, d3d_re
 /* */
 static int DesktopCallback(vlc_object_t *, char const *, vlc_value_t, vlc_value_t, void *);
 
-#define vlc_format_is_DXVA(fmt) (fmt == VLC_CODEC_DXVA_D3D9_OPAQUE)
+#define vlc_format_is_DXVA(fmt) (fmt == VLC_CODEC_DXVA_N_OPAQUE \
+    || fmt == VLC_CODEC_DXVA_Y_OPAQUE || fmt == VLC_CODEC_DXVA_I_OPAQUE)
 
 /**
  * It creates a Direct3D vout display.
@@ -880,8 +881,10 @@ static const d3d_format_t d3d_formats[] = {
     { "YV12",       MAKEFOURCC('Y','V','1','2'),    VLC_CODEC_YV12,  0,0,0 },
     { "YV12",       MAKEFOURCC('Y','V','1','2'),    VLC_CODEC_I420,  0,0,0 },
     { "YV12",       MAKEFOURCC('Y','V','1','2'),    VLC_CODEC_J420,  0,0,0 },
-    { "DXVAS9",     MAKEFOURCC('N','V','1','2'),    VLC_CODEC_DXVA_D3D9_OPAQUE,  0,0,0 },
     { "NV12",       MAKEFOURCC('N','V','1','2'),    VLC_CODEC_NV12,  0,0,0 },
+    { "DXVANV12",   MAKEFOURCC('N','V','1','2'),    VLC_CODEC_DXVA_N_OPAQUE,  0,0,0 },
+    { "DXVAYV12",   MAKEFOURCC('Y','V','1','2'),    VLC_CODEC_DXVA_Y_OPAQUE,  0,0,0 },
+    { "DXVAIMC3",   MAKEFOURCC('I','M','C','3'),    VLC_CODEC_DXVA_I_OPAQUE,  0,0,0 },
     { "UYVY",       D3DFMT_UYVY,    VLC_CODEC_UYVY,  0,0,0 },
     { "YUY2",       D3DFMT_YUY2,    VLC_CODEC_YUYV,  0,0,0 },
     { "X8R8G8B8",   D3DFMT_X8R8G8B8,VLC_CODEC_RGB32, 0xff0000, 0x00ff00, 0x0000ff },
@@ -893,8 +896,6 @@ static const d3d_format_t d3d_formats[] = {
     { NULL, 0, 0, 0,0,0}
 };
 
-static const vlc_fourcc_t d3d_dxva2_opaque[] = { VLC_CODEC_DXVA_D3D9_OPAQUE, 0 };
-
 /**
  * It returns the format (closest to chroma) that can be converted to target */
 static const d3d_format_t *Direct3DFindFormat(vout_display_t *vd, vlc_fourcc_t chroma, D3DFORMAT target)
@@ -903,9 +904,10 @@ static const d3d_format_t *Direct3DFindFormat(vout_display_t *vd, vlc_fourcc_t c
 
     for (unsigned pass = 0; pass < 2; pass++) {
         const vlc_fourcc_t *list;
+        const vlc_fourcc_t dxva_chroma[] = {chroma, 0};
 
         if (pass == 0 && vlc_format_is_DXVA( chroma ))
-            list = d3d_dxva2_opaque;
+            list = dxva_chroma;
         else if (pass == 0 && sys->allow_hw_yuv && vlc_fourcc_IsYUV(chroma))
             list = vlc_fourcc_GetYUVFallback(chroma);
         else if (pass == 1)

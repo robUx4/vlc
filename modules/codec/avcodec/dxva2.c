@@ -280,9 +280,9 @@ static const dxva2_mode_t *Dxva2FindMode(const GUID *guid)
 
 /* XXX Prefered format must come first */
 static const d3d_format_t d3d_formats[] = {
-// FIXME support more pixel conversions { "YV12",   MAKEFOURCC('Y','V','1','2'),    VLC_CODEC_YV12, 0,0,0 },
+    { "YV12",   MAKEFOURCC('Y','V','1','2'),    VLC_CODEC_YV12, 0,0,0 },
     { "NV12",   MAKEFOURCC('N','V','1','2'),    VLC_CODEC_NV12, 0,0,0 },
-// FIXME support more pixel conversions { "IMC3",   MAKEFOURCC('I','M','C','3'),    VLC_CODEC_YV12, 0,0,0 },
+    { "IMC3",   MAKEFOURCC('I','M','C','3'),    VLC_CODEC_YV12, 0,0,0 },
 
     { NULL, 0, 0, 0,0,0 }
 };
@@ -506,7 +506,6 @@ static int Setup(vlc_va_t *va, AVCodecContext *avctx, vlc_fourcc_t *chroma, pict
     fmt.i_height = avctx->coded_height;
     fmt.i_visible_width = avctx->width;
     fmt.i_visible_height = avctx->height;
-    fmt.i_chroma = VLC_CODEC_DXVA_D3D9_OPAQUE;
 
     if (DxCreateVideoDecoder(va, sys->codec_id, &fmt, avctx->active_thread_type & FF_THREAD_FRAME))
         return VLC_EGENERIC;
@@ -521,8 +520,21 @@ static int Setup(vlc_va_t *va, AVCodecContext *avctx, vlc_fourcc_t *chroma, pict
 
     /* */
 ok:
+    switch(sys->p_render->format)
+    {
+    case MAKEFOURCC('N','V','1','2'):
+        *chroma = VLC_CODEC_DXVA_N_OPAQUE;
+        break;
+    case MAKEFOURCC('Y','V','1','2'):
+        *chroma = VLC_CODEC_DXVA_Y_OPAQUE;
+        break;
+    case MAKEFOURCC('I','M','C','3'):
+        *chroma = VLC_CODEC_DXVA_I_OPAQUE;
+        break;
+    default:
+        return VLC_EGENERIC;
+    }
     avctx->hwaccel_context = &sys->hw;
-    *chroma = VLC_CODEC_DXVA_D3D9_OPAQUE;
     output_init->pf_create_config = CreateSurfacePoolConfig;
     sys->pool_cookie.p_va_sys = sys;
     output_init->p_sys = &sys->pool_cookie;
@@ -1316,14 +1328,80 @@ static void NV12_I420 (filter_t *p_filter, picture_t *src, picture_t *dst)
     IDirect3DSurface9_UnlockRect(d3d);
 }
 
+static void YV12_I420 (filter_t *p_filter, picture_t *src, picture_t *dst)
+{
+    copy_cache_t *p_copy_cache = (copy_cache_t*) p_filter->p_sys;
+
+    LPDIRECT3DSURFACE9 d3d = src->p_sys->surface;
+
+    /* */
+    D3DLOCKED_RECT lock;
+    if (FAILED(IDirect3DSurface9_LockRect(d3d, &lock, NULL, D3DLOCK_READONLY))) {
+        msg_Err(p_filter, "Failed to lock surface");
+        return;
+    }
+
+    size_t pitch[3] = {
+        lock.Pitch,
+        lock.Pitch / 2,
+        lock.Pitch / 2,
+    };
+
+    uint8_t *plane[3] = {
+        (uint8_t*)lock.pBits,
+        (uint8_t*)lock.pBits + pitch[0] * src->format.i_height,
+        (uint8_t*)lock.pBits + pitch[0] * src->format.i_height
+                             + pitch[1] * src->format.i_height / 2,
+    };
+
+    CopyFromYv12(dst, plane, pitch, src->format.i_width, src->format.i_visible_height,
+                 p_copy_cache);
+
+    /* */
+    IDirect3DSurface9_UnlockRect(d3d);
+}
+
+static void IMC3_I420 (filter_t *p_filter, picture_t *src, picture_t *dst)
+{
+    copy_cache_t *p_copy_cache = (copy_cache_t*) p_filter->p_sys;
+
+    LPDIRECT3DSURFACE9 d3d = src->p_sys->surface;
+
+    /* */
+    D3DLOCKED_RECT lock;
+    if (FAILED(IDirect3DSurface9_LockRect(d3d, &lock, NULL, D3DLOCK_READONLY))) {
+        msg_Err(p_filter, "Failed to lock surface");
+        return;
+    }
+
+    size_t pitch[3] = {
+        lock.Pitch,
+        lock.Pitch,
+        lock.Pitch,
+    };
+
+    uint8_t *plane[3] = {
+        (uint8_t*)lock.pBits,
+        (uint8_t*)lock.pBits + pitch[0] * src->format.i_height
+                             + pitch[1] * src->format.i_height / 2,
+        (uint8_t*)lock.pBits + pitch[0] * src->format.i_height,
+    };
+
+    CopyFromYv12(dst, plane, pitch, src->format.i_width, src->format.i_visible_height,
+                 p_copy_cache);
+
+    /* */
+    IDirect3DSurface9_UnlockRect(d3d);
+}
+
+
 VIDEO_FILTER_WRAPPER (NV12_I420)
+VIDEO_FILTER_WRAPPER (YV12_I420)
+VIDEO_FILTER_WRAPPER (IMC3_I420)
 
 static int OpenConverter( vlc_object_t *obj )
 {
     filter_t *p_filter = (filter_t *)obj;
-    if ( p_filter->fmt_in.video.i_chroma != VLC_CODEC_DXVA_D3D9_OPAQUE )
-        return VLC_EGENERIC;
-
     if ( p_filter->fmt_in.video.i_height != p_filter->fmt_out.video.i_height
          || p_filter->fmt_in.video.i_width != p_filter->fmt_out.video.i_width )
         return VLC_EGENERIC;
@@ -1333,11 +1411,18 @@ static int OpenConverter( vlc_object_t *obj )
          && p_filter->fmt_out.video.i_chroma != VLC_CODEC_NV12 )
         return VLC_EGENERIC;
 
+    if ( p_filter->fmt_in.video.i_chroma == VLC_CODEC_DXVA_N_OPAQUE )
+        p_filter->pf_video_filter = NV12_I420_Filter;
+    else if ( p_filter->fmt_in.video.i_chroma == VLC_CODEC_DXVA_Y_OPAQUE )
+        p_filter->pf_video_filter = YV12_I420_Filter;
+    else if ( p_filter->fmt_in.video.i_chroma == VLC_CODEC_DXVA_I_OPAQUE )
+        p_filter->pf_video_filter = IMC3_I420_Filter;
+    else
+        return VLC_EGENERIC;
+
     copy_cache_t *p_copy_cache = calloc(1, sizeof(*p_copy_cache));
     CopyInitCache(p_copy_cache, p_filter->fmt_in.video.i_width );
     p_filter->p_sys = (filter_sys_t*) p_copy_cache;
-
-    p_filter->pf_video_filter = NV12_I420_Filter;
 
     return VLC_SUCCESS;
 }

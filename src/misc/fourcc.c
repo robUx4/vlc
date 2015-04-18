@@ -1824,9 +1824,6 @@ static const vlc_fourcc_t p_YV12_fallback[] = {
 static const vlc_fourcc_t p_NV12_fallback[] = {
     VLC_CODEC_NV12, VLC_CODEC_I420, VLC_CODEC_J420, VLC_CODEC_FALLBACK_420, 0
 };
-static const vlc_fourcc_t p_DXVA_fallback[] = {
-    VLC_CODEC_DXVA_D3D9_OPAQUE, VLC_CODEC_NV12, VLC_CODEC_I420, VLC_CODEC_J420, VLC_CODEC_FALLBACK_420, 0
-};
 
 #define VLC_CODEC_FALLBACK_420_16 \
     VLC_CODEC_I420, VLC_CODEC_YV12, VLC_CODEC_J420, VLC_CODEC_FALLBACK_420
@@ -1978,8 +1975,6 @@ static const vlc_fourcc_t *pp_YUV_fallback[] = {
     p_UYVY_fallback,
     p_VYUY_fallback,
     p_NV12_fallback,
-    p_DXVA_fallback,
-
 
     NULL,
 };
@@ -2195,7 +2190,7 @@ static const struct
     { { VLC_CODEC_ANDROID_OPAQUE, VLC_CODEC_MMAL_OPAQUE, },
                                                FAKE_FMT() },
 
-    { { VLC_CODEC_DXVA_D3D9_OPAQUE, },
+    { { VLC_CODEC_DXVA_N_OPAQUE, VLC_CODEC_DXVA_Y_OPAQUE, VLC_CODEC_DXVA_I_OPAQUE, },
                                                 FAKE_FMT() },
 
     { { 0 },                                   FAKE_FMT() }
