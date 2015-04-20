@@ -237,7 +237,6 @@ static vout_thread_t *RequestVout( input_resource_t *p_resource,
             .fmt          = p_fmt,
             .dpb_size     = dpb_size,
             .p_pool_setup = p_pool_setup,
-            .p_dec_sys  = p_dec_sys,
         };
         p_vout = vout_Request( p_resource->p_parent, &cfg );
         if( !p_vout )
@@ -278,7 +277,6 @@ static vout_thread_t *RequestVout( input_resource_t *p_resource,
                 .change_fmt = false,
                 .fmt        = NULL,
                 .dpb_size   = 0,
-                .p_dec_sys  = NULL,
             };
             p_resource->p_vout_free = vout_Request( p_resource->p_parent, &cfg );
         }

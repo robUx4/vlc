@@ -41,7 +41,6 @@
 #include <vlc_codec.h>
 #include <vlc_cpu.h>
 #include <vlc_plugin.h>
-#include <vlc_codecs.h>
 #include <vlc_filter.h>
 
 #include <libavcodec/avcodec.h>
@@ -51,16 +50,8 @@
 
 #include "avcodec.h"
 #include "va.h"
-<<<<<<< HEAD
-<<<<<<< HEAD
-#include "../../video_chroma/copy.h"
-=======
-#include "../../video_output/msw/direct3d9.h"
->>>>>>> 563754c... DIRECT_DXVA is always set
-=======
 #include "../../video_chroma/copy.h"
 #include "../../demux/asf/libasf_guid.h"
->>>>>>> 818a148... clean the shared includes between dxva2 and d3d9
 #include "dxva2.h"
 
 static int Open(vlc_va_t *, AVCodecContext *, const es_format_t *);
@@ -391,7 +382,6 @@ static int DxCreateVideoDecoder(vlc_va_t *,
 static void DxDestroyVideoDecoder(vlc_va_sys_t *);
 static int DxResetVideoDecoder(vlc_va_t *);
 
-<<<<<<< HEAD
 static void CopySurface( picture_t *p_dst, picture_t *p_src )
 {
     picture_sys_t *p_src_sys = p_src->p_sys;
@@ -557,8 +547,6 @@ error:
     return NULL;
 }
 
-=======
->>>>>>> 563754c... DIRECT_DXVA is always set
 /* */
 static int Setup(vlc_va_t *va, AVCodecContext *avctx, vlc_fourcc_t *chroma, picture_pool_setup_t *output_init)
 {
@@ -616,16 +604,12 @@ ok:
         return VLC_EGENERIC;
     }
     avctx->hwaccel_context = &sys->hw;
-<<<<<<< HEAD
     output_init->pf_create_config = CreateSurfacePoolConfig;
     sys->pool_cookie.p_va_sys = sys;
     sys->pool_cookie.d3ddev = sys->d3ddev;
     sys->pool_cookie.d3dobj = sys->d3dobj;
     sys->pool_cookie.d3dpp = sys->d3dpp;
     output_init->p_sys = &sys->pool_cookie;
-=======
-    *chroma = VLC_CODEC_DXVA_D3D9_OPAQUE;
->>>>>>> 563754c... DIRECT_DXVA is always set
 
     return VLC_SUCCESS;
 }
@@ -644,22 +628,9 @@ static int Extract(vlc_va_t *va, picture_t *picture, void *opaque,
     vlc_va_sys_t *sys = va->sys;
     LPDIRECT3DSURFACE9 source = (LPDIRECT3DSURFACE9)(uintptr_t)data;
 
-<<<<<<< HEAD
     LPDIRECT3DSURFACE9 output = picture->p_sys->surface;
 
     assert(source == p_output->p_dxva_surface->surface);
-=======
-    /* */
-    if ( p_picture_sys->p_lock )
-        vlc_mutex_lock( p_picture_sys->p_lock );
-
-#if EXTRACT_LOCKS || GET_DECODER_SURFACE || !LOCK_SURFACE
-    D3DLOCKED_RECT lock;
-    if (FAILED(IDirect3DSurface9_LockRect(source, &lock, NULL, D3DLOCK_READONLY))) {
-        msg_Err(va, "Failed to lock surface");
-        if ( p_picture_sys->p_lock )
-            vlc_mutex_unlock( p_picture_sys->p_lock );
->>>>>>> 563754c... DIRECT_DXVA is always set
 
     picture->pf_copy_private = CopySurface;
 
@@ -667,17 +638,13 @@ static int Extract(vlc_va_t *va, picture_t *picture, void *opaque,
     if ( picture->p_sys->p_lock )
         vlc_mutex_lock( picture->p_sys->p_lock );
 
-<<<<<<< HEAD
     HRESULT hr;
 #if 0
-=======
->>>>>>> 563754c... DIRECT_DXVA is always set
     D3DSURFACE_DESC srcDesc;
     D3DSURFACE_DESC dstDesc;
     hr = IDirect3DSurface9_GetDesc( source, &srcDesc);
     hr = IDirect3DSurface9_GetDesc( output, &dstDesc);
 #endif
-<<<<<<< HEAD
 #if 0
     RECT outputRect;
     outputRect.top = 0;
@@ -689,28 +656,14 @@ static int Extract(vlc_va_t *va, picture_t *picture, void *opaque,
     if (FAILED(hr)) {
         msg_Err(va, "Failed to copy the hw surface to the decoder surface (hr=0x%0lx)", hr );
     }
-=======
->>>>>>> 563754c... DIRECT_DXVA is always set
 
 #if DEBUG_SURFACE
     //msg_Dbg(va, "%lx Extracted pts: %"PRId64" surface %d 0x%p from dxva surface %d 0x%p", GetCurrentThreadId(), picture->date, picture->p_sys->index, picture->p_sys->surface, p_output->p_dxva_surface->index, source);
 #endif
 
     /* */
-<<<<<<< HEAD
     if ( picture->p_sys->p_lock )
         vlc_mutex_unlock( picture->p_sys->p_lock );
-=======
-#if EXTRACT_LOCKS || GET_DECODER_SURFACE || !LOCK_SURFACE
-    IDirect3DSurface9_UnlockRect(source);
-    p_picture_sys->b_lockrect = false;
-#if DEBUG_SURFACE
-    msg_Dbg(va, "d3d surface 0x%p at %d 0x%p unlocked", data, p_picture_sys->index, p_picture_sys );
-#endif
-#endif
-    if ( p_picture_sys->p_lock )
-        vlc_mutex_unlock( p_picture_sys->p_lock );
->>>>>>> 563754c... DIRECT_DXVA is always set
 
     return VLC_SUCCESS;
 }
@@ -1163,14 +1116,44 @@ static int DxFindVideoServiceConversion(vlc_va_t *va, GUID *input, const d3d_for
         }
         if ( is_supported && mode->i_profile && sys->i_profile > 0)
         {
-            if (mode->codec_id == AV_CODEC_ID_H264 &&
-                (sys->i_profile & ~FF_PROFILE_H264_CONSTRAINED) > mode->i_profile) {
-                msg_Warn( va, "Unsupported H.264 profile for DXVA2 HWAccel: %d", sys->i_profile );
-                is_supported = false;
-            } else if (sys->i_profile > mode->i_profile) {
-                msg_Warn( va, "Unsupported profile for DXVA2 HWAccel: %d", sys->i_profile );
+            if (mode->codec_id == AV_CODEC_ID_H264)
+            {
+                if (mode->i_profile == FF_PROFILE_H264_HIGH)
+                {
+                    switch (sys->i_profile & ~(FF_PROFILE_H264_CONSTRAINED|FF_PROFILE_H264_INTRA))
+                    {
+                    case FF_PROFILE_H264_BASELINE:
+                    case FF_PROFILE_H264_MAIN:
+                    case FF_PROFILE_H264_HIGH:
+                        /* supported */
+                        break;
+                    default:
+                        is_supported = false;
+                        break;
+                    }
+                }
+            }
+            else if (mode->codec_id == AV_CODEC_ID_HEVC)
+            {
+                switch (mode->i_profile)
+                {
+                case FF_PROFILE_HEVC_MAIN:
+                    if (sys->i_profile != FF_PROFILE_HEVC_MAIN)
+                        is_supported = false;
+                    break;
+                case FF_PROFILE_HEVC_MAIN_10:
+                    if (sys->i_profile != FF_PROFILE_HEVC_MAIN && sys->i_profile != FF_PROFILE_HEVC_MAIN_10 )
+                        is_supported = false;
+                    break;
+                }
+            }
+            else if (sys->i_profile > mode->i_profile)
+            {
+                /* ordered profiles numbers like AV_CODEC_ID_MPEG2VIDEO */
                 is_supported = false;
             }
+            if (!is_supported)
+                msg_Warn( va, "Unsupported profile for DXVA2 HWAccel: %d", sys->i_profile );
         }
         if (!is_supported)
             continue;
@@ -1418,7 +1401,6 @@ static int DxResetVideoDecoder(vlc_va_t *va)
     msg_Err(va, "DxResetVideoDecoder unimplemented");
     return VLC_EGENERIC;
 }
-<<<<<<< HEAD
 
 static void NV12_I420 (filter_t *p_filter, picture_t *src, picture_t *dst)
 {
@@ -1555,5 +1537,3 @@ static void CloseConverter( vlc_object_t *obj )
     free( p_copy_cache );
     p_filter->p_sys = NULL;
 }
-=======
->>>>>>> 563754c... DIRECT_DXVA is always set

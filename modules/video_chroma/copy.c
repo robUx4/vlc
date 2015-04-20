@@ -326,12 +326,7 @@ static void SSE_CopyFromNv12(picture_t *dst,
                   src[0], src_pitch[0],
                   cache->buffer, cache->size,
                   width, height, cpu);
-    if( dst->format.i_chroma != VLC_CODEC_YV12 )
-        SSE_CopyPlane(dst->p[1].p_pixels, dst->p[1].i_pitch,
-                      src[1], src_pitch[1],
-                      cache->buffer, cache->size,
-                      width, height/2, cpu);
-    else
+    if( dst->format.i_chroma == VLC_CODEC_YV12 )
         SSE_SplitPlanes(dst->p[2].p_pixels, dst->p[2].i_pitch,
                         dst->p[1].p_pixels, dst->p[1].i_pitch,
                         src[1], src_pitch[1],
@@ -411,11 +406,7 @@ void CopyFromNv12(picture_t *dst, uint8_t *src[2], size_t src_pitch[2],
     CopyPlane(dst->p[0].p_pixels, dst->p[0].i_pitch,
               src[0], src_pitch[0],
               width, height);
-    if( dst->format.i_chroma != VLC_CODEC_YV12 )
-        CopyPlane(dst->p[1].p_pixels, dst->p[1].i_pitch,
-                      src[1], src_pitch[1],
-                      width, height/2);
-    else
+    if( dst->format.i_chroma == VLC_CODEC_YV12 )
         SplitPlanes(dst->p[2].p_pixels, dst->p[2].i_pitch,
                     dst->p[1].p_pixels, dst->p[1].i_pitch,
                     src[1], src_pitch[1],
