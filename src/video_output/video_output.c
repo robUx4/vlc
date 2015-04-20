@@ -397,15 +397,6 @@ void vout_FlushSubpictureChannel( vout_thread_t *vout, int channel )
                              channel);
 }
 
-/**
- * It retreives a picture from the vout or NULL if no pictures are
- * available yet.
- *
- * You MUST call vout_PutPicture or picture_Release on it.
- *
- * You may use picture_Hold() (paired with picture_Release()) to keep a
- * read-only reference.
- */
 picture_t *vout_GetPicture(vout_thread_t *vout)
 {
     picture_t *picture = picture_pool_Get(vout->p->decoder_pool);
@@ -417,14 +408,6 @@ picture_t *vout_GetPicture(vout_thread_t *vout)
     return picture;
 }
 
-/**
- * It gives to the vout a picture to be displayed.
- *
- * The given picture MUST comes from vout_GetPicture.
- *
- * Becareful, after vout_PutPicture is called, picture_t::p_next cannot be
- * read/used.
- */
 void vout_PutPicture(vout_thread_t *vout, picture_t *picture)
 {
     picture->p_next = NULL;
