@@ -347,6 +347,7 @@ static void CloseDecoder( vlc_object_t *p_this )
 
     avcodec_free_context( &p_sys->p_context );
     free( p_sys );
+    p_dec->p_sys = NULL;
 }
 
 /*****************************************************************************
