@@ -41,7 +41,48 @@
 
 #include "avcodec.h"
 #include "va.h"
-#include "video.h"
+
+/*****************************************************************************
+ * decoder_sys_t : decoder descriptor
+ *****************************************************************************/
+struct decoder_sys_t
+{
+    AVCODEC_COMMON_MEMBERS
+
+    /* Video decoder specific part */
+    mtime_t i_pts;
+
+    AVFrame          *p_ff_pic;
+
+    /* for frame skipping algo */
+    bool b_hurry_up;
+    enum AVDiscard i_skip_frame;
+
+    /* how many decoded frames are late */
+    int     i_late_frames;
+    mtime_t i_late_frames_start;
+
+    /* for direct rendering */
+    bool b_direct_rendering;
+    int  i_direct_rendering_used;
+
+    bool b_has_b_frames;
+
+    /* Hack to force display of still pictures */
+    bool b_first_frame;
+
+
+    /* */
+    bool palette_sent;
+
+    /* */
+    bool b_flush;
+
+    /* VA API */
+    vlc_va_t *p_va;
+
+    vlc_sem_t sem_mt;
+};
 
 #ifdef HAVE_AVCODEC_MT
 #   define wait_mt(s) vlc_sem_wait( &s->sem_mt )
@@ -334,10 +375,6 @@ int InitVideoDec( decoder_t *p_dec, AVCodecContext *p_context,
     msg_Dbg( p_dec, "allowing %d thread(s) for decoding", i_thread_count );
     p_context->thread_count = i_thread_count;
     p_context->thread_safe_callbacks = true;
-# if 0 //defined(_WIN32)
-    p_context->thread_safe_callbacks = false;
-    //p_context->thread_type = FF_THREAD_SLICE;
-# endif
 
     switch( p_codec->id )
     {
