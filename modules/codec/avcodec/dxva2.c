@@ -41,11 +41,7 @@
 #include <vlc_codec.h>
 #include <vlc_cpu.h>
 #include <vlc_plugin.h>
-<<<<<<< HEAD
 #include <vlc_filter.h>
-=======
-#include <vlc_codecs.h>
->>>>>>> remotes/origin/master
 
 #include <libavcodec/avcodec.h>
 #    define DXVA2API_USE_BITFIELDS
@@ -55,11 +51,8 @@
 #include "avcodec.h"
 #include "va.h"
 #include "../../video_chroma/copy.h"
-<<<<<<< HEAD
 #include "../../demux/asf/libasf_guid.h"
 #include "dxva2.h"
-=======
->>>>>>> remotes/origin/master
 
 static int Open(vlc_va_t *, AVCodecContext *, const es_format_t *);
 static void Close(vlc_va_t *, AVCodecContext *);
@@ -179,7 +172,6 @@ DEFINE_GUID(DXVA_ModeH263_D,                        0x1b81be06, 0xa0c7, 0x11d3, 
 DEFINE_GUID(DXVA_ModeH263_E,                        0x1b81be07, 0xa0c7, 0x11d3, 0xb9, 0x84, 0x00, 0xc0, 0x4f, 0x2e, 0x73, 0xc5);
 DEFINE_GUID(DXVA_ModeH263_F,                        0x1b81be08, 0xa0c7, 0x11d3, 0xb9, 0x84, 0x00, 0xc0, 0x4f, 0x2e, 0x73, 0xc5);
 
-
 /* */
 typedef struct {
     const char   *name;
@@ -197,6 +189,7 @@ static const dxva2_mode_t dxva2_modes[] = {
     { "MPEG-2 decoder, restricted profile D",                                         &DXVA_ModeMPEG2_D,                      0, 0 },
     { "MPEG-2 variable-length decoder",                                               &DXVA2_ModeMPEG2_VLD,                   AV_CODEC_ID_MPEG2VIDEO, FF_PROFILE_MPEG2_SIMPLE },
     { "MPEG-2 & MPEG-1 variable-length decoder",                                      &DXVA2_ModeMPEG2and1_VLD,               AV_CODEC_ID_MPEG2VIDEO, FF_PROFILE_MPEG2_MAIN },
+    { "MPEG-2 & MPEG-1 variable-length decoder",                                      &DXVA2_ModeMPEG2and1_VLD,               AV_CODEC_ID_MPEG1VIDEO, 0 },
     { "MPEG-2 motion compensation",                                                   &DXVA2_ModeMPEG2_MoComp,                0, 0 },
     { "MPEG-2 inverse discrete cosine transform",                                     &DXVA2_ModeMPEG2_IDCT,                  0, 0 },
 
@@ -385,7 +378,7 @@ static void DxDestroyVideoService(vlc_va_sys_t *);
 static int DxFindVideoServiceConversion(vlc_va_t *, GUID *input, const d3d_format_t **output);
 
 static int DxCreateVideoDecoder(vlc_va_t *,
-                                int codec_id, const video_format_t *, int);
+                                int codec_id, const video_format_t *, bool);
 static void DxDestroyVideoDecoder(vlc_va_sys_t *);
 static int DxResetVideoDecoder(vlc_va_t *);
 
@@ -1211,12 +1204,11 @@ static int DxFindVideoServiceConversion(vlc_va_t *va, GUID *input, const d3d_for
     return VLC_EGENERIC;
 }
 
-
 /**
  * It creates a DXVA2 decoder using the given video format
  */
 static int DxCreateVideoDecoder(vlc_va_t *va, int codec_id,
-                                const video_format_t *fmt, int i_threading)
+                                const video_format_t *fmt, bool b_threading)
 {
     vlc_va_sys_t *sys = va->sys;
     int surface_alignment;
@@ -1229,41 +1221,41 @@ static int DxCreateVideoDecoder(vlc_va_t *va, int codec_id,
     sys->width  = fmt->i_width;
     sys->height = fmt->i_height;
 
-    surface_count = 4;
-    switch ( codec_id )
-    {
-    case AV_CODEC_ID_MPEG2VIDEO:
-        /* decoding MPEG-2 requires additional alignment on some Intel GPUs,
-           but it causes issues for H.264 on certain AMD GPUs..... */
-        surface_alignment = 32;
-        surface_count += 2;
-        break;
+    /* Allocates all surfaces needed for the decoder */
+    switch (codec_id) {
     case AV_CODEC_ID_HEVC:
         /* the HEVC DXVA2 spec asks for 128 pixel aligned surfaces to ensure
            all coding features have enough room to work with */
         surface_alignment = 128;
-        surface_count += 16;
+        surface_count = 4 + 16;
         break;
     case AV_CODEC_ID_H264:
-        surface_count += 16;
+        surface_alignment = 16;
+        surface_count = 4 + 16;
+        break;
+    case AV_CODEC_ID_MPEG1VIDEO:
+    case AV_CODEC_ID_MPEG2VIDEO:
+        /* decoding MPEG-2 requires additional alignment on some Intel GPUs,
+           but it causes issues for H.264 on certain AMD GPUs..... */
+        surface_alignment = 32;
+        surface_count = 4 + 2;
         break;
     default:
         surface_alignment = 16;
-        surface_count += 2;
+        surface_count = 4 + 2;
+        break;
     }
 
 #define ALIGN(x, y) (((x) + ((y) - 1)) & ~((y) - 1))
     sys->surface_width  = ALIGN(fmt->i_width, surface_alignment);
     sys->surface_height = ALIGN(fmt->i_height, surface_alignment);
 
-    if ( i_threading )
+    if ( b_threading )
         surface_count += sys->thread_count;
 
     if (surface_count > VA_DXVA2_MAX_SURFACE_COUNT)
         return VLC_EGENERIC;
     sys->surface_count = surface_count;
-
-    /* Allocates all surfaces needed for the decoder */
     if (FAILED(IDirectXVideoDecoderService_CreateSurface(sys->vs,
                                                          sys->surface_width,
                                                          sys->surface_height,

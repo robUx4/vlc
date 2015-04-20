@@ -50,6 +50,7 @@
 
 #include "common.h"
 #include "builtin_shaders.h"
+#include "../../codec/avcodec/dxva2.h"
 
 /*****************************************************************************
  * Module descriptor

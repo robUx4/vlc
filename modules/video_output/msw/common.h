@@ -23,9 +23,6 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston MA 02110-1301, USA.
  *****************************************************************************/
 
-#ifndef MSW_COMMON_H_
-#define MSW_COMMON_H_
-
 #ifdef MODULE_NAME_IS_directdraw
 # include <ddraw.h>
 #endif
@@ -41,7 +38,6 @@
 #ifdef MODULE_NAME_IS_direct3d9
 # include <d3d9.h>
 # include <d3dx9effect.h>
-#include "../../codec/avcodec/dxva2.h"
 #endif
 #ifdef MODULE_NAME_IS_glwin32
 # include "../opengl.h"
@@ -267,5 +263,3 @@ picture_pool_t *CommonPool(vout_display_t *, unsigned);
 #define DX_POSITION_CHANGE 0x1000
 #define DX_WALLPAPER_CHANGE 0x2000
 #define DX_DESKTOP_CHANGE 0x4000
-
-#endif /* MSW_COMMON_H_ */

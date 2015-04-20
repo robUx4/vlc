@@ -1978,6 +1978,7 @@ static const vlc_fourcc_t *pp_YUV_fallback[] = {
     p_VYUY_fallback,
     p_NV12_fallback,
 
+
     NULL,
 };
 

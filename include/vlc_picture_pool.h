@@ -121,22 +121,6 @@ VLC_API picture_pool_t * picture_pool_New(unsigned count,
 VLC_API picture_pool_t * picture_pool_NewFromFormat(const video_format_t *fmt,
                                                     unsigned count) VLC_USED;
 
-#if 0
-/**
- * Allocates pictures from the heap and creates a picture pool with them.
- * This is a convenience wrapper for picture_NewFromFormat() and
- * picture_pool_New().
- *
- * @param fmt video format of pictures to allocate from the heap
- * @param count number of pictures to allocate
- *
- * @return a pointer to the new pool on success, NULL on error
- */
-VLC_API picture_pool_t * picture_pool_NewFromFormatSys(const video_format_t *fmt,
-                                                       unsigned count,
-                                                       picture_pool_setup_t *p_pool_setup) VLC_USED;
-#endif
-
 /**
  * Releases a pool created by picture_pool_NewExtended(), picture_pool_New()
  * or picture_pool_NewFromFormat().
