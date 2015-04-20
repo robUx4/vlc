@@ -314,7 +314,7 @@ struct vlc_va_sys_t
     int          width;
     int          height;
 
-    bool            b_need_thread_safe;
+    bool            b_thread_safe;
     vlc_mutex_t     surface_lock;
 
     /* DLL */
@@ -504,7 +504,7 @@ static picture_pool_configuration_t *CreateSurfacePoolConfig(picture_pool_setup_
         p_sys_pictures[i]->surface = hw_surfaces[i];
         p_sys_pictures[i]->d3ddev = sys->d3ddev;
         p_sys_pictures[i]->index = i;
-        if ( sys->b_need_thread_safe )
+        if ( sys->b_thread_safe )
             p_sys_pictures[i]->p_lock = &sys->surface_lock;
 #if DEBUG_SURFACE
         p_sys_pictures[i]->p_va = sys->va;
@@ -692,7 +692,7 @@ static int Get(vlc_va_t *va, void **opaque, uint8_t **data)
     *opaque = p_output;
     p_output->p_sys = sys;
 
-    if ( sys->b_need_thread_safe )
+    if ( sys->b_thread_safe )
         vlc_mutex_lock( &sys->surface_lock );
 
     /* Grab an unused surface, in case none are, try the oldest
@@ -718,7 +718,7 @@ static int Get(vlc_va_t *va, void **opaque, uint8_t **data)
     msg_Dbg( va, "%lx pool get picture_sys_t 0x%p dxva surface %d 0x%p", GetCurrentThreadId(), p_output->p_dxva_surface, oldest->index, p_output->p_dxva_surface->surface );
 #endif
 
-    if ( sys->b_need_thread_safe )
+    if ( sys->b_thread_safe )
         vlc_mutex_unlock( &sys->surface_lock );
 
     return VLC_SUCCESS;
@@ -760,7 +760,7 @@ static void Close(vlc_va_t *va, AVCodecContext *ctx)
         FreeLibrary(sys->hdxva2_dll);
     if (sys->hd3d9_dll)
         FreeLibrary(sys->hd3d9_dll);
-    if ( sys->b_need_thread_safe )
+    if ( sys->b_thread_safe )
         vlc_mutex_destroy( &sys->surface_lock );
 
     free((char *)va->description);
@@ -782,8 +782,8 @@ static int Open(vlc_va_t *va, AVCodecContext *ctx, const es_format_t *fmt)
     sys->codec_id = ctx->codec_id;
     sys->i_profile = ctx->profile;
 
-    sys->b_need_thread_safe = ctx->thread_safe_callbacks;
-    if ( sys->b_need_thread_safe )
+    sys->b_thread_safe = ctx->thread_safe_callbacks;
+    if ( sys->b_thread_safe )
         vlc_mutex_init( &sys->surface_lock );
 
     /* Load dll*/
@@ -1274,7 +1274,7 @@ static int DxCreateVideoDecoder(vlc_va_t *va, int codec_id,
         p_picture->refcount = 0;
         p_picture->index = i;
         p_picture->order = i;
-        if ( sys->b_need_thread_safe )
+        if ( sys->b_thread_safe )
             p_picture->p_lock = &sys->surface_lock;
 #if DEBUG_SURFACE
         p_picture->p_va = va;
