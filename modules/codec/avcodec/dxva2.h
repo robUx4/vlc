@@ -26,8 +26,6 @@
 #ifndef AVCODEC_DXVA2_H_
 #define AVCODEC_DXVA2_H_
 
-#define DEBUG_SURFACE 0
-
 #ifdef HAVE_CONFIG_H
 # include "config.h"
 #endif
@@ -56,18 +54,16 @@ struct picture_pool_setup_sys_t {
 struct picture_sys_t
 {
     LPDIRECT3DSURFACE9 surface;
-    LPDIRECT3DDEVICE9  d3ddev; // TODO not needed anymore ?
+    LPDIRECT3DDEVICE9  surface_device;
 
+    /* D3D9 vout stuff */
     picture_t          *fallback;
 
-    /* DXVA stuff */
+    /* DXVA2 decoder stuff */
     int                refcount;
     unsigned int       order;
     unsigned int       index;
     vlc_mutex_t        *p_lock;
-#if DEBUG_SURFACE
-    vlc_va_t           *p_va;
-#endif
 };
 
 #endif /* AVCODEC_DXVA2_H_ */

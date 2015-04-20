@@ -375,8 +375,8 @@ void picture_CopyPixels( picture_t *p_dst, const picture_t *p_src )
 
 void picture_Copy( picture_t *p_dst, const picture_t *p_src )
 {
-    picture_CopyProperties( p_dst, p_src );
     picture_CopyPixels( p_dst, p_src );
+    picture_CopyProperties( p_dst, p_src );
 }
 
 

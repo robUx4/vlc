@@ -32,7 +32,6 @@
 #include <vlc_plugin.h>
 #include <vlc_vout_wrapper.h>
 #include <vlc_vout.h>
-#include <vlc_codec.h>
 #include <assert.h>
 #include "vout_internal.h"
 #include "display.h"
@@ -135,7 +134,7 @@ int vout_InitWrapper(vout_thread_t *vout)
                                                         reserved_picture + decoder_picture) : 3;
     picture_pool_t *display_pool = vout_display_Pool(vd, display_pool_size);
     if ( picture_pool_GetSize(display_pool) < display_pool_size )
-        msg_Warn(vout, "Not enough direct buffers in the pool, requested %d got %d",
+        msg_Warn(vout, "Not enough display buffers in the pool, requested %d got %d",
                  display_pool_size, picture_pool_GetSize(display_pool));
 
     if (allow_dr &&
@@ -153,10 +152,9 @@ int vout_InitWrapper(vout_thread_t *vout)
                 conf = vd->cfg->p_pool_setup->pf_create_config( vd->cfg->p_pool_setup->p_sys, &source, decoder_pool_size);
             if ( conf != NULL )
                 sys->decoder_pool = picture_pool_NewExtended( conf );
-            else
-                sys->decoder_pool = picture_pool_NewFromFormat(&source, decoder_pool_size);
         }
-        else
+
+        if (!sys->decoder_pool)
             sys->decoder_pool = picture_pool_NewFromFormat(&source, decoder_pool_size);
         if (!sys->decoder_pool)
             return VLC_EGENERIC;

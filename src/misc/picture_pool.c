@@ -32,7 +32,6 @@
 #include <assert.h>
 
 #include <vlc_common.h>
-#include <vlc_codec.h>
 #include <vlc_picture_pool.h>
 
 /*****************************************************************************
@@ -196,8 +195,7 @@ picture_pool_t *picture_pool_NewFromFormat(const video_format_t *fmt,
     unsigned i;
 
     for (i = 0; i < count; i++) {
-        const picture_resource_t *p_pic_resource = NULL;
-        picture[i] = picture_NewFromResource( fmt, p_pic_resource );
+        picture[i] = picture_NewFromFormat(fmt);
         if (picture[i] == NULL)
             goto error;
     }
@@ -213,46 +211,6 @@ error:
         picture_Release(picture[--i]);
     return NULL;
 }
-
-#if 0
-picture_pool_t *picture_pool_NewFromFormatSys(const video_format_t *fmt,
-                                              unsigned count,
-                                              picture_pool_setup_t *p_pool_setup)
-{
-    picture_t *picture[count ? count : 1];
-    unsigned i;
-
-    if (p_fmt_init && p_fmt_init->pf_create)
-        p_fmt_init->pf_create( p_fmt_init, fmt, count );
-
-    for (i = 0; i < count; i++) {
-        const picture_resource_t *p_pic_resource = NULL;
-        if (p_fmt_init && p_fmt_init->pf_get_resource)
-            p_pic_resource = p_fmt_init->pf_get_resource( p_fmt_init, fmt, i );
-
-        picture[i] = picture_NewFromResource( fmt, p_pic_resource );
-        if (picture[i] == NULL)
-            goto error;
-        if (p_fmt_init && p_fmt_init->pf_source_sys_alloc)
-            p_fmt_init->pf_source_sys_alloc( p_fmt_init, picture[i] );
-    }
-
-    picture_pool_t *pool = picture_pool_New(count, picture);
-    if (!pool)
-        goto error;
-
-    pool->p_fmt_init = p_fmt_init;
-
-    return pool;
-
-error:
-    while (i > 0)
-        picture_Release(picture[--i]);
-    if (p_fmt_init && p_fmt_init->pf_destroy)
-        p_fmt_init->pf_destroy( p_fmt_init );
-    return NULL;
-}
-#endif
 
 picture_pool_t *picture_pool_Reserve(picture_pool_t *master, unsigned count)
 {

@@ -729,9 +729,6 @@ static picture_t *DecodeVideo( decoder_t *p_dec, block_t **pp_block )
 
             /* Fill p_picture_t from AVVideoFrame and do chroma conversion
              * if needed */
-#ifndef NDEBUG
-            p_pic->date = i_pts;
-#endif
             ffmpeg_CopyPicture( p_dec, p_pic, p_sys->p_ff_pic );
         }
         else

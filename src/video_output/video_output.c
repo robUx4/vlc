@@ -45,7 +45,6 @@
 #include <vlc_filter.h>
 #include <vlc_vout_osd.h>
 #include <vlc_image.h>
-#include <vlc_codec.h>
 
 #include <libvlc.h>
 #include "vout_internal.h"
@@ -918,16 +917,18 @@ static int ThreadDisplayRenderPicture(vout_thread_t *vout, bool is_forced)
      */
     bool is_direct = vout->p->decoder_pool == vout->p->display_pool;
     picture_t *todisplay = filtered;
-    if (do_early_spu && subpic && vout->p->spu_blend) {
-        picture_t *blent = picture_pool_Get(vout->p->private_pool);
-        if (blent) {
-            VideoFormatCopyCropAr(&blent->format, &filtered->format);
-            picture_Copy(blent, filtered);
-            if (picture_BlendSubpicture(blent, vout->p->spu_blend, subpic)) {
-                picture_Release(todisplay);
-                todisplay = blent;
-            } else
-                picture_Release(blent);
+    if (do_early_spu && subpic) {
+        if (vout->p->spu_blend) {
+            picture_t *blent = picture_pool_Get(vout->p->private_pool);
+            if (blent) {
+                VideoFormatCopyCropAr(&blent->format, &filtered->format);
+                picture_Copy(blent, filtered);
+                if (picture_BlendSubpicture(blent, vout->p->spu_blend, subpic)) {
+                    picture_Release(todisplay);
+                    todisplay = blent;
+                } else
+                    picture_Release(blent);
+            }
         }
         subpicture_Delete(subpic);
         subpic = NULL;
@@ -948,7 +949,6 @@ static int ThreadDisplayRenderPicture(vout_thread_t *vout, bool is_forced)
          * subject to invalidation...). Since there are no filters, copying
          * pictures from the decoder to the output is unavoidable. */
         VideoFormatCopyCropAr(&direct->format, &todisplay->format);
-        //msg_Dbg(vout, "copy picture 0x%p into 0x%p %"PRId64, todisplay, direct, direct->date );
         picture_Copy(direct, todisplay);
         picture_Release(todisplay);
         todisplay = direct;
