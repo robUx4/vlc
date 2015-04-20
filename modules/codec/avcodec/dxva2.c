@@ -41,7 +41,11 @@
 #include <vlc_codec.h>
 #include <vlc_cpu.h>
 #include <vlc_plugin.h>
+<<<<<<< HEAD
 #include <vlc_filter.h>
+=======
+#include <vlc_codecs.h>
+>>>>>>> remotes/origin/master
 
 #include <libavcodec/avcodec.h>
 #    define DXVA2API_USE_BITFIELDS
@@ -51,8 +55,11 @@
 #include "avcodec.h"
 #include "va.h"
 #include "../../video_chroma/copy.h"
+<<<<<<< HEAD
 #include "../../demux/asf/libasf_guid.h"
 #include "dxva2.h"
+=======
+>>>>>>> remotes/origin/master
 
 static int Open(vlc_va_t *, AVCodecContext *, const es_format_t *);
 static void Close(vlc_va_t *, AVCodecContext *);
