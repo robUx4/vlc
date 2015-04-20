@@ -188,14 +188,15 @@ static block_t *DecoderBlockFlushNew()
  * Buffers allocation callbacks for the decoders
  *****************************************************************************/
 static vout_thread_t *aout_request_vout( void *p_private,
-                                         vout_thread_t *p_vout, video_format_t *p_fmt, bool b_recyle )
+                                         vout_thread_t *p_vout, video_format_t *p_fmt,
+                                         picture_pool_setup_t *p_pool_setup, bool b_recyle )
 {
     decoder_t *p_dec = p_private;
     decoder_owner_sys_t *p_owner = p_dec->p_owner;
     input_thread_t *p_input = p_owner->p_input;
 
-    p_vout = input_resource_RequestVout( p_owner->p_resource, p_vout, p_fmt, 1,
-                                         b_recyle );
+    p_vout = input_resource_RequestVout( p_owner->p_resource, p_vout, p_fmt,
+                                         p_pool_setup, 1, b_recyle );
     if( p_input != NULL )
         input_SendEventVout( p_input );
 
@@ -400,6 +401,7 @@ static int vout_update_format( decoder_t *p_dec )
         }
         p_vout = input_resource_RequestVout( p_owner->p_resource,
                                              p_vout, &fmt,
+                                             &p_dec->fmt_out_pool_setup,
                                              dpb_size +
                                              p_dec->i_extra_picture_buffers + 1,
                                              true );
@@ -1670,7 +1672,7 @@ static void DeleteDecoder( decoder_t * p_dec )
 
         /* */
         input_resource_RequestVout( p_owner->p_resource, p_owner->p_vout, NULL,
-                                    0, true );
+                                    &p_dec->fmt_out_pool_setup, 0, true );
         if( p_owner->p_input != NULL )
             input_SendEventVout( p_owner->p_input );
     }

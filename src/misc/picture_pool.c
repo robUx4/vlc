@@ -50,6 +50,8 @@ struct picture_pool_t {
     unsigned       picture_count;
     picture_t      **picture;
 
+    picture_pool_gc_t gc;
+
     int       (*pic_lock)(picture_t *);
     void      (*pic_unlock)(picture_t *);
     unsigned    refs;
@@ -76,6 +78,8 @@ void picture_pool_Release(picture_pool_t *pool)
         free(sys);
         free(picture);
     }
+    if (pool->gc.pf_destroy)
+        pool->gc.pf_destroy( pool->gc.p_sys );
 
     vlc_mutex_destroy(&pool->lock);
     free(pool->picture);
@@ -126,6 +130,7 @@ static picture_t *picture_pool_ClonePicture(picture_pool_t *pool,
         clone->gc.p_sys = sys;
     else
         free(sys);
+    clone->pf_copy_private = picture->pf_copy_private;
 
     return clone;
 }
@@ -157,6 +162,7 @@ picture_pool_t *picture_pool_NewExtended(const picture_pool_configuration_t *cfg
 
     pool->pic_lock   = cfg->lock;
     pool->pic_unlock = cfg->unlock;
+    pool->gc = cfg->gc;
 
     for (unsigned i = 0; i < cfg->picture_count; i++) {
         picture_t *picture = picture_pool_ClonePicture(pool, cfg->picture[i]);

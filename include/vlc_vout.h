@@ -56,6 +56,7 @@ typedef struct {
     bool                 change_fmt;
     const video_format_t *fmt;
     unsigned             dpb_size;
+    picture_pool_setup_t *p_pool_setup;
 } vout_configuration_t;
 
 /**

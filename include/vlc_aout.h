@@ -334,6 +334,8 @@ VLC_API void aout_FiltersDelete(vlc_object_t *, aout_filters_t *);
 VLC_API bool aout_FiltersAdjustResampling(aout_filters_t *, int);
 VLC_API block_t *aout_FiltersPlay(aout_filters_t *, block_t *, int rate);
 
-VLC_API vout_thread_t * aout_filter_RequestVout( filter_t *, vout_thread_t *p_vout, video_format_t *p_fmt );
+VLC_API vout_thread_t * aout_filter_RequestVout( filter_t *, vout_thread_t *p_vout,
+                                                 video_format_t *p_fmt,
+                                                 picture_pool_setup_t *p_pool_setup );
 
 #endif /* VLC_AOUT_H */

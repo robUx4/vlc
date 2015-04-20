@@ -37,15 +37,41 @@
 typedef struct picture_pool_t picture_pool_t;
 
 /**
+ * Picture pool destroy callback
+ */
+typedef struct
+{
+    void *p_sys;
+    void (*pf_destroy)(void *);
+} picture_pool_gc_t;
+
+/**
  * Picture pool configuration
  */
 typedef struct {
     unsigned  picture_count;
     picture_t *const *picture;
 
+    picture_pool_gc_t gc;
+
     int       (*lock)(picture_t *);
     void      (*unlock)(picture_t *);
 } picture_pool_configuration_t;
+
+/**
+ * Private type for picture_pool_setup_t
+ */
+typedef struct picture_pool_setup_sys_t picture_pool_setup_sys_t;
+
+/**
+ * Callback set by the decoder to do special processing when a picture_pool_t
+  * is created.
+ */
+struct picture_pool_setup_t
+{
+    picture_pool_configuration_t *(*pf_create_config) (picture_pool_setup_sys_t *p_sys, const video_format_t *fmt, unsigned count);
+    picture_pool_setup_sys_t     *p_sys;
+};
 
 /**
  * Creates a pool of preallocated pictures. Free pictures can be allocated from

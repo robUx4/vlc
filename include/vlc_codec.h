@@ -28,6 +28,7 @@
 #include <vlc_es.h>
 #include <vlc_picture.h>
 #include <vlc_subpicture.h>
+#include <vlc_picture_pool.h>
 
 /**
  * \file
@@ -62,6 +63,7 @@ struct decoder_t
 
     /* Output format of decoder/packetizer */
     es_format_t         fmt_out;
+    picture_pool_setup_t fmt_out_pool_setup;
 
     /* Some decoders only accept packetized data (ie. not truncated) */
     bool                b_need_packetized;

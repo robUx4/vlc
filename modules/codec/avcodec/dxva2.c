@@ -376,7 +376,7 @@ static void DxCreateVideoConversion(vlc_va_sys_t *);
 static void DxDestroyVideoConversion(vlc_va_sys_t *);
 
 /* */
-static int Setup(vlc_va_t *va, AVCodecContext *avctx, vlc_fourcc_t *chroma)
+static int Setup(vlc_va_t *va, AVCodecContext *avctx, vlc_fourcc_t *chroma, picture_pool_setup_t *output_init)
 {
     vlc_va_sys_t *sys = va->sys;
 

@@ -110,6 +110,8 @@ typedef struct {
         int den;
     } zoom;
 
+    picture_pool_setup_t *p_pool_setup;
+
 } vout_display_cfg_t;
 
 /**
