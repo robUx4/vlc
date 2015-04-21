@@ -1196,34 +1196,29 @@ static int DxCreateVideoDecoder(vlc_va_t *va, int codec_id,
     sys->width  = fmt->i_width;
     sys->height = fmt->i_height;
 
-    /* Allocates all surfaces needed for the decoder */
-    switch (codec_id) {
-    case AV_CODEC_ID_HEVC:
-        /* the HEVC DXVA2 spec asks for 128 pixel aligned surfaces to ensure
-           all coding features have enough room to work with */
-        surface_alignment = 128;
-        surface_count = 4 + 16;
-        break;
-    case AV_CODEC_ID_H264:
-        surface_alignment = 16;
-        surface_count = 4 + 16;
-        break;
-    case AV_CODEC_ID_MPEG1VIDEO:
-    case AV_CODEC_ID_MPEG2VIDEO:
-        /* decoding MPEG-2 requires additional alignment on some Intel GPUs,
-           but it causes issues for H.264 on certain AMD GPUs..... */
+    /* decoding MPEG-2 requires additional alignment on some Intel GPUs,
+       but it causes issues for H.264 on certain AMD GPUs..... */
+    if ( codec_id == AV_CODEC_ID_MPEG2VIDEO )
         surface_alignment = 32;
-        surface_count = 4 + 2;
-        break;
-    default:
+    /* the HEVC DXVA2 spec asks for 128 pixel aligned surfaces to ensure
+       all coding features have enough room to work with */
+    else if ( codec_id == AV_CODEC_ID_HEVC )
+        surface_alignment = 128;
+    else
         surface_alignment = 16;
+
+    /* Allocates all surfaces needed for the decoder */
+    --surface_alignment;
+    sys->surface_width  = (fmt->i_width  + surface_alignment) & ~surface_alignment;
+    sys->surface_height = (fmt->i_height + surface_alignment) & ~surface_alignment;
+
+    surface_count = 4;
+    /* add surfaces based on number of possible refs */
+    if ( codec_id == AV_CODEC_ID_H264 || codec_id == AV_CODEC_ID_HEVC )
+        surface_count += 16;
+    else
         surface_count = 4 + 2;
         break;
-    }
-
-#define ALIGN(x, y) (((x) + ((y) - 1)) & ~((y) - 1))
-    sys->surface_width  = ALIGN(fmt->i_width, surface_alignment);
-    sys->surface_height = ALIGN(fmt->i_height, surface_alignment);
 
     if ( b_threading )
         surface_count += sys->thread_count;
@@ -1231,6 +1226,7 @@ static int DxCreateVideoDecoder(vlc_va_t *va, int codec_id,
     if (surface_count > VA_DXVA2_MAX_SURFACE_COUNT)
         return VLC_EGENERIC;
     sys->surface_count = surface_count;
+
     if (FAILED(IDirectXVideoDecoderService_CreateSurface(sys->vs,
                                                          sys->surface_width,
                                                          sys->surface_height,
