@@ -785,8 +785,7 @@ static picture_t *DecodeVideo( decoder_t *p_dec, block_t **pp_block )
         if( p_pic == NULL )
         {
             /* Get a new picture */
-            if( p_sys->p_va == NULL )
-                p_pic = ffmpeg_NewPictBuf( p_dec, p_context );
+            p_pic = ffmpeg_NewPictBuf( p_dec, p_context );
             if( !p_pic )
             {
                 av_frame_unref(frame);
@@ -794,12 +793,13 @@ static picture_t *DecodeVideo( decoder_t *p_dec, block_t **pp_block )
             }
 
             /* Fill picture_t from AVFrame */
-            lavc_CopyPicture(p_dec, p_pic, frame);
+            if( p_sys->p_va != NULL )
+                vlc_va_Extract( p_sys->p_va, p_pic, frame->data[3] );
+            else
+                lavc_CopyPicture(p_dec, p_pic, frame);
         }
         else
         {
-            if( p_sys->p_va != NULL )
-                vlc_va_Extract( p_sys->p_va, p_pic, frame->data[3] );
             picture_Hold( p_pic );
         }
 
@@ -968,7 +968,6 @@ static int lavc_va_GetFrame(struct AVCodecContext *ctx, AVFrame *frame,
         return -1;
     }
 
-    frame->opaque = pic;
     assert(frame->data[0] != NULL);
     return 0;
 }
