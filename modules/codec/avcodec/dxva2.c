@@ -305,6 +305,7 @@ typedef struct {
     LPDIRECT3DSURFACE9 d3d;
     int                refcount;
     unsigned int       order;
+    vlc_mutex_t        *p_lock;
 } vlc_va_surface_t;
 
 #define VA_DXVA2_MAX_SURFACE_COUNT (64)
@@ -313,6 +314,8 @@ struct vlc_va_sys_t
     int          codec_id;
     int          width;
     int          height;
+
+    vlc_mutex_t     surface_lock;
 
     /* DLL */
     HINSTANCE             hd3d9_dll;
@@ -501,6 +504,8 @@ static int Get(vlc_va_t *va, picture_t *pic, uint8_t **data)
         return VLC_EGENERIC;
     }
 
+    vlc_mutex_lock( &sys->surface_lock );
+
     /* Grab an unused surface, in case none are, try the oldest
      * XXX using the oldest is a workaround in case a problem happens with libavcodec */
     unsigned i, old;
@@ -522,6 +527,9 @@ static int Get(vlc_va_t *va, picture_t *pic, uint8_t **data)
     surface->order = sys->surface_order++;
     *data = (void *)surface->d3d;
     pic->context = surface;
+
+    vlc_mutex_unlock( &sys->surface_lock );
+
     return VLC_SUCCESS;
 }
 
@@ -529,11 +537,14 @@ static void Release(void *opaque, uint8_t *data)
 {
     picture_t *pic = opaque;
     vlc_va_surface_t *surface = pic->context;
+    vlc_mutex_lock( surface->p_lock );
 
     surface->refcount--;
     pic->context = NULL;
     picture_Release(pic);
     (void) data;
+
+    vlc_mutex_unlock( surface->p_lock );
 }
 
 static void Close(vlc_va_t *va, AVCodecContext *ctx)
@@ -551,6 +562,7 @@ static void Close(vlc_va_t *va, AVCodecContext *ctx)
         FreeLibrary(sys->hdxva2_dll);
     if (sys->hd3d9_dll)
         FreeLibrary(sys->hd3d9_dll);
+    vlc_mutex_destroy( &sys->surface_lock );
 
     free((char *)va->description);
     free(sys);
@@ -564,6 +576,8 @@ static int Open(vlc_va_t *va, AVCodecContext *ctx, const es_format_t *fmt)
 
     va->sys = sys;
     sys->codec_id = ctx->codec_id;
+
+    vlc_mutex_init( &sys->surface_lock );
 
     /* Load dll*/
     sys->hd3d9_dll = LoadLibrary(TEXT("D3D9.DLL"));
@@ -1009,6 +1023,7 @@ static int DxCreateVideoDecoder(vlc_va_t *va, int codec_id,
         surface->d3d = sys->hw_surface[i];
         surface->refcount = 0;
         surface->order = 0;
+        surface->p_lock = &sys->surface_lock;
     }
     msg_Dbg(va, "IDirectXVideoAccelerationService_CreateSurface succeed with %d surfaces (%dx%d)",
             sys->surface_count, fmt->i_width, fmt->i_height);
