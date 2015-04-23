@@ -181,11 +181,15 @@ typedef struct {
     const int    *p_profiles; // NULL or ends with 0
 } dxva2_mode_t;
 
-static const int PROF_MPEG2_SIMPLE[] = {FF_PROFILE_MPEG2_SIMPLE, 0};
-static const int PROF_MPEG2_MAIN[] = {FF_PROFILE_MPEG2_SIMPLE, FF_PROFILE_MPEG2_MAIN, 0};
-static const int PROF_H264_HIGH[] = {FF_PROFILE_H264_BASELINE, FF_PROFILE_H264_CONSTRAINED_BASELINE, FF_PROFILE_H264_MAIN, FF_PROFILE_H264_HIGH, 0};
-static const int PROF_HEVC_MAIN[] = {FF_PROFILE_HEVC_MAIN, 0};
-static const int PROF_HEVC_MAIN10[] = {FF_PROFILE_HEVC_MAIN, FF_PROFILE_HEVC_MAIN_10, 0};
+static const int PROF_MPEG2_SIMPLE[] = { FF_PROFILE_MPEG2_SIMPLE, 0 };
+static const int PROF_MPEG2_MAIN[]   = { FF_PROFILE_MPEG2_SIMPLE,
+                                         FF_PROFILE_MPEG2_MAIN, 0 };
+static const int PROF_H264_HIGH[]    = { FF_PROFILE_H264_CONSTRAINED_BASELINE,
+                                         FF_PROFILE_H264_MAIN,
+                                         FF_PROFILE_H264_HIGH, 0 };
+static const int PROF_HEVC_MAIN[]    = { FF_PROFILE_HEVC_MAIN, 0 };
+static const int PROF_HEVC_MAIN10[]  = { FF_PROFILE_HEVC_MAIN,
+                                         FF_PROFILE_HEVC_MAIN_10, 0 };
 
 /* XXX Prefered modes must come first */
 static const dxva2_mode_t dxva2_modes[] = {
