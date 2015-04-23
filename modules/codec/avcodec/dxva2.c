@@ -336,7 +336,6 @@ struct vlc_va_sys_t
     HINSTANCE             hdxva2_dll;
 
     /* Direct3D */
-    D3DPRESENT_PARAMETERS  d3dpp;
     LPDIRECT3D9            d3dobj;
     D3DADAPTER_IDENTIFIER9 d3dai;
     LPDIRECT3DDEVICE9      d3ddev;
@@ -400,9 +399,49 @@ static int DxResetVideoDecoder(vlc_va_t *);
 static bool profile_supported(const dxva2_mode_t *mode, const es_format_t *fmt);
 
 /* */
-static int Setup(vlc_va_t *va, AVCodecContext *avctx, vlc_fourcc_t *chroma)
+static int Setup(vlc_va_t *va, AVCodecContext *avctx, vlc_fourcc_t *chroma, picture_t *p_test_output)
 {
     vlc_va_sys_t *sys = va->sys;
+    LPDIRECT3DDEVICE9 picd3ddev = NULL;
+    if (p_test_output!=NULL && p_test_output->p_sys)
+        IDirect3DSurface9_GetDevice(p_test_output->p_sys->surface, &picd3ddev);
+
+    if ( picd3ddev != NULL && picd3ddev != sys->d3ddev )
+    {
+        /* restart the dxva decoder with the appropriate D3D9 device */
+        DxDestroyVideoDecoder(sys);
+        DxDestroyVideoService(sys);
+        D3dDestroyDeviceManager(sys);
+        D3dDestroyDevice(sys);
+
+        if (FAILED(IDirect3DDevice9_GetDirect3D(picd3ddev, &sys->d3dobj))) {
+            msg_Err(va, "Can't retrieve the D3D from the device");
+            goto error;
+        }
+        IDirect3D9_AddRef(sys->d3dobj);
+        IDirect3DDevice9_AddRef(picd3ddev);
+        sys->d3ddev = picd3ddev;
+        msg_Dbg(va, "D3dCreateDevice succeed");
+
+        if (D3dCreateDeviceManager(va)) {
+            msg_Err(va, "D3dCreateDeviceManager failed");
+            goto error;
+        }
+
+        if (DxCreateVideoService(va)) {
+            msg_Err(va, "DxCreateVideoService failed");
+            goto error;
+        }
+
+        /* */
+        es_format_t fake_fmt;
+        memset(&fake_fmt, 0, sizeof(fake_fmt));
+        fake_fmt.i_profile = avctx->profile;
+        if (DxFindVideoServiceConversion(va, &sys->input, &sys->render, &fake_fmt)) {
+            msg_Err(va, "DxFindVideoServiceConversion failed");
+            goto error;
+        }
+    }
 
     if (sys->width == avctx->coded_width && sys->height == avctx->coded_height
      && sys->decoder != NULL)
@@ -436,16 +475,24 @@ ok:
     *chroma = VLC_CODEC_D3D9_OPAQUE;
 
     return VLC_SUCCESS;
+
+error:
+    DxDestroyVideoDecoder(sys);
+    DxDestroyVideoService(sys);
+    D3dDestroyDeviceManager(sys);
+    D3dDestroyDevice(sys);
+    return VLC_EGENERIC;
 }
 
 static void DXA9_I420 (filter_t *p_filter, picture_t *src, picture_t *dst)
 {
     copy_cache_t *p_copy_cache = (copy_cache_t*) p_filter->p_sys;
 
+#if 0
     msg_Dbg( p_filter, "Filter picture 0x%p context 0x%p into picture 0x%p", src, src->context, dst);
+#endif
 
-    vlc_va_surface_t *surface = src->context;
-    LPDIRECT3DSURFACE9 d3d = surface->d3d;
+    LPDIRECT3DSURFACE9 d3d = src->p_sys->surface;
     D3DSURFACE_DESC desc;
     if (FAILED( IDirect3DSurface9_GetDesc(d3d, &desc) ))
         return;
@@ -482,8 +529,7 @@ static void DXA9_I420 (filter_t *p_filter, picture_t *src, picture_t *dst)
         }
         CopyFromYv12(dst, plane, pitch, src->format.i_width, src->format.i_visible_height,
                      p_copy_cache);
-    } else {
-        assert(desc.Format == MAKEFOURCC('N','V','1','2'));
+    } else if (desc.Format == MAKEFOURCC('N','V','1','2')) {
         uint8_t *plane[2] = {
             lock.pBits,
             (uint8_t*)lock.pBits + lock.Pitch * src->format.i_height
@@ -494,6 +540,8 @@ static void DXA9_I420 (filter_t *p_filter, picture_t *src, picture_t *dst)
         };
         CopyFromNv12(dst, plane, pitch, src->format.i_width, src->format.i_visible_height,
                      p_copy_cache);
+    } else {
+        msg_Err(p_filter, "Unsupported DXA9 conversion to 0x%08X", desc.Format);
     }
 
     /* */
@@ -516,7 +564,7 @@ static int Extract(vlc_va_t *va, picture_t *picture, uint8_t *data)
     LPDIRECT3DDEVICE9 srcDevice, dstDevice;
     IDirect3DSurface9_GetDevice(d3d, &srcDevice);
     IDirect3DSurface9_GetDevice(output, &dstDevice);
-    assert(srcDevice != dstDevice);
+    assert(srcDevice == dstDevice);
 #endif
 
     HRESULT hr;
@@ -719,19 +767,19 @@ static int D3dCreateDevice(vlc_va_t *va)
     }
 
     /* */
-    D3DPRESENT_PARAMETERS *d3dpp = &sys->d3dpp;
-    ZeroMemory(d3dpp, sizeof(*d3dpp));
-    d3dpp->Flags                  = D3DPRESENTFLAG_VIDEO;
-    d3dpp->Windowed               = TRUE;
-    d3dpp->hDeviceWindow          = NULL;
-    d3dpp->SwapEffect             = D3DSWAPEFFECT_DISCARD;
-    d3dpp->MultiSampleType        = D3DMULTISAMPLE_NONE;
-    d3dpp->PresentationInterval   = D3DPRESENT_INTERVAL_DEFAULT;
-    d3dpp->BackBufferCount        = 0;                  /* FIXME what to put here */
-    d3dpp->BackBufferFormat       = D3DFMT_X8R8G8B8;    /* FIXME what to put here */
-    d3dpp->BackBufferWidth        = 0;
-    d3dpp->BackBufferHeight       = 0;
-    d3dpp->EnableAutoDepthStencil = FALSE;
+    D3DPRESENT_PARAMETERS d3dpp;
+    ZeroMemory(&d3dpp, sizeof(d3dpp));
+    d3dpp.Flags                  = D3DPRESENTFLAG_VIDEO;
+    d3dpp.Windowed               = TRUE;
+    d3dpp.hDeviceWindow          = NULL;
+    d3dpp.SwapEffect             = D3DSWAPEFFECT_DISCARD;
+    d3dpp.MultiSampleType        = D3DMULTISAMPLE_NONE;
+    d3dpp.PresentationInterval   = D3DPRESENT_INTERVAL_DEFAULT;
+    d3dpp.BackBufferCount        = 0;                  /* FIXME what to put here */
+    d3dpp.BackBufferFormat       = D3DFMT_X8R8G8B8;    /* FIXME what to put here */
+    d3dpp.BackBufferWidth        = 0;
+    d3dpp.BackBufferHeight       = 0;
+    d3dpp.EnableAutoDepthStencil = FALSE;
 
     /* Direct3D needs a HWND to create a device, even without using ::Present
     this HWND is used to alert Direct3D when there's a change of focus window.
@@ -741,7 +789,7 @@ static int D3dCreateDevice(vlc_va_t *va)
                                        D3DDEVTYPE_HAL, GetDesktopWindow(),
                                        D3DCREATE_SOFTWARE_VERTEXPROCESSING |
                                        D3DCREATE_MULTITHREADED,
-                                       d3dpp, &d3ddev))) {
+                                       &d3dpp, &d3ddev))) {
         msg_Err(va, "IDirect3D9_CreateDevice failed");
         return VLC_EGENERIC;
     }
