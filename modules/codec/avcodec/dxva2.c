@@ -399,9 +399,6 @@ static int DxResetVideoDecoder(vlc_va_t *);
 
 static bool profile_supported(const dxva2_mode_t *mode, const es_format_t *fmt);
 
-static void DxCreateVideoConversion(vlc_va_sys_t *);
-static void DxDestroyVideoConversion(vlc_va_sys_t *);
-
 /* */
 static int Setup(vlc_va_t *va, AVCodecContext *avctx, vlc_fourcc_t *chroma)
 {
@@ -515,10 +512,11 @@ static int Extract(vlc_va_t *va, picture_t *picture, uint8_t *data)
 #endif
 
     assert(d3d != output);
-
-#if 0
-    if ( surface->p_lock )
-        vlc_mutex_lock( surface->p_lock );
+#ifndef NDEBUG
+    LPDIRECT3DDEVICE9 srcDevice, dstDevice;
+    IDirect3DSurface9_GetDevice(d3d, &srcDevice);
+    IDirect3DSurface9_GetDevice(output, &dstDevice);
+    assert(srcDevice != dstDevice);
 #endif
 
     HRESULT hr;
@@ -532,13 +530,8 @@ static int Extract(vlc_va_t *va, picture_t *picture, uint8_t *data)
     hr = IDirect3DDevice9_StretchRect( sys->d3ddev, d3d, NULL, output, NULL, D3DTEXF_NONE);
     if (FAILED(hr)) {
         msg_Err(va, "Failed to copy the hw surface to the decoder surface (hr=0x%0lx)", hr );
+        return VLC_EGENERIC;
     }
-
-    /* */
-#if 0
-    if ( surface->p_lock )
-        vlc_mutex_unlock( surface->p_lock );
-#endif
 
     return VLC_SUCCESS;
 }

@@ -290,6 +290,8 @@ SOURCES_libvlc_linux = \
 	$(NULL)
 
 SOURCES_libvlc_win32 = \
+	win32/direct3d9_pool.c \
+	win32/direct3d9_pool.h \
 	win32/dirs.c \
 	win32/error.c \
 	win32/filesystem.c \

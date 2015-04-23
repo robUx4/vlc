@@ -35,6 +35,9 @@
 #include <assert.h>
 #include "vout_internal.h"
 #include "display.h"
+#if defined(_WIN32)
+#include "../win32/direct3d9_pool.h"
+#endif
 
 /*****************************************************************************
  * Local prototypes
@@ -145,10 +148,19 @@ int vout_InitWrapper(vout_thread_t *vout)
         sys->decoder_pool = display_pool;
         sys->display_pool = display_pool;
     } else if (!sys->decoder_pool) {
-        sys->decoder_pool =
-            picture_pool_NewFromFormat(&source,
-                                       __MAX(VOUT_MAX_PICTURES,
-                                             reserved_picture + decoder_picture - DISPLAY_PICTURE_COUNT));
+        const unsigned decoder_pool_size = __MAX(VOUT_MAX_PICTURES,
+                                                 reserved_picture + decoder_picture - DISPLAY_PICTURE_COUNT);
+#if defined(_WIN32)
+        if (source.i_chroma == VLC_CODEC_D3D9_OPAQUE)
+        {
+            /* FIXME dirty hack for now */
+            sys->decoder_pool = AllocPoolD3D9( VLC_OBJECT(vout), &source, decoder_pool_size );
+        }
+        else
+#endif
+        {
+            sys->decoder_pool = picture_pool_NewFromFormat( &source, decoder_pool_size );
+        }
         if (!sys->decoder_pool)
             return VLC_EGENERIC;
         if (allow_dr) {
