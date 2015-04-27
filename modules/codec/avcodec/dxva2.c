@@ -917,7 +917,7 @@ static void DxDestroyVideoService(vlc_va_sys_t *va)
 
 static bool profile_supported(const dxva2_mode_t *mode, const es_format_t *fmt)
 {
-    bool is_supported = mode->p_profiles==NULL || !mode->p_profiles[0];
+    bool is_supported = mode->p_profiles == NULL || !mode->p_profiles[0];
     if (!is_supported)
     {
         int profile = fmt->i_profile;
