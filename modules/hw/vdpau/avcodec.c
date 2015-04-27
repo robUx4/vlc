@@ -172,7 +172,7 @@ static int Setup(vlc_va_t *va, AVCodecContext *avctx, vlc_fourcc_t *chromap)
 }
 
 static int Open(vlc_va_t *va, AVCodecContext *avctx, enum PixelFormat pix_fmt,
-                const es_format_t *fmt, const picture_sys_t *p_sys)
+                const es_format_t *fmt)
 {
     if (pix_fmt != AV_PIX_FMT_VDPAU)
         return VLC_EGENERIC;

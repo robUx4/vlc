@@ -291,7 +291,7 @@ static int FindFormat(vlc_va_sys_t *sys)
 }
 
 static int Create( vlc_va_t *va, AVCodecContext *ctx, enum PixelFormat pix_fmt,
-                   const es_format_t *fmt, const picture_sys_t *p_sys )
+                   const es_format_t *fmt )
 {
     if( pix_fmt != AV_PIX_FMT_VAAPI_VLD )
         return VLC_EGENERIC;

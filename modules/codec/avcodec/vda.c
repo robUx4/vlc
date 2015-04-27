@@ -45,7 +45,7 @@
 #pragma mark prototypes and definitions
 
 static int Open( vlc_va_t *, AVCodecContext *, enum PixelFormat,
-                 const es_format_t *, const picture_sys_t * );
+                 const es_format_t * );
 static void Close( vlc_va_t * , AVCodecContext *);
 static int Setup( vlc_va_t *, AVCodecContext *, vlc_fourcc_t *);
 static int Get( vlc_va_t *, picture_t *, uint8_t ** );
@@ -117,7 +117,7 @@ static vlc_va_vda_t *vlc_va_vda_Get( vlc_va_t *va )
 #pragma mark - module handling
 
 static int Open( vlc_va_t *va, AVCodecContext *ctx, enum PixelFormat pix_fmt,
-                 const es_format_t *fmt, const picture_sys_t *p_sys )
+                 const es_format_t *fmt )
 {
     if( pix_fmt != AV_PIX_FMT_VDA_VLD )
         return VLC_EGENERIC;
