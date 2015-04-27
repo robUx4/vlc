@@ -854,10 +854,10 @@ static int ThreadDisplayRenderPicture(vout_thread_t *vout, bool is_forced)
     //the source format.
     const bool do_early_spu = !do_dr_spu &&
                                vd->source.orientation == ORIENT_NORMAL &&
+                              !vout_IsDisplayFiltered(vd) &&
                               (vd->info.is_slow ||
                                sys->display.use_dr ||
                                do_snapshot ||
-                               !vout_IsDisplayFiltered(vd) ||
                                vd->fmt.i_width * vd->fmt.i_height <= vd->source.i_width * vd->source.i_height);
 
     const vlc_fourcc_t *subpicture_chromas;
