@@ -1069,7 +1069,7 @@ static int lavc_GetFrame(struct AVCodecContext *ctx, AVFrame *frame, int flags)
 
     if (sys->p_va != NULL)
     {   /* TODO: Move this to get_format(). We are screwed if it fails here. */
-        if (vlc_va_Setup(sys->p_va, ctx, &dec->fmt_out.video.i_chroma, pic))
+        if (vlc_va_Setup(sys->p_va, ctx, &dec->fmt_out.video.i_chroma))
         {
             picture_Release(pic);
             post_mt(sys);
@@ -1151,7 +1151,7 @@ static enum PixelFormat ffmpeg_GetFormat( AVCodecContext *p_context,
         /* We try to call vlc_va_Setup when possible to detect errors when
          * possible (later is too late) */
         if( p_context->width > 0 && p_context->height > 0
-         && vlc_va_Setup( va, p_context, &p_dec->fmt_out.video.i_chroma, NULL ) )
+         && vlc_va_Setup( va, p_context, &p_dec->fmt_out.video.i_chroma) )
         {
             msg_Err( p_dec, "acceleration setup failure" );
             vlc_va_Delete(va, p_context);

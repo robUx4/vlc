@@ -404,49 +404,9 @@ static int DxResetVideoDecoder(vlc_va_t *);
 static bool profile_supported(const dxva2_mode_t *mode, const es_format_t *fmt);
 
 /* */
-static int Setup(vlc_va_t *va, AVCodecContext *avctx, vlc_fourcc_t *chroma, picture_t *p_test_output)
+static int Setup(vlc_va_t *va, AVCodecContext *avctx, vlc_fourcc_t *chroma)
 {
     vlc_va_sys_t *sys = va->sys;
-    LPDIRECT3DDEVICE9 picd3ddev = NULL;
-    if (p_test_output!=NULL && p_test_output->p_sys)
-        IDirect3DSurface9_GetDevice(p_test_output->p_sys->surface, &picd3ddev);
-
-    if ( picd3ddev != NULL && picd3ddev != sys->d3ddev )
-    {
-        /* restart the dxva decoder with the appropriate D3D9 device */
-        DxDestroyVideoDecoder(sys);
-        DxDestroyVideoService(sys);
-        D3dDestroyDeviceManager(sys);
-        D3dDestroyDevice(sys);
-
-        if (FAILED(IDirect3DDevice9_GetDirect3D(picd3ddev, &sys->d3dobj))) {
-            msg_Err(va, "Can't retrieve the D3D from the device");
-            goto error;
-        }
-        IDirect3D9_AddRef(sys->d3dobj);
-        IDirect3DDevice9_AddRef(picd3ddev);
-        sys->d3ddev = picd3ddev;
-        msg_Dbg(va, "D3dCreateDevice succeed");
-
-        if (D3dCreateDeviceManager(va)) {
-            msg_Err(va, "D3dCreateDeviceManager failed");
-            goto error;
-        }
-
-        if (DxCreateVideoService(va)) {
-            msg_Err(va, "DxCreateVideoService failed");
-            goto error;
-        }
-
-        /* */
-        es_format_t fake_fmt;
-        memset(&fake_fmt, 0, sizeof(fake_fmt));
-        fake_fmt.i_profile = avctx->profile;
-        if (DxFindVideoServiceConversion(va, &sys->input, &sys->render, &fake_fmt)) {
-            msg_Err(va, "DxFindVideoServiceConversion failed");
-            goto error;
-        }
-    }
 
     if (sys->width == avctx->coded_width && sys->height == avctx->coded_height
      && sys->decoder != NULL)
