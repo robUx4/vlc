@@ -193,6 +193,8 @@ static vout_thread_t *VoutCreate(vlc_object_t *object,
     /* */
     if (vlc_clone(&vout->p->thread, Thread, vout,
                   VLC_THREAD_PRIORITY_OUTPUT)) {
+        if (vout->p->window != NULL)
+            vout_display_window_Delete(vout->p->window);
         spu_Destroy(vout->p->spu);
         vlc_object_release(vout);
         return NULL;
@@ -267,6 +269,9 @@ void vout_Close(vout_thread_t *vout)
     vout_control_PushVoid(&vout->p->control, VOUT_CONTROL_CLEAN);
     vlc_join(vout->p->thread, NULL);
 
+    if (vout->p->window != NULL)
+        vout_display_window_Delete(vout->p->window);
+
     vlc_mutex_lock(&vout->p->spu_lock);
     spu_Destroy(vout->p->spu);
     vout->p->spu = NULL;
@@ -333,27 +338,6 @@ bool vout_IsEmpty(vout_thread_t *vout)
         picture_Release(picture);
 
     return !picture;
-}
-
-void vout_FixLeaks( vout_thread_t *vout )
-{
-    picture_t *picture = picture_fifo_Peek(vout->p->decoder_fifo);
-    if (picture != NULL) {
-        picture_Release(picture);
-        return; /* Not all pictures has been displayed yet */
-
-    }
-
-    picture = picture_pool_Get(vout->p->decoder_pool);
-
-    if (picture != NULL)
-        picture_Release(picture); /* Not all pictures are referenced */
-    else {
-        /* There are no reasons that no pictures are available, force one
-         * from the pool, be careful with it though */
-        msg_Err(vout, "pictures leaked, trying to workaround");
-        picture_pool_NonEmpty(vout->p->decoder_pool);
-    }
 }
 
 void vout_NextPicture(vout_thread_t *vout, mtime_t *duration)
@@ -1340,9 +1324,9 @@ static int ThreadStart(vout_thread_t *vout, const vout_display_state_t *state)
     }
 
     if (vout_OpenWrapper(vout, vout->p->splitter_name, state))
-        return VLC_EGENERIC;
+        goto error;
     if (vout_InitWrapper(vout))
-        return VLC_EGENERIC;
+        goto error;
     assert(vout->p->decoder_pool);
 
     vout->p->displayed.current       = NULL;
@@ -1360,6 +1344,15 @@ static int ThreadStart(vout_thread_t *vout, const vout_display_state_t *state)
 
     video_format_Print(VLC_OBJECT(vout), "original format", &vout->p->original);
     return VLC_SUCCESS;
+error:
+    if (vout->p->filter.chain_interactive != NULL)
+        filter_chain_Delete(vout->p->filter.chain_interactive);
+    if (vout->p->filter.chain_static != NULL)
+        filter_chain_Delete(vout->p->filter.chain_static);
+    video_format_Clean(&vout->p->filter.format);
+    if (vout->p->decoder_fifo != NULL)
+        picture_fifo_Delete(vout->p->decoder_fifo);
+    return VLC_EGENERIC;
 }
 
 static void ThreadStop(vout_thread_t *vout, vout_display_state_t *state)
@@ -1399,8 +1392,6 @@ static void ThreadInit(vout_thread_t *vout)
 
 static void ThreadClean(vout_thread_t *vout)
 {
-    if (vout->p->window != NULL)
-        vout_window_Delete(vout->p->window);
     vout_chrono_Clean(&vout->p->render);
     vout->p->dead = true;
     vout_control_Dead(&vout->p->control);
@@ -1462,8 +1453,12 @@ static int ThreadControl(vout_thread_t *vout, vout_control_cmd_t cmd)
     switch(cmd.type) {
     case VOUT_CONTROL_INIT:
         ThreadInit(vout);
-        if (!ThreadStart(vout, NULL))
-            break;
+        if (ThreadStart(vout, NULL))
+        {
+            ThreadClean(vout);
+            return 1;
+        }
+        break;
     case VOUT_CONTROL_CLEAN:
         ThreadStop(vout, NULL);
         ThreadClean(vout);

@@ -29,6 +29,7 @@
 
 #include <jni.h>
 #include <stdint.h>
+#include <assert.h>
 
 #include <vlc_common.h>
 #include <vlc_plugin.h>
@@ -141,11 +142,13 @@ struct decoder_sys_t
     int stride, slice_height;
     char *name;
 
+    void *p_extra_buffer;
+    size_t i_extra_buffer;
+
     bool allocated;
     bool started;
     bool decoded;
     bool error_state;
-    bool error_event_sent;
 
     ArchitectureSpecificCopyData architecture_specific_data;
 
@@ -175,7 +178,6 @@ struct jfields
     jmethodID release_output_buffer;
     jmethodID create_video_format, set_integer, set_bytebuffer, get_integer;
     jmethodID buffer_info_ctor;
-    jmethodID allocate_direct, limit;
     jfieldID size_field, offset_field, pts_field;
 };
 static struct jfields jfields;
@@ -250,10 +252,6 @@ static const struct member members[] = {
     { "size", "I", "android/media/MediaCodec$BufferInfo", OFF(size_field), FIELD, true },
     { "offset", "I", "android/media/MediaCodec$BufferInfo", OFF(offset_field), FIELD, true },
     { "presentationTimeUs", "J", "android/media/MediaCodec$BufferInfo", OFF(pts_field), FIELD, true },
-
-    { "allocateDirect", "(I)Ljava/nio/ByteBuffer;", "java/nio/ByteBuffer", OFF(allocate_direct), STATIC_METHOD, true },
-    { "limit", "(I)Ljava/nio/Buffer;", "java/nio/ByteBuffer", OFF(limit), METHOD, true },
-
     { NULL, NULL, NULL, 0, 0, false },
 };
 
@@ -264,6 +262,7 @@ static const struct member members[] = {
  *****************************************************************************/
 static int  OpenDecoder(vlc_object_t *);
 static void CloseDecoder(vlc_object_t *);
+static void CloseMediaCodec(decoder_t *p_dec, JNIEnv *env);
 
 static picture_t *DecodeVideo(decoder_t *, block_t **);
 
@@ -390,17 +389,14 @@ end:
 }
 
 /*****************************************************************************
- * OpenDecoder: Create the decoder instance
+ * OpenMediaCodec: Create the mediacodec instance
  *****************************************************************************/
-static int OpenDecoder(vlc_object_t *p_this)
+static int OpenMediaCodec(decoder_t *p_dec, JNIEnv *env)
 {
-    decoder_t *p_dec = (decoder_t*)p_this;
-    decoder_sys_t *p_sys;
-
-    if (p_dec->fmt_in.i_cat != VIDEO_ES && !p_dec->b_force)
-        return VLC_EGENERIC;
-
+    decoder_sys_t *p_sys = p_dec->p_sys;
     const char *mime = NULL;
+    size_t fmt_profile = 0;
+
     switch (p_dec->fmt_in.i_codec) {
     case VLC_CODEC_HEVC: mime = "video/hevc"; break;
     case VLC_CODEC_H264: mime = "video/avc"; break;
@@ -411,31 +407,11 @@ static int OpenDecoder(vlc_object_t *p_this)
     case VLC_CODEC_VP8:  mime = "video/x-vnd.on2.vp8"; break;
     case VLC_CODEC_VP9:  mime = "video/x-vnd.on2.vp9"; break;
     default:
-        msg_Dbg(p_dec, "codec %4.4s not supported", (char *)&p_dec->fmt_in.i_codec);
-        return VLC_EGENERIC;
+        vlc_assert_unreachable();
     }
 
-    size_t fmt_profile = 0;
     if (p_dec->fmt_in.i_codec == VLC_CODEC_H264)
         h264_get_profile_level(&p_dec->fmt_in, &fmt_profile, NULL, NULL);
-
-    /* Allocate the memory needed to store the decoder's structure */
-    if ((p_dec->p_sys = p_sys = calloc(1, sizeof(*p_sys))) == NULL)
-        return VLC_ENOMEM;
-
-    p_dec->pf_decode_video = DecodeVideo;
-
-    p_dec->fmt_out.i_cat = p_dec->fmt_in.i_cat;
-    p_dec->fmt_out.video = p_dec->fmt_in.video;
-    p_dec->fmt_out.audio = p_dec->fmt_in.audio;
-    p_dec->b_need_packetized = true;
-
-    JNIEnv* env = NULL;
-    if (!(env = jni_get_env(THREAD_NAME)))
-        goto error;
-
-    if (!InitJNIFields(p_dec, env))
-        goto error;
 
     int num_codecs = (*env)->CallStaticIntMethod(env, jfields.media_codec_list_class,
                                                  jfields.get_codec_count);
@@ -554,30 +530,50 @@ loopclean:
                          jfields.create_video_format, (*env)->NewStringUTF(env, mime),
                          p_dec->fmt_in.video.i_width, p_dec->fmt_in.video.i_height);
 
-    if (p_dec->fmt_in.i_extra) {
-        // Allocate a byte buffer via allocateDirect in java instead of NewDirectByteBuffer,
-        // since the latter doesn't allocate storage of its own, and we don't know how long
-        // the codec uses the buffer.
-        int buf_size = p_dec->fmt_in.i_extra + 20;
-        jobject bytebuf = (*env)->CallStaticObjectMethod(env, jfields.byte_buffer_class,
-                                                         jfields.allocate_direct, buf_size);
+    if (p_dec->fmt_in.i_extra && !p_sys->p_extra_buffer) {
         uint32_t size = p_dec->fmt_in.i_extra;
-        uint8_t *ptr = (*env)->GetDirectBufferAddress(env, bytebuf);
+        int buf_size = p_dec->fmt_in.i_extra + 20;
+
+        /* Don't free p_extra_buffer until Format use it, so until MediaCodec
+         * is closed */
+        p_sys->p_extra_buffer = malloc(buf_size);
+        if (!p_sys->p_extra_buffer)
+        {
+            msg_Warn(p_dec, "extra buffer allocation failed");
+            goto error;
+        }
         if (p_dec->fmt_in.i_codec == VLC_CODEC_H264 && ((uint8_t*)p_dec->fmt_in.p_extra)[0] == 1) {
             convert_sps_pps(p_dec, p_dec->fmt_in.p_extra, p_dec->fmt_in.i_extra,
-                            ptr, buf_size,
+                            p_sys->p_extra_buffer, buf_size,
                             &size, &p_sys->nal_size);
         } else if (p_dec->fmt_in.i_codec == VLC_CODEC_HEVC) {
             convert_hevc_nal_units(p_dec, p_dec->fmt_in.p_extra,
-                                   p_dec->fmt_in.i_extra, ptr, buf_size,
+                                   p_dec->fmt_in.i_extra,
+                                   p_sys->p_extra_buffer, buf_size,
                                    &size, &p_sys->nal_size);
         } else {
-            memcpy(ptr, p_dec->fmt_in.p_extra, size);
+            memcpy(p_sys->p_extra_buffer, p_dec->fmt_in.p_extra, size);
         }
-        (*env)->CallObjectMethod(env, bytebuf, jfields.limit, size);
+        p_sys->i_extra_buffer = size;
+    }
+    if (p_sys->p_extra_buffer)
+    {
+        jobject jextra_buffer;
+
+        jextra_buffer = (*env)->NewDirectByteBuffer( env,
+                                                     p_sys->p_extra_buffer,
+                                                     p_sys->i_extra_buffer);
+        if (CHECK_EXCEPTION() || !jextra_buffer)
+        {
+            msg_Warn(p_dec, "java extra buffer allocation failed");
+            free(p_sys->p_extra_buffer);
+            p_sys->p_extra_buffer = NULL;
+            goto error;
+        }
         (*env)->CallVoidMethod(env, format, jfields.set_bytebuffer,
-                               (*env)->NewStringUTF(env, "csd-0"), bytebuf);
-        (*env)->DeleteLocalRef(env, bytebuf);
+                               (*env)->NewStringUTF(env, "csd-0"),
+                               jextra_buffer);
+        (*env)->DeleteLocalRef(env, jextra_buffer);
     }
 
     p_sys->direct_rendering = var_InheritBool(p_dec, CFG_PREFIX "dr");
@@ -663,18 +659,136 @@ loopclean:
     p_sys->buffer_info = (*env)->NewGlobalRef(env, p_sys->buffer_info);
     (*env)->DeleteLocalRef(env, format);
 
-    const int timestamp_fifo_size = 32;
-    p_sys->timestamp_fifo = timestamp_FifoNew(timestamp_fifo_size);
-    if (!p_sys->timestamp_fifo)
+    return VLC_SUCCESS;
+
+ error:
+    CloseMediaCodec(p_dec, env);
+    return VLC_EGENERIC;
+}
+
+/*****************************************************************************
+ * CloseMediaCodec: Close the mediacodec instance
+ *****************************************************************************/
+static void CloseMediaCodec(decoder_t *p_dec, JNIEnv *env)
+{
+    decoder_sys_t *p_sys = p_dec->p_sys;
+
+    if (!p_sys)
+        return;
+
+    free(p_sys->name);
+    p_sys->name = NULL;
+
+    /* Invalidate all pictures that are currently in flight in order
+     * to prevent the vout from using destroyed output buffers. */
+    if (p_sys->direct_rendering) {
+        InvalidateAllPictures(p_dec);
+        p_sys->direct_rendering = false;
+    }
+
+    if (p_sys->input_buffers) {
+        (*env)->DeleteGlobalRef(env, p_sys->input_buffers);
+        p_sys->input_buffers = NULL;
+    }
+    if (p_sys->output_buffers) {
+        (*env)->DeleteGlobalRef(env, p_sys->output_buffers);
+        p_sys->output_buffers = NULL;
+    }
+    if (p_sys->codec) {
+        if (p_sys->started)
+        {
+            (*env)->CallVoidMethod(env, p_sys->codec, jfields.stop);
+            if (CHECK_EXCEPTION())
+                msg_Err(p_dec, "Exception in MediaCodec.stop");
+            p_sys->started = false;
+        }
+        if (p_sys->allocated)
+        {
+            (*env)->CallVoidMethod(env, p_sys->codec, jfields.release);
+            if (CHECK_EXCEPTION())
+                msg_Err(p_dec, "Exception in MediaCodec.release");
+            p_sys->allocated = false;
+        }
+        (*env)->DeleteGlobalRef(env, p_sys->codec);
+        p_sys->codec = NULL;
+    }
+    if (p_sys->buffer_info) {
+        (*env)->DeleteGlobalRef(env, p_sys->buffer_info);
+        p_sys->buffer_info = NULL;
+    }
+}
+
+/*****************************************************************************
+ * OpenDecoder: Create the decoder instance
+ *****************************************************************************/
+static int OpenDecoder(vlc_object_t *p_this)
+{
+    decoder_t *p_dec = (decoder_t*)p_this;
+    JNIEnv* env = NULL;
+
+    if (p_dec->fmt_in.i_cat != VIDEO_ES && !p_dec->b_force)
+        return VLC_EGENERIC;
+
+    switch (p_dec->fmt_in.i_codec) {
+    case VLC_CODEC_H264:
+    case VLC_CODEC_HEVC:
+    case VLC_CODEC_H263:
+    case VLC_CODEC_MP4V:
+    case VLC_CODEC_WMV3:
+    case VLC_CODEC_VC1:
+    case VLC_CODEC_VP8:
+    case VLC_CODEC_VP9:
+        if (p_dec->fmt_in.video.i_width && p_dec->fmt_in.video.i_height)
+            break;
+    default:
+        msg_Dbg(p_dec, "codec %4.4s or resolution (%dx%d) not supported",
+                (char *)&p_dec->fmt_in.i_codec,
+                p_dec->fmt_in.video.i_width, p_dec->fmt_in.video.i_height);
+        return VLC_EGENERIC;
+    }
+
+    if (!(env = jni_get_env(THREAD_NAME)))
         goto error;
 
-    return VLC_SUCCESS;
+    if (!InitJNIFields(p_dec, env))
+        goto error;
+
+    /* Allocate the memory needed to store the decoder's structure */
+    if ((p_dec->p_sys = calloc(1, sizeof(*p_dec->p_sys))) == NULL)
+        return VLC_ENOMEM;
+
+    p_dec->pf_decode_video = DecodeVideo;
+
+    p_dec->fmt_out.i_cat = p_dec->fmt_in.i_cat;
+    p_dec->fmt_out.video = p_dec->fmt_in.video;
+    p_dec->fmt_out.audio = p_dec->fmt_in.audio;
+    p_dec->b_need_packetized = true;
+
+    p_dec->p_sys->timestamp_fifo = timestamp_FifoNew(32);
+    if (!p_dec->p_sys->timestamp_fifo)
+        goto error;
+
+    switch (p_dec->fmt_in.i_codec)
+    {
+    case VLC_CODEC_VC1:
+        if (!p_dec->fmt_in.i_extra)
+        {
+            msg_Warn(p_dec, "waiting for extra data for codec %4.4s",
+                     (const char *)&p_dec->fmt_in.i_codec);
+            return VLC_SUCCESS;
+        }
+        break;
+    }
+    return OpenMediaCodec(p_dec, env);
 
  error:
     CloseDecoder(p_this);
     return VLC_EGENERIC;
 }
 
+/*****************************************************************************
+ * CloseDecoder: Close the decoder instance
+ *****************************************************************************/
 static void CloseDecoder(vlc_object_t *p_this)
 {
     decoder_t *p_dec = (decoder_t *)p_this;
@@ -684,37 +798,12 @@ static void CloseDecoder(vlc_object_t *p_this)
     if (!p_sys)
         return;
 
-    /* Invalidate all pictures that are currently in flight in order
-     * to prevent the vout from using destroyed output buffers. */
-    if (p_sys->direct_rendering)
-        InvalidateAllPictures(p_dec);
+    if ((env = jni_get_env(THREAD_NAME)))
+        CloseMediaCodec(p_dec, env);
+    else
+        msg_Warn(p_dec, "Can't get a JNIEnv, can't close mediacodec !");
 
-    if (!(env = jni_get_env(THREAD_NAME)))
-        goto cleanup;
-
-    if (p_sys->input_buffers)
-        (*env)->DeleteGlobalRef(env, p_sys->input_buffers);
-    if (p_sys->output_buffers)
-        (*env)->DeleteGlobalRef(env, p_sys->output_buffers);
-    if (p_sys->codec) {
-        if (p_sys->started)
-        {
-            (*env)->CallVoidMethod(env, p_sys->codec, jfields.stop);
-            if (CHECK_EXCEPTION())
-                msg_Err(p_dec, "Exception in MediaCodec.stop");
-        }
-        if (p_sys->allocated)
-        {
-            (*env)->CallVoidMethod(env, p_sys->codec, jfields.release);
-            if (CHECK_EXCEPTION())
-                msg_Err(p_dec, "Exception in MediaCodec.release");
-        }
-        (*env)->DeleteGlobalRef(env, p_sys->codec);
-    }
-    if (p_sys->buffer_info)
-        (*env)->DeleteGlobalRef(env, p_sys->buffer_info);
-
-cleanup:
+    free(p_sys->p_extra_buffer);
     free(p_sys->name);
     ArchitectureSpecificCopyHooksDestroy(p_sys->pixel_format, &p_sys->architecture_specific_data);
     free(p_sys->pp_inflight_pictures);
@@ -1025,16 +1114,22 @@ static picture_t *DecodeVideo(decoder_t *p_dec, block_t **pp_block)
     picture_t *p_pic = NULL;
     JNIEnv *env = NULL;
     block_t *p_block = pp_block ? *pp_block : NULL;
+    unsigned int i_attempts = 0;
+    jlong timeout = 0;
+    int i_output_ret = 0;
+    int i_input_ret = 0;
+    bool b_error = false;
 
     if (p_sys->error_state)
         goto endclean;
 
     if (!(env = jni_get_env(THREAD_NAME)))
+    {
+        b_error = true;
         goto endclean;
+    }
 
     if (p_block && p_block->i_flags & (BLOCK_FLAG_DISCONTINUITY|BLOCK_FLAG_CORRUPTED)) {
-        block_Release(p_block);
-        *pp_block = NULL;
         p_sys->i_preroll_end = 0;
         timestamp_FifoEmpty(p_sys->timestamp_fifo);
         if (p_sys->decoded) {
@@ -1047,12 +1142,34 @@ static picture_t *DecodeVideo(decoder_t *p_dec, block_t **pp_block)
             (*env)->CallVoidMethod(env, p_sys->codec, jfields.flush);
             if (CHECK_EXCEPTION()) {
                 msg_Warn(p_dec, "Exception occurred in MediaCodec.flush");
-                p_sys->error_state = true;
+                b_error = true;
             }
         }
         p_sys->decoded = false;
         goto endclean;
     }
+
+    /* try delayed opening if there is a new extra data */
+    if (!p_sys->codec)
+    {
+        bool b_delayed_open = false;
+
+        switch (p_dec->fmt_in.i_codec)
+        {
+        case VLC_CODEC_VC1:
+            if (p_dec->fmt_in.i_extra)
+                b_delayed_open = true;
+        default:
+            break;
+        }
+        if (b_delayed_open && OpenMediaCodec(p_dec, env) != VLC_SUCCESS)
+        {
+            b_error = true;
+            goto endclean;
+        }
+    }
+    if (!p_sys->codec)
+        goto endclean;
 
     /* Use the aspect ratio provided by the input (ie read from packetizer).
      * Don't check the current value of the aspect ratio in fmt_out, since we
@@ -1062,23 +1179,12 @@ static picture_t *DecodeVideo(decoder_t *p_dec, block_t **pp_block)
         p_dec->fmt_out.video.i_sar_den = p_dec->fmt_in.video.i_sar_den;
     }
 
-    unsigned int i_attempts = 0;
-    jlong timeout = 0;
-    int i_output_ret = 0;
-    int i_input_ret = 0;
     do {
-        if (p_block && i_input_ret == 0) {
+        if (p_block && i_input_ret == 0)
             i_input_ret = PutInput(p_dec, env, p_block, timeout);
-            if (i_input_ret == 1) {
-                block_Release(p_block);
-                *pp_block = NULL;
-            } else if (i_input_ret == -1) {
-                p_sys->error_state = true;
-                break;
-            }
-        }
 
-        if (i_output_ret == 0) {
+        if (i_output_ret == 0)
+        {
             /* FIXME: A new picture shouldn't be created each time.
              * If decoder_NewPicture fails because the decoder is
              * flushing/exiting, GetOutput will either fail (or crash in
@@ -1087,7 +1193,8 @@ static picture_t *DecodeVideo(decoder_t *p_dec, block_t **pp_block)
              * input is waiting for the output or vice-versa.  Therefore, call
              * decoder_NewPicture before GetOutput as a safeguard. */
 
-            if (p_sys->pixel_format) {
+            if (p_sys->pixel_format)
+            {
                 p_pic = decoder_NewPicture(p_dec);
                 if (!p_pic) {
                     msg_Warn(p_dec, "NewPicture failed");
@@ -1095,44 +1202,51 @@ static picture_t *DecodeVideo(decoder_t *p_dec, block_t **pp_block)
                 }
             }
             i_output_ret = GetOutput(p_dec, env, p_pic, timeout);
-            if (i_output_ret == -1) {
-                p_sys->error_state = true;
-                break;
-            } else if (i_output_ret == 0) {
-                if (p_pic) {
+            if (p_pic)
+            {
+                if (i_output_ret != 1) {
                     picture_Release(p_pic);
                     p_pic = NULL;
-                } else if (++i_attempts > 100) {
+                }
+            } else
+            {
+                if (i_output_ret == 0 && i_input_ret == 0 && ++i_attempts > 100)
+                {
                     /* No p_pic, so no pixel_format, thereforce mediacodec
                      * didn't produce any output or events yet. Don't wait
                      * indefinitely and abort after 2seconds (100 * 2 * 10ms)
                      * without any data. Indeed, MediaCodec can fail without
                      * throwing any exception or error returns... */
-                    p_sys->error_state = true;
+                    b_error = true;
                     break;
                 }
             }
         }
         timeout = 10 * 1000; // 10 ms
-        /* loop until input is processed or when we got an output pic */
-    } while (p_block && i_input_ret != 1 && i_output_ret != 1);
+        /* loop until either the input or the output are processed (i_input_ret
+         * or i_output_ret == 1 ) or caused an error (i_input_ret or
+         * i_output_ret == -1 )*/
+    } while (p_block && i_input_ret == 0 && i_output_ret == 0);
+
+    if (i_input_ret == -1 || i_output_ret == -1)
+        b_error = true;
 
 endclean:
-    if (p_sys->error_state) {
-        if( p_block )
-        {
-            block_Release(p_block);
-            *pp_block = NULL;
-        }
-        if (p_pic)
-            picture_Release(p_pic);
-        p_pic = NULL;
 
-        if (!p_sys->error_event_sent) {
-            /* Signal the error to the Java. */
-            jni_EventHardwareAccelerationError();
-            p_sys->error_event_sent = true;
-        }
+    /* If pf_decode returns NULL, we'll get a new p_block from the next
+     * pf_decode call. Therefore we need to release the current one even if we
+     * couldn't process it (it happens in case or error or if MediaCodec is
+     * still not opened). We also must release the current p_block if we were
+     * able to process it. */
+    if (p_block && (p_pic == NULL || i_input_ret != 0))
+    {
+        block_Release(p_block);
+        *pp_block = NULL;
+    }
+    if (b_error && !p_sys->error_state) {
+        /* Signal the error to the Java. */
+        jni_EventHardwareAccelerationError();
+        p_sys->error_state = true;
     }
 
     return p_pic;

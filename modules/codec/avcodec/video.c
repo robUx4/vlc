@@ -111,10 +111,9 @@ static uint32_t ffmpeg_CodecTag( vlc_fourcc_t fcc )
 /**
  * Sets the decoder output format.
  */
-static int lavc_UpdateVideoFormat( decoder_t *p_dec,
-                                   AVCodecContext *p_context )
+static int lavc_UpdateVideoFormat( decoder_t *p_dec, AVCodecContext *p_context,
+                                   bool hwaccel )
 {
-    bool hwaccel = p_dec->p_sys->p_va != NULL;
     int width = p_context->coded_width;
     int height = p_context->coded_height;
 
@@ -122,9 +121,12 @@ static int lavc_UpdateVideoFormat( decoder_t *p_dec,
     {
         int aligns[AV_NUM_DATA_POINTERS];
 
+        if (GetVlcChroma(&p_dec->fmt_out.video, p_context->pix_fmt))
+            return -1;
+
         avcodec_align_dimensions2(p_context, &width, &height, aligns);
     }
-
+    p_dec->fmt_out.i_codec = p_dec->fmt_out.video.i_chroma;
 
     if( width == 0 || height == 0 || width > 8192 || height > 8192 )
     {
@@ -144,15 +146,6 @@ static int lavc_UpdateVideoFormat( decoder_t *p_dec,
         p_dec->fmt_out.video.i_visible_width = width;
         p_dec->fmt_out.video.i_visible_height = height;
     }
-
-    if( !hwaccel && GetVlcChroma( &p_dec->fmt_out.video, p_context->pix_fmt ) )
-    {
-        /* we are doomed, but not really, because most codecs set their pix_fmt
-         * much later
-         * FIXME does it make sense here ? */
-        p_dec->fmt_out.video.i_chroma = VLC_CODEC_I420;
-    }
-    p_dec->fmt_out.i_codec = p_dec->fmt_out.video.i_chroma;
 
     /* If an aspect-ratio was specified in the input format then force it */
     if( p_dec->fmt_in.video.i_sar_num > 0 && p_dec->fmt_in.video.i_sar_den > 0 )
@@ -192,8 +185,10 @@ static int lavc_UpdateVideoFormat( decoder_t *p_dec,
 static inline picture_t *ffmpeg_NewPictBuf( decoder_t *p_dec,
                                             AVCodecContext *p_context )
 {
-    lavc_UpdateVideoFormat( p_dec, p_context );
-    /* FIXME: check for error ^^ and return NULL */
+    bool hwaccel = p_dec->p_sys->p_va != NULL;
+
+    if (lavc_UpdateVideoFormat(p_dec, p_context, hwaccel))
+        return NULL;
     return decoder_NewPicture( p_dec );
 }
 
@@ -1106,13 +1101,17 @@ static enum PixelFormat ffmpeg_GetFormat( AVCodecContext *p_context,
 {
     decoder_t *p_dec = p_context->opaque;
     decoder_sys_t *p_sys = p_dec->p_sys;
-    vlc_va_t *p_va = p_sys->p_va;
 
-    if( p_va != NULL )
-        vlc_va_Delete( p_va, p_context );
+    if (p_sys->p_va != NULL)
+    {
+        vlc_va_Delete(p_sys->p_va, p_context);
+        p_sys->p_va = NULL;
+    }
 
     /* Enumerate available formats */
+    enum PixelFormat swfmt = avcodec_default_get_format(p_context, pi_fmt);
     bool can_hwaccel = false;
+
     for( size_t i = 0; pi_fmt[i] != PIX_FMT_NONE; i++ )
     {
         const AVPixFmtDescriptor *dsc = av_pix_fmt_desc_get(pi_fmt[i]);
@@ -1127,50 +1126,45 @@ static enum PixelFormat ffmpeg_GetFormat( AVCodecContext *p_context,
     }
 
     if (!can_hwaccel)
-        goto end;
-
-    /* Profile and level information is needed now.
-     * TODO: avoid code duplication with avcodec.c */
-    if( p_context->profile != FF_PROFILE_UNKNOWN)
-        p_dec->fmt_in.i_profile = p_context->profile;
-    if( p_context->level != FF_LEVEL_UNKNOWN)
-        p_dec->fmt_in.i_level = p_context->level;
-
-    p_va = vlc_va_New( VLC_OBJECT(p_dec), p_context, &p_dec->fmt_in );
-    if( p_va == NULL )
-        goto end;
+        return swfmt;
 
     for( size_t i = 0; pi_fmt[i] != PIX_FMT_NONE; i++ )
     {
-        if( p_va->pix_fmt != pi_fmt[i] )
-            continue;
+        enum PixelFormat hwfmt = pi_fmt[i];
+
+        p_dec->fmt_out.video.i_chroma = vlc_va_GetChroma(hwfmt, swfmt);
+        if (p_dec->fmt_out.video.i_chroma == 0)
+            continue; /* Unknown brand of hardware acceleration */
+        if (lavc_UpdateVideoFormat(p_dec, p_context, true))
+            continue; /* Unsupported brand of hardware acceleration */
+
+        vlc_va_t *va = vlc_va_New(VLC_OBJECT(p_dec), p_context, hwfmt,
+                                  &p_dec->fmt_in);
+        if (va == NULL)
+            continue; /* Unsupported codec profile or such */
 
         /* We try to call vlc_va_Setup when possible to detect errors when
          * possible (later is too late) */
         if( p_context->width > 0 && p_context->height > 0
-         && vlc_va_Setup( p_va, p_context, &p_dec->fmt_out.video.i_chroma, NULL ) )
+         && vlc_va_Setup( va, p_context, &p_dec->fmt_out.video.i_chroma, NULL ) )
         {
             msg_Err( p_dec, "acceleration setup failure" );
-            break;
+            vlc_va_Delete(va, p_context);
+            continue;
         }
 
-        if( p_va->description )
-            msg_Info( p_dec, "Using %s for hardware decoding.",
-                      p_va->description );
+        if (va->description != NULL)
+            msg_Info(p_dec, "Using %s for hardware decoding", va->description);
 
         /* FIXME this will disable direct rendering
          * even if a new pixel format is renegotiated
          */
         p_sys->b_direct_rendering = false;
-        p_sys->p_va = p_va;
+        p_sys->p_va = va;
         p_context->draw_horiz_band = NULL;
         return pi_fmt[i];
     }
 
-    vlc_va_Delete( p_va, p_context );
-
-end:
     /* Fallback to default behaviour */
-    p_sys->p_va = NULL;
-    return avcodec_default_get_format( p_context, pi_fmt );
+    return swfmt;
 }

@@ -415,7 +415,6 @@ static int vout_update_format( decoder_t *p_dec )
         if( p_vout == NULL )
         {
             msg_Err( p_dec, "failed to create video output" );
-            p_dec->b_error = true;
             return -1;
         }
     }
@@ -434,18 +433,6 @@ static picture_t *vout_new_buffer( decoder_t *p_dec )
         picture_t *p_picture = vout_GetPicture( p_owner->p_vout );
         if( p_picture )
             return p_picture;
-
-        /* */
-        vlc_mutex_lock( &p_owner->lock );
-        if( p_owner->b_waiting )
-        {
-            p_owner->b_has_data = true;
-            vlc_cond_signal( &p_owner->wait_acknowledge );
-        }
-        vlc_mutex_unlock( &p_owner->lock );
-
-        /* Check the decoder doesn't leak pictures */
-        vout_FixLeaks( p_owner->p_vout );
 
         /* FIXME add a vout_WaitPictureAvailable (timedwait) */
         msleep( VOUT_OUTMEM_SLEEP );

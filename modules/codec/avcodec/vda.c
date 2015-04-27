@@ -44,7 +44,8 @@
 
 #pragma mark prototypes and definitions
 
-static int Open( vlc_va_t *, AVCodecContext *, const es_format_t * );
+static int Open( vlc_va_t *, AVCodecContext *, enum PixelFormat,
+                 const es_format_t * );
 static void Close( vlc_va_t * , AVCodecContext *);
 static int Setup( vlc_va_t *, AVCodecContext *, vlc_fourcc_t *);
 static int Get( vlc_va_t *, picture_t *, uint8_t ** );
@@ -115,9 +116,12 @@ static vlc_va_vda_t *vlc_va_vda_Get( vlc_va_t *va )
 
 #pragma mark - module handling
 
-static int Open( vlc_va_t *va, AVCodecContext *ctx,
+static int Open( vlc_va_t *va, AVCodecContext *ctx, enum PixelFormat pix_fmt,
                  const es_format_t *fmt )
 {
+    if( pix_fmt != AV_PIX_FMT_VDA_VLD )
+        return VLC_EGENERIC;
+
     msg_Dbg( va, "opening VDA module" );
     if( ctx->codec_id != AV_CODEC_ID_H264 )
     {
@@ -140,7 +144,6 @@ static int Open( vlc_va_t *va, AVCodecContext *ctx,
 
     va->sys = p_vda;
     va->description = "VDA";
-    va->pix_fmt = PIX_FMT_VDA_VLD;
     va->setup = Setup;
     va->get = Get;
     va->release = NULL;
@@ -308,12 +311,15 @@ vlc_module_begin ()
     set_callbacks( Open, Close )
 vlc_module_end ()
 
-static int Open( vlc_va_t *va, AVCodecContext *avctx, const es_format_t *fmt )
+static int Open( vlc_va_t *va, AVCodecContext *avctx,
+                 enum PixelFormat pix_fmt, const es_format_t *fmt )
 {
+    if( pix_fmt != AV_PIX_FMT_VDA )
+        return VLC_EGENERIC;
+
     msg_Dbg( va, "VDA decoder Open");
 
     va->description = (char *)"VDA";
-    va->pix_fmt = AV_PIX_FMT_VDA;
     va->setup = Setup;
     va->get = Get;
     va->release = NULL;
