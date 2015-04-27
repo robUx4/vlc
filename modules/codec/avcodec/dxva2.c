@@ -703,12 +703,20 @@ static int Open(vlc_va_t *va, AVCodecContext *ctx, enum PixelFormat pix_fmt,
     }
     msg_Dbg(va, "DLLs loaded");
 
-    /* */
-    if (D3dCreateDevice(va)) {
-        msg_Err(va, "Failed to create Direct3D device");
-        goto error;
+    sys->d3ddev = NULL;
+    if (p_sys!=NULL)
+        IDirect3DSurface9_GetDevice(p_sys->surface, &sys->d3ddev);
+
+    if (sys->d3ddev) {
+        msg_Dbg(va, "Reusing D3D9 device");
+    } else {
+        /* */
+        if (D3dCreateDevice(va)) {
+            msg_Err(va, "Failed to create Direct3D device");
+            goto error;
+        }
+        msg_Dbg(va, "D3dCreateDevice succeed");
     }
-    msg_Dbg(va, "D3dCreateDevice succeed");
 
     if (D3dCreateDeviceManager(va)) {
         msg_Err(va, "D3dCreateDeviceManager failed");
