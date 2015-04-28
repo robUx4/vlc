@@ -186,8 +186,8 @@ picture_pool_t *AllocPoolD3D9Ex(vlc_object_t *va, LPDIRECT3DDEVICE9 d3ddev,
             goto error;
 
         HRESULT hr = IDirect3DDevice9_CreateOffscreenPlainSurface(d3ddev,
-                                                          fmt->i_width,
-                                                          fmt->i_height,
+                                                          fmt->i_visible_width,
+                                                          fmt->i_visible_height,
                                                           MAKEFOURCC('N','V','1','2'), /* FIXME d3ddm.Format, */
                                                           D3DPOOL_DEFAULT,
                                                           &picsys->surface,

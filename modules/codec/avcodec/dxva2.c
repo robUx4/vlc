@@ -486,7 +486,7 @@ static void DXA9_I420 (filter_t *p_filter, picture_t *src, picture_t *dst)
     } else if (desc.Format == MAKEFOURCC('N','V','1','2')) {
         uint8_t *plane[2] = {
             lock.pBits,
-            (uint8_t*)lock.pBits + lock.Pitch * src->format.i_height
+            (uint8_t*)lock.pBits + lock.Pitch * src->format.i_visible_height
         };
         size_t  pitch[2] = {
             lock.Pitch,
@@ -522,14 +522,12 @@ static int Extract(vlc_va_t *va, picture_t *picture, uint8_t *data)
 #endif
 
     HRESULT hr;
-#if 0
-    RECT outputRect;
-    outputRect.top = 0;
-    outputRect.left = 0;
-    outputRect.right = picture->format.i_visible_width;
-    outputRect.bottom = picture->format.i_visible_height;
-#endif
-    hr = IDirect3DDevice9_StretchRect( sys->d3ddev, d3d, NULL, output, NULL, D3DTEXF_NONE);
+    RECT visibleSource;
+    visibleSource.left = 0;
+    visibleSource.top = 0;
+    visibleSource.right = picture->format.i_visible_width;
+    visibleSource.bottom = picture->format.i_visible_height;
+    hr = IDirect3DDevice9_StretchRect( sys->d3ddev, d3d, &visibleSource, output, &visibleSource, D3DTEXF_NONE);
     if (FAILED(hr)) {
         msg_Err(va, "Failed to copy the hw surface to the decoder surface (hr=0x%0lx)", hr );
         return VLC_EGENERIC;
