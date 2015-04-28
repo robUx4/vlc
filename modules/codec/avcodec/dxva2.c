@@ -458,6 +458,12 @@ static void DXA9_YV12(filter_t *p_filter, picture_t *src, picture_t *dst)
         return;
     }
 
+    if (dst->format.i_chroma == VLC_CODEC_I420) {
+        uint8_t *tmp = dst->p[1].p_pixels;
+        dst->p[1].p_pixels = dst->p[2].p_pixels;
+        dst->p[2].p_pixels = tmp;
+    }
+
     if (desc.Format == MAKEFOURCC('Y','V','1','2') ||
         desc.Format == MAKEFOURCC('I','M','C','3')) {
         bool imc3 = desc.Format == MAKEFOURCC('I','M','C','3');
@@ -498,71 +504,15 @@ static void DXA9_YV12(filter_t *p_filter, picture_t *src, picture_t *dst)
         msg_Err(p_filter, "Unsupported DXA9 conversion from 0x%08X to YV12", desc.Format);
     }
 
-    /* */
-    IDirect3DSurface9_UnlockRect(d3d);
-}
-
-#if 0
-static void DXA9_I420(filter_t *p_filter, picture_t *src, picture_t *dst)
-{
-    copy_cache_t *p_copy_cache = (copy_cache_t*) p_filter->p_sys;
-
-    LPDIRECT3DSURFACE9 d3d = src->p_sys->surface;
-    D3DSURFACE_DESC desc;
-    if (FAILED( IDirect3DSurface9_GetDesc(d3d, &desc) ))
-        return;
-
-    /* */
-    D3DLOCKED_RECT lock;
-    if (FAILED(IDirect3DSurface9_LockRect(d3d, &lock, NULL, D3DLOCK_READONLY))) {
-        msg_Err(p_filter, "Failed to lock surface");
-        return;
-    }
-
-    if (desc.Format == MAKEFOURCC('Y','V','1','2') ||
-        desc.Format == MAKEFOURCC('I','M','C','3')) {
-        bool imc3 = desc.Format == MAKEFOURCC('I','M','C','3');
-        size_t chroma_pitch = imc3 ? lock.Pitch : (lock.Pitch / 2);
-
-        size_t pitch[3] = {
-            lock.Pitch,
-            chroma_pitch,
-            chroma_pitch,
-        };
-
-        uint8_t *plane[3] = {
-            (uint8_t*)lock.pBits,
-            (uint8_t*)lock.pBits + pitch[0] * src->format.i_height,
-            (uint8_t*)lock.pBits + pitch[0] * src->format.i_height
-                                 + pitch[1] * src->format.i_height / 2,
-        };
-
-        if (imc3) {
-            uint8_t *V = plane[1];
-            plane[1] = plane[2];
-            plane[2] = V;
-        }
-        CopyFromYv12ToI420(dst, plane, pitch, src->format.i_width, src->format.i_visible_height,
-                     p_copy_cache);
-    } else if (desc.Format == MAKEFOURCC('N','V','1','2')) {
-        uint8_t *plane[2] = {
-            lock.pBits,
-            (uint8_t*)lock.pBits + lock.Pitch * src->format.i_visible_height
-        };
-        size_t  pitch[2] = {
-            lock.Pitch,
-            lock.Pitch,
-        };
-        CopyFromNv12ToI420(dst, plane, pitch, src->format.i_width, src->format.i_visible_height,
-                     p_copy_cache);
-    } else {
-        msg_Err(p_filter, "Unsupported DXA9 conversion from 0x%08X to I420", desc.Format);
+    if (dst->format.i_chroma == VLC_CODEC_I420) {
+        uint8_t *tmp = dst->p[1].p_pixels;
+        dst->p[1].p_pixels = dst->p[2].p_pixels;
+        dst->p[2].p_pixels = tmp;
     }
 
     /* */
     IDirect3DSurface9_UnlockRect(d3d);
 }
-#endif
 
 static void DXA9_NV12(filter_t *p_filter, picture_t *src, picture_t *dst)
 {
@@ -1306,9 +1256,6 @@ static int DxResetVideoDecoder(vlc_va_t *va)
 }
 
 VIDEO_FILTER_WRAPPER (DXA9_YV12)
-#if 0
-VIDEO_FILTER_WRAPPER (DXA9_I420)
-#endif
 VIDEO_FILTER_WRAPPER (DXA9_NV12)
 
 static int OpenConverter( vlc_object_t *obj )
@@ -1322,11 +1269,7 @@ static int OpenConverter( vlc_object_t *obj )
         return VLC_EGENERIC;
 
     switch( p_filter->fmt_out.video.i_chroma ) {
-#if 0
     case VLC_CODEC_I420:
-        p_filter->pf_video_filter = DXA9_I420_Filter;
-        break;
-#endif
     case VLC_CODEC_YV12:
         p_filter->pf_video_filter = DXA9_YV12_Filter;
         break;

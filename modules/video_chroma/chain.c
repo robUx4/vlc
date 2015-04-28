@@ -61,9 +61,6 @@ static void EsFormatMergeSize( es_format_t *p_dst,
                                const es_format_t *p_size );
 
 static const vlc_fourcc_t pi_allowed_chromas[] = {
-#ifdef _WIN32
-    VLC_CODEC_YV12,
-#endif
     VLC_CODEC_I420,
     VLC_CODEC_I422,
     VLC_CODEC_RGB32,
