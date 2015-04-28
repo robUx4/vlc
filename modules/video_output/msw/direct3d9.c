@@ -1041,8 +1041,7 @@ static void Direct3D9DestroyPool(vout_display_t *vd)
 
     if (sys->pool) {
         picture_sys_t *picsys = sys->picsys;
-        if ( picsys != NULL )
-        {
+        if ( picsys != NULL ) {
             IDirect3DSurface9_Release(picsys->surface);
             if (picsys->fallback)
                 picture_Release(picsys->fallback);
