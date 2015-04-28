@@ -695,10 +695,16 @@ static int Direct3D11Open(vout_display_t *vd, video_format_t *fmt)
 # endif
 #endif
 
+    vlc_fourcc_t i_src_chroma;
+    if (fmt->i_chroma == VLC_CODEC_D3D9_OPAQUE)
+        i_src_chroma = VLC_CODEC_NV12; // favor NV12
+    else
+        i_src_chroma = fmt->i_chroma;
+
     // look for the request pixel format first
     for (unsigned i = 0; d3d_formats[i].name != 0; i++)
     {
-        if( fmt->i_chroma == d3d_formats[i].fourcc)
+        if( i_src_chroma == d3d_formats[i].fourcc)
         {
             UINT i_formatSupport;
             if( SUCCEEDED( ID3D11Device_CheckFormatSupport(sys->d3ddevice,
