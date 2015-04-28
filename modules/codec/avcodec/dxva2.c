@@ -495,13 +495,14 @@ static void DXA9_YV12(filter_t *p_filter, picture_t *src, picture_t *dst)
         CopyFromNv12(dst, plane, pitch, src->format.i_width, src->format.i_visible_height,
                      p_copy_cache);
     } else {
-        msg_Err(p_filter, "Unsupported DXA9 conversion to 0x%08X", desc.Format);
+        msg_Err(p_filter, "Unsupported DXA9 conversion from 0x%08X to YV12", desc.Format);
     }
 
     /* */
     IDirect3DSurface9_UnlockRect(d3d);
 }
 
+#if 0
 static void DXA9_I420(filter_t *p_filter, picture_t *src, picture_t *dst)
 {
     copy_cache_t *p_copy_cache = (copy_cache_t*) p_filter->p_sys;
@@ -555,12 +556,13 @@ static void DXA9_I420(filter_t *p_filter, picture_t *src, picture_t *dst)
         CopyFromNv12ToI420(dst, plane, pitch, src->format.i_width, src->format.i_visible_height,
                      p_copy_cache);
     } else {
-        msg_Err(p_filter, "Unsupported DXA9 conversion to 0x%08X", desc.Format);
+        msg_Err(p_filter, "Unsupported DXA9 conversion from 0x%08X to I420", desc.Format);
     }
 
     /* */
     IDirect3DSurface9_UnlockRect(d3d);
 }
+#endif
 
 static void DXA9_NV12(filter_t *p_filter, picture_t *src, picture_t *dst)
 {
@@ -590,7 +592,7 @@ static void DXA9_NV12(filter_t *p_filter, picture_t *src, picture_t *dst)
         CopyFromNv12ToNv12(dst, plane, pitch, src->format.i_width, src->format.i_visible_height,
                      p_copy_cache);
     } else {
-        msg_Err(p_filter, "Unsupported DXA9 conversion to 0x%08X", desc.Format);
+        msg_Err(p_filter, "Unsupported DXA9 conversion from 0x%08X to NV12", desc.Format);
     }
 
     /* */
@@ -1304,7 +1306,9 @@ static int DxResetVideoDecoder(vlc_va_t *va)
 }
 
 VIDEO_FILTER_WRAPPER (DXA9_YV12)
+#if 0
 VIDEO_FILTER_WRAPPER (DXA9_I420)
+#endif
 VIDEO_FILTER_WRAPPER (DXA9_NV12)
 
 static int OpenConverter( vlc_object_t *obj )
@@ -1317,11 +1321,12 @@ static int OpenConverter( vlc_object_t *obj )
          || p_filter->fmt_in.video.i_width != p_filter->fmt_out.video.i_width )
         return VLC_EGENERIC;
 
-    switch( p_filter->fmt_out.video.i_chroma )
-    {
+    switch( p_filter->fmt_out.video.i_chroma ) {
+#if 0
     case VLC_CODEC_I420:
         p_filter->pf_video_filter = DXA9_I420_Filter;
         break;
+#endif
     case VLC_CODEC_YV12:
         p_filter->pf_video_filter = DXA9_YV12_Filter;
         break;
