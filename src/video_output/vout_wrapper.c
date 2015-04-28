@@ -152,15 +152,10 @@ int vout_InitWrapper(vout_thread_t *vout)
                                                  reserved_picture + decoder_picture - DISPLAY_PICTURE_COUNT);
 #if defined(_WIN32)
         if (source.i_chroma == VLC_CODEC_D3D9_OPAQUE)
-        {
-            /* FIXME dirty hack for now */
             sys->decoder_pool = AllocPoolD3D9( VLC_OBJECT(vout), &source, decoder_pool_size );
-        }
         else
 #endif
-        {
             sys->decoder_pool = picture_pool_NewFromFormat( &source, decoder_pool_size );
-        }
         if (!sys->decoder_pool)
             return VLC_EGENERIC;
         if (allow_dr) {

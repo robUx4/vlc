@@ -1059,19 +1059,10 @@ static int lavc_GetFrame(struct AVCodecContext *ctx, AVFrame *frame, int flags)
     frame->opaque = NULL;
 
     wait_mt(sys);
-    /* The semaphore protects updates to fmt_out */
-    pic = ffmpeg_NewPictBuf(dec, ctx);
-    if (pic == NULL)
-    {
-        post_mt(sys);
-        return -1;
-    }
-
     if (sys->p_va != NULL)
     {   /* TODO: Move this to get_format(). We are screwed if it fails here. */
         if (vlc_va_Setup(sys->p_va, ctx, &dec->fmt_out.video.i_chroma))
         {
-            picture_Release(pic);
             post_mt(sys);
             msg_Err(dec, "hardware acceleration setup failed");
             return -1;
@@ -1079,11 +1070,15 @@ static int lavc_GetFrame(struct AVCodecContext *ctx, AVFrame *frame, int flags)
     }
     else if (!sys->b_direct_rendering)
     {
-        picture_Release(pic);
         post_mt(sys);
         return avcodec_default_get_buffer2(ctx, frame, flags);
     }
+
+    /* The semaphore protects updates to fmt_out */
+    pic = ffmpeg_NewPictBuf(dec, ctx);
     post_mt(sys);
+    if (pic == NULL)
+        return -1;
 
     if (sys->p_va != NULL)
         return lavc_va_GetFrame(ctx, frame, pic);
@@ -1153,7 +1148,7 @@ static enum PixelFormat ffmpeg_GetFormat( AVCodecContext *p_context,
         /* We try to call vlc_va_Setup when possible to detect errors when
          * possible (later is too late) */
         if( p_context->width > 0 && p_context->height > 0
-         && vlc_va_Setup( va, p_context, &p_dec->fmt_out.video.i_chroma) )
+         && vlc_va_Setup(va, p_context, &p_dec->fmt_out.video.i_chroma))
         {
             msg_Err( p_dec, "acceleration setup failure" );
             vlc_va_Delete(va, p_context);

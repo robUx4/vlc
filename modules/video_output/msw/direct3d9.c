@@ -350,7 +350,7 @@ static void Display(vout_display_t *vd, picture_t *picture, subpicture_t *subpic
     // No stretching should happen here !
     const RECT src = sys->rect_dest_clipped;
     const RECT dst = sys->rect_dest_clipped;
-    HRESULT hr = IDirect3DDevice9_Present(d3ddev, &src, &dst, sys->hvideownd, NULL);
+    HRESULT hr = IDirect3DDevice9_Present(d3ddev, &src, &dst, NULL, NULL);
     if (FAILED(hr)) {
         msg_Dbg(vd, "Failed IDirect3DDevice9_Present: 0x%0lx", hr);
     }
@@ -555,7 +555,7 @@ static int Direct3D9Create(vout_display_t *vd)
     ** Get device capabilities
     */
     ZeroMemory(&sys->d3dcaps, sizeof(sys->d3dcaps));
-    HRESULT hr = IDirect3D9_GetDeviceCaps(sys->d3dobj, D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, &sys->d3dcaps);
+    HRESULT hr = IDirect3D9_GetDeviceCaps(d3dobj, D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, &sys->d3dcaps);
     if (FAILED(hr)) {
        msg_Err(vd, "Could not read adapter capabilities. (hr=0x%0lx)", hr);
        return VLC_EGENERIC;
@@ -1020,11 +1020,8 @@ static int Direct3D9CreatePool(vout_display_t *vd, video_format_t *fmt)
         memset(&pool_cfg, 0, sizeof(pool_cfg));
         pool_cfg.picture_count = 1;
         pool_cfg.picture       = &picture;
-        if (fmt->i_chroma != VLC_CODEC_D3D9_OPAQUE)
-        {
-            pool_cfg.lock      = Direct3D9LockSurface;
-            pool_cfg.unlock    = Direct3D9UnlockSurface;
-        }
+        pool_cfg.lock      = Direct3D9LockSurface;
+        pool_cfg.unlock    = Direct3D9UnlockSurface;
 
         sys->pool = picture_pool_NewExtended(&pool_cfg);
         if (!sys->pool) {

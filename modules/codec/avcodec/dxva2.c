@@ -440,22 +440,11 @@ ok:
     *chroma = VLC_CODEC_D3D9_OPAQUE;
 
     return VLC_SUCCESS;
-
-error:
-    DxDestroyVideoDecoder(sys);
-    DxDestroyVideoService(sys);
-    D3dDestroyDeviceManager(sys);
-    D3dDestroyDevice(sys);
-    return VLC_EGENERIC;
 }
 
 static void DXA9_I420 (filter_t *p_filter, picture_t *src, picture_t *dst)
 {
     copy_cache_t *p_copy_cache = (copy_cache_t*) p_filter->p_sys;
-
-#if 0
-    msg_Dbg( p_filter, "Filter picture 0x%p context 0x%p into picture 0x%p", src, src->context, dst);
-#endif
 
     LPDIRECT3DSURFACE9 d3d = src->p_sys->surface;
     D3DSURFACE_DESC desc;
