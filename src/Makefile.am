@@ -290,8 +290,6 @@ SOURCES_libvlc_linux = \
 	$(NULL)
 
 SOURCES_libvlc_win32 = \
-	win32/direct3d9_pool.c \
-	win32/direct3d9_pool.h \
 	win32/dirs.c \
 	win32/error.c \
 	win32/filesystem.c \
@@ -302,6 +300,15 @@ SOURCES_libvlc_win32 = \
 	win32/winsock.c \
 	win32/rand.c \
 	$(NULL)
+
+if HAVE_DIRECTX
+if !HAVE_WINSTORE
+SOURCES_libvlc_win32 += \
+        win32/direct3d9_pool.c \
+	win32/direct3d9_pool.h \
+	$(NULL)
+endif
+endif
 
 SOURCES_libvlc_symbian = \
 	symbian/path.cpp \

@@ -35,7 +35,7 @@
 #include <assert.h>
 #include "vout_internal.h"
 #include "display.h"
-#if defined(_WIN32)
+#if defined(_WIN32) && defined(HAVE_D3D9_H)
 #include "../win32/direct3d9_pool.h"
 #endif
 
@@ -150,7 +150,7 @@ int vout_InitWrapper(vout_thread_t *vout)
     } else if (!sys->decoder_pool) {
         const unsigned decoder_pool_size = __MAX(VOUT_MAX_PICTURES,
                                                  reserved_picture + decoder_picture - DISPLAY_PICTURE_COUNT);
-#if defined(_WIN32)
+#if defined(_WIN32) && defined(HAVE_D3D9_H)
         if (source.i_chroma == VLC_CODEC_D3D9_OPAQUE)
             sys->decoder_pool = AllocPoolD3D9( VLC_OBJECT(vout), &source, decoder_pool_size );
         else
