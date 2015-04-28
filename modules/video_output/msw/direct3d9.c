@@ -1546,7 +1546,7 @@ static void Direct3D9ImportSubpicture(vout_display_t *vd,
                 cache->format == sys->d3dregion_format &&
                 cache->width  == r->fmt.i_visible_width &&
                 cache->height == r->fmt.i_visible_height) {
-#ifndef NDEBUG
+#if 0 //ndef NDEBUG
                 msg_Dbg(vd, "Reusing %dx%d texture for OSD",
                         cache->width, cache->height);
 #endif
