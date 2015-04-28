@@ -33,7 +33,16 @@
 filter_t *filter_NewBlend( vlc_object_t *p_this,
                            const video_format_t *p_dst_chroma )
 {
-    filter_t *p_blend = vlc_custom_create( p_this, sizeof(*p_blend), "blend" );
+    filter_t *p_blend;
+    const vlc_chroma_description_t *p_desc;
+
+    p_desc = vlc_fourcc_GetChromaDescription( p_dst_chroma->i_chroma );
+    if( !p_desc || p_desc->plane_count == 0 )
+    {
+        msg_Err( p_this, "Could not create blending filter for fake fmt" );
+        return NULL;
+    }
+    p_blend = vlc_custom_create( p_this, sizeof(*p_blend), "blend" );
     if( !p_blend )
         return NULL;
 
