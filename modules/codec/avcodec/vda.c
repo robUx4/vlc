@@ -314,7 +314,7 @@ vlc_module_begin ()
 vlc_module_end ()
 
 static int Open( vlc_va_t *va, AVCodecContext *avctx,
-                 enum PixelFormat pix_fmt, const es_format_t *fmt )
+                 enum PixelFormat pix_fmt, const es_format_t *fmt, picture_sys_t *p_sys )
 {
     if( pix_fmt != AV_PIX_FMT_VDA )
         return VLC_EGENERIC;

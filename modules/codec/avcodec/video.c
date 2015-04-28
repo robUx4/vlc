@@ -1128,6 +1128,8 @@ static enum PixelFormat ffmpeg_GetFormat( AVCodecContext *p_context,
     if (!can_hwaccel)
         return swfmt;
 
+    wait_mt(p_sys);
+
     for( size_t i = 0; pi_fmt[i] != PIX_FMT_NONE; i++ )
     {
         enum PixelFormat hwfmt = pi_fmt[i];
@@ -1158,6 +1160,8 @@ static enum PixelFormat ffmpeg_GetFormat( AVCodecContext *p_context,
             continue;
         }
 
+        post_mt(p_sys);
+
         if (va->description != NULL)
             msg_Info(p_dec, "Using %s for hardware decoding", va->description);
 
@@ -1170,6 +1174,7 @@ static enum PixelFormat ffmpeg_GetFormat( AVCodecContext *p_context,
         return pi_fmt[i];
     }
 
+    post_mt(p_sys);
     /* Fallback to default behaviour */
     return swfmt;
 }

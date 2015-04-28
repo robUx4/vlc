@@ -1094,7 +1094,6 @@ static int GetOutput(decoder_t *p_dec, JNIEnv *env, picture_t *p_pic, jlong time
             p_sys->stride = width;
         if (p_sys->slice_height <= 0)
             p_sys->slice_height = height;
-        CHECK_EXCEPTION();
 
         ArchitectureSpecificCopyHooks(p_dec, p_sys->pixel_format, p_sys->slice_height,
                                       p_sys->stride, &p_sys->architecture_specific_data);
@@ -1183,7 +1182,7 @@ static picture_t *DecodeVideo(decoder_t *p_dec, block_t **pp_block)
         if (p_block && i_input_ret == 0)
             i_input_ret = PutInput(p_dec, env, p_block, timeout);
 
-        if (i_output_ret == 0)
+        if (i_input_ret != -1 && i_output_ret == 0)
         {
             /* FIXME: A new picture shouldn't be created each time.
              * If decoder_NewPicture fails because the decoder is
