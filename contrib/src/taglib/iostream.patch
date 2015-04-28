@@ -1,0 +1,132 @@
+diff --git a/taglib/fileref.cpp b/taglib/fileref.cpp
+index 2b5d5f2..04d9a56 100644
+--- a/taglib/fileref.cpp
++++ b/taglib/fileref.cpp
+@@ -80,7 +80,12 @@ FileRef::FileRef()
+ FileRef::FileRef(FileName fileName, bool readAudioProperties,
+                  AudioProperties::ReadStyle audioPropertiesStyle)
+ {
+-  d = new FileRefPrivate(create(fileName, readAudioProperties, audioPropertiesStyle));
++    d = new FileRefPrivate(create(fileName, readAudioProperties, audioPropertiesStyle));
++}
++
++FileRef::FileRef(IOStream* stream, bool readAudioProperties, AudioProperties::ReadStyle audioPropertiesStyle)
++{
++    d = new FileRefPrivate(create(stream, readAudioProperties, audioPropertiesStyle));
+ }
+ 
+ FileRef::FileRef(File *file)
+@@ -284,3 +289,77 @@ File *FileRef::create(FileName fileName, bool readAudioProperties,
+ 
+   return 0;
+ }
++
++File *FileRef::create(IOStream* ioStream, bool readAudioProperties, AudioProperties::ReadStyle audioPropertiesStyle)
++{
++    // Ok, this is really dumb for now, but it works for testing.
++
++    String ext;
++    {
++  #ifdef _WIN32
++
++      String s = ioStream->name().toString();
++
++  #else
++
++      String s = ioStream->name();
++
++   #endif
++
++      const int pos = s.rfind(".");
++      if(pos != -1)
++        ext = s.substr(pos + 1).upper();
++    }
++
++    // If this list is updated, the method defaultFileExtensions() should also be
++    // updated.  However at some point that list should be created at the same time
++    // that a default file type resolver is created.
++
++    if(!ext.isEmpty()) {
++      if(ext == "MP3")
++        return new MPEG::File(ioStream, ID3v2::FrameFactory::instance(), readAudioProperties, audioPropertiesStyle);
++      if(ext == "OGG")
++        return new Ogg::Vorbis::File(ioStream, readAudioProperties, audioPropertiesStyle);
++      if(ext == "OGA") {
++        /* .oga can be any audio in the Ogg container. First try FLAC, then Vorbis. */
++        File *file = new Ogg::FLAC::File(ioStream, readAudioProperties, audioPropertiesStyle);
++        if (file->isValid())
++          return file;
++        delete file;
++        return new Ogg::Vorbis::File(ioStream, readAudioProperties, audioPropertiesStyle);
++      }
++      if(ext == "FLAC")
++        return new FLAC::File(ioStream, ID3v2::FrameFactory::instance(), readAudioProperties, audioPropertiesStyle);
++      if(ext == "MPC")
++        return new MPC::File(ioStream, readAudioProperties, audioPropertiesStyle);
++      if(ext == "WV")
++        return new WavPack::File(ioStream, readAudioProperties, audioPropertiesStyle);
++      if(ext == "SPX")
++        return new Ogg::Speex::File(ioStream, readAudioProperties, audioPropertiesStyle);
++      if(ext == "OPUS")
++        return new Ogg::Opus::File(ioStream, readAudioProperties, audioPropertiesStyle);
++      if(ext == "TTA")
++        return new TrueAudio::File(ioStream, readAudioProperties, audioPropertiesStyle);
++      if(ext == "M4A" || ext == "M4R" || ext == "M4B" || ext == "M4P" || ext == "MP4" || ext == "3G2")
++        return new MP4::File(ioStream, readAudioProperties, audioPropertiesStyle);
++      if(ext == "WMA" || ext == "ASF")
++        return new ASF::File(ioStream, readAudioProperties, audioPropertiesStyle);
++      if(ext == "AIF" || ext == "AIFF" || ext == "AFC" || ext == "AIFC")
++        return new RIFF::AIFF::File(ioStream, readAudioProperties, audioPropertiesStyle);
++      if(ext == "WAV")
++        return new RIFF::WAV::File(ioStream, readAudioProperties, audioPropertiesStyle);
++      if(ext == "APE")
++        return new APE::File(ioStream, readAudioProperties, audioPropertiesStyle);
++      // module, nst and wow are possible but uncommon extensions
++      if(ext == "MOD" || ext == "MODULE" || ext == "NST" || ext == "WOW")
++        return new Mod::File(ioStream, readAudioProperties, audioPropertiesStyle);
++      if(ext == "S3M")
++        return new S3M::File(ioStream, readAudioProperties, audioPropertiesStyle);
++      if(ext == "IT")
++        return new IT::File(ioStream, readAudioProperties, audioPropertiesStyle);
++      if(ext == "XM")
++        return new XM::File(ioStream, readAudioProperties, audioPropertiesStyle);
++    }
++
++    return 0;
++}
+diff --git a/taglib/fileref.h b/taglib/fileref.h
+index 0f0c21a..3ba03af 100644
+--- a/taglib/fileref.h
++++ b/taglib/fileref.h
+@@ -128,6 +128,20 @@ namespace TagLib {
+                      audioPropertiesStyle = AudioProperties::Average);
+ 
+     /*!
++     * Create a FileRef from an opened \a IOStream.  If \a readAudioProperties is true then
++     * the audio properties will be read using \a audioPropertiesStyle.  If
++     * \a readAudioProperties is false then \a audioPropertiesStyle will be
++     * ignored.
++     *
++     * Also see the note in the class documentation about why you may not want to
++     * use this method in your application.
++     */
++    explicit FileRef(IOStream* stream,
++                     bool readAudioProperties = true,
++                     AudioProperties::ReadStyle
++                     audioPropertiesStyle = AudioProperties::Average);
++
++    /*!
+      * Contruct a FileRef using \a file.  The FileRef now takes ownership of the
+      * pointer and will delete the File when it passes out of scope.
+      */
+@@ -252,6 +266,10 @@ namespace TagLib {
+                         bool readAudioProperties = true,
+                         AudioProperties::ReadStyle audioPropertiesStyle = AudioProperties::Average);
+ 
++    static File *create(IOStream* ioStream,
++                        bool readAudioProperties = true,
++                        AudioProperties::ReadStyle audioPropertiesStyle = AudioProperties::Average);
++
+ 
+   private:
+     class FileRefPrivate;
