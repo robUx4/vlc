@@ -348,6 +348,14 @@ if HAVE_AVCODEC_DXVA2
 codec_LTLIBRARIES += libdxva2_plugin.la
 endif
 
+libd3d11va_plugin_la_SOURCES = \
+	codec/avcodec/d3d11va.c packetizer/h264_nal.c packetizer/h264_nal.h \
+	../src/win32/direct3d9_pool.c ../src/win32/direct3d9_pool.h
+libd3d11va_plugin_la_LIBADD = -lole32 -lshlwapi -luuid
+if HAVE_AVCODEC_D3D11VA
+codec_LTLIBRARIES += libd3d11va_plugin.la
+endif
+
 libvda_plugin_la_SOURCES = \
 	video_chroma/copy.c video_chroma/copy.h \
 	codec/avcodec/vda.c
