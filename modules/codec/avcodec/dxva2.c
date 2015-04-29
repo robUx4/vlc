@@ -40,10 +40,8 @@
 #include <vlc_common.h>
 #include <vlc_picture.h>
 #include <vlc_fourcc.h>
-#include <vlc_cpu.h>
 #include <vlc_plugin.h>
 #include <vlc_codecs.h>
-#include <vlc_filter.h>
 
 #include <libavcodec/avcodec.h>
 #    define DXVA2API_USE_BITFIELDS
@@ -52,15 +50,11 @@
 
 #include "avcodec.h"
 #include "va.h"
-#include "../../video_chroma/copy.h"
 #include "../h264_nal.h"
 
 static int Open(vlc_va_t *, AVCodecContext *, enum PixelFormat,
                 const es_format_t *, picture_sys_t *p_sys);
 static void Close(vlc_va_t *, AVCodecContext *);
-
-static int  OpenConverter( vlc_object_t * );
-static void CloseConverter( vlc_object_t * );
 
 vlc_module_begin()
     set_description(N_("DirectX Video Acceleration (DXVA) 2.0"))
@@ -68,10 +62,6 @@ vlc_module_begin()
     set_category(CAT_INPUT)
     set_subcategory(SUBCAT_INPUT_VCODEC)
     set_callbacks(Open, Close)
-    add_submodule()
-        set_description( N_("DXA9 to I420,YV12,NV12") )
-        set_capability( "video filter2", 10 )
-        set_callbacks( OpenConverter, CloseConverter )
 vlc_module_end()
 
 #include <windows.h>
@@ -359,10 +349,6 @@ struct vlc_va_sys_t
     DXVA2_ConfigPictureDecode    cfg;
     IDirectXVideoDecoder         *decoder;
 
-    /* Option conversion */
-    D3DFORMAT                    output;
-    copy_cache_t                 surface_cache;
-
     /* */
     struct dxva_context hw;
 
@@ -442,112 +428,6 @@ ok:
     return VLC_SUCCESS;
 }
 
-static void DXA9_YV12(filter_t *p_filter, picture_t *src, picture_t *dst)
-{
-    copy_cache_t *p_copy_cache = (copy_cache_t*) p_filter->p_sys;
-
-    LPDIRECT3DSURFACE9 d3d = src->p_sys->surface;
-    D3DSURFACE_DESC desc;
-    if (FAILED( IDirect3DSurface9_GetDesc(d3d, &desc) ))
-        return;
-
-    /* */
-    D3DLOCKED_RECT lock;
-    if (FAILED(IDirect3DSurface9_LockRect(d3d, &lock, NULL, D3DLOCK_READONLY))) {
-        msg_Err(p_filter, "Failed to lock surface");
-        return;
-    }
-
-    if (dst->format.i_chroma == VLC_CODEC_I420) {
-        uint8_t *tmp = dst->p[1].p_pixels;
-        dst->p[1].p_pixels = dst->p[2].p_pixels;
-        dst->p[2].p_pixels = tmp;
-    }
-
-    if (desc.Format == MAKEFOURCC('Y','V','1','2') ||
-        desc.Format == MAKEFOURCC('I','M','C','3')) {
-        bool imc3 = desc.Format == MAKEFOURCC('I','M','C','3');
-        size_t chroma_pitch = imc3 ? lock.Pitch : (lock.Pitch / 2);
-
-        size_t pitch[3] = {
-            lock.Pitch,
-            chroma_pitch,
-            chroma_pitch,
-        };
-
-        uint8_t *plane[3] = {
-            (uint8_t*)lock.pBits,
-            (uint8_t*)lock.pBits + pitch[0] * src->format.i_height,
-            (uint8_t*)lock.pBits + pitch[0] * src->format.i_height
-                                 + pitch[1] * src->format.i_height / 2,
-        };
-
-        if (imc3) {
-            uint8_t *V = plane[1];
-            plane[1] = plane[2];
-            plane[2] = V;
-        }
-        CopyFromYv12(dst, plane, pitch, src->format.i_width, src->format.i_visible_height,
-                     p_copy_cache);
-    } else if (desc.Format == MAKEFOURCC('N','V','1','2')) {
-        uint8_t *plane[2] = {
-            lock.pBits,
-            (uint8_t*)lock.pBits + lock.Pitch * src->format.i_visible_height
-        };
-        size_t  pitch[2] = {
-            lock.Pitch,
-            lock.Pitch,
-        };
-        CopyFromNv12(dst, plane, pitch, src->format.i_width, src->format.i_visible_height,
-                     p_copy_cache);
-    } else {
-        msg_Err(p_filter, "Unsupported DXA9 conversion from 0x%08X to YV12", desc.Format);
-    }
-
-    if (dst->format.i_chroma == VLC_CODEC_I420) {
-        uint8_t *tmp = dst->p[1].p_pixels;
-        dst->p[1].p_pixels = dst->p[2].p_pixels;
-        dst->p[2].p_pixels = tmp;
-    }
-
-    /* */
-    IDirect3DSurface9_UnlockRect(d3d);
-}
-
-static void DXA9_NV12(filter_t *p_filter, picture_t *src, picture_t *dst)
-{
-    copy_cache_t *p_copy_cache = (copy_cache_t*) p_filter->p_sys;
-
-    LPDIRECT3DSURFACE9 d3d = src->p_sys->surface;
-    D3DSURFACE_DESC desc;
-    if (FAILED( IDirect3DSurface9_GetDesc(d3d, &desc) ))
-        return;
-
-    /* */
-    D3DLOCKED_RECT lock;
-    if (FAILED(IDirect3DSurface9_LockRect(d3d, &lock, NULL, D3DLOCK_READONLY))) {
-        msg_Err(p_filter, "Failed to lock surface");
-        return;
-    }
-
-    if (desc.Format == MAKEFOURCC('N','V','1','2')) {
-        uint8_t *plane[2] = {
-            lock.pBits,
-            (uint8_t*)lock.pBits + lock.Pitch * src->format.i_visible_height
-        };
-        size_t  pitch[2] = {
-            lock.Pitch,
-            lock.Pitch,
-        };
-        CopyFromNv12ToNv12(dst, plane, pitch, src->format.i_width, src->format.i_visible_height,
-                     p_copy_cache);
-    } else {
-        msg_Err(p_filter, "Unsupported DXA9 conversion from 0x%08X to NV12", desc.Format);
-    }
-
-    /* */
-    IDirect3DSurface9_UnlockRect(d3d);
-}
 
 static int Extract(vlc_va_t *va, picture_t *picture, uint8_t *data)
 {
@@ -1255,43 +1135,3 @@ static int DxResetVideoDecoder(vlc_va_t *va)
     return VLC_EGENERIC;
 }
 
-VIDEO_FILTER_WRAPPER (DXA9_YV12)
-VIDEO_FILTER_WRAPPER (DXA9_NV12)
-
-static int OpenConverter( vlc_object_t *obj )
-{
-    filter_t *p_filter = (filter_t *)obj;
-    if ( p_filter->fmt_in.video.i_chroma != VLC_CODEC_D3D9_OPAQUE )
-        return VLC_EGENERIC;
-
-    if ( p_filter->fmt_in.video.i_height != p_filter->fmt_out.video.i_height
-         || p_filter->fmt_in.video.i_width != p_filter->fmt_out.video.i_width )
-        return VLC_EGENERIC;
-
-    switch( p_filter->fmt_out.video.i_chroma ) {
-    case VLC_CODEC_I420:
-    case VLC_CODEC_YV12:
-        p_filter->pf_video_filter = DXA9_YV12_Filter;
-        break;
-    case VLC_CODEC_NV12:
-        p_filter->pf_video_filter = DXA9_NV12_Filter;
-        break;
-    default:
-        return VLC_EGENERIC;
-    }
-
-    copy_cache_t *p_copy_cache = calloc(1, sizeof(*p_copy_cache));
-    CopyInitCache(p_copy_cache, p_filter->fmt_in.video.i_width );
-    p_filter->p_sys = (filter_sys_t*) p_copy_cache;
-
-    return VLC_SUCCESS;
-}
-
-static void CloseConverter( vlc_object_t *obj )
-{
-    filter_t *p_filter = (filter_t *)obj;
-    copy_cache_t *p_copy_cache = (copy_cache_t*) p_filter->p_sys;
-    CopyCleanCache(p_copy_cache);
-    free( p_copy_cache );
-    p_filter->p_sys = NULL;
-}

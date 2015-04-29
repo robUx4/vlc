@@ -341,7 +341,6 @@ endif
 endif
 
 libdxva2_plugin_la_SOURCES = \
-	video_chroma/copy.c video_chroma/copy.h \
 	codec/avcodec/dxva2.c codec/h264_nal.c codec/h264_nal.h \
 	../src/win32/direct3d9_pool.c ../src/win32/direct3d9_pool.h
 libdxva2_plugin_la_LIBADD = -lole32 -lshlwapi -luuid
