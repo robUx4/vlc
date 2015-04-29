@@ -62,7 +62,6 @@ static bool GetLock(filter_t *p_filter, LPDIRECT3DSURFACE9 d3d,
         return false;
 
     /* */
-    D3DLOCKED_RECT lock;
     if (FAILED(IDirect3DSurface9_LockRect(d3d, p_lock, NULL, D3DLOCK_READONLY))) {
         msg_Err(p_filter, "Failed to lock surface");
         return false;

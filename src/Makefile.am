@@ -301,7 +301,7 @@ SOURCES_libvlc_win32 = \
 	win32/rand.c \
 	$(NULL)
 
-if HAVE_DIRECTX
+if HAVE_AVCODEC_DXVA2
 if !HAVE_WINSTORE
 SOURCES_libvlc_win32 += \
         win32/direct3d9_pool.c \

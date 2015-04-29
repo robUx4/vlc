@@ -102,8 +102,8 @@ endif
 libdxa9_plugin_la_SOURCES = video_chroma/dxa9.c \
 	video_chroma/copy.c video_chroma/copy.h
 
-#if HAVE_AVCODEC_DXVA2
+if HAVE_AVCODEC_DXVA2
 chroma_LTLIBRARIES += \
 	libdxa9_plugin.la
-#endif
+endif
 
