@@ -37,13 +37,15 @@
 #include <vlc_block_helper.h>
 #include <vlc_cpu.h>
 
-#include "../h264_nal.h"
-#include "../hevc_nal.h"
+#include "../../packetizer/h264_nal.h"
+#include "../../packetizer/hevc_nal.h"
 #include <OMX_Core.h>
 #include <OMX_Component.h>
 #include "omxil_utils.h"
 #include "android_opaque.h"
 #include "../../video_output/android/android_window.h"
+
+#define BUFFER_FLAG_CODEC_CONFIG  2
 
 #define INFO_OUTPUT_BUFFERS_CHANGED -3
 #define INFO_OUTPUT_FORMAT_CHANGED  -2
@@ -142,13 +144,23 @@ struct decoder_sys_t
     int stride, slice_height;
     char *name;
 
-    void *p_extra_buffer;
-    size_t i_extra_buffer;
+    /* "csd-0" buffer */
+    void *p_csd0_buffer;
+    size_t i_csd0_buffer;
+    /* or buffer sent via BUFFER_FLAG_CODEC_CONFIG flag */
+    uint8_t *p_config_buffer;
+    size_t i_config_buffer;
+    bool b_config_resend;
+
+    bool b_update_format;
+    int i_width;
+    int i_height;
 
     bool allocated;
     bool started;
     bool decoded;
     bool error_state;
+    bool b_new_block;
 
     ArchitectureSpecificCopyData architecture_specific_data;
 
@@ -255,8 +267,6 @@ static const struct member members[] = {
     { NULL, NULL, NULL, 0, 0, false },
 };
 
-#define GET_INTEGER(obj, name) (*env)->CallIntMethod(env, obj, jfields.get_integer, (*env)->NewStringUTF(env, name))
-
 /*****************************************************************************
  * Local prototypes
  *****************************************************************************/
@@ -288,6 +298,16 @@ vlc_module_begin ()
              DIRECTRENDERING_TEXT, DIRECTRENDERING_LONGTEXT, true)
     set_callbacks( OpenDecoder, CloseDecoder )
 vlc_module_end ()
+
+static inline int get_integer(JNIEnv *env, jobject obj, const char *psz_name)
+{
+    int i_ret;
+    jstring jname = (*env)->NewStringUTF(env, psz_name);
+    i_ret = (*env)->CallIntMethod(env, obj, jfields.get_integer, jname);
+    (*env)->DeleteLocalRef(env, jname);
+    return i_ret;
+}
+#define GET_INTEGER(obj, name) get_integer(env, obj, name)
 
 static int jstrcmp(JNIEnv* env, jobject str, const char* str2)
 {
@@ -388,36 +408,49 @@ end:
     return ret;
 }
 
-/*****************************************************************************
- * OpenMediaCodec: Create the mediacodec instance
- *****************************************************************************/
-static int OpenMediaCodec(decoder_t *p_dec, JNIEnv *env)
+static int H264GetSPSPPS(uint8_t *p_buf, size_t i_buf,
+                         uint8_t **pp_sps_buf, size_t *p_sps_size,
+                         uint8_t **pp_pps_buf, size_t *p_pps_size,
+                         struct nal_sps *p_sps)
+{
+    uint8_t *p_sps_buf, *p_pps_buf;
+    size_t i_sps_size, i_pps_size;
+
+    if (h264_get_spspps(p_buf, i_buf, &p_sps_buf, &i_sps_size,
+                        &p_pps_buf, &i_pps_size) == 0)
+    {
+        if (pp_sps_buf && p_sps_size )
+        {
+            *pp_sps_buf = p_sps_buf;
+            *p_sps_size = i_sps_size;
+        }
+        if (pp_pps_buf && p_pps_size )
+        {
+            *pp_pps_buf = p_pps_buf;
+            *p_pps_size = i_pps_size;
+        }
+        return h264_parse_sps(p_sps_buf, i_sps_size, p_sps);
+    } else
+        return -1;
+}
+
+static jstring GetMediaCodecName(decoder_t *p_dec, JNIEnv *env,
+                                 const char *mime, jstring jmime)
 {
     decoder_sys_t *p_sys = p_dec->p_sys;
-    const char *mime = NULL;
+    int num_codecs;
     size_t fmt_profile = 0;
-
-    switch (p_dec->fmt_in.i_codec) {
-    case VLC_CODEC_HEVC: mime = "video/hevc"; break;
-    case VLC_CODEC_H264: mime = "video/avc"; break;
-    case VLC_CODEC_H263: mime = "video/3gpp"; break;
-    case VLC_CODEC_MP4V: mime = "video/mp4v-es"; break;
-    case VLC_CODEC_WMV3: mime = "video/x-ms-wmv"; break;
-    case VLC_CODEC_VC1:  mime = "video/wvc1"; break;
-    case VLC_CODEC_VP8:  mime = "video/x-vnd.on2.vp8"; break;
-    case VLC_CODEC_VP9:  mime = "video/x-vnd.on2.vp9"; break;
-    default:
-        vlc_assert_unreachable();
-    }
+    jstring jcodec_name = NULL;
 
     if (p_dec->fmt_in.i_codec == VLC_CODEC_H264)
         h264_get_profile_level(&p_dec->fmt_in, &fmt_profile, NULL, NULL);
 
-    int num_codecs = (*env)->CallStaticIntMethod(env, jfields.media_codec_list_class,
-                                                 jfields.get_codec_count);
-    jobject codec_name = NULL;
+    num_codecs = (*env)->CallStaticIntMethod(env,
+                                             jfields.media_codec_list_class,
+                                             jfields.get_codec_count);
 
-    for (int i = 0; i < num_codecs; i++) {
+    for (int i = 0; i < num_codecs; i++)
+    {
         jobject codec_capabilities = NULL;
         jobject profile_levels = NULL;
         jobject info = NULL;
@@ -441,8 +474,9 @@ static int OpenMediaCodec(decoder_t *p_dec, JNIEnv *env)
         if ((*env)->CallBooleanMethod(env, info, jfields.is_encoder))
             goto loopclean;
 
-        codec_capabilities = (*env)->CallObjectMethod(env, info, jfields.get_capabilities_for_type,
-                                                      (*env)->NewStringUTF(env, mime));
+        codec_capabilities = (*env)->CallObjectMethod(env, info,
+                                                      jfields.get_capabilities_for_type,
+                                                      jmime);
         if (CHECK_EXCEPTION()) {
             msg_Warn(p_dec, "Exception occurred in MediaCodecInfo.getCapabilitiesForType");
             goto loopclean;
@@ -492,11 +526,15 @@ static int OpenMediaCodec(decoder_t *p_dec, JNIEnv *env)
             p_sys->name = malloc(name_len + 1);
             memcpy(p_sys->name, name_ptr, name_len);
             p_sys->name[name_len] = '\0';
-            codec_name = name;
+            jcodec_name = name;
         }
 loopclean:
         if (name)
+        {
             (*env)->ReleaseStringUTFChars(env, name, name_ptr);
+            if (jcodec_name != name)
+                (*env)->DeleteLocalRef(env, name);
+        }
         if (profile_levels)
             (*env)->DeleteLocalRef(env, profile_levels);
         if (types)
@@ -508,8 +546,47 @@ loopclean:
         if (found)
             break;
     }
+    return jcodec_name;
+}
 
-    if (!codec_name) {
+/*****************************************************************************
+ * OpenMediaCodec: Create the mediacodec instance
+ *****************************************************************************/
+static int OpenMediaCodec(decoder_t *p_dec, JNIEnv *env)
+{
+    decoder_sys_t *p_sys = p_dec->p_sys;
+    const char *mime = NULL;
+    int i_ret = VLC_EGENERIC;
+    jstring jmime = NULL;
+    jstring jcodec_name = NULL;
+    jobject jcodec = NULL;
+    jobject jcsd0_buffer = NULL;
+    jstring jcsd0_string = NULL;
+    jobject jformat = NULL;
+    jstring jrotation_string = NULL;
+    jobject jinput_buffers = NULL;
+    jobject joutput_buffers = NULL;
+    jobject jbuffer_info = NULL;
+
+    switch (p_dec->fmt_in.i_codec) {
+    case VLC_CODEC_HEVC: mime = "video/hevc"; break;
+    case VLC_CODEC_H264: mime = "video/avc"; break;
+    case VLC_CODEC_H263: mime = "video/3gpp"; break;
+    case VLC_CODEC_MP4V: mime = "video/mp4v-es"; break;
+    case VLC_CODEC_WMV3: mime = "video/x-ms-wmv"; break;
+    case VLC_CODEC_VC1:  mime = "video/wvc1"; break;
+    case VLC_CODEC_VP8:  mime = "video/x-vnd.on2.vp8"; break;
+    case VLC_CODEC_VP9:  mime = "video/x-vnd.on2.vp9"; break;
+    default:
+        vlc_assert_unreachable();
+    }
+
+    jmime = (*env)->NewStringUTF(env, mime);
+    if (!jmime)
+        return VLC_EGENERIC;
+
+    jcodec_name = GetMediaCodecName(p_dec, env, mime, jmime);
+    if (!jcodec_name) {
         msg_Dbg(p_dec, "No suitable codec matching %s was found", mime);
         goto error;
     }
@@ -517,63 +594,86 @@ loopclean:
     // This method doesn't handle errors nicely, it crashes if the codec isn't found.
     // (The same goes for createDecoderByType.) This is fixed in latest AOSP and in 4.2,
     // but not in 4.1 devices.
-    p_sys->codec = (*env)->CallStaticObjectMethod(env, jfields.media_codec_class,
-                                                  jfields.create_by_codec_name, codec_name);
+    jcodec = (*env)->CallStaticObjectMethod(env, jfields.media_codec_class,
+                                            jfields.create_by_codec_name,
+                                            jcodec_name);
     if (CHECK_EXCEPTION()) {
         msg_Warn(p_dec, "Exception occurred in MediaCodec.createByCodecName.");
         goto error;
     }
     p_sys->allocated = true;
-    p_sys->codec = (*env)->NewGlobalRef(env, p_sys->codec);
+    p_sys->codec = (*env)->NewGlobalRef(env, jcodec);
 
-    jobject format = (*env)->CallStaticObjectMethod(env, jfields.media_format_class,
-                         jfields.create_video_format, (*env)->NewStringUTF(env, mime),
-                         p_dec->fmt_in.video.i_width, p_dec->fmt_in.video.i_height);
-
-    if (p_dec->fmt_in.i_extra && !p_sys->p_extra_buffer) {
+    /* Either we use a "csd-0" buffer that is provided before codec
+     * initialisation via the MediaFormat class, or use a CODEC_CONFIG buffer
+     * that can be provided during playback (and must be provided after a flush
+     * and a start). */
+    if (p_dec->fmt_in.i_extra && !p_sys->p_config_buffer) {
         uint32_t size = p_dec->fmt_in.i_extra;
         int buf_size = p_dec->fmt_in.i_extra + 20;
 
-        /* Don't free p_extra_buffer until Format use it, so until MediaCodec
+        /* Don't free p_csd0_buffer until Format use it, so until MediaCodec
          * is closed */
-        p_sys->p_extra_buffer = malloc(buf_size);
-        if (!p_sys->p_extra_buffer)
+        p_sys->p_csd0_buffer = malloc(buf_size);
+        if (!p_sys->p_csd0_buffer)
         {
             msg_Warn(p_dec, "extra buffer allocation failed");
             goto error;
         }
         if (p_dec->fmt_in.i_codec == VLC_CODEC_H264 && ((uint8_t*)p_dec->fmt_in.p_extra)[0] == 1) {
             convert_sps_pps(p_dec, p_dec->fmt_in.p_extra, p_dec->fmt_in.i_extra,
-                            p_sys->p_extra_buffer, buf_size,
+                            p_sys->p_csd0_buffer, buf_size,
                             &size, &p_sys->nal_size);
         } else if (p_dec->fmt_in.i_codec == VLC_CODEC_HEVC) {
             convert_hevc_nal_units(p_dec, p_dec->fmt_in.p_extra,
                                    p_dec->fmt_in.i_extra,
-                                   p_sys->p_extra_buffer, buf_size,
+                                   p_sys->p_csd0_buffer, buf_size,
                                    &size, &p_sys->nal_size);
         } else {
-            memcpy(p_sys->p_extra_buffer, p_dec->fmt_in.p_extra, size);
+            memcpy(p_sys->p_csd0_buffer, p_dec->fmt_in.p_extra, size);
         }
-        p_sys->i_extra_buffer = size;
-    }
-    if (p_sys->p_extra_buffer)
-    {
-        jobject jextra_buffer;
+        p_sys->i_csd0_buffer = size;
 
-        jextra_buffer = (*env)->NewDirectByteBuffer( env,
-                                                     p_sys->p_extra_buffer,
-                                                     p_sys->i_extra_buffer);
-        if (CHECK_EXCEPTION() || !jextra_buffer)
+        if (p_dec->fmt_in.i_codec == VLC_CODEC_H264)
+        {
+            struct nal_sps sps;
+
+            if (H264GetSPSPPS(p_sys->p_csd0_buffer, p_sys->i_csd0_buffer,
+                              NULL, NULL, NULL, NULL, &sps) == 0)
+            {
+                msg_Warn(p_dec, "SPS found, id: %d size: %dx%d (vs %dx%d)",
+                         sps.i_id, sps.i_width, sps.i_height,
+                         p_sys->i_width, p_sys->i_height);
+                p_sys->i_width = sps.i_width;
+                p_sys->i_height = sps.i_height;
+            }
+        }
+    }
+
+    if (!p_sys->i_width && !p_sys->i_height)
+    {
+        msg_Err(p_dec, "invalid size, abort MediaCodec");
+        goto error;
+    }
+    jformat = (*env)->CallStaticObjectMethod(env, jfields.media_format_class,
+                                             jfields.create_video_format, jmime,
+                                             p_sys->i_width, p_sys->i_height);
+
+    if (p_sys->p_csd0_buffer)
+    {
+        jcsd0_buffer = (*env)->NewDirectByteBuffer( env,
+                                                    p_sys->p_csd0_buffer,
+                                                    p_sys->i_csd0_buffer);
+        if (CHECK_EXCEPTION() || !jcsd0_buffer)
         {
             msg_Warn(p_dec, "java extra buffer allocation failed");
-            free(p_sys->p_extra_buffer);
-            p_sys->p_extra_buffer = NULL;
+            free(p_sys->p_csd0_buffer);
+            p_sys->p_csd0_buffer = NULL;
             goto error;
         }
-        (*env)->CallVoidMethod(env, format, jfields.set_bytebuffer,
-                               (*env)->NewStringUTF(env, "csd-0"),
-                               jextra_buffer);
-        (*env)->DeleteLocalRef(env, jextra_buffer);
+        jcsd0_string = (*env)->NewStringUTF(env, "csd-0");
+        (*env)->CallVoidMethod(env, jformat, jfields.set_bytebuffer,
+                               jcsd0_string, jcsd0_buffer);
     }
 
     p_sys->direct_rendering = var_InheritBool(p_dec, CFG_PREFIX "dr");
@@ -605,15 +705,16 @@ loopclean:
                 default:
                     i_angle = 0;
             }
-            (*env)->CallVoidMethod(env, format, jfields.set_integer,
-                                   (*env)->NewStringUTF(env, "rotation-degrees"),
-                                   i_angle);
+            jrotation_string = (*env)->NewStringUTF(env, "rotation-degrees");
+            (*env)->CallVoidMethod(env, jformat, jfields.set_integer,
+                                   jrotation_string, i_angle);
         }
 
         jobject surf = jni_LockAndGetAndroidJavaSurface();
         if (surf) {
             // Configure MediaCodec with the Android surface.
-            (*env)->CallVoidMethod(env, p_sys->codec, jfields.configure, format, surf, NULL, 0);
+            (*env)->CallVoidMethod(env, p_sys->codec, jfields.configure,
+                                   jformat, surf, NULL, 0);
             if (CHECK_EXCEPTION()) {
                 msg_Warn(p_dec, "Exception occurred in MediaCodec.configure with an output surface.");
                 jni_UnlockAndroidSurface();
@@ -627,7 +728,8 @@ loopclean:
         }
     }
     if (!p_sys->direct_rendering) {
-        (*env)->CallVoidMethod(env, p_sys->codec, jfields.configure, format, NULL, NULL, 0);
+        (*env)->CallVoidMethod(env, p_sys->codec, jfields.configure,
+                               jformat, NULL, NULL, 0);
         if (CHECK_EXCEPTION()) {
             msg_Warn(p_dec, "Exception occurred in MediaCodec.configure");
             goto error;
@@ -642,28 +744,55 @@ loopclean:
     p_sys->started = true;
 
     if (jfields.get_input_buffers && jfields.get_output_buffers) {
-        p_sys->input_buffers = (*env)->CallObjectMethod(env, p_sys->codec, jfields.get_input_buffers);
+
+        jinput_buffers = (*env)->CallObjectMethod(env, p_sys->codec,
+                                                  jfields.get_input_buffers);
         if (CHECK_EXCEPTION()) {
             msg_Err(p_dec, "Exception in MediaCodec.getInputBuffers (OpenDecoder)");
             goto error;
         }
-        p_sys->output_buffers = (*env)->CallObjectMethod(env, p_sys->codec, jfields.get_output_buffers);
+        p_sys->input_buffers = (*env)->NewGlobalRef(env, jinput_buffers);
+
+        joutput_buffers = (*env)->CallObjectMethod(env, p_sys->codec,
+                                                   jfields.get_output_buffers);
         if (CHECK_EXCEPTION()) {
             msg_Err(p_dec, "Exception in MediaCodec.getOutputBuffers (OpenDecoder)");
             goto error;
         }
-        p_sys->input_buffers = (*env)->NewGlobalRef(env, p_sys->input_buffers);
-        p_sys->output_buffers = (*env)->NewGlobalRef(env, p_sys->output_buffers);
+        p_sys->output_buffers = (*env)->NewGlobalRef(env, joutput_buffers);
     }
-    p_sys->buffer_info = (*env)->NewObject(env, jfields.buffer_info_class, jfields.buffer_info_ctor);
-    p_sys->buffer_info = (*env)->NewGlobalRef(env, p_sys->buffer_info);
-    (*env)->DeleteLocalRef(env, format);
+    jbuffer_info = (*env)->NewObject(env, jfields.buffer_info_class,
+                                     jfields.buffer_info_ctor);
+    p_sys->buffer_info = (*env)->NewGlobalRef(env, jbuffer_info);
+    p_sys->b_update_format = true;
 
-    return VLC_SUCCESS;
+    i_ret = VLC_SUCCESS;
 
- error:
-    CloseMediaCodec(p_dec, env);
-    return VLC_EGENERIC;
+error:
+    if (jmime)
+        (*env)->DeleteLocalRef(env, jmime);
+    if (jcodec_name)
+        (*env)->DeleteLocalRef(env, jcodec_name);
+    if (jcodec)
+        (*env)->DeleteLocalRef(env, jcodec);
+    if (jcsd0_buffer)
+        (*env)->DeleteLocalRef(env, jcsd0_buffer);
+    if (jcsd0_string)
+        (*env)->DeleteLocalRef(env, jcsd0_string);
+    if (jformat)
+        (*env)->DeleteLocalRef(env, jformat);
+    if (jrotation_string)
+        (*env)->DeleteLocalRef(env, jrotation_string);
+    if (jinput_buffers)
+        (*env)->DeleteLocalRef(env, jinput_buffers);
+    if (joutput_buffers)
+        (*env)->DeleteLocalRef(env, joutput_buffers);
+    if (jbuffer_info)
+        (*env)->DeleteLocalRef(env, jbuffer_info);
+
+    if (i_ret != VLC_SUCCESS)
+        CloseMediaCodec(p_dec, env);
+    return i_ret;
 }
 
 /*****************************************************************************
@@ -731,6 +860,8 @@ static int OpenDecoder(vlc_object_t *p_this)
 
     switch (p_dec->fmt_in.i_codec) {
     case VLC_CODEC_H264:
+        /* We can handle h264 without a valid video size */
+        break;
     case VLC_CODEC_HEVC:
     case VLC_CODEC_H263:
     case VLC_CODEC_MP4V:
@@ -764,12 +895,24 @@ static int OpenDecoder(vlc_object_t *p_this)
     p_dec->fmt_out.audio = p_dec->fmt_in.audio;
     p_dec->b_need_packetized = true;
 
+    p_dec->p_sys->i_width = p_dec->fmt_in.video.i_width;
+    p_dec->p_sys->i_height = p_dec->fmt_in.video.i_height;
+
     p_dec->p_sys->timestamp_fifo = timestamp_FifoNew(32);
     if (!p_dec->p_sys->timestamp_fifo)
         goto error;
 
+    p_dec->p_sys->b_new_block = true;
+
     switch (p_dec->fmt_in.i_codec)
     {
+    case VLC_CODEC_H264:
+        if (!p_dec->p_sys->i_width || !p_dec->p_sys->i_height)
+        {
+            msg_Warn(p_dec, "waiting for sps/pps for codec %4.4s",
+                     (const char *)&p_dec->fmt_in.i_codec);
+            return VLC_SUCCESS;
+        }
     case VLC_CODEC_VC1:
         if (!p_dec->fmt_in.i_extra)
         {
@@ -803,7 +946,8 @@ static void CloseDecoder(vlc_object_t *p_this)
     else
         msg_Warn(p_dec, "Can't get a JNIEnv, can't close mediacodec !");
 
-    free(p_sys->p_extra_buffer);
+    free(p_sys->p_csd0_buffer);
+    free(p_sys->p_config_buffer);
     free(p_sys->name);
     ArchitectureSpecificCopyHooksDestroy(p_sys->pixel_format, &p_sys->architecture_specific_data);
     free(p_sys->pp_inflight_pictures);
@@ -900,10 +1044,12 @@ static int PutInput(decoder_t *p_dec, JNIEnv *env, block_t *p_block, jlong timeo
 {
     decoder_sys_t *p_sys = p_dec->p_sys;
     int index;
-    jobject buf;
-    jsize size;
-    uint8_t *bufptr;
-    struct H264ConvertState convert_state = { 0, 0 };
+    int64_t ts = 0;
+    uint8_t *p_mc_buf, *p_buf;
+    size_t i_buf;
+    jobject j_mc_buf;
+    jsize j_mc_size;
+    jint j_flags = 0;
 
     index = (*env)->CallIntMethod(env, p_sys->codec,
                                   jfields.dequeue_input_buffer, timeout);
@@ -914,37 +1060,61 @@ static int PutInput(decoder_t *p_dec, JNIEnv *env, block_t *p_block, jlong timeo
     if (index < 0)
         return 0;
 
+    if (p_sys->b_config_resend)
+    {
+        p_buf = p_sys->p_config_buffer;
+        i_buf = p_sys->i_config_buffer;
+        j_flags = BUFFER_FLAG_CODEC_CONFIG;
+        msg_Dbg(p_dec, "sending codec specific data of size %d "
+                       "via BUFFER_FLAG_CODEC_CONFIG flag", i_buf);
+    } else
+    {
+        p_buf = p_block->p_buffer;
+        i_buf = p_block->i_buffer;
+    }
+
     if (jfields.get_input_buffers)
-        buf = (*env)->GetObjectArrayElement(env, p_sys->input_buffers, index);
+        j_mc_buf = (*env)->GetObjectArrayElement(env, p_sys->input_buffers,
+                                                 index);
     else
-        buf = (*env)->CallObjectMethod(env, p_sys->codec, jfields.get_input_buffer, index);
-    size = (*env)->GetDirectBufferCapacity(env, buf);
-    bufptr = (*env)->GetDirectBufferAddress(env, buf);
-    if (size < 0) {
+        j_mc_buf = (*env)->CallObjectMethod(env, p_sys->codec,
+                                            jfields.get_input_buffer, index);
+    j_mc_size = (*env)->GetDirectBufferCapacity(env, j_mc_buf);
+    p_mc_buf = (*env)->GetDirectBufferAddress(env, j_mc_buf);
+    if (j_mc_size < 0) {
         msg_Err(p_dec, "Java buffer has invalid size");
+        (*env)->DeleteLocalRef(env, j_mc_buf);
         return -1;
     }
-    if ((size_t) size > p_block->i_buffer)
-        size = p_block->i_buffer;
-    memcpy(bufptr, p_block->p_buffer, size);
+    if ((size_t) j_mc_size > i_buf)
+        j_mc_size = i_buf;
+    memcpy(p_mc_buf, p_buf, j_mc_size);
 
-    convert_h264_to_annexb(bufptr, size, p_sys->nal_size, &convert_state);
-
-    int64_t ts = p_block->i_pts;
-    if (!ts && p_block->i_dts)
-        ts = p_block->i_dts;
-    if (p_block->i_flags & BLOCK_FLAG_PREROLL )
-        p_sys->i_preroll_end = ts;
-    timestamp_FifoPut(p_sys->timestamp_fifo, p_block->i_pts ? VLC_TS_INVALID : p_block->i_dts);
-    (*env)->CallVoidMethod(env, p_sys->codec, jfields.queue_input_buffer, index, 0, size, ts, 0);
-    (*env)->DeleteLocalRef(env, buf);
+    if (!p_sys->b_config_resend)
+    {
+        ts = p_block->i_pts;
+        if (!ts && p_block->i_dts)
+            ts = p_block->i_dts;
+        if (p_block->i_flags & BLOCK_FLAG_PREROLL )
+            p_sys->i_preroll_end = ts;
+        timestamp_FifoPut(p_sys->timestamp_fifo,
+                          p_block->i_pts ? VLC_TS_INVALID : p_block->i_dts);
+    }
+    (*env)->CallVoidMethod(env, p_sys->codec, jfields.queue_input_buffer,
+                           index, 0, j_mc_size, ts, j_flags);
+    (*env)->DeleteLocalRef(env, j_mc_buf);
     if (CHECK_EXCEPTION()) {
         msg_Err(p_dec, "Exception in MediaCodec.queueInputBuffer");
         return -1;
     }
     p_sys->decoded = true;
 
-    return 1;
+    if (p_sys->b_config_resend)
+    {
+        p_sys->b_config_resend = false;
+        return 0; /* 0 since the p_block is not processed */
+    } else
+        return 1;
 }
 
 static int GetOutput(decoder_t *p_dec, JNIEnv *env, picture_t *p_pic, jlong timeout)
@@ -1027,31 +1197,39 @@ static int GetOutput(decoder_t *p_dec, JNIEnv *env, picture_t *p_pic, jlong time
         }
         return 1;
     } else if (index == INFO_OUTPUT_BUFFERS_CHANGED) {
+        jobject joutput_buffers;
+
         msg_Dbg(p_dec, "output buffers changed");
         if (!jfields.get_output_buffers)
             return 0;
         (*env)->DeleteGlobalRef(env, p_sys->output_buffers);
 
-        p_sys->output_buffers = (*env)->CallObjectMethod(env, p_sys->codec,
-                                                         jfields.get_output_buffers);
+        joutput_buffers = (*env)->CallObjectMethod(env, p_sys->codec,
+                                                   jfields.get_output_buffers);
         if (CHECK_EXCEPTION()) {
             msg_Err(p_dec, "Exception in MediaCodec.getOutputBuffer (GetOutput)");
             p_sys->output_buffers = NULL;
             return -1;
         }
-
-        p_sys->output_buffers = (*env)->NewGlobalRef(env, p_sys->output_buffers);
+        p_sys->output_buffers = (*env)->NewGlobalRef(env, joutput_buffers);
+        (*env)->DeleteLocalRef(env, joutput_buffers);
     } else if (index == INFO_OUTPUT_FORMAT_CHANGED) {
-        jobject format = (*env)->CallObjectMethod(env, p_sys->codec, jfields.get_output_format);
+        jobject format = NULL;
+        jobject format_string = NULL;
+        jsize format_len;
+        const char *format_ptr;
+
+        format = (*env)->CallObjectMethod(env, p_sys->codec,
+                                          jfields.get_output_format);
         if (CHECK_EXCEPTION()) {
             msg_Err(p_dec, "Exception in MediaCodec.getOutputFormat (GetOutput)");
             return -1;
         }
 
-        jobject format_string = (*env)->CallObjectMethod(env, format, jfields.tostring);
+        format_string = (*env)->CallObjectMethod(env, format, jfields.tostring);
 
-        jsize format_len = (*env)->GetStringUTFLength(env, format_string);
-        const char *format_ptr = (*env)->GetStringUTFChars(env, format_string, NULL);
+        format_len = (*env)->GetStringUTFLength(env, format_string);
+        format_ptr = (*env)->GetStringUTFChars(env, format_string, NULL);
         msg_Dbg(p_dec, "output format changed: %.*s", format_len, format_ptr);
         (*env)->ReleaseStringUTFChars(env, format_string, format_ptr);
 
@@ -1066,6 +1244,7 @@ static int GetOutput(decoder_t *p_dec, JNIEnv *env, picture_t *p_pic, jlong time
         int crop_top        = GET_INTEGER(format, "crop-top");
         int crop_right      = GET_INTEGER(format, "crop-right");
         int crop_bottom     = GET_INTEGER(format, "crop-bottom");
+        (*env)->DeleteLocalRef(env, format);
 
         const char *name = "unknown";
         if (!p_sys->direct_rendering) {
@@ -1103,8 +1282,104 @@ static int GetOutput(decoder_t *p_dec, JNIEnv *env, picture_t *p_pic, jlong time
             p_sys->slice_height = 0;
             p_sys->stride = p_dec->fmt_out.video.i_width;
         }
+        p_sys->b_update_format = true;
     }
     return 0;
+}
+
+static bool spsppscmp(decoder_t *p_dec, uint8_t *p_sps_buf, size_t i_sps_size,
+                      uint8_t *p_pps_buf, size_t i_pps_size)
+{
+    decoder_sys_t *p_sys = p_dec->p_sys;
+
+    if (p_sys->i_config_buffer != i_sps_size + i_pps_size)
+        return false;
+    if (p_sps_buf && memcmp(p_sys->p_config_buffer, p_sps_buf, i_sps_size) != 0)
+        return false;
+    if (p_pps_buf && memcmp(p_sys->p_config_buffer + i_sps_size,
+                            p_pps_buf, i_pps_size) != 0)
+        return false;
+    return true;
+}
+
+static void H264ProcessBlock(decoder_t *p_dec, JNIEnv *env, block_t *p_block,
+                             bool *p_delayed_open)
+{
+    decoder_sys_t *p_sys = p_dec->p_sys;
+    uint8_t *p_sps_buf, *p_pps_buf;
+    size_t i_sps_size, i_pps_size;
+    struct nal_sps sps;
+    struct H264ConvertState convert_state = { 0, 0 };
+
+    assert(p_dec->fmt_in.i_codec == VLC_CODEC_H264 && p_block);
+
+    if (p_sys->p_csd0_buffer)
+    {
+        convert_h264_to_annexb(p_block->p_buffer, p_block->i_buffer,
+                               p_sys->nal_size, &convert_state);
+    } else if (H264GetSPSPPS(p_block->p_buffer, p_block->i_buffer,
+                             &p_sps_buf, &i_sps_size,
+                             &p_pps_buf, &i_pps_size, &sps) == 0
+        && sps.i_width && sps.i_height
+        && !spsppscmp(p_dec, p_sps_buf, i_sps_size, p_pps_buf, i_pps_size))
+    {
+        void *p_config_buffer;
+
+        msg_Warn(p_dec, "New SPS/PPS found, id: %d size: %dx%d (vs %dx%d) %d %d",
+                 sps.i_id, sps.i_width, sps.i_height,
+                 p_sys->i_width, p_sys->i_height,
+                 i_sps_size, i_pps_size);
+
+        if (p_sys->codec && (sps.i_width != p_sys->i_width ||
+                             sps.i_height != p_sys->i_height))
+        {
+            msg_Err(p_dec, "SPS/PPS changed during the stream and "
+                    "MediaCodec configured with a different video size. "
+                    "Restart it !");
+            CloseMediaCodec(p_dec, env);
+        }
+        if (!p_sys->codec)
+            *p_delayed_open = true;
+
+        p_config_buffer = realloc(p_sys->p_config_buffer,
+                                  i_sps_size + i_pps_size);
+        if (!p_config_buffer)
+            free(p_sys->p_config_buffer);
+        p_sys->p_config_buffer = p_config_buffer;
+
+        if (p_sys->p_config_buffer)
+        {
+            if (p_sps_buf && i_sps_size)
+                memcpy(p_sys->p_config_buffer, p_sps_buf, i_sps_size);
+            if (p_pps_buf && i_pps_size)
+                memcpy(p_sys->p_config_buffer + i_sps_size,
+                       p_pps_buf, i_pps_size);
+            p_sys->i_config_buffer = i_sps_size + i_pps_size;
+            p_sys->b_config_resend = true;
+        }
+
+        p_sys->i_width = sps.i_width;
+        p_sys->i_height = sps.i_height;
+    }
+}
+
+static void HEVCProcessBlock(decoder_t *p_dec, JNIEnv *env, block_t *p_block,
+                             bool *p_delayed_open)
+{
+    decoder_sys_t *p_sys = p_dec->p_sys;
+    struct H264ConvertState convert_state = { 0, 0 };
+
+    assert(p_dec->fmt_in.i_codec == VLC_CODEC_HEVC && p_block);
+
+    if (p_sys->p_csd0_buffer)
+    {
+        convert_h264_to_annexb(p_block->p_buffer, p_block->i_buffer,
+                               p_sys->nal_size, &convert_state);
+    }
+
+    /* TODO */
+    VLC_UNUSED(env);
+    VLC_UNUSED(p_delayed_open);
 }
 
 static picture_t *DecodeVideo(decoder_t *p_dec, block_t **pp_block)
@@ -1118,9 +1393,19 @@ static picture_t *DecodeVideo(decoder_t *p_dec, block_t **pp_block)
     int i_output_ret = 0;
     int i_input_ret = 0;
     bool b_error = false;
+    bool b_delayed_open = false;
+    bool b_new_block = p_block ? p_sys->b_new_block : false;
 
     if (p_sys->error_state)
         goto endclean;
+
+    /* Allow interlaced picture only after API 21 */
+    if (p_block && p_block->i_flags & BLOCK_FLAG_INTERLACED_MASK
+        && !(jfields.get_input_buffer && jfields.get_output_buffer))
+    {
+        b_error = true;
+        goto endclean;
+    }
 
     if (!(env = jni_get_env(THREAD_NAME)))
     {
@@ -1145,14 +1430,25 @@ static picture_t *DecodeVideo(decoder_t *p_dec, block_t **pp_block)
             }
         }
         p_sys->decoded = false;
+
+        /* resend CODEC_CONFIG buffer after a flush */
+        if (p_sys->p_config_buffer)
+            p_sys->b_config_resend = true;
         goto endclean;
+    }
+
+    if (b_new_block)
+    {
+        p_sys->b_new_block = false;
+        if (p_dec->fmt_in.i_codec == VLC_CODEC_H264)
+            H264ProcessBlock(p_dec, env, p_block, &b_delayed_open);
+        else if (p_dec->fmt_in.i_codec == VLC_CODEC_HEVC)
+            HEVCProcessBlock(p_dec, env, p_block, &b_delayed_open);
     }
 
     /* try delayed opening if there is a new extra data */
     if (!p_sys->codec)
     {
-        bool b_delayed_open = false;
-
         switch (p_dec->fmt_in.i_codec)
         {
         case VLC_CODEC_VC1:
@@ -1173,13 +1469,17 @@ static picture_t *DecodeVideo(decoder_t *p_dec, block_t **pp_block)
     /* Use the aspect ratio provided by the input (ie read from packetizer).
      * Don't check the current value of the aspect ratio in fmt_out, since we
      * want to allow changes in it to propagate. */
-    if (p_dec->fmt_in.video.i_sar_num != 0 && p_dec->fmt_in.video.i_sar_den != 0) {
+    if (p_dec->fmt_in.video.i_sar_num != 0 && p_dec->fmt_in.video.i_sar_den != 0
+     && (p_dec->fmt_out.video.i_sar_num != p_dec->fmt_in.video.i_sar_num ||
+         p_dec->fmt_out.video.i_sar_den != p_dec->fmt_in.video.i_sar_den))
+    {
         p_dec->fmt_out.video.i_sar_num = p_dec->fmt_in.video.i_sar_num;
         p_dec->fmt_out.video.i_sar_den = p_dec->fmt_in.video.i_sar_den;
+        p_sys->b_update_format = true;
     }
 
     do {
-        if (p_block && i_input_ret == 0)
+        if ((p_sys->b_config_resend || p_block) && i_input_ret == 0)
             i_input_ret = PutInput(p_dec, env, p_block, timeout);
 
         if (i_input_ret != -1 && i_output_ret == 0)
@@ -1194,10 +1494,20 @@ static picture_t *DecodeVideo(decoder_t *p_dec, block_t **pp_block)
 
             if (p_sys->pixel_format)
             {
+                if (p_sys->b_update_format)
+                {
+                    p_sys->b_update_format = false;
+                    if (decoder_UpdateVideoFormat(p_dec) != 0)
+                    {
+                        msg_Err(p_dec, "decoder_UpdateVideoFormat failed");
+                        b_error = true;
+                        break;
+                    }
+                }
                 p_pic = decoder_NewPicture(p_dec);
                 if (!p_pic) {
                     msg_Warn(p_dec, "NewPicture failed");
-                    goto endclean;
+                    break;
                 }
             }
             i_output_ret = GetOutput(p_dec, env, p_pic, timeout);
@@ -1241,6 +1551,7 @@ endclean:
     {
         block_Release(p_block);
         *pp_block = NULL;
+        p_sys->b_new_block = true;
     }
     if (b_error && !p_sys->error_state) {
         /* Signal the error to the Java. */
