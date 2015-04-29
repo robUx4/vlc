@@ -27,7 +27,6 @@
 # include "config.h"
 #endif
 
-#define DEBUG_SURFACE 0
 
 # if _WIN32_WINNT < 0x600
 /* dxva2 needs Vista support */
@@ -311,10 +310,6 @@ typedef struct {
     int                refcount;
     unsigned int       order;
     vlc_mutex_t        *p_lock;
-
-#if DEBUG_SURFACE
-    vlc_va_t *p_va;
-#endif
 } vlc_va_surface_t;
 
 #define VA_DXVA2_MAX_SURFACE_COUNT (64)
@@ -436,10 +431,6 @@ static int Extract(vlc_va_t *va, picture_t *picture, uint8_t *data)
     picture_sys_t *p_sys = picture->p_sys;
     LPDIRECT3DSURFACE9 output = p_sys->surface;
 
-#if DEBUG_SURFACE
-    msg_Dbg( va, "Extract surface 0x%p into picture 0x%p context 0x%p surface 0x%p", d3d, picture, picture->context, surface->d3d );
-#endif
-
     assert(d3d != output);
 #ifndef NDEBUG
     LPDIRECT3DDEVICE9 srcDevice, dstDevice;
@@ -502,10 +493,6 @@ static int Get(vlc_va_t *va, picture_t *pic, uint8_t **data)
     *data = (void *)surface->d3d;
     pic->context = surface;
 
-#if DEBUG_SURFACE
-    msg_Dbg( va, "Get picture 0x%p context 0x%p surface 0x%p", pic, pic->context, surface->d3d );
-#endif
-
     vlc_mutex_unlock( &sys->surface_lock );
 
     return VLC_SUCCESS;
@@ -516,10 +503,6 @@ static void Release(void *opaque, uint8_t *data)
     picture_t *pic = opaque;
     vlc_va_surface_t *surface = pic->context;
     vlc_mutex_lock( surface->p_lock );
-
-#if DEBUG_SURFACE
-    msg_Dbg( surface->p_va, "Release picture 0x%p context 0x%p surface 0x%p", pic, pic->context, surface->d3d );
-#endif
 
     surface->refcount--;
     pic->context = NULL;
@@ -1018,9 +1001,6 @@ static int DxCreateVideoDecoder(vlc_va_t *va, int codec_id,
         surface->refcount = 0;
         surface->order = 0;
         surface->p_lock = &sys->surface_lock;
-#if DEBUG_SURFACE
-        surface->p_va = va;
-#endif
     }
     msg_Dbg(va, "IDirectXVideoAccelerationService_CreateSurface succeed with %d surfaces (%dx%d)",
             sys->surface_count, fmt->i_width, fmt->i_height);
