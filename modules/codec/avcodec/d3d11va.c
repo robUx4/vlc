@@ -765,16 +765,19 @@ static bool profile_supported(const d3d11va_mode_t *mode, const es_format_t *fmt
 static int DxFindVideoServiceConversion(vlc_va_t *va, GUID *input, DXGI_FORMAT *output, const es_format_t *fmt)
 {
     vlc_va_sys_t *sys = va->sys;
+    HRESULT hr;
 
-#if TODO
     /* Retreive supported modes from the decoder service */
-    UINT input_count = 0;
-    GUID *input_list = NULL;
-    if (FAILED(IDirectXVideoDecoderService_GetDecoderDeviceGuids(sys->vs,
-                                                                 &input_count,
-                                                                 &input_list))) {
-        msg_Err(va, "IDirectXVideoDecoderService_GetDecoderDeviceGuids failed");
-        return VLC_EGENERIC;
+    UINT input_count = ID3D11VideoDevice_GetVideoDecoderProfileCount(sys->d3dvidev);
+    GUID input_list[input_count];
+    memset(input_list, 0, sizeof(input_list));
+    for (UINT i = 0; i < input_count; i++) {
+        hr = ID3D11VideoDevice_GetVideoDecoderProfile(sys->d3dvidev, i, &input_list[i]);
+        if (FAILED(hr))
+        {
+            msg_Err(va, "GetVideoDecoderProfile %d failed. (hr=0x%lX)", i, hr);
+            continue;
+        }
     }
     for (unsigned i = 0; i < input_count; i++) {
         const GUID *g = &input_list[i];
@@ -801,29 +804,21 @@ static int DxFindVideoServiceConversion(vlc_va_t *va, GUID *input, DXGI_FORMAT *
         {
             is_supported = profile_supported( mode, fmt );
             if (!is_supported)
-                msg_Warn( va, "Unsupported profile for DXVA2 HWAccel: %d", fmt->i_profile );
+                msg_Warn( va, "Unsupported profile for D3D11 HWAccel: %d", fmt->i_profile );
         }
         if (!is_supported)
             continue;
 
         /* */
         msg_Dbg(va, "Trying to use '%s' as input", mode->name);
-        UINT      output_count = 0;
-        DXGI_FORMAT *output_list = NULL;
-        if (FAILED(IDirectXVideoDecoderService_GetDecoderRenderTargets(sys->vs, mode->guid,
-                                                                       &output_count,
-                                                                       &output_list))) {
-            msg_Err(va, "IDirectXVideoDecoderService_GetDecoderRenderTargets failed");
-            continue;
-        }
-        for (unsigned j = 0; j < output_count; j++) {
-            const DXGI_FORMAT f = output_list[j];
-            const d3d_format_t *format = D3dFindFormat(f);
-            if (format) {
-                msg_Dbg(va, "%s is supported for output", format->name);
-            } else {
-                msg_Dbg(va, "%d is supported for output (%4.4s)", f, (const char*)&f);
-            }
+        for (unsigned j = 0; d3d_formats[j].name; j++) {
+            const d3d_format_t *format = &d3d_formats[j];
+
+            BOOL is_supported = false;
+            hr = ID3D11VideoDevice_CheckVideoDecoderFormat(sys->d3dvidev, mode->guid, format->format, &is_supported);
+            if (FAILED(hr) || !is_supported)
+                continue;
+            msg_Dbg(va, "%s is supported for output", format->name);
         }
 
         /* */
@@ -831,25 +826,18 @@ static int DxFindVideoServiceConversion(vlc_va_t *va, GUID *input, DXGI_FORMAT *
             const d3d_format_t *format = &d3d_formats[j];
 
             /* */
-            bool is_supported = false;
-            for (unsigned k = 0; !is_supported && k < output_count; k++) {
-                is_supported = format->format == output_list[k];
-            }
-            if (!is_supported)
+            BOOL is_supported = false;
+            hr = ID3D11VideoDevice_CheckVideoDecoderFormat(sys->d3dvidev, mode->guid, format->format, &is_supported);
+            if (FAILED(hr) || !is_supported)
                 continue;
 
             /* We have our solution */
             msg_Dbg(va, "Using '%s' to decode to '%s'", mode->name, format->name);
             *input  = *mode->guid;
             *output = format->format;
-            CoTaskMemFree(output_list);
-            CoTaskMemFree(input_list);
             return VLC_SUCCESS;
         }
-        CoTaskMemFree(output_list);
     }
-    CoTaskMemFree(input_list);
-#endif
     return VLC_EGENERIC;
 }
 
