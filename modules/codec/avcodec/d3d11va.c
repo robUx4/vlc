@@ -267,20 +267,19 @@ struct vlc_va_sys_t
 
     /* Video service */
     ID3D11VideoDevice            *d3dvidev;
-    /* TODO IDirectXVideoDecoderService  *vs;*/
     GUID                         input;
     DXGI_FORMAT                  render;
 
     /* Video decoder */
     D3D11_VIDEO_DECODER_CONFIG    cfg;
-    /* TODO IDirectXVideoDecoder         *decoder; */
+    ID3D11VideoDecoder            *decoder;
 
     /* */
     struct d3d11va_context hw;
 
     /* */
-    unsigned     surface_count;
-    unsigned     surface_order;
+    int          surface_count;
+    int          surface_order;
     int          surface_width;
     int          surface_height;
     vlc_fourcc_t surface_chroma;
@@ -322,7 +321,6 @@ static int Setup(vlc_va_t *va, AVCodecContext *avctx, vlc_fourcc_t *chroma)
 {
     vlc_va_sys_t *sys = va->sys;
 
-#if TODO
     if (sys->width == avctx->coded_width && sys->height == avctx->coded_height
      && sys->decoder != NULL)
         goto ok;
@@ -352,12 +350,9 @@ static int Setup(vlc_va_t *va, AVCodecContext *avctx, vlc_fourcc_t *chroma)
     /* */
 ok:
     avctx->hwaccel_context = &sys->hw;
-    *chroma = VLC_CODEC_D3D9_OPAQUE;
+    *chroma = VLC_CODEC_NV12; /* TODO FIXME */
 
     return VLC_SUCCESS;
-#else
-    return VLC_EGENERIC;
-#endif
 }
 
 
@@ -850,6 +845,7 @@ static int DxCreateVideoDecoder(vlc_va_t *va, int codec_id,
     vlc_va_sys_t *sys = va->sys;
     int surface_alignment = 16;
     int surface_count = 4;
+    HRESULT hr;
 
 #if TODO
     /* To set multi-thread protection, first call QueryInterface on ID3D11Device
@@ -895,31 +891,51 @@ static int DxCreateVideoDecoder(vlc_va_t *va, int codec_id,
 
     if (surface_count > VA_D3D11_MAX_SURFACE_COUNT)
         return VLC_EGENERIC;
-#if TODO
-    sys->surface_count = surface_count;
-    if (FAILED(IDirectXVideoDecoderService_CreateSurface(sys->vs,
-                                                         sys->surface_width,
-                                                         sys->surface_height,
-                                                         sys->surface_count - 1,
-                                                         sys->render,
-                                                         D3DPOOL_DEFAULT,
-                                                         0,
-                                                         DXVA2_VideoDecoderRenderTarget,
-                                                         sys->hw_surface,
-                                                         NULL))) {
-        msg_Err(va, "IDirectXVideoAccelerationService_CreateSurface failed");
-        sys->surface_count = 0;
-        return VLC_EGENERIC;
-    }
-    for (unsigned i = 0; i < sys->surface_count; i++) {
-        vlc_va_surface_t *surface = &sys->surface[i];
-        surface->d3d = sys->hw_surface[i];
+
+    D3D11_TEXTURE2D_DESC texDesc;
+    ZeroMemory(&texDesc, sizeof(texDesc));
+    texDesc.Width = sys->surface_width;
+    texDesc.Height = sys->surface_height;
+    texDesc.MipLevels = 1;
+    texDesc.ArraySize = surface_count;
+    texDesc.Format = sys->render;
+    texDesc.SampleDesc.Count = 1;
+    texDesc.Usage = D3D11_USAGE_DEFAULT; //D3D11_USAGE_STAGING; // D3D11_USAGE_DEFAULT
+    texDesc.BindFlags = D3D11_BIND_DECODER;
+    //texDesc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
+    texDesc.MiscFlags = 0; // D3D11_RESOURCE_MISC_SHARED
+
+    D3D11_VIDEO_DECODER_OUTPUT_VIEW_DESC viewDesc;
+    ZeroMemory(&viewDesc, sizeof(viewDesc));
+    viewDesc.DecodeProfile = sys->input;
+    viewDesc.ViewDimension = D3D11_VPIV_DIMENSION_TEXTURE2D;
+    viewDesc.Texture2D.ArraySlice = 1;
+
+    for (sys->surface_count = 0; sys->surface_count < surface_count; sys->surface_count++) {
+        vlc_va_surface_t *surface = &sys->surface[sys->surface_count];
+
+        ID3D11Texture2D *p_texture;
+        hr = ID3D11Device_CreateTexture2D( sys->d3ddev, &texDesc, NULL, &p_texture );
+        if (FAILED(hr)) {
+            msg_Err(va, "CreateTexture2D %d failed. (hr=0x%0lx)", sys->surface_count, hr);
+            return VLC_EGENERIC;
+        }
+
+        ID3D11Resource *p_resource = p_texture;
+        hr = ID3D11VideoDevice_CreateVideoDecoderOutputView( sys->d3dvidev, p_resource,
+                                                             &viewDesc, &surface->d3d );
+        if (FAILED(hr)) {
+            msg_Err(va, "CreateVideoDecoderOutputView %d failed. (hr=0x%0lx)", sys->surface_count, hr);
+            ID3D11Texture2D_Release(p_texture);
+            return VLC_EGENERIC;
+        }
         surface->refcount = 0;
         surface->order = 0;
         surface->p_lock = &sys->surface_lock;
     }
-    msg_Dbg(va, "IDirectXVideoAccelerationService_CreateSurface succeed with %d surfaces (%dx%d)",
+    msg_Dbg(va, "ID3D11VideoDecoderOutputView succeed with %d surfaces (%dx%d)",
             sys->surface_count, fmt->i_width, fmt->i_height);
+#if TODO
 
     /* */
     DXVA2_VideoDesc dsc;
@@ -995,7 +1011,7 @@ static int DxCreateVideoDecoder(vlc_va_t *va, int codec_id,
 
     /* Create the decoder */
     IDirectXVideoDecoder *decoder;
-    if (FAILED(IDirectXVideoDecoderService_CreateVideoDecoder(sys->vs,
+    if (FAILED(ID3D11VideoDevice_CreateVideoDecoder(sys->vs,
                                                               &sys->input,
                                                               &dsc,
                                                               &sys->cfg,
@@ -1011,25 +1027,25 @@ static int DxCreateVideoDecoder(vlc_va_t *va, int codec_id,
     if (IsEqualGUID(&sys->input, &DXVADDI_Intel_ModeH264_E))
         sys->hw.workaround |= FF_DXVA2_WORKAROUND_INTEL_CLEARVIDEO;
 #endif
-
-    msg_Dbg(va, "IDirectXVideoDecoderService_CreateVideoDecoder succeed");
-    return VLC_SUCCESS;
-#else
-    return VLC_EGENERIC;
 #endif
+
+    msg_Dbg(va, "DxCreateVideoDecoder succeed");
+    return VLC_SUCCESS;
 }
 
 static void DxDestroyVideoDecoder(vlc_va_sys_t *va)
 {
-#if TODO
     if (va->decoder)
-        IDirectXVideoDecoder_Release(va->decoder);
+        ID3D11VideoDecoder_Release(va->decoder);
     va->decoder = NULL;
 
-    for (unsigned i = 0; i < va->surface_count; i++)
-        IDirect3DSurface9_Release(va->surface[i].d3d);
+    for (unsigned i = 0; i < va->surface_count; i++) {
+        ID3D11Resource *p_texture;
+        ID3D11VideoDecoderOutputView_GetResource( va->surface[i].d3d, &p_texture );
+        ID3D11Resource_Release(p_texture);
+        ID3D11VideoDecoderOutputView_Release(va->surface[i].d3d);
+    }
     va->surface_count = 0;
-#endif
 }
 
 static int DxResetVideoDecoder(vlc_va_t *va)
