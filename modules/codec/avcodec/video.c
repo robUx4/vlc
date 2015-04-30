@@ -436,6 +436,8 @@ int InitVideoDec( decoder_t *p_dec, AVCodecContext *p_context,
         p_dec->i_extra_picture_buffers = 2 * p_context->thread_count;
 #endif
 
+    p_context->thread_type &= ~FF_THREAD_FRAME;
+
     /* ***** misc init ***** */
     p_sys->i_pts = VLC_TS_INVALID;
     p_sys->b_first_frame = true;
