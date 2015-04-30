@@ -585,12 +585,23 @@ static int D3dCreateDevice(vlc_va_t *va)
     creationFlags |= D3D11_CREATE_DEVICE_DEBUG;
 # endif
 
+    /*
+     * If we create the device with higher features, the VideoDevice can't be created on Win7
+     * http://stackoverflow.com/questions/19846770/how-do-i-use-hardware-accelerated-video-h-264-decoding-with-directx-11-and-windo/24629812#24629812
+     */
+    static const D3D_FEATURE_LEVEL featureLevels[] =
+    {
+        D3D_FEATURE_LEVEL_9_3,
+        D3D_FEATURE_LEVEL_9_2,
+        D3D_FEATURE_LEVEL_9_1
+    };
+
     /* */
     ID3D11Device *d3ddev;
     ID3D11DeviceContext *d3dctx;
     HRESULT hr = pf_CreateDevice(NULL, D3D_DRIVER_TYPE_HARDWARE, NULL,
-                                 creationFlags, NULL, 0, D3D11_SDK_VERSION,
-                                 &d3ddev, NULL, &d3dctx);
+                                 creationFlags, featureLevels, ARRAYSIZE(featureLevels),
+                                 D3D11_SDK_VERSION, &d3ddev, NULL, &d3dctx);
     if (FAILED(hr)) {
         msg_Err(va, "D3D11CreateDevice failed. (hr=0x%lX)", hr);
         return VLC_EGENERIC;
