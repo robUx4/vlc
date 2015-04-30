@@ -353,6 +353,33 @@ static int Extract(vlc_va_t *va, picture_t *picture, uint8_t *data)
     vlc_va_sys_t *sys = va->sys;
     ID3D11VideoDecoderOutputView *d3d = (ID3D11VideoDecoderOutputView*)(uintptr_t)data;
     picture_sys_t *p_sys = picture->p_sys;
+
+    /* TODO extract to NV12 planes */
+#if 0
+    D3D11_TEXTURE2D_DESC sDesc;
+    surface->GetDesc(&sDesc);
+    sDesc.Usage = D3D11_USAGE_DYNAMIC;
+    sDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+    //sDesc.BindFlags = 0;
+
+    ID3D11Texture2D *staging = NULL;
+    ID3D11Device_CreateTexture2D( sys->d3ddev, NULL, &staging);
+
+    D3D11_MAPPED_SUBRESOURCE rectangle;
+    if (FAILED(g_Windowing.Get3D11Context()->Map(staging, 0, D3D11_MAP_WRITE_DISCARD, 0, &rectangle)))
+    {
+        m_context->ClearReference(surface);
+        staging->Release();
+        return VLC_EGENERIC;
+    }
+    g_Windowing.Get3D11Context()->Unmap(staging, 0);
+    g_Windowing.Get3D11Context()->CopyResource(surface, staging);
+    staging->Release();
+
+    m_context->ClearReference(surface);
+    m_context->MarkRender(surface);
+#endif
+#if TODO
     ID3D11VideoDecoderOutputView *output = p_sys->surface;
 
     assert(d3d != output);
@@ -363,7 +390,6 @@ static int Extract(vlc_va_t *va, picture_t *picture, uint8_t *data)
     assert(srcDevice == dstDevice);
 #endif
 
-#if TODO
     HRESULT hr;
     RECT visibleSource;
     visibleSource.left = 0;
