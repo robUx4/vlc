@@ -1,12 +1,14 @@
 /*****************************************************************************
- * dxva2.c: Video Acceleration helpers
+ * d3d11va.c: Direct3D11 Video Acceleration helpers
  *****************************************************************************
  * Copyright (C) 2009 Geoffroy Couprie
  * Copyright (C) 2009 Laurent Aimar
+ * Copyright (C) 2015 Steve Lhomme
  * $Id$
  *
  * Authors: Geoffroy Couprie <geal@videolan.org>
  *          Laurent Aimar <fenrir _AT_ videolan _DOT_ org>
+ *          Steve Lhomme <robux4@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU Lesser General Public License as published by
@@ -366,18 +368,21 @@ static int Extract(vlc_va_t *va, picture_t *picture, uint8_t *data)
     ID3D11Texture2D *staging = NULL;
     ID3D11Resource *p_texture = NULL;
     D3D11_TEXTURE2D_DESC texDesc;
-    picture_t *p_mapped_pic;
     HRESULT hr;
+
+    int d3didx;
+    for ( d3didx = 0; d3didx < va->sys->surface_count; ++d3didx ) {
+        if (va->sys->hw_surface[d3didx] == d3d)
+            break;
+    }
+    if (d3didx == va->sys->surface_count) {
+        msg_Err(va, "Extracting an unknown surface." );
+        goto error;
+    }
 
     ID3D11VideoDecoderOutputView_GetResource( d3d, &p_texture );
     if (!p_texture) {
         msg_Err(va, "Failed to get the texture of the outputview." );
-        goto error;
-    }
-
-    p_mapped_pic = picture_NewFromFormat(&picture->format);
-    if (!p_mapped_pic) {
-        msg_Err(va, "Failed to allocate the mapped picture." );
         goto error;
     }
 
@@ -394,7 +399,8 @@ static int Extract(vlc_va_t *va, picture_t *picture, uint8_t *data)
         goto error;
     }
 
-    ID3D11DeviceContext_CopyResource( sys->d3dctx, (ID3D11Resource*) staging, p_texture);
+    ID3D11DeviceContext_CopySubresourceRegion(sys->d3dctx, (ID3D11Resource*) staging, 0, 0, 0, 0,
+                                              p_texture, d3didx, NULL);
 
     D3D11_MAPPED_SUBRESOURCE mappedResource;
     hr = ID3D11DeviceContext_Map(sys->d3dctx, (ID3D11Resource*) staging, 0, D3D11_MAP_READ, 0, &mappedResource);
@@ -403,12 +409,6 @@ static int Extract(vlc_va_t *va, picture_t *picture, uint8_t *data)
         goto error;
     }
 
-#if 0
-    if (CommonUpdatePicture(p_mapped_pic, NULL, mappedResource.pData, mappedResource.RowPitch)!=VLC_SUCCESS) {
-        msg_Err(va, "Failed to map the surface pixels to a picture (hr=0x%0lx)", hr );
-        goto error;
-    }
-#endif
     uint8_t *plane[2] = {
         mappedResource.pData,
         (uint8_t*)mappedResource.pData + mappedResource.RowPitch * texDesc.Height,
@@ -972,8 +972,8 @@ static int DxCreateVideoDecoder(vlc_va_t *va, int codec_id,
     texDesc.ArraySize = surface_count;
     texDesc.Format = sys->render;
     texDesc.SampleDesc.Count = 1;
-    texDesc.Usage = D3D11_USAGE_DEFAULT; //D3D11_USAGE_STAGING; // D3D11_USAGE_DEFAULT
-    texDesc.BindFlags = D3D11_BIND_DECODER;
+    texDesc.Usage = D3D11_USAGE_DEFAULT; //D3D11_USAGE_DYNAMIC; //D3D11_USAGE_STAGING; // D3D11_USAGE_DEFAULT
+    texDesc.BindFlags = D3D11_BIND_DECODER;// | D3D11_BIND_UNORDERED_ACCESS;
     //texDesc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
     texDesc.MiscFlags = 0; // D3D11_RESOURCE_MISC_SHARED
 
@@ -981,17 +981,18 @@ static int DxCreateVideoDecoder(vlc_va_t *va, int codec_id,
     ZeroMemory(&viewDesc, sizeof(viewDesc));
     viewDesc.DecodeProfile = sys->input;
     viewDesc.ViewDimension = D3D11_VPIV_DIMENSION_TEXTURE2D;
-    viewDesc.Texture2D.ArraySlice = 1;
+
+    ID3D11Texture2D *p_texture;
+    hr = ID3D11Device_CreateTexture2D( sys->d3ddev, &texDesc, NULL, &p_texture );
+    if (FAILED(hr)) {
+        msg_Err(va, "CreateTexture2D %d failed. (hr=0x%0lx)", sys->surface_count, hr);
+        return VLC_EGENERIC;
+    }
 
     for (sys->surface_count = 0; sys->surface_count < surface_count; sys->surface_count++) {
         vlc_va_surface_t *surface = &sys->surface[sys->surface_count];
 
-        ID3D11Texture2D *p_texture;
-        hr = ID3D11Device_CreateTexture2D( sys->d3ddev, &texDesc, NULL, &p_texture );
-        if (FAILED(hr)) {
-            msg_Err(va, "CreateTexture2D %d failed. (hr=0x%0lx)", sys->surface_count, hr);
-            return VLC_EGENERIC;
-        }
+        viewDesc.Texture2D.ArraySlice = sys->surface_count;
 
         ID3D11Resource *p_resource = (ID3D11Resource*) p_texture;
         hr = ID3D11VideoDevice_CreateVideoDecoderOutputView( sys->d3dvidev, p_resource,
