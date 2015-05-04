@@ -409,6 +409,8 @@ static int Extract(vlc_va_t *va, picture_t *picture, uint8_t *data)
 
     ID3D11DeviceContext_Unmap(sys->d3dctx, sys->staging, 0);
 
+    if (p_texture!=NULL)
+        ID3D11Resource_Release(p_texture);
     return VLC_SUCCESS;
 
 error:
@@ -705,6 +707,8 @@ static char *DxDescribe(vlc_va_sys_t *p_sys)
                      FromWide(adapterDesc.Description),
                      adapterDesc.VendorId, vendor, adapterDesc.DeviceId, adapterDesc.Revision) < 0)
             return NULL;
+        IDXGIAdapter_Release(p_adapter);
+        IDXGIDevice_Release(pDXGIDevice);
         return description;
     }
 
