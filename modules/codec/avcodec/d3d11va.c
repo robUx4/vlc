@@ -53,6 +53,7 @@
 #include "avcodec.h"
 #include "va.h"
 #include "../../packetizer/h264_nal.h"
+#include "../../video_chroma/copy.h"
 
 static int Open(vlc_va_t *, AVCodecContext *, enum PixelFormat,
                 const es_format_t *, picture_sys_t *p_sys);
@@ -284,6 +285,8 @@ struct vlc_va_sys_t
 
     vlc_va_surface_t surface[VA_D3D11_MAX_SURFACE_COUNT];
     ID3D11VideoDecoderOutputView* hw_surface[VA_D3D11_MAX_SURFACE_COUNT];
+
+    copy_cache_t *p_copy_cache;
 };
 
 #if D3D11_DR /* for now we export to NV12 */
@@ -360,59 +363,77 @@ static int Extract(vlc_va_t *va, picture_t *picture, uint8_t *data)
     vlc_va_sys_t *sys = va->sys;
     ID3D11VideoDecoderOutputView *d3d = (ID3D11VideoDecoderOutputView*)(uintptr_t)data;
     picture_sys_t *p_sys = picture->p_sys;
-
-    /* TODO extract to NV12 planes */
-#if 0
-    D3D11_TEXTURE2D_DESC sDesc;
-    surface->GetDesc(&sDesc);
-    sDesc.Usage = D3D11_USAGE_DYNAMIC;
-    sDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
-    //sDesc.BindFlags = 0;
-
     ID3D11Texture2D *staging = NULL;
-    ID3D11Device_CreateTexture2D( sys->d3ddev, NULL, &staging);
-
-    D3D11_MAPPED_SUBRESOURCE rectangle;
-    if (FAILED(g_Windowing.Get3D11Context()->Map(staging, 0, D3D11_MAP_WRITE_DISCARD, 0, &rectangle)))
-    {
-        m_context->ClearReference(surface);
-        staging->Release();
-        return VLC_EGENERIC;
-    }
-    g_Windowing.Get3D11Context()->Unmap(staging, 0);
-    g_Windowing.Get3D11Context()->CopyResource(surface, staging);
-    staging->Release();
-
-    m_context->ClearReference(surface);
-    m_context->MarkRender(surface);
-#endif
-#if TODO
-    ID3D11VideoDecoderOutputView *output = p_sys->surface;
-
-    assert(d3d != output);
-#ifndef NDEBUG
-    ID3D11Device *srcDevice, *dstDevice;
-    srcDevice = GetOutputViewDevice(d3d);
-    dstDevice = GetOutputViewDevice(output);
-    assert(srcDevice == dstDevice);
-#endif
-
+    ID3D11Resource *p_texture = NULL;
+    D3D11_TEXTURE2D_DESC texDesc;
+    picture_t *p_mapped_pic;
     HRESULT hr;
-    RECT visibleSource;
-    visibleSource.left = 0;
-    visibleSource.top = 0;
-    visibleSource.right = picture->format.i_visible_width;
-    visibleSource.bottom = picture->format.i_visible_height;
-    hr = IDirect3DDevice9_StretchRect( sys->d3ddev, d3d, &visibleSource, output, &visibleSource, D3DTEXF_NONE);
-    if (FAILED(hr)) {
-        msg_Err(va, "Failed to copy the hw surface to the decoder surface (hr=0x%0lx)", hr );
-        return VLC_EGENERIC;
+
+    ID3D11VideoDecoderOutputView_GetResource( d3d, &p_texture );
+    if (!p_texture) {
+        msg_Err(va, "Failed to get the texture of the outputview." );
+        goto error;
     }
+
+    p_mapped_pic = picture_NewFromFormat(&picture->format);
+    if (!p_mapped_pic) {
+        msg_Err(va, "Failed to allocate the mapped picture." );
+        goto error;
+    }
+
+    ID3D11Texture2D_GetDesc( (ID3D11Texture2D*) p_texture, &texDesc);
+    texDesc.ArraySize = 1;
+    texDesc.Usage = D3D11_USAGE_STAGING;
+    texDesc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
+    texDesc.BindFlags = 0;
+
+    /* extract to NV12 planes */
+    hr = ID3D11Device_CreateTexture2D( sys->d3ddev, &texDesc, NULL, &staging);
+    if (FAILED(hr)) {
+        msg_Err(va, "Failed to create a temporary texture to extract surface pixels (hr=0x%0lx)", hr );
+        goto error;
+    }
+
+    ID3D11DeviceContext_CopyResource( sys->d3dctx, (ID3D11Resource*) staging, p_texture);
+
+    D3D11_MAPPED_SUBRESOURCE mappedResource;
+    hr = ID3D11DeviceContext_Map(sys->d3dctx, (ID3D11Resource*) staging, 0, D3D11_MAP_READ, 0, &mappedResource);
+    if (FAILED(hr)) {
+        msg_Err(va, "Failed to map the texture surface pixels (hr=0x%0lx)", hr );
+        goto error;
+    }
+
+#if 0
+    if (CommonUpdatePicture(p_mapped_pic, NULL, mappedResource.pData, mappedResource.RowPitch)!=VLC_SUCCESS) {
+        msg_Err(va, "Failed to map the surface pixels to a picture (hr=0x%0lx)", hr );
+        goto error;
+    }
+#endif
+    uint8_t *plane[2] = {
+        mappedResource.pData,
+        (uint8_t*)mappedResource.pData + mappedResource.RowPitch * texDesc.Height,
+    };
+    size_t  pitch[2] = {
+        mappedResource.RowPitch,
+        mappedResource.RowPitch,
+    };
+    CopyFromNv12ToNv12(picture, plane, pitch, texDesc.Width, texDesc.Height, sys->p_copy_cache );
+
+    ID3D11DeviceContext_Unmap(sys->d3dctx, (ID3D11Resource*) staging, 0);
+    //g_Windowing.Get3D11Context()->CopyResource(surface, staging);
+    ID3D11Resource_Release(staging);
+
+    //m_context->ClearReference(surface);
+    //m_context->MarkRender(surface);
 
     return VLC_SUCCESS;
-#else
+
+error:
+    if (staging!=NULL)
+        ID3D11Resource_Release(staging);
+    if (p_texture!=NULL)
+        ID3D11Resource_Release(p_texture);
     return VLC_EGENERIC;
-#endif
 }
 
 /* FIXME it is nearly common with VAAPI */
@@ -487,6 +508,11 @@ static void Close(vlc_va_t *va, AVCodecContext *ctx)
 #endif
     D3dDestroyDevice(sys);
 
+    if (sys->p_copy_cache!=NULL) {
+        CopyCleanCache(sys->p_copy_cache);
+        free( sys->p_copy_cache );
+    }
+
     if (sys->hd3d11_dll)
         FreeLibrary(sys->hd3d11_dll);
     vlc_mutex_destroy( &sys->surface_lock );
@@ -512,14 +538,23 @@ static ID3D11Device *GetOutputViewDevice(ID3D11VideoDecoderOutputView *p_view)
 static int Open(vlc_va_t *va, AVCodecContext *ctx, enum PixelFormat pix_fmt,
                 const es_format_t *fmt, picture_sys_t *p_sys)
 {
+    int err = VLC_EGENERIC;
+
     if (pix_fmt != AV_PIX_FMT_D3D11VA_VLD)
         return VLC_EGENERIC;
 
-    (void) p_sys;
+    VLC_UNUSED(p_sys);
 
     vlc_va_sys_t *sys = calloc(1, sizeof (*sys));
     if (unlikely(sys == NULL))
         return VLC_ENOMEM;
+
+    sys->p_copy_cache = calloc(1, sizeof(*sys->p_copy_cache));
+    if (!sys->p_copy_cache) {
+         err = VLC_ENOMEM;
+         goto error;
+    }
+    CopyInitCache( sys->p_copy_cache, fmt->video.i_width );
 
     va->sys = sys;
     sys->codec_id = ctx->codec_id;
@@ -581,7 +616,7 @@ static int Open(vlc_va_t *va, AVCodecContext *ctx, enum PixelFormat pix_fmt,
 
 error:
     Close(va, ctx);
-    return VLC_EGENERIC;
+    return err;
 }
 /* */
 
