@@ -31,7 +31,7 @@
 # include "config.h"
 #endif
 
-
+#define DEBUG_LEAK 0
 #define D3D11_DR 0
 
 # if _WIN32_WINNT < 0x600
@@ -786,6 +786,10 @@ static void Close(vlc_va_t *va, AVCodecContext *ctx)
     if (sys->dxgidebug_dll)
         FreeLibrary(sys->dxgidebug_dll);
 #endif
+#if DEBUG_LEAK
+    sys->hd3d11_dll = NULL;
+    sys->dxgidebug_dll = NULL;
+#endif
     vlc_mutex_destroy( &sys->surface_lock );
 
     free((char *)va->description);
@@ -930,6 +934,9 @@ static int D3dCreateDevice(vlc_va_t *va)
     }
     sys->d3ddev = d3ddev;
     sys->d3dctx = d3dctx;
+#if DEBUG_LEAK
+    msg_Err(va, "Created ID3D11Device 0x%p / ID3D11DeviceContext 0x%p", d3ddev, d3dctx);
+#endif
 
     ID3D11VideoContext *d3dvidctx = NULL;
     hr = ID3D11DeviceContext_QueryInterface(d3dctx, &IID_ID3D11VideoContext, (void **)&d3dvidctx);
@@ -938,6 +945,9 @@ static int D3dCreateDevice(vlc_va_t *va)
        return VLC_EGENERIC;
     }
     sys->d3dvidctx = d3dvidctx;
+#if DEBUG_LEAK
+    msg_Err(va, "Got ID3D11VideoContext 0x%p", d3dvidctx);
+#endif
 
 #ifndef NDEBUG
     HRESULT (WINAPI  * pf_DXGIGetDebugInterface)(const GUID *riid, void **ppDebug);
@@ -974,6 +984,11 @@ static void D3dDestroyDevice(vlc_va_sys_t *va)
         ID3D11DeviceContext_Release(va->d3dctx);
     if (va->d3ddev)
         ID3D11Device_Release(va->d3ddev);
+#if DEBUG_LEAK
+    va->d3dvidctx = NULL;
+    va->d3dctx = NULL;
+    va->d3ddev = NULL;
+#endif
 }
 /**
  * It describes our Direct3D object
@@ -1091,6 +1106,9 @@ static int DxCreateVideoService(vlc_va_t *va)
        return VLC_EGENERIC;
     }
     sys->d3dvidev = d3dvidev;
+#if DEBUG_LEAK
+    msg_Err(va, "Got ID3D11VideoDevice 0x%p", d3dvidev);
+#endif
 
     return VLC_SUCCESS;
 }
@@ -1102,6 +1120,9 @@ static void DxDestroyVideoService(vlc_va_sys_t *va)
 {
     if (va->d3dvidev)
         ID3D11VideoDevice_Release(va->d3dvidev);
+#if DEBUG_LEAK
+    va->d3dvidev = NULL;
+#endif
 }
 
 static bool profile_supported(const d3d11va_mode_t *mode, const es_format_t *fmt)
@@ -1229,6 +1250,9 @@ static int DxCreateVideoDecoder(vlc_va_t *va, int codec_id,
     if (SUCCEEDED(hr)) {
         ID3D10Multithread_SetMultithreadProtected(pMultithread, b_threading && sys->thread_count > 1);
         ID3D10Multithread_Release(pMultithread);
+#if DEBUG_LEAK
+    msg_Err(va, "Got ID3D10Multithread 0x%p", pMultithread);
+#endif
     }
 
     /* */
@@ -1404,6 +1428,10 @@ static void DxDestroyVideoDecoder(vlc_va_sys_t *va)
         ID3D11VideoDecoderOutputView_GetResource( va->surface[i].d3d, &p_texture );
         ID3D11Resource_Release(p_texture);
         ID3D11VideoDecoderOutputView_Release(va->surface[i].d3d);
+#if DEBUG_LEAK
+        assert(va->surface[i].d3d == va->hw_surface[i]);
+        va->surface[i].d3d = va->hw_surface[i] = NULL;
+#endif
     }
     va->surface_count = 0;
 
@@ -1412,6 +1440,9 @@ static void DxDestroyVideoDecoder(vlc_va_sys_t *va)
     if (va->decoder)
         ID3D11VideoDecoder_Release(va->decoder);
     va->decoder = NULL;
+#if DEBUG_LEAK
+    va->staging = NULL;
+#endif
 }
 
 static int DxResetVideoDecoder(vlc_va_t *va)
