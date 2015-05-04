@@ -30,6 +30,8 @@
 #endif
 
 
+#define D3D11_DR 0
+
 # if _WIN32_WINNT < 0x600
 /* d3d11 needs Vista support */
 #  undef _WIN32_WINNT
@@ -284,10 +286,12 @@ struct vlc_va_sys_t
     ID3D11VideoDecoderOutputView* hw_surface[VA_D3D11_MAX_SURFACE_COUNT];
 };
 
+#if D3D11_DR /* for now we export to NV12 */
 struct picture_sys_t
 {
     ID3D11VideoDecoderOutputView *surface;
 };
+#endif
 
 /* */
 static int D3dCreateDevice(vlc_va_t *);
@@ -531,8 +535,10 @@ static int Open(vlc_va_t *va, AVCodecContext *ctx, enum PixelFormat pix_fmt,
     msg_Dbg(va, "DLLs loaded");
 
     sys->d3ddev = NULL;
+#if D3D11_DR
     if ( p_sys != NULL )
         sys->d3ddev = GetOutputViewDevice( p_sys->surface );
+#endif
 
     if (sys->d3ddev) {
         msg_Dbg(va, "Reusing D3D11 device");
