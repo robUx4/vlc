@@ -424,6 +424,7 @@ static int Get(vlc_va_t *va, picture_t *pic, uint8_t **data)
 
 #if TODO
     /* Check the device */
+    /* see MFCreateDXGIDeviceManager in mfplat.dll, not avail in Win7 */
     HRESULT hr = IDirect3DDeviceManager9_TestDevice(sys->devmng, sys->device);
     if (hr == DXVA2_E_NEW_VIDEO_DEVICE) {
         if (DxResetVideoDecoder(va))
