@@ -60,7 +60,9 @@
 static int Open(vlc_va_t *, AVCodecContext *, enum PixelFormat,
                 const es_format_t *, picture_sys_t *p_sys);
 static void Close(vlc_va_t *, AVCodecContext *);
+#if D3D11_DR
 static ID3D11Device *GetOutputViewDevice(ID3D11VideoDecoderOutputView *p_view);
+#endif
 
 vlc_module_begin()
     set_description(N_("Direct3D11 Video Acceleration"))
@@ -74,7 +76,6 @@ vlc_module_end()
 #include <windowsx.h>
 #include <ole2.h>
 #include <commctrl.h>
-#include <shlwapi.h>
 #include <d3d11.h>
 
 #include <initguid.h> /* must be last included to not redefine existing GUIDs */
@@ -100,6 +101,7 @@ MS_GUID    (DXVA_NoEncrypt,                         0x1b81bed0, 0xa0c7, 0x11d3, 
 
 DEFINE_GUID(IID_ID3D11VideoDevice,   0x10EC4D5B, 0x975A, 0x4689, 0xB9, 0xE4, 0xD0, 0xAA, 0xC3, 0x0F, 0xE3, 0x33);
 DEFINE_GUID(IID_ID3D11VideoContext,  0x61F21C45, 0x3C0E, 0x4a74, 0x9C, 0xEA, 0x67, 0x10, 0x0D, 0x9A, 0xD5, 0xE4);
+DEFINE_GUID(IID_IDXGIDevice, 0x54ec77fa, 0x1377, 0x44e6, 0x8c,0x32, 0x88,0xfd,0x5f,0x44,0xc8,0x4c);
 
 DEFINE_GUID(D3D11_DECODER_PROFILE_MPEG2_MOCOMP,      0xe6a9f44b, 0x61b0, 0x4563,0x9e,0xa4,0x63,0xd2,0xa3,0xc6,0xfe,0x66);
 DEFINE_GUID(D3D11_DECODER_PROFILE_MPEG2_IDCT,        0xbf22ad00, 0x03ea, 0x4690,0x80,0x77,0x47,0x33,0x46,0x20,0x9b,0x7e);
@@ -260,8 +262,6 @@ struct vlc_va_sys_t
 
     /* Device manager */
     UINT                     token;
-    /* TODO IDirect3DDeviceManager9  *devmng;*/
-    /* TODO HANDLE                   device;*/
 
     /* Video service */
     ID3D11VideoDevice            *d3dvidev;
@@ -356,7 +356,7 @@ static int Setup(vlc_va_t *va, AVCodecContext *avctx, vlc_fourcc_t *chroma)
     /* */
 ok:
     avctx->hwaccel_context = &sys->hw;
-    *chroma = VLC_CODEC_NV12; /* TODO FIXME */
+    *chroma = VLC_CODEC_NV12; /* TODO use an opaque format for direct rendering */
 
     return VLC_SUCCESS;
 }
@@ -369,6 +369,7 @@ static int Extract(vlc_va_t *va, picture_t *picture, uint8_t *data)
     ID3D11Resource *p_texture = NULL;
     D3D11_TEXTURE2D_DESC texDesc;
     D3D11_VIDEO_DECODER_OUTPUT_VIEW_DESC viewDesc;
+    D3D11_MAPPED_SUBRESOURCE mappedResource;
     HRESULT hr;
 
     msg_Dbg(va, "%lx Extract ", GetCurrentThreadId());
@@ -388,7 +389,6 @@ static int Extract(vlc_va_t *va, picture_t *picture, uint8_t *data)
     ID3D11DeviceContext_CopySubresourceRegion(sys->d3dctx, sys->staging, 0, 0, 0, 0,
                                               p_texture, viewDesc.Texture2D.ArraySlice, NULL);
 
-    D3D11_MAPPED_SUBRESOURCE mappedResource;
     hr = ID3D11DeviceContext_Map(sys->d3dctx, sys->staging, 0, D3D11_MAP_READ, 0, &mappedResource);
     if (FAILED(hr)) {
         msg_Err(va, "Failed to map the texture surface pixels (hr=0x%0lx)", hr );
@@ -500,6 +500,7 @@ static void Close(vlc_va_t *va, AVCodecContext *ctx)
     free(sys);
 }
 
+#if D3D11_DR
 static ID3D11Device *GetOutputViewDevice(ID3D11VideoDecoderOutputView *p_view)
 {
     ID3D11Device *result = NULL;
@@ -513,6 +514,7 @@ static ID3D11Device *GetOutputViewDevice(ID3D11VideoDecoderOutputView *p_view)
     }
     return result;
 }
+#endif
 
 static int Open(vlc_va_t *va, AVCodecContext *ctx, enum PixelFormat pix_fmt,
                 const es_format_t *fmt, picture_sys_t *p_sys)
@@ -669,7 +671,7 @@ static void D3dDestroyDevice(vlc_va_sys_t *va)
 /**
  * It describes our Direct3D object
  */
-static char *DxDescribe(vlc_va_sys_t *va)
+static char *DxDescribe(vlc_va_sys_t *p_sys)
 {
     static const struct {
         unsigned id;
@@ -682,26 +684,41 @@ static char *DxDescribe(vlc_va_sys_t *va)
         { 0x5333, "S3 Graphics" },
         { 0, "" }
     };
-#if TODO
-    D3DADAPTER_IDENTIFIER9 *id = &va->d3dai;
 
-    const char *vendor = "Unknown";
-    for (int i = 0; vendors[i].id != 0; i++) {
-        if (vendors[i].id == id->VendorId) {
-            vendor = vendors[i].name;
-            break;
-        }
+    IDXGIDevice *pDXGIDevice = NULL;
+    HRESULT hr = ID3D11Device_QueryInterface(p_sys->d3ddev, &IID_IDXGIDevice, (void **)&pDXGIDevice);
+    if (FAILED(hr)) {
+       return NULL;
     }
 
-    char *description;
-    if (asprintf(&description, "DXVA2 (%.*s, vendor %lu(%s), device %lu, revision %lu)",
-                 sizeof(id->Description), id->Description,
-                 id->VendorId, vendor, id->DeviceId, id->Revision) < 0)
-        return NULL;
-    return description;
-#else
+    IDXGIAdapter *p_adapter;
+    hr = IDXGIDevice_GetAdapter(pDXGIDevice, &p_adapter);
+    if (FAILED(hr)) {
+        IDXGIDevice_Release(pDXGIDevice);
+       return NULL;
+    }
+
+    DXGI_ADAPTER_DESC adapterDesc;
+    if (SUCCEEDED(IDXGIAdapter_GetDesc(p_adapter, &adapterDesc))) {
+        const char *vendor = "Unknown";
+        for (int i = 0; vendors[i].id != 0; i++) {
+            if (vendors[i].id == adapterDesc.VendorId) {
+                vendor = vendors[i].name;
+                break;
+            }
+        }
+
+        char *description;
+        if (asprintf(&description, "D3D11VA (%.*s, vendor %lu(%s), device %lu, revision %lu)",
+                     sizeof(adapterDesc.Description), adapterDesc.Description,
+                     adapterDesc.VendorId, vendor, adapterDesc.DeviceId, adapterDesc.Revision) < 0)
+            return NULL;
+        return description;
+    }
+
+    IDXGIAdapter_Release(p_adapter);
+    IDXGIDevice_Release(pDXGIDevice);
     return NULL;
-#endif
 }
 
 #if 0
@@ -957,7 +974,8 @@ static int DxCreateVideoDecoder(vlc_va_t *va, int codec_id,
     texDesc.BindFlags = 0;
 
     sys->staging = NULL;
-    hr = ID3D11Device_CreateTexture2D( sys->d3ddev, &texDesc, NULL, &sys->staging);
+    hr = ID3D11Device_CreateTexture2D( sys->d3ddev, &texDesc, NULL,
+                                       (ID3D11Texture2D**) &sys->staging);
     if (FAILED(hr)) {
         msg_Err(va, "Failed to create a staging texture to extract surface pixels (hr=0x%0lx)", hr );
         return VLC_EGENERIC;
