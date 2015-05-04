@@ -95,6 +95,7 @@ vlc_module_end()
 # else
 #  include <dxva.h>
 # endif
+#include <d3d10.h>
 
 #endif /* __MINGW32__ */
 
@@ -102,7 +103,8 @@ MS_GUID    (DXVA_NoEncrypt,                         0x1b81bed0, 0xa0c7, 0x11d3, 
 
 DEFINE_GUID(IID_ID3D11VideoDevice,   0x10EC4D5B, 0x975A, 0x4689, 0xB9, 0xE4, 0xD0, 0xAA, 0xC3, 0x0F, 0xE3, 0x33);
 DEFINE_GUID(IID_ID3D11VideoContext,  0x61F21C45, 0x3C0E, 0x4a74, 0x9C, 0xEA, 0x67, 0x10, 0x0D, 0x9A, 0xD5, 0xE4);
-DEFINE_GUID(IID_IDXGIDevice, 0x54ec77fa, 0x1377, 0x44e6, 0x8c,0x32, 0x88,0xfd,0x5f,0x44,0xc8,0x4c);
+DEFINE_GUID(IID_IDXGIDevice,         0x54ec77fa, 0x1377, 0x44e6, 0x8c, 0x32, 0x88, 0xfd, 0x5f, 0x44, 0xc8, 0x4c);
+DEFINE_GUID(IID_ID3D10Multithread,   0x9b7e4e00, 0x342c, 0x4106, 0xa1, 0x9f, 0x4f, 0x27, 0x04, 0xf6, 0x89, 0xf0);
 
 DEFINE_GUID(D3D11_DECODER_PROFILE_MPEG2_MOCOMP,      0xe6a9f44b, 0x61b0, 0x4563,0x9e,0xa4,0x63,0xd2,0xa3,0xc6,0xfe,0x66);
 DEFINE_GUID(D3D11_DECODER_PROFILE_MPEG2_IDCT,        0xbf22ad00, 0x03ea, 0x4690,0x80,0x77,0x47,0x33,0x46,0x20,0x9b,0x7e);
@@ -915,12 +917,12 @@ static int DxCreateVideoDecoder(vlc_va_t *va, int codec_id,
     int surface_count = 4;
     HRESULT hr;
 
-#if TODO
-    /* To set multi-thread protection, first call QueryInterface on ID3D11Device
-     *  to get an ID3D10Multithread pointer. Then call
-     *  ID3D10Multithread::SetMultithreadProtected, passing in true for bMTProtect.
-     */
-#endif
+    ID3D10Multithread *pMultithread;
+    hr = ID3D11Device_QueryInterface(sys->d3ddev, &IID_ID3D10Multithread, (void **)&pMultithread);
+    if (SUCCEEDED(hr)) {
+        ID3D10Multithread_SetMultithreadProtected(pMultithread, b_threading && sys->thread_count > 1);
+        ID3D10Multithread_Release(pMultithread);
+    }
 
     /* */
     msg_Dbg(va, "DxCreateVideoDecoder id %d %dx%d",
