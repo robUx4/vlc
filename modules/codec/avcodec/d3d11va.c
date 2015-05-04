@@ -276,6 +276,10 @@ struct vlc_va_sys_t
     /* */
     struct d3d11va_context hw;
 
+    /* Extraction */
+    ID3D11Resource        *staging;
+    copy_cache_t          *p_copy_cache;
+
     /* */
     int          surface_count;
     int          surface_order;
@@ -287,8 +291,6 @@ struct vlc_va_sys_t
 
     vlc_va_surface_t surface[VA_D3D11_MAX_SURFACE_COUNT];
     ID3D11VideoDecoderOutputView* hw_surface[VA_D3D11_MAX_SURFACE_COUNT];
-
-    copy_cache_t *p_copy_cache;
 };
 
 #if D3D11_DR /* for now we export to NV12 */
@@ -364,21 +366,15 @@ static int Extract(vlc_va_t *va, picture_t *picture, uint8_t *data)
 {
     vlc_va_sys_t *sys = va->sys;
     ID3D11VideoDecoderOutputView *d3d = (ID3D11VideoDecoderOutputView*)(uintptr_t)data;
-    picture_sys_t *p_sys = picture->p_sys;
-    ID3D11Texture2D *staging = NULL;
     ID3D11Resource *p_texture = NULL;
     D3D11_TEXTURE2D_DESC texDesc;
+    D3D11_VIDEO_DECODER_OUTPUT_VIEW_DESC viewDesc;
     HRESULT hr;
 
-    int d3didx;
-    for ( d3didx = 0; d3didx < va->sys->surface_count; ++d3didx ) {
-        if (va->sys->hw_surface[d3didx] == d3d)
-            break;
-    }
-    if (d3didx == va->sys->surface_count) {
-        msg_Err(va, "Extracting an unknown surface." );
-        goto error;
-    }
+    msg_Dbg(va, "%lx Extract ", GetCurrentThreadId());
+    assert( picture->format.i_chroma == VLC_CODEC_NV12);
+
+    ID3D11VideoDecoderOutputView_GetDesc( d3d, &viewDesc );
 
     ID3D11VideoDecoderOutputView_GetResource( d3d, &p_texture );
     if (!p_texture) {
@@ -387,23 +383,13 @@ static int Extract(vlc_va_t *va, picture_t *picture, uint8_t *data)
     }
 
     ID3D11Texture2D_GetDesc( (ID3D11Texture2D*) p_texture, &texDesc);
-    texDesc.ArraySize = 1;
-    texDesc.Usage = D3D11_USAGE_STAGING;
-    texDesc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
-    texDesc.BindFlags = 0;
 
     /* extract to NV12 planes */
-    hr = ID3D11Device_CreateTexture2D( sys->d3ddev, &texDesc, NULL, &staging);
-    if (FAILED(hr)) {
-        msg_Err(va, "Failed to create a temporary texture to extract surface pixels (hr=0x%0lx)", hr );
-        goto error;
-    }
-
-    ID3D11DeviceContext_CopySubresourceRegion(sys->d3dctx, (ID3D11Resource*) staging, 0, 0, 0, 0,
-                                              p_texture, d3didx, NULL);
+    ID3D11DeviceContext_CopySubresourceRegion(sys->d3dctx, sys->staging, 0, 0, 0, 0,
+                                              p_texture, viewDesc.Texture2D.ArraySlice, NULL);
 
     D3D11_MAPPED_SUBRESOURCE mappedResource;
-    hr = ID3D11DeviceContext_Map(sys->d3dctx, (ID3D11Resource*) staging, 0, D3D11_MAP_READ, 0, &mappedResource);
+    hr = ID3D11DeviceContext_Map(sys->d3dctx, sys->staging, 0, D3D11_MAP_READ, 0, &mappedResource);
     if (FAILED(hr)) {
         msg_Err(va, "Failed to map the texture surface pixels (hr=0x%0lx)", hr );
         goto error;
@@ -419,18 +405,11 @@ static int Extract(vlc_va_t *va, picture_t *picture, uint8_t *data)
     };
     CopyFromNv12ToNv12(picture, plane, pitch, texDesc.Width, texDesc.Height, sys->p_copy_cache );
 
-    ID3D11DeviceContext_Unmap(sys->d3dctx, (ID3D11Resource*) staging, 0);
-    //g_Windowing.Get3D11Context()->CopyResource(surface, staging);
-    ID3D11Resource_Release(staging);
-
-    //m_context->ClearReference(surface);
-    //m_context->MarkRender(surface);
+    ID3D11DeviceContext_Unmap(sys->d3dctx, sys->staging, 0);
 
     return VLC_SUCCESS;
 
 error:
-    if (staging!=NULL)
-        ID3D11Resource_Release(staging);
     if (p_texture!=NULL)
         ID3D11Resource_Release(p_texture);
     return VLC_EGENERIC;
@@ -969,18 +948,25 @@ static int DxCreateVideoDecoder(vlc_va_t *va, int codec_id,
     texDesc.Width = sys->surface_width;
     texDesc.Height = sys->surface_height;
     texDesc.MipLevels = 1;
-    texDesc.ArraySize = surface_count;
     texDesc.Format = sys->render;
     texDesc.SampleDesc.Count = 1;
+    texDesc.MiscFlags = 0; // D3D11_RESOURCE_MISC_SHARED
+    texDesc.ArraySize = 1;
+    texDesc.Usage = D3D11_USAGE_STAGING;
+    texDesc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
+    texDesc.BindFlags = 0;
+
+    sys->staging = NULL;
+    hr = ID3D11Device_CreateTexture2D( sys->d3ddev, &texDesc, NULL, &sys->staging);
+    if (FAILED(hr)) {
+        msg_Err(va, "Failed to create a staging texture to extract surface pixels (hr=0x%0lx)", hr );
+        return VLC_EGENERIC;
+    }
+
+    texDesc.ArraySize = surface_count;
     texDesc.Usage = D3D11_USAGE_DEFAULT; //D3D11_USAGE_DYNAMIC; //D3D11_USAGE_STAGING; // D3D11_USAGE_DEFAULT
     texDesc.BindFlags = D3D11_BIND_DECODER;// | D3D11_BIND_UNORDERED_ACCESS;
-    //texDesc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
-    texDesc.MiscFlags = 0; // D3D11_RESOURCE_MISC_SHARED
-
-    D3D11_VIDEO_DECODER_OUTPUT_VIEW_DESC viewDesc;
-    ZeroMemory(&viewDesc, sizeof(viewDesc));
-    viewDesc.DecodeProfile = sys->input;
-    viewDesc.ViewDimension = D3D11_VPIV_DIMENSION_TEXTURE2D;
+    texDesc.CPUAccessFlags = 0; //D3D11_CPU_ACCESS_READ;
 
     ID3D11Texture2D *p_texture;
     hr = ID3D11Device_CreateTexture2D( sys->d3ddev, &texDesc, NULL, &p_texture );
@@ -988,6 +974,11 @@ static int DxCreateVideoDecoder(vlc_va_t *va, int codec_id,
         msg_Err(va, "CreateTexture2D %d failed. (hr=0x%0lx)", sys->surface_count, hr);
         return VLC_EGENERIC;
     }
+
+    D3D11_VIDEO_DECODER_OUTPUT_VIEW_DESC viewDesc;
+    ZeroMemory(&viewDesc, sizeof(viewDesc));
+    viewDesc.DecodeProfile = sys->input;
+    viewDesc.ViewDimension = D3D11_VPIV_DIMENSION_TEXTURE2D;
 
     for (sys->surface_count = 0; sys->surface_count < surface_count; sys->surface_count++) {
         vlc_va_surface_t *surface = &sys->surface[sys->surface_count];
