@@ -47,6 +47,7 @@
 #include <vlc_fourcc.h>
 #include <vlc_plugin.h>
 #include <vlc_codecs.h>
+#include <vlc_charset.h>
 
 #include <libavcodec/avcodec.h>
 #    define COBJMACROS
@@ -372,7 +373,6 @@ static int Extract(vlc_va_t *va, picture_t *picture, uint8_t *data)
     D3D11_MAPPED_SUBRESOURCE mappedResource;
     HRESULT hr;
 
-    msg_Dbg(va, "%lx Extract ", GetCurrentThreadId());
     assert( picture->format.i_chroma == VLC_CODEC_NV12);
 
     ID3D11VideoDecoderOutputView_GetDesc( d3d, &viewDesc );
@@ -709,8 +709,8 @@ static char *DxDescribe(vlc_va_sys_t *p_sys)
         }
 
         char *description;
-        if (asprintf(&description, "D3D11VA (%.*s, vendor %lu(%s), device %lu, revision %lu)",
-                     sizeof(adapterDesc.Description), adapterDesc.Description,
+        if (asprintf(&description, "D3D11VA (%s, vendor %u(%s), device %u, revision %u)",
+                     FromWide(adapterDesc.Description),
                      adapterDesc.VendorId, vendor, adapterDesc.DeviceId, adapterDesc.Revision) < 0)
             return NULL;
         return description;
