@@ -438,7 +438,7 @@ static int Get(vlc_va_t *va, picture_t *pic, uint8_t **data)
 
     /* Grab an unused surface, in case none are, try the oldest
      * XXX using the oldest is a workaround in case a problem happens with libavcodec */
-    unsigned i, old;
+    int i, old;
     for (i = 0, old = 0; i < sys->surface_count; i++) {
         vlc_va_surface_t *surface = &sys->surface[i];
 
@@ -1092,7 +1092,7 @@ static int DxCreateVideoDecoder(vlc_va_t *va, int codec_id,
 
 static void DxDestroyVideoDecoder(vlc_va_sys_t *va)
 {
-    for (unsigned i = 0; i < va->surface_count; i++) {
+    for (int i = 0; i < va->surface_count; i++) {
         ID3D11Resource *p_texture;
         ID3D11VideoDecoderOutputView_GetResource( va->surface[i].d3d, &p_texture );
         ID3D11Resource_Release(p_texture);
