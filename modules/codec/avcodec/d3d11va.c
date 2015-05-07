@@ -559,8 +559,8 @@ struct vlc_va_sys_t
     D3D11_VIDEO_DECODER_CONFIG    cfg;
     ID3D11VideoDecoder            *decoder;
 
-    /* */
-    struct d3d11va_context hw;
+    /* avcodec internals */
+    struct av_d3d11va_context     hw;
 
     /* Extraction */
     ID3D11Resource        *staging;
