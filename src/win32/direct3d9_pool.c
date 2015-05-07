@@ -245,4 +245,5 @@ static void DestroyPicture(picture_t *picture)
     FreeLibrary(picture->p_sys->hd3d9_dll);
 
     free(picture->p_sys);
+    free(picture);
 }

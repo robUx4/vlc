@@ -344,8 +344,8 @@ struct vlc_va_sys_t
     DXVA2_ConfigPictureDecode    cfg;
     IDirectXVideoDecoder         *decoder;
 
-    /* */
-    struct dxva_context hw;
+    /* avcodec internals */
+    struct dxva_context          hw;
 
     /* */
     unsigned     surface_count;
