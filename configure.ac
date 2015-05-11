@@ -2398,7 +2398,7 @@ have_avcodec_d3d11va="no"
 AS_IF([test "${enable_d3d11va}" != "no"], [
   if test "${SYS}" = "mingw32"; then
   AS_IF([test "x${have_avcodec}" = "xyes"], [
-    AC_CHECK_HEADERS(d3d11.h,
+    AC_CHECK_TYPES([ID3D11VideoDecoder],
       [
         AC_CHECK_HEADERS(libavcodec/d3d11va.h, [
            AC_MSG_NOTICE([D3D11 acceleration activated])
@@ -2412,9 +2412,9 @@ AS_IF([test "${enable_d3d11va}" != "no"], [
             #define _WIN32_WINNT 0x600])
       ],[
     AS_IF([test "${enable_d3d11va}" = "yes"],
-              [AC_MSG_ERROR([Could not find required d3d11.h])],
-              [AC_MSG_WARN([d3d11.h not found])])
-      ])
+              [AC_MSG_ERROR([Could not find required ID3D11VideoDecoder in d3d11.h])],
+              [AC_MSG_WARN([ID3D11VideoDecoder not found])])
+      ], [#include <d3d11.h>])
   ],[
     AS_IF([test "x${enable_d3d11va}" != "x"], [
       AC_MSG_ERROR([--enable-d3d11va and --disable-avcodec options are mutually exclusive.])
