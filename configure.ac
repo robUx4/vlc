@@ -2425,6 +2425,11 @@ AS_IF([test "${enable_d3d11va}" != "no"], [
 AM_CONDITIONAL([HAVE_AVCODEC_D3D11VA], [test "${have_avcodec_d3d11va}" = "yes"])
 
 dnl
+dnl DXGI debug
+dnl
+AC_CHECK_HEADERS(dxgidebug.h)
+
+dnl
 dnl vda needs avcodec
 dnl
 AC_ARG_ENABLE(vda,

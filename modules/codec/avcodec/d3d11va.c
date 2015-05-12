@@ -73,12 +73,6 @@ vlc_module_begin()
     set_callbacks(Open, Close)
 vlc_module_end()
 
-#include <windows.h>
-#include <windowsx.h>
-#include <ole2.h>
-#include <commctrl.h>
-#include <d3d11.h>
-
 #include <initguid.h> /* must be last included to not redefine existing GUIDs */
 
 /* dxva2api.h GUIDs: http://msdn.microsoft.com/en-us/library/windows/desktop/ms697067(v=vs100).aspx
@@ -95,295 +89,16 @@ vlc_module_end()
 # else
 #  include <dxva.h>
 # endif
-#include <d3d10.h>
 
 #endif /* __MINGW32__ */
-
-MS_GUID    (DXVA_NoEncrypt,                         0x1b81bed0, 0xa0c7, 0x11d3, 0xb9, 0x84, 0x00, 0xc0, 0x4f, 0x2e, 0x73, 0xc5);
 
 DEFINE_GUID(IID_ID3D11VideoDevice,   0x10EC4D5B, 0x975A, 0x4689, 0xB9, 0xE4, 0xD0, 0xAA, 0xC3, 0x0F, 0xE3, 0x33);
 DEFINE_GUID(IID_ID3D11VideoContext,  0x61F21C45, 0x3C0E, 0x4a74, 0x9C, 0xEA, 0x67, 0x10, 0x0D, 0x9A, 0xD5, 0xE4);
 DEFINE_GUID(IID_IDXGIDevice,         0x54ec77fa, 0x1377, 0x44e6, 0x8c, 0x32, 0x88, 0xfd, 0x5f, 0x44, 0xc8, 0x4c);
 DEFINE_GUID(IID_ID3D10Multithread,   0x9b7e4e00, 0x342c, 0x4106, 0xa1, 0x9f, 0x4f, 0x27, 0x04, 0xf6, 0x89, 0xf0);
-#ifndef NDEBUG
-#ifndef __IDXGIDebug_FWD_DEFINED__
-#define __IDXGIDebug_FWD_DEFINED__
-typedef interface IDXGIDebug IDXGIDebug;
 
-#endif 	/* __IDXGIDebug_FWD_DEFINED__ */
-
-DEFINE_GUID(DXGI_DEBUG_ALL, 0xe48ae283, 0xda80, 0x490b, 0x87, 0xe6, 0x43, 0xe9, 0xa9, 0xcf, 0xda, 0x8);
-DEFINE_GUID(DXGI_DEBUG_DX, 0x35cdd7fc, 0x13b2, 0x421d, 0xa5, 0xd7, 0x7e, 0x44, 0x51, 0x28, 0x7d, 0x64);
-DEFINE_GUID(DXGI_DEBUG_DXGI, 0x25cddaa4, 0xb1c6, 0x47e1, 0xac, 0x3e, 0x98, 0x87, 0x5b, 0x5a, 0x2e, 0x2a);
-DEFINE_GUID(DXGI_DEBUG_APP, 0x6cd6e01, 0x4219, 0x4ebd, 0x87, 0x9, 0x27, 0xed, 0x23, 0x36, 0xc, 0x62);
-
-typedef
-enum DXGI_DEBUG_RLO_FLAGS
-    {
-        DXGI_DEBUG_RLO_SUMMARY	= 0x1,
-        DXGI_DEBUG_RLO_DETAIL	= 0x2,
-        DXGI_DEBUG_RLO_ALL	= 0x3
-    } 	DXGI_DEBUG_RLO_FLAGS;
-
-#ifndef __IDXGIDebug_INTERFACE_DEFINED__
-#define __IDXGIDebug_INTERFACE_DEFINED__
-
-/* interface IDXGIDebug */
-/* [unique][local][object][uuid] */
-
-
-EXTERN_C const IID IID_IDXGIDebug;
-
-#if defined(__cplusplus) && !defined(CINTERFACE)
-
-    MIDL_INTERFACE("119E7452-DE9E-40fe-8806-88F90C12B441")
-    IDXGIDebug : public IUnknown
-    {
-    public:
-        virtual HRESULT STDMETHODCALLTYPE ReportLiveObjects(
-            GUID apiid,
-            DXGI_DEBUG_RLO_FLAGS flags) = 0;
-
-    };
-
-
-#else 	/* C style interface */
-
-    typedef struct IDXGIDebugVtbl
-    {
-        BEGIN_INTERFACE
-
-        HRESULT ( STDMETHODCALLTYPE *QueryInterface )(
-            IDXGIDebug * This,
-            /* [in] */ REFIID riid,
-            /* [annotation][iid_is][out] */
-            void **ppvObject);
-
-        ULONG ( STDMETHODCALLTYPE *AddRef )(
-            IDXGIDebug * This);
-
-        ULONG ( STDMETHODCALLTYPE *Release )(
-            IDXGIDebug * This);
-
-        HRESULT ( STDMETHODCALLTYPE *ReportLiveObjects )(
-            IDXGIDebug * This,
-            GUID apiid,
-            DXGI_DEBUG_RLO_FLAGS flags);
-
-        END_INTERFACE
-    } IDXGIDebugVtbl;
-
-    interface IDXGIDebug
-    {
-        CONST_VTBL struct IDXGIDebugVtbl *lpVtbl;
-    };
-
-
-
-#ifdef COBJMACROS
-
-
-#define IDXGIDebug_QueryInterface(This,riid,ppvObject)	\
-    ( (This)->lpVtbl -> QueryInterface(This,riid,ppvObject) )
-
-#define IDXGIDebug_AddRef(This)	\
-    ( (This)->lpVtbl -> AddRef(This) )
-
-#define IDXGIDebug_Release(This)	\
-    ( (This)->lpVtbl -> Release(This) )
-
-
-#define IDXGIDebug_ReportLiveObjects(This,apiid,flags)	\
-    ( (This)->lpVtbl -> ReportLiveObjects(This,apiid,flags) )
-
-#endif /* COBJMACROS */
-
-
-#endif 	/* C style interface */
-
-
-
-
-#endif 	/* __IDXGIDebug_INTERFACE_DEFINED__ */
-
-DEFINE_GUID(IID_IDXGIDebug,0x119E7452,0xDE9E,0x40fe,0x88,0x06,0x88,0xF9,0x0C,0x12,0xB4,0x41);
-
-#ifndef __ID3D11Debug_FWD_DEFINED__
-#define __ID3D11Debug_FWD_DEFINED__
-typedef interface ID3D11Debug ID3D11Debug;
-
-#endif 	/* __ID3D11Debug_FWD_DEFINED__ */
-
-typedef
-enum D3D11_RLDO_FLAGS
-    {
-        D3D11_RLDO_SUMMARY	= 0x1,
-        D3D11_RLDO_DETAIL	= 0x2
-    } 	D3D11_RLDO_FLAGS;
-
-#ifndef __ID3D11Debug_INTERFACE_DEFINED__
-#define __ID3D11Debug_INTERFACE_DEFINED__
-
-/* interface ID3D11Debug */
-/* [unique][local][object][uuid] */
-
-
-#if defined(__cplusplus) && !defined(CINTERFACE)
-
-    MIDL_INTERFACE("79cf2233-7536-4948-9d36-1e4692dc5760")
-    ID3D11Debug : public IUnknown
-    {
-    public:
-        virtual HRESULT STDMETHODCALLTYPE SetFeatureMask(
-            UINT Mask) = 0;
-
-        virtual UINT STDMETHODCALLTYPE GetFeatureMask( void) = 0;
-
-        virtual HRESULT STDMETHODCALLTYPE SetPresentPerRenderOpDelay(
-            UINT Milliseconds) = 0;
-
-        virtual UINT STDMETHODCALLTYPE GetPresentPerRenderOpDelay( void) = 0;
-
-        virtual HRESULT STDMETHODCALLTYPE SetSwapChain(
-            /* [annotation] */
-            _In_opt_  IDXGISwapChain *pSwapChain) = 0;
-
-        virtual HRESULT STDMETHODCALLTYPE GetSwapChain(
-            /* [annotation] */
-            _Out_  IDXGISwapChain **ppSwapChain) = 0;
-
-        virtual HRESULT STDMETHODCALLTYPE ValidateContext(
-            /* [annotation] */
-            _In_  ID3D11DeviceContext *pContext) = 0;
-
-        virtual HRESULT STDMETHODCALLTYPE ReportLiveDeviceObjects(
-            D3D11_RLDO_FLAGS Flags) = 0;
-
-        virtual HRESULT STDMETHODCALLTYPE ValidateContextForDispatch(
-            /* [annotation] */
-            _In_  ID3D11DeviceContext *pContext) = 0;
-
-    };
-
-
-#else 	/* C style interface */
-
-    typedef struct ID3D11DebugVtbl
-    {
-        BEGIN_INTERFACE
-
-        HRESULT ( STDMETHODCALLTYPE *QueryInterface )(
-            ID3D11Debug * This,
-            /* [in] */ REFIID riid,
-            /* [annotation][iid_is][out] */
-            void **ppvObject);
-
-        ULONG ( STDMETHODCALLTYPE *AddRef )(
-            ID3D11Debug * This);
-
-        ULONG ( STDMETHODCALLTYPE *Release )(
-            ID3D11Debug * This);
-
-        HRESULT ( STDMETHODCALLTYPE *SetFeatureMask )(
-            ID3D11Debug * This,
-            UINT Mask);
-
-        UINT ( STDMETHODCALLTYPE *GetFeatureMask )(
-            ID3D11Debug * This);
-
-        HRESULT ( STDMETHODCALLTYPE *SetPresentPerRenderOpDelay )(
-            ID3D11Debug * This,
-            UINT Milliseconds);
-
-        UINT ( STDMETHODCALLTYPE *GetPresentPerRenderOpDelay )(
-            ID3D11Debug * This);
-
-        HRESULT ( STDMETHODCALLTYPE *SetSwapChain )(
-            ID3D11Debug * This,
-            /* [annotation] */
-            _In_opt_  IDXGISwapChain *pSwapChain);
-
-        HRESULT ( STDMETHODCALLTYPE *GetSwapChain )(
-            ID3D11Debug * This,
-            /* [annotation] */
-            _Out_  IDXGISwapChain **ppSwapChain);
-
-        HRESULT ( STDMETHODCALLTYPE *ValidateContext )(
-            ID3D11Debug * This,
-            /* [annotation] */
-            _In_  ID3D11DeviceContext *pContext);
-
-        HRESULT ( STDMETHODCALLTYPE *ReportLiveDeviceObjects )(
-            ID3D11Debug * This,
-            D3D11_RLDO_FLAGS Flags);
-
-        HRESULT ( STDMETHODCALLTYPE *ValidateContextForDispatch )(
-            ID3D11Debug * This,
-            /* [annotation] */
-            _In_  ID3D11DeviceContext *pContext);
-
-        END_INTERFACE
-    } ID3D11DebugVtbl;
-
-    interface ID3D11Debug
-    {
-        CONST_VTBL struct ID3D11DebugVtbl *lpVtbl;
-    };
-
-
-
-#ifdef COBJMACROS
-
-
-#define ID3D11Debug_QueryInterface(This,riid,ppvObject)	\
-    ( (This)->lpVtbl -> QueryInterface(This,riid,ppvObject) )
-
-#define ID3D11Debug_AddRef(This)	\
-    ( (This)->lpVtbl -> AddRef(This) )
-
-#define ID3D11Debug_Release(This)	\
-    ( (This)->lpVtbl -> Release(This) )
-
-
-#define ID3D11Debug_SetFeatureMask(This,Mask)	\
-    ( (This)->lpVtbl -> SetFeatureMask(This,Mask) )
-
-#define ID3D11Debug_GetFeatureMask(This)	\
-    ( (This)->lpVtbl -> GetFeatureMask(This) )
-
-#define ID3D11Debug_SetPresentPerRenderOpDelay(This,Milliseconds)	\
-    ( (This)->lpVtbl -> SetPresentPerRenderOpDelay(This,Milliseconds) )
-
-#define ID3D11Debug_GetPresentPerRenderOpDelay(This)	\
-    ( (This)->lpVtbl -> GetPresentPerRenderOpDelay(This) )
-
-#define ID3D11Debug_SetSwapChain(This,pSwapChain)	\
-    ( (This)->lpVtbl -> SetSwapChain(This,pSwapChain) )
-
-#define ID3D11Debug_GetSwapChain(This,ppSwapChain)	\
-    ( (This)->lpVtbl -> GetSwapChain(This,ppSwapChain) )
-
-#define ID3D11Debug_ValidateContext(This,pContext)	\
-    ( (This)->lpVtbl -> ValidateContext(This,pContext) )
-
-#define ID3D11Debug_ReportLiveDeviceObjects(This,Flags)	\
-    ( (This)->lpVtbl -> ReportLiveDeviceObjects(This,Flags) )
-
-#define ID3D11Debug_ValidateContextForDispatch(This,pContext)	\
-    ( (This)->lpVtbl -> ValidateContextForDispatch(This,pContext) )
-
-#endif /* COBJMACROS */
-
-
-#endif 	/* C style interface */
-
-
-
-
-#endif 	/* __ID3D11Debug_INTERFACE_DEFINED__ */
-
-DEFINE_GUID(IID_ID3D11Debug,0x79cf2233,0x7536,0x4948,0x9d,0x36,0x1e,0x46,0x92,0xdc,0x57,0x60);
-
+#if defined(NDEBUG) && defined(HAVE_DXGIDEBUG_H)
+#include <dxgidebug.h>
 #endif
 
 DEFINE_GUID(D3D11_DECODER_PROFILE_MPEG2_MOCOMP,      0xe6a9f44b, 0x61b0, 0x4563,0x9e,0xa4,0x63,0xd2,0xa3,0xc6,0xfe,0x66);
@@ -538,7 +253,7 @@ struct vlc_va_sys_t
 
     /* DLL */
     HINSTANCE             hd3d11_dll;
-#ifndef NDEBUG
+#if defined(NDEBUG) && defined(HAVE_DXGIDEBUG_H)
     HINSTANCE             dxgidebug_dll;
 #endif
 
@@ -782,7 +497,7 @@ static void Close(vlc_va_t *va, AVCodecContext *ctx)
 
     if (sys->hd3d11_dll)
         FreeLibrary(sys->hd3d11_dll);
-#ifndef NDEBUG
+#if defined(NDEBUG) && defined(HAVE_DXGIDEBUG_H)
     if (sys->dxgidebug_dll)
         FreeLibrary(sys->dxgidebug_dll);
 #endif
@@ -846,7 +561,7 @@ static int Open(vlc_va_t *va, AVCodecContext *ctx, enum PixelFormat pix_fmt,
     }
     msg_Dbg(va, "DLLs loaded");
 
-#ifndef NDEBUG
+#if defined(NDEBUG) && defined(HAVE_DXGIDEBUG_H)
     sys->dxgidebug_dll = LoadLibrary(TEXT("DXGIDEBUG.DLL"));
 #endif
 
@@ -949,7 +664,7 @@ static int D3dCreateDevice(vlc_va_t *va)
     msg_Err(va, "Got ID3D11VideoContext 0x%p", d3dvidctx);
 #endif
 
-#ifndef NDEBUG
+#if defined(NDEBUG) && defined(HAVE_DXGIDEBUG_H)
     HRESULT (WINAPI  * pf_DXGIGetDebugInterface)(const GUID *riid, void **ppDebug);
     if (sys->dxgidebug_dll) {
         pf_DXGIGetDebugInterface = (void *)GetProcAddress(sys->dxgidebug_dll, "DXGIGetDebugInterface");
@@ -957,16 +672,9 @@ static int D3dCreateDevice(vlc_va_t *va)
             IDXGIDebug *pDXGIDebug = NULL;
             hr = pf_DXGIGetDebugInterface(&IID_IDXGIDebug, (void**)&pDXGIDebug);
             if (SUCCEEDED(hr) && pDXGIDebug) {
-                hr = IDXGIDebug_ReportLiveObjects(pDXGIDebug, DXGI_DEBUG_DX, DXGI_DEBUG_RLO_DETAIL);
+                hr = IDXGIDebug_ReportLiveObjects(pDXGIDebug, DXGI_DEBUG_ALL, DXGI_DEBUG_RLO_ALL);
             }
         }
-    }
-
-    ID3D11Debug *pD3D11Debug;
-    hr = ID3D11Device_QueryInterface(d3ddev, &IID_ID3D11Debug, (void **) &pD3D11Debug);
-    if (SUCCEEDED(hr)) {
-        hr = ID3D11Debug_ReportLiveDeviceObjects(pD3D11Debug, D3D11_RLDO_DETAIL);
-        ID3D11Debug_Release(pD3D11Debug);
     }
 #endif
 
