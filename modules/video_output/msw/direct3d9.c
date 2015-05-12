@@ -1023,8 +1023,8 @@ static int Direct3D9CreatePool(vout_display_t *vd, video_format_t *fmt)
     memset(&pool_cfg, 0, sizeof(pool_cfg));
     pool_cfg.picture_count = 1;
     pool_cfg.picture       = &picture;
-    pool_cfg.lock      = Direct3D9LockSurface;
-    pool_cfg.unlock    = Direct3D9UnlockSurface;
+    pool_cfg.lock          = Direct3D9LockSurface;
+    pool_cfg.unlock        = Direct3D9UnlockSurface;
 
     sys->pool = picture_pool_NewExtended(&pool_cfg);
     if (!sys->pool) {

@@ -423,7 +423,6 @@ ok:
     return VLC_SUCCESS;
 }
 
-
 static int Extract(vlc_va_t *va, picture_t *picture, uint8_t *data)
 {
     vlc_va_sys_t *sys = va->sys;
