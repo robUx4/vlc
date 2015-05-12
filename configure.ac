@@ -2398,23 +2398,42 @@ have_avcodec_d3d11va="no"
 AS_IF([test "${enable_d3d11va}" != "no"], [
   if test "${SYS}" = "mingw32"; then
   AS_IF([test "x${have_avcodec}" = "xyes"], [
-    AC_CHECK_TYPES([ID3D11VideoDecoder],
-      [
-        AC_CHECK_HEADERS(libavcodec/d3d11va.h, [
-           AC_MSG_NOTICE([D3D11 acceleration activated])
-           have_avcodec_d3d11va="yes"
-        ],[
-    AS_IF([test "${enable_d3d11va}" = "yes"],
-          [AC_MSG_ERROR([d3d11va is present but libavcodec/d3d11va.h is missing])],
-              [AC_MSG_WARN([d3d11va is present but libavcodec/d3d11va.h is missing ])])
-        ], [#undef _WIN32_WINNT
-            /* D3D11 is only available in Vista and above */
-            #define _WIN32_WINNT 0x600])
-      ],[
-    AS_IF([test "${enable_d3d11va}" = "yes"],
-              [AC_MSG_ERROR([Could not find required ID3D11VideoDecoder in d3d11.h])],
-              [AC_MSG_WARN([ID3D11VideoDecoder not found])])
-      ], [#include <d3d11.h>])
+        AC_CHECK_TYPES([ID3D11VideoDecoder],
+          [
+            AC_CHECK_HEADERS(libavcodec/d3d11va.h, [
+               AC_MSG_NOTICE([D3D11 acceleration activated])
+               have_avcodec_d3d11va="yes"
+            ],[
+              AS_IF([test "${enable_d3d11va}" = "yes"],
+                [AC_MSG_ERROR([d3d11va is present but libavcodec/d3d11va.h is missing])],
+                    [AC_MSG_WARN([d3d11va is present but libavcodec/d3d11va.h is missing ])])
+              ], [#undef _WIN32_WINNT
+                  /* D3D11 is only available in Vista and above */
+                  #define _WIN32_WINNT 0x600])
+          ],[
+            $as_unset ac_cv_type_ID3D11VideoDecoder
+            AC_CHECK_TYPES([ID3D11VideoDecoder],
+              [
+                AC_CHECK_HEADERS(libavcodec/d3d11va.h, [
+                   AC_MSG_NOTICE([D3D11 acceleration activated])
+                   have_avcodec_d3d11va="yes"
+                   AC_DEFINE(HAVE_D3D11_EXTRA_H, 1, [Use <d3d11_extra.h> to get ID3D11VideoDecoder])
+                ],[
+            AS_IF([test "${enable_d3d11va}" = "yes"],
+                  [AC_MSG_ERROR([d3d11va is present but libavcodec/d3d11va.h is missing])],
+                      [AC_MSG_WARN([d3d11va is present but libavcodec/d3d11va.h is missing ])])
+                ], [#include <d3d11.h>
+#include <d3d11_extra.h>
+#undef _WIN32_WINNT
+                    /* D3D11 is only available in Vista and above */
+                    #define _WIN32_WINNT 0x600])
+              ],[
+            AS_IF([test "${enable_d3d11va}" = "yes"],
+                      [AC_MSG_ERROR([Could not find required ID3D11VideoDecoder in d3d11.h or d3d11_extra.h])],
+                      [AC_MSG_WARN([ID3D11VideoDecoder not found])])
+              ], [#include <d3d11.h>
+#include <d3d11_extra.h>])
+          ], [#include <d3d11.h>])
   ],[
     AS_IF([test "x${enable_d3d11va}" != "x"], [
       AC_MSG_ERROR([--enable-d3d11va and --disable-avcodec options are mutually exclusive.])
