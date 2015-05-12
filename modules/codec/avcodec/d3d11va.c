@@ -560,7 +560,7 @@ struct vlc_va_sys_t
     ID3D11VideoDecoder            *decoder;
 
     /* avcodec internals */
-    struct av_d3d11va_context     hw;
+    struct AVD3D11VAContext       hw;
 
     /* Extraction */
     ID3D11Resource        *staging;
@@ -1329,7 +1329,7 @@ static int DxCreateVideoDecoder(vlc_va_t *va, int codec_id,
     D3D11_VIDEO_DECODER_OUTPUT_VIEW_DESC viewDesc;
     ZeroMemory(&viewDesc, sizeof(viewDesc));
     viewDesc.DecodeProfile = sys->input;
-    viewDesc.ViewDimension = D3D11_VPIV_DIMENSION_TEXTURE2D;
+    viewDesc.ViewDimension = D3D11_VDOV_DIMENSION_TEXTURE2D;
 
     for (sys->surface_count = 0; sys->surface_count < surface_count; sys->surface_count++) {
         vlc_va_surface_t *surface = &sys->surface[sys->surface_count];
