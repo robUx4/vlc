@@ -287,7 +287,7 @@ error:
     return VLC_EGENERIC;
 }
 
-bool profile_supported(const directx_va_mode_t *mode, const es_format_t *fmt)
+bool directx_va_ProfileSupported(const directx_va_mode_t *mode, const es_format_t *fmt)
 {
     bool is_supported = mode->p_profiles == NULL || !mode->p_profiles[0];
     if (!is_supported)

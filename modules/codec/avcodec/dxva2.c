@@ -708,7 +708,7 @@ static int DxFindVideoServiceConversion(vlc_va_t *va, GUID *input, const es_form
         }
         if ( is_supported )
         {
-            is_supported = profile_supported( mode, fmt );
+            is_supported = directx_va_ProfileSupported( mode, fmt );
             if (!is_supported)
                 msg_Warn( va, "Unsupported profile for DXVA2 HWAccel: %d", fmt->i_profile );
         }
