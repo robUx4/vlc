@@ -305,7 +305,7 @@ static void DxDestroyVideoService(vlc_va_t *);
 static int DxFindVideoServiceConversion(vlc_va_t *, GUID *input, const es_format_t *fmt);
 
 static int DxCreateVideoDecoder(vlc_va_t *va, int codec_id, const video_format_t *fmt, bool b_threading);
-static void DxDestroyVideoDecoder(vlc_va_t *);
+static void DxDestroySurfaces(vlc_va_t *);
 static int DxResetVideoDecoder(vlc_va_t *);
 static void SetupAVCodecContext(vlc_va_t *);
 
@@ -432,9 +432,6 @@ static int Open(vlc_va_t *va, AVCodecContext *ctx, enum PixelFormat pix_fmt,
 
     dx_sys = &sys->dx_sys;
 
-    dx_sys->pf_create_decoder          = DxCreateVideoDecoder;
-    dx_sys->pf_destroy_decoder         = DxDestroyVideoDecoder;
-    dx_sys->pf_setup_avcodec_ctx       = SetupAVCodecContext;
     dx_sys->pf_check_device            = CheckDevice;
     dx_sys->pf_create_device           = D3dCreateDevice;
     dx_sys->pf_destroy_device          = D3dDestroyDevice;
@@ -442,6 +439,9 @@ static int Open(vlc_va_t *va, AVCodecContext *ctx, enum PixelFormat pix_fmt,
     dx_sys->pf_destroy_device_manager  = D3dDestroyDeviceManager;
     dx_sys->pf_create_video_service    = DxCreateVideoService;
     dx_sys->pf_destroy_video_service   = DxDestroyVideoService;
+    dx_sys->pf_create_decoder_surfaces = DxCreateVideoDecoder;
+    dx_sys->pf_destroy_surfaces        = DxDestroySurfaces;
+    dx_sys->pf_setup_avcodec_ctx       = SetupAVCodecContext;
     dx_sys->pf_find_service_conversion = DxFindVideoServiceConversion;
     dx_sys->psz_decoder_dll            = TEXT("DXVA2.DLL");
 
@@ -785,13 +785,6 @@ static int DxCreateVideoDecoder(vlc_va_t *va, int codec_id, const video_format_t
         dx_sys->surface_count = 0;
         return VLC_EGENERIC;
     }
-    for (int i = 0; i < dx_sys->surface_count; i++) {
-        vlc_va_surface_t *surface = &dx_sys->surface[i];
-        surface->d3d = dx_sys->hw_surface[i];
-        surface->refcount = 0;
-        surface->order = 0;
-        surface->p_lock = &dx_sys->surface_lock;
-    }
     msg_Dbg(va, "IDirectXVideoAccelerationService_CreateSurface succeed with %d surfaces (%dx%d)",
             dx_sys->surface_count, dx_sys->surface_width, dx_sys->surface_height);
 
@@ -888,7 +881,7 @@ static int DxCreateVideoDecoder(vlc_va_t *va, int codec_id, const video_format_t
     return VLC_SUCCESS;
 }
 
-static void DxDestroyVideoDecoder(vlc_va_t *va)
+static void DxDestroySurfaces(vlc_va_t *va)
 {
     VLC_UNUSED(va);
 }

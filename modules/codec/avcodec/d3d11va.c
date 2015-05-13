@@ -246,8 +246,8 @@ static int DxCreateVideoService(vlc_va_t *);
 static void DxDestroyVideoService(vlc_va_t *);
 static int DxFindVideoServiceConversion(vlc_va_t *, GUID *input, const es_format_t *fmt);
 
-static int DxCreateVideoDecoder(vlc_va_t *va, int codec_id, const video_format_t *fmt, bool b_threading);
-static void DxDestroyVideoDecoder(vlc_va_t *);
+static int DxCreateDecoderSurfaces(vlc_va_t *va, int codec_id, const video_format_t *fmt, bool b_threading);
+static void DxDestroySurfaces(vlc_va_t *);
 static void SetupAVCodecContext(vlc_va_t *);
 
 /* */
@@ -429,9 +429,6 @@ static int Open(vlc_va_t *va, AVCodecContext *ctx, enum PixelFormat pix_fmt,
 
     dx_sys = &sys->dx_sys;
 
-    dx_sys->pf_create_decoder          = DxCreateVideoDecoder;
-    dx_sys->pf_destroy_decoder         = DxDestroyVideoDecoder;
-    dx_sys->pf_setup_avcodec_ctx       = SetupAVCodecContext;
     dx_sys->pf_check_device            = CheckDevice;
     dx_sys->pf_create_device           = D3dCreateDevice;
     dx_sys->pf_destroy_device          = D3dDestroyDevice;
@@ -439,6 +436,9 @@ static int Open(vlc_va_t *va, AVCodecContext *ctx, enum PixelFormat pix_fmt,
     dx_sys->pf_destroy_device_manager  = D3dDestroyDeviceManager;
     dx_sys->pf_create_video_service    = DxCreateVideoService;
     dx_sys->pf_destroy_video_service   = DxDestroyVideoService;
+    dx_sys->pf_create_decoder_surfaces = DxCreateDecoderSurfaces;
+    dx_sys->pf_destroy_surfaces        = DxDestroySurfaces;
+    dx_sys->pf_setup_avcodec_ctx       = SetupAVCodecContext;
     dx_sys->pf_find_service_conversion = DxFindVideoServiceConversion;
     dx_sys->psz_decoder_dll            = TEXT("D3D11.DLL");
 
@@ -764,9 +764,9 @@ static int DxFindVideoServiceConversion(vlc_va_t *va, GUID *input, const es_form
 }
 
 /**
- * It creates a DXVA2 decoder using the given video format
+ * It creates a Direct3D11 decoder using the given video format
  */
-static int DxCreateVideoDecoder(vlc_va_t *va, int codec_id, const video_format_t *fmt, bool b_threading)
+static int DxCreateDecoderSurfaces(vlc_va_t *va, int codec_id, const video_format_t *fmt, bool b_threading)
 {
     VLC_UNUSED(fmt);
 
@@ -824,22 +824,17 @@ static int DxCreateVideoDecoder(vlc_va_t *va, int codec_id, const video_format_t
 
     int surface_count = dx_sys->surface_count;
     for (dx_sys->surface_count = 0; dx_sys->surface_count < surface_count; dx_sys->surface_count++) {
-        vlc_va_surface_t *surface = &dx_sys->surface[dx_sys->surface_count];
-
         viewDesc.Texture2D.ArraySlice = dx_sys->surface_count;
 
-        ID3D11Resource *p_resource = (ID3D11Resource*) p_texture;
-        hr = ID3D11VideoDevice_CreateVideoDecoderOutputView( (ID3D11VideoDevice*) dx_sys->d3ddec, p_resource,
-                                                             &viewDesc, (ID3D11VideoDecoderOutputView**) &surface->d3d );
+        hr = ID3D11VideoDevice_CreateVideoDecoderOutputView( (ID3D11VideoDevice*) dx_sys->d3ddec,
+                                                             (ID3D11Resource*) p_texture,
+                                                             &viewDesc,
+                                                             (ID3D11VideoDecoderOutputView**) &dx_sys->hw_surface[dx_sys->surface_count] );
         if (FAILED(hr)) {
             msg_Err(va, "CreateVideoDecoderOutputView %d failed. (hr=0x%0lx)", dx_sys->surface_count, hr);
             ID3D11Texture2D_Release(p_texture);
             return VLC_EGENERIC;
         }
-        surface->refcount = 0;
-        surface->order = 0;
-        surface->p_lock = &dx_sys->surface_lock;
-        dx_sys->hw_surface[dx_sys->surface_count] = surface->d3d;
     }
     msg_Dbg(va, "ID3D11VideoDecoderOutputView succeed with %d surfaces (%dx%d)",
             dx_sys->surface_count, dx_sys->surface_width, dx_sys->surface_height);
@@ -917,12 +912,12 @@ static int DxCreateVideoDecoder(vlc_va_t *va, int codec_id, const video_format_t
     return VLC_SUCCESS;
 }
 
-static void DxDestroyVideoDecoder(vlc_va_t *va)
+static void DxDestroySurfaces(vlc_va_t *va)
 {
     directx_sys_t *dx_sys = &va->sys->dx_sys;
-    for (int i = 0; i < dx_sys->surface_count; i++) {
+    if (dx_sys->surface_count) {
         ID3D11Resource *p_texture;
-        ID3D11VideoDecoderOutputView_GetResource( (ID3D11VideoDecoderOutputView*) dx_sys->surface[i].d3d, &p_texture );
+        ID3D11VideoDecoderOutputView_GetResource( (ID3D11VideoDecoderOutputView*) dx_sys->hw_surface[0], &p_texture );
         ID3D11Resource_Release(p_texture);
         ID3D11Resource_Release(p_texture);
     }

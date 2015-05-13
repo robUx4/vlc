@@ -57,7 +57,6 @@ typedef struct {
 
 /* */
 typedef struct {
-    IUnknown           *d3d;
     int                refcount;
     unsigned int       order;
     vlc_mutex_t        *p_lock;
@@ -69,8 +68,6 @@ typedef struct
     int          codec_id;
     int          width;
     int          height;
-
-    vlc_mutex_t     surface_lock;
 
     /* DLL */
     HINSTANCE             hdecoder_dll;
@@ -94,13 +91,13 @@ typedef struct
 
     int          thread_count;
 
+    vlc_mutex_t      surface_lock;
     vlc_va_surface_t surface[MAX_SURFACE_COUNT];
-    void*            hw_surface[MAX_SURFACE_COUNT];
+    IUnknown         *hw_surface[MAX_SURFACE_COUNT];
 
-    int (*pf_create_decoder)(vlc_va_t *, int codec_id, const video_format_t *fmt, bool b_threading);
-    void (*pf_destroy_decoder)(vlc_va_t *);
-    void (*pf_setup_avcodec_ctx)(vlc_va_t *);
-
+    /**
+     * Check that the decoder device is still available
+     */
     int (*pf_check_device)(vlc_va_t *);
 
     int (*pf_create_device)(vlc_va_t *);
@@ -113,6 +110,19 @@ typedef struct
     void (*pf_destroy_video_service)(vlc_va_t *);
 
     int (*pf_find_service_conversion)(vlc_va_t *, GUID *input, const es_format_t *fmt);
+
+    /**
+     * Create the DirectX surfaces in hw_surface and the decoder in decoder
+     */
+    int (*pf_create_decoder_surfaces)(vlc_va_t *, int codec_id, const video_format_t *fmt, bool b_threading);
+    /**
+     * Destroy resources allocated with the surfaces except from hw_surface objects
+     */
+    void (*pf_destroy_surfaces)(vlc_va_t *);
+    /**
+     * Set the avcodec hw context after the decoder is created
+     */
+    void (*pf_setup_avcodec_ctx)(vlc_va_t *);
 
 } directx_sys_t;
 

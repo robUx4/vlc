@@ -140,8 +140,15 @@ int directx_va_Setup(vlc_va_t *va, directx_sys_t *dx_sys, AVCodecContext *avctx,
     fmt.i_frame_rate = avctx->framerate.num;
     fmt.i_frame_rate_base = avctx->framerate.den;
 
-    if (dx_sys->pf_create_decoder(va, dx_sys->codec_id, &fmt, avctx->active_thread_type & FF_THREAD_FRAME))
+    if (dx_sys->pf_create_decoder_surfaces(va, dx_sys->codec_id, &fmt, avctx->active_thread_type & FF_THREAD_FRAME))
         return VLC_EGENERIC;
+
+    for (int i = 0; i < dx_sys->surface_count; i++) {
+        vlc_va_surface_t *surface = &dx_sys->surface[i];
+        surface->refcount = 0;
+        surface->order = 0;
+        surface->p_lock = &dx_sys->surface_lock;
+    }
 
     dx_sys->pf_setup_avcodec_ctx(va);
 
@@ -151,15 +158,11 @@ ok:
 
 void DestroyVideoDecoder(vlc_va_t *va, directx_sys_t *dx_sys)
 {
-    dx_sys->pf_destroy_decoder(va);
+    dx_sys->pf_destroy_surfaces(va);
 
-    for (int i = 0; i < dx_sys->surface_count; i++) {
-        IUnknown_Release( dx_sys->surface[i].d3d );
-#if DEBUG_LEAK
-        assert(dx_sys->surface[i].d3d == dx_sys->hw_surface[i]);
-        dx_sys->surface[i].d3d = dx_sys->hw_surface[i] = NULL;
-#endif
-    }
+    for (int i = 0; i < dx_sys->surface_count; i++)
+        IUnknown_Release( dx_sys->hw_surface[i] );
+
     if (dx_sys->decoder)
         IUnknown_Release( dx_sys->decoder );
 
@@ -195,7 +198,7 @@ int directx_va_Get(vlc_va_t *va, directx_sys_t *dx_sys, picture_t *pic, uint8_t 
 
     surface->refcount = 1;
     surface->order = dx_sys->surface_order++;
-    *data = (void *)surface->d3d;
+    *data = (void *)dx_sys->hw_surface[i];
     pic->context = surface;
 
     vlc_mutex_unlock( &dx_sys->surface_lock );
