@@ -42,18 +42,14 @@
 
 #include <unknwn.h>
 
-const int PROF_MPEG2_SIMPLE[2];
-const int PROF_MPEG2_MAIN[3];
-const int PROF_H264_HIGH[4];
-const int PROF_HEVC_MAIN[2];
-const int PROF_HEVC_MAIN10[3];
-
 typedef struct {
     const char   *name;
     const GUID   *guid;
     int          codec;
     const int    *p_profiles; // NULL or ends with 0
 } directx_va_mode_t;
+
+const directx_va_mode_t DXVA_MODES[];
 
 /* */
 typedef struct {
@@ -132,7 +128,7 @@ int directx_va_Setup(vlc_va_t *, directx_sys_t *, AVCodecContext *avctx, vlc_fou
 int directx_va_Get(vlc_va_t *, directx_sys_t *, picture_t *pic, uint8_t **data);
 void directx_va_Release(void *opaque, uint8_t *data);
 
-const directx_va_mode_t *directx_va_FindMode(const GUID *guid, const directx_va_mode_t dxva_modes[]);
+const directx_va_mode_t *directx_va_FindMode(const GUID *guid);
 bool directx_va_ProfileSupported(const directx_va_mode_t *mode, const es_format_t *fmt);
 
 #endif /* AVCODEC_DIRECTX_VA_H */
