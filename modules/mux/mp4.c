@@ -449,6 +449,7 @@ static int AddStream(sout_mux_t *p_mux, sout_input_t *p_input)
     switch(p_input->p_fmt->i_codec)
     {
     case VLC_CODEC_A52:
+    case VLC_CODEC_DTS:
     case VLC_CODEC_EAC3:
     case VLC_CODEC_MP4A:
     case VLC_CODEC_MP4V:
@@ -874,6 +875,12 @@ static bo_t *GetESDS(mp4_stream_t *p_stream)
     case VLC_CODEC_MP4V:
         i_object_type_indication = 0x20;
         break;
+    case VLC_CODEC_MPGV:
+        if(p_stream->fmt.i_original_fourcc == VLC_CODEC_MP1V)
+        {
+            i_object_type_indication = 0x6b;
+            break;
+        }
     case VLC_CODEC_MP2V:
         /* MPEG-I=0x6b, MPEG-II = 0x60 -> 0x65 */
         i_object_type_indication = 0x65;
@@ -889,6 +896,9 @@ static bo_t *GetESDS(mp4_stream_t *p_stream)
     case VLC_CODEC_MPGA:
         i_object_type_indication =
             p_stream->fmt.audio.i_rate < 32000 ? 0x69 : 0x6b;
+        break;
+    case VLC_CODEC_DTS:
+        i_object_type_indication = 0xa9;
         break;
     default:
         i_object_type_indication = 0x00;
@@ -1572,6 +1582,8 @@ static bo_t *GetSounBox(sout_mux_t *p_mux, mp4_stream_t *p_stream)
         memcpy(fcc, "ac-3", 4);
     } else if (codec == VLC_CODEC_EAC3) {
         memcpy(fcc, "ec-3", 4);
+    } else if (codec == VLC_CODEC_DTS) {
+        memcpy(fcc, "DTS ", 4);
     } else
         vlc_fourcc_to_char(codec, fcc);
 
@@ -2193,7 +2205,7 @@ static bo_t *GetMoovBox(sout_mux_t *p_mux)
             bo_add_32be(mdhd, i_timestamp);   // creation time
             bo_add_32be(mdhd, i_timestamp);   // modification time
             bo_add_32be(mdhd, p_stream->i_timescale); // timescale
-            bo_add_32be(mdhd, i_stream_duration);  // duration
+            bo_add_32be(mdhd, i_stream_duration * p_stream->i_timescale / i_movie_timescale);  // duration
         } else {
             mdhd = box_full_new("mdhd", 1, 0);
             if(!mdhd)
@@ -2205,7 +2217,7 @@ static bo_t *GetMoovBox(sout_mux_t *p_mux)
             bo_add_64be(mdhd, i_timestamp);   // creation time
             bo_add_64be(mdhd, i_timestamp);   // modification time
             bo_add_32be(mdhd, p_stream->i_timescale); // timescale
-            bo_add_64be(mdhd, i_stream_duration);  // duration
+            bo_add_64be(mdhd, i_stream_duration * p_stream->i_timescale / i_movie_timescale);  // duration
         }
 
         if (p_stream->fmt.psz_language) {
@@ -2938,7 +2950,7 @@ static void WriteFragments(sout_mux_t *p_mux, bool b_flush)
  * This is the end boundary case. */
 static void LengthLocalFixup(sout_mux_t *p_mux, const mp4_stream_t *p_stream, block_t *p_entrydata)
 {
-    if ( p_stream->fmt.i_cat == VIDEO_ES )
+    if ( p_stream->fmt.i_cat == VIDEO_ES && p_stream->fmt.video.i_frame_rate )
     {
         p_entrydata->i_length = CLOCK_FREQ *
                 p_stream->fmt.video.i_frame_rate_base /
@@ -2948,7 +2960,7 @@ static void LengthLocalFixup(sout_mux_t *p_mux, const mp4_stream_t *p_stream, bl
     }
     else if (p_stream->fmt.i_cat == AUDIO_ES &&
              p_stream->fmt.audio.i_rate &&
-             p_entrydata->i_nb_samples)
+             p_entrydata->i_nb_samples && p_stream->fmt.audio.i_rate)
     {
         p_entrydata->i_length = CLOCK_FREQ * p_entrydata->i_nb_samples /
                 p_stream->fmt.audio.i_rate;

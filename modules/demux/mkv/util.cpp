@@ -97,7 +97,7 @@ int32_t zlib_decompress_extra( demux_t * p_demux, mkv_track_t * tk )
     }
 
     tk->p_extra_data = p_new_extra;
-    
+
     inflateEnd( &d_stream );
     return 0;
 }
@@ -186,7 +186,7 @@ void handle_real_audio(demux_t * p_demux, mkv_track_t * p_tk, block_t * p_blk, m
 
         if ( !( p_blk->i_flags & BLOCK_FLAG_TYPE_I) )
         {
-            msg_Dbg( p_demux, "discard non-key preroll block in track %d at%"PRId64,
+            msg_Dbg( p_demux, "discard non-key preroll block in track %d at%" PRId64,
                      p_tk->i_number, i_pts );
             return;
         }
@@ -217,7 +217,7 @@ void handle_real_audio(demux_t * p_demux, mkv_track_t * p_tk, block_t * p_blk, m
             p_block->i_pts = VLC_TS_INVALID;
             if( !p_sys->i_subpacket )
             {
-                p_tk->i_last_dts = 
+                p_tk->i_last_dts =
                 p_block->i_pts = i_pts;
             }
 
@@ -293,7 +293,7 @@ void send_Block( demux_t * p_demux, mkv_track_t * p_tk, block_t * p_block, unsig
     }
 
 #if 0
-msg_Dbg( p_demux, "block (track=%d) i_dts: %"PRId64" / i_pts: %"PRId64, p_tk->i_number, p_block->i_dts, p_block->i_pts);
+msg_Dbg( p_demux, "block (track=%d) i_dts: %" PRId64" / i_pts: %" PRId64, p_tk->i_number, p_block->i_dts, p_block->i_pts);
 #endif
 
     es_out_Send( p_demux->out, p_tk->p_es, p_block);
@@ -319,7 +319,7 @@ Cook_PrivateTrackData::~Cook_PrivateTrackData()
         if( p_subpackets[i] )
             block_Release( p_subpackets[i] );
 
-    free( p_subpackets );    
+    free( p_subpackets );
 }
 
 static inline void fill_wvpk_block(uint16_t version, uint32_t block_samples, uint32_t flags,
@@ -338,7 +338,7 @@ static inline void fill_wvpk_block(uint16_t version, uint32_t block_samples, uin
     SetDWLE( dst + 20, block_samples );
     SetDWLE( dst + 24, flags );
     SetDWLE( dst + 28, crc );
-    memcpy( dst + 32, src, srclen ); 
+    memcpy( dst + 32, src, srclen );
 }
 
 block_t * packetize_wavpack( mkv_track_t * p_tk, uint8_t * buffer, size_t  size)
@@ -348,13 +348,13 @@ block_t * packetize_wavpack( mkv_track_t * p_tk, uint8_t * buffer, size_t  size)
     uint32_t flags;
     uint32_t crc;
     block_t * p_block = NULL;
-    
+
     if( p_tk->i_extra_data >= 2 )
         version = GetWLE( p_tk->p_extra_data );
 
     if( size < 12 )
         return NULL;
- 
+
     block_samples = GetDWLE(buffer);
     buffer += 4;
     flags = GetDWLE(buffer);
@@ -376,7 +376,7 @@ block_t * packetize_wavpack( mkv_track_t * p_tk, uint8_t * buffer, size_t  size)
     else
     {
         /* Multiblock */
-        size_t total_size = 0; 
+        size_t total_size = 0;
 
         p_block = block_Alloc( 0 );
         if( !p_block )

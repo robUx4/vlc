@@ -106,7 +106,7 @@ static int RtspRead( void *p_userdata, uint8_t *p_buffer, int i_buffer )
     access_t *p_access = (access_t *)p_userdata;
     access_sys_t *p_sys = p_access->p_sys;
 
-    return net_Read( p_access, p_sys->fd, 0, p_buffer, i_buffer, true );
+    return net_Read( p_access, p_sys->fd, p_buffer, i_buffer, true );
 }
 
 static int RtspReadLine( void *p_userdata, uint8_t *p_buffer, int i_buffer )
@@ -114,7 +114,7 @@ static int RtspReadLine( void *p_userdata, uint8_t *p_buffer, int i_buffer )
     access_t *p_access = (access_t *)p_userdata;
     access_sys_t *p_sys = p_access->p_sys;
 
-    char *psz = net_Gets( p_access, p_sys->fd, 0 );
+    char *psz = net_Gets( p_access, p_sys->fd );
 
     //fprintf(stderr, "ReadLine: %s\n", psz);
 
@@ -133,7 +133,7 @@ static int RtspWrite( void *p_userdata, uint8_t *p_buffer, int i_buffer )
 
     //fprintf(stderr, "Write: %s", p_buffer);
 
-    net_Printf( p_access, p_sys->fd, 0, "%s", p_buffer );
+    net_Printf( p_access, p_sys->fd, "%s", p_buffer );
 
     return 0;
 }

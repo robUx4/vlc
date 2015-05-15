@@ -632,8 +632,7 @@ static int ReadStatusLine( vlc_object_t *p_this )
     char *psz_next;
     int i_result = VLC_EGENERIC;
 
-    p_sys->psz_last_status_line = net_Gets( p_this, p_sys->i_control_fd,
-                                            NULL );
+    p_sys->psz_last_status_line = net_Gets( p_this, p_sys->i_control_fd );
     if ( !p_sys->psz_last_status_line )
         goto error;
 
@@ -681,7 +680,7 @@ static int ReadHeader( vlc_object_t *p_this,
     char *psz_value;
     int i_err = VLC_SUCCESS;
 
-    psz_line = net_Gets( p_this, p_sys->i_control_fd, NULL );
+    psz_line = net_Gets( p_this, p_sys->i_control_fd );
     if ( !psz_line )
     {
         i_err = VLC_EGENERIC;
@@ -735,7 +734,7 @@ static int WriteAuxHeaders( vlc_object_t *p_this,
         psz_key = ppsz_keys[i];
         psz_value = vlc_dictionary_value_for_key( p_req_headers, psz_key );
 
-        i_rc = net_Printf( p_this, p_sys->i_control_fd, NULL,
+        i_rc = net_Printf( p_this, p_sys->i_control_fd,
                            "%s: %s\r\n", psz_key, psz_value );
         if ( i_rc < 0 )
         {
@@ -763,7 +762,7 @@ static int SendRequest( vlc_object_t *p_this, const char *psz_method,
     int i_err = VLC_SUCCESS;
     int i_rc;
 
-    i_rc = net_Printf( p_this, p_sys->i_control_fd, NULL,
+    i_rc = net_Printf( p_this, p_sys->i_control_fd,
                        "%s %s RTSP/1.0\r\n"
                        "User-Agent: " RAOP_USER_AGENT "\r\n"
                        "Client-Instance: %s\r\n"
@@ -779,7 +778,7 @@ static int SendRequest( vlc_object_t *p_this, const char *psz_method,
 
     if ( psz_content_type )
     {
-        i_rc = net_Printf( p_this, p_sys->i_control_fd, NULL,
+        i_rc = net_Printf( p_this, p_sys->i_control_fd,
                            "Content-Type: %s\r\n", psz_content_type );
         if ( i_rc < 0 )
         {
@@ -792,7 +791,7 @@ static int SendRequest( vlc_object_t *p_this, const char *psz_method,
     {
         i_body_length = strlen( psz_body );
 
-        i_rc = net_Printf( p_this, p_sys->i_control_fd, NULL,
+        i_rc = net_Printf( p_this, p_sys->i_control_fd,
                            "Content-Length: %u\r\n",
                            (unsigned int)i_body_length );
         if ( i_rc < 0 )
@@ -806,7 +805,7 @@ static int SendRequest( vlc_object_t *p_this, const char *psz_method,
     if ( i_err != VLC_SUCCESS )
         goto error;
 
-    i_rc = net_Write( p_this, p_sys->i_control_fd, NULL,
+    i_rc = net_Write( p_this, p_sys->i_control_fd,
                       psz_headers_end, sizeof( psz_headers_end ) - 1 );
     if ( i_rc < 0 )
     {
@@ -815,8 +814,7 @@ static int SendRequest( vlc_object_t *p_this, const char *psz_method,
     }
 
     if ( psz_body )
-        net_Write( p_this, p_sys->i_control_fd, NULL,
-                   psz_body, i_body_length );
+        net_Write( p_this, p_sys->i_control_fd, psz_body, i_body_length );
 
 error:
     return i_err;
@@ -1350,8 +1348,7 @@ static void SendAudio( sout_stream_t *p_stream, block_t *p_buffer )
             goto error;
 
         /* Send data */
-        rc = net_Write( p_stream, p_sys->i_stream_fd, NULL,
-                        p_sys->p_sendbuf, i_len );
+        rc = net_Write( p_stream, p_sys->i_stream_fd, p_sys->p_sendbuf, i_len );
         if ( rc < 0 )
             goto error;
 

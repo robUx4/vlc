@@ -27,9 +27,17 @@
 #endif
 
 #include "IsoffMainParser.h"
-#include "SegmentTemplate.h"
-#include "SegmentTimeline.h"
+#include "../adaptative/playlist/SegmentTemplate.h"
+#include "../adaptative/playlist/Segment.h"
+#include "../adaptative/playlist/SegmentBase.h"
+#include "../adaptative/playlist/SegmentList.h"
+#include "../adaptative/playlist/SegmentTimeline.h"
+#include "MPD.h"
+#include "Representation.h"
+#include "Period.h"
+#include "AdaptationSet.h"
 #include "ProgramInformation.h"
+#include "DASHSegment.h"
 #include "xml/DOMHelper.h"
 #include <vlc_strings.h>
 #include <vlc_stream.h>
@@ -38,13 +46,30 @@
 
 using namespace dash::mpd;
 using namespace dash::xml;
+using namespace adaptative::playlist;
 
-IsoffMainParser::IsoffMainParser    (Node *root, stream_t *p_stream) :
-                 IMPDParser(root, NULL, p_stream, NULL)
+IsoffMainParser::IsoffMainParser    (Node *root_, stream_t *stream)
 {
+    root = root_;
+    mpd = NULL;
+    p_stream = stream;
 }
+
 IsoffMainParser::~IsoffMainParser   ()
 {
+}
+
+void IsoffMainParser::setMPDBaseUrl(Node *root)
+{
+    std::vector<Node *> baseUrls = DOMHelper::getChildElementByTagName(root, "BaseURL");
+
+    for(size_t i = 0; i < baseUrls.size(); i++)
+        mpd->addBaseUrl(baseUrls.at(i)->getText());
+}
+
+MPD* IsoffMainParser::getMPD()
+{
+    return mpd;
 }
 
 bool    IsoffMainParser::parse              (Profile profile)
@@ -55,7 +80,8 @@ bool    IsoffMainParser::parse              (Profile profile)
     setMPDBaseUrl(root);
     parsePeriods(root);
 
-    print();
+    if(mpd)
+        mpd->debug();
     return true;
 }
 
@@ -99,7 +125,7 @@ void IsoffMainParser::parsePeriods(Node *root)
     std::vector<Node *> periods = DOMHelper::getElementByTagName(root, "Period", false);
     std::vector<Node *>::const_iterator it;
 
-    for(it = periods.begin(); it != periods.end(); it++)
+    for(it = periods.begin(); it != periods.end(); ++it)
     {
         Period *period = new (std::nothrow) Period(mpd);
         if (!period)
@@ -163,7 +189,7 @@ size_t IsoffMainParser::parseSegmentTemplate(Node *templateNode, SegmentInformat
 size_t IsoffMainParser::parseSegmentInformation(Node *node, SegmentInformation *info)
 {
     size_t total = 0;
-    parseSegmentBase(DOMHelper::getFirstChildElementByName(node, "SegmentBase"), info);
+    total += parseSegmentBase(DOMHelper::getFirstChildElementByName(node, "SegmentBase"), info);
     total += parseSegmentList(DOMHelper::getFirstChildElementByName(node, "SegmentList"), info);
     total += parseSegmentTemplate(DOMHelper::getFirstChildElementByName(node, "SegmentTemplate" ), info);
     if(node->hasAttribute("bitstreamSwitching"))
@@ -178,13 +204,17 @@ void    IsoffMainParser::setAdaptationSets  (Node *periodNode, Period *period)
     std::vector<Node *> adaptationSets = DOMHelper::getElementByTagName(periodNode, "AdaptationSet", false);
     std::vector<Node *>::const_iterator it;
 
-    for(it = adaptationSets.begin(); it != adaptationSets.end(); it++)
+    for(it = adaptationSets.begin(); it != adaptationSets.end(); ++it)
     {
         AdaptationSet *adaptationSet = new AdaptationSet(period);
         if(!adaptationSet)
             continue;
         if((*it)->hasAttribute("mimeType"))
             adaptationSet->setMimeType((*it)->getAttributeValue("mimeType"));
+
+        Node *baseUrl = DOMHelper::getFirstChildElementByName((*it), "BaseURL");
+        if(baseUrl)
+            adaptationSet->baseUrl.Set(new Url(baseUrl->getText()));
 
         parseSegmentInformation( *it, adaptationSet );
 
@@ -198,92 +228,61 @@ void    IsoffMainParser::setRepresentations (Node *adaptationSetNode, Adaptation
 
     for(size_t i = 0; i < representations.size(); i++)
     {
-        this->currentRepresentation = new Representation(adaptationSet, getMPD());
+        Representation *currentRepresentation = new Representation(adaptationSet, getMPD());
         Node *repNode = representations.at(i);
 
         std::vector<Node *> baseUrls = DOMHelper::getChildElementByTagName(repNode, "BaseURL");
         if(!baseUrls.empty())
-            currentRepresentation->setBaseUrl( new BaseUrl( baseUrls.front()->getText() ) );
+            currentRepresentation->baseUrl.Set(new Url(baseUrls.front()->getText()));
 
         if(repNode->hasAttribute("id"))
             currentRepresentation->setId(repNode->getAttributeValue("id"));
 
         if(repNode->hasAttribute("width"))
-            this->currentRepresentation->setWidth(atoi(repNode->getAttributeValue("width").c_str()));
+            currentRepresentation->setWidth(atoi(repNode->getAttributeValue("width").c_str()));
 
         if(repNode->hasAttribute("height"))
-            this->currentRepresentation->setHeight(atoi(repNode->getAttributeValue("height").c_str()));
+            currentRepresentation->setHeight(atoi(repNode->getAttributeValue("height").c_str()));
 
         if(repNode->hasAttribute("bandwidth"))
-            this->currentRepresentation->setBandwidth(atoi(repNode->getAttributeValue("bandwidth").c_str()));
+            currentRepresentation->setBandwidth(atoi(repNode->getAttributeValue("bandwidth").c_str()));
 
         if(repNode->hasAttribute("mimeType"))
             currentRepresentation->setMimeType(repNode->getAttributeValue("mimeType"));
 
-        size_t totalmediasegments = parseSegmentInformation(repNode, currentRepresentation);
-        if(!totalmediasegments)
-        {
-            /* unranged & segment less representation, add fake segment */
-            SegmentList *list = new SegmentList();
-            Segment *seg = new Segment(currentRepresentation);
-            if(list && seg)
-            {
-                list->addSegment(seg);
-                currentRepresentation->setSegmentList(list);
-            }
-            else
-            {
-                delete seg;
-                delete list;
-            }
-        }
+        parseSegmentInformation(repNode, currentRepresentation);
 
-        adaptationSet->addRepresentation(this->currentRepresentation);
+        adaptationSet->addRepresentation(currentRepresentation);
     }
 }
-
-void IsoffMainParser::parseSegmentBase(Node * segmentBaseNode, SegmentInformation *info)
+size_t IsoffMainParser::parseSegmentBase(Node * segmentBaseNode, SegmentInformation *info)
 {
-    if(!segmentBaseNode)
-        return;
+    SegmentBase *base;
 
-    else if(segmentBaseNode->hasAttribute("indexRange"))
+    if(!segmentBaseNode || !(base = new (std::nothrow) SegmentBase(info)))
+        return 0;
+
+    if(segmentBaseNode->hasAttribute("indexRange"))
     {
-        SegmentList *list = new SegmentList();
-        Segment *seg;
-
         size_t start = 0, end = 0;
         if (std::sscanf(segmentBaseNode->getAttributeValue("indexRange").c_str(), "%zu-%zu", &start, &end) == 2)
         {
-            seg = new IndexSegment(info);
-            seg->setByteRange(start, end);
-            list->addSegment(seg);
-            /* index must be before data, so data starts at index end */
-            seg = new Segment(info);
-            seg->setByteRange(end + 1, 0);
-        }
-        else
-        {
-            seg = new Segment(info);
-        }
-
-        list->addSegment(seg);
-        info->setSegmentList(list);
-
-        Node *initSeg = DOMHelper::getFirstChildElementByName(segmentBaseNode, "Initialization");
-        if(initSeg)
-        {
-            SegmentBase *base = new SegmentBase();
-            parseInitSegment(initSeg, base);
-            info->setSegmentBase(base);
+            IndexSegment *index = new (std::nothrow) DashIndexSegment(info);
+            if(index)
+            {
+                index->setByteRange(start, end);
+                base->indexSegment.Set(index);
+                /* index must be before data, so data starts at index end */
+                base->setByteRange(end + 1, 0);
+            }
         }
     }
-    else
-    {
-        SegmentBase *base = new SegmentBase();
-        parseInitSegment(DOMHelper::getFirstChildElementByName(segmentBaseNode, "Initialization"), base);
-        info->setSegmentBase(base);
-    }
+
+    parseInitSegment(DOMHelper::getFirstChildElementByName(segmentBaseNode, "Initialization"), base, info);
+
+    info->setSegmentBase(base);
+
+    return 1;
 }
 
 size_t IsoffMainParser::parseSegmentList(Node * segListNode, SegmentInformation *info)
@@ -294,9 +293,9 @@ size_t IsoffMainParser::parseSegmentList(Node * segListNode, SegmentInformation 
     {
         std::vector<Node *> segments = DOMHelper::getElementByTagName(segListNode, "SegmentURL", false);
         SegmentList *list;
-        if(!segments.empty() && (list = new (std::nothrow) SegmentList()))
+        if((list = new (std::nothrow) SegmentList()))
         {
-            parseInitSegment(DOMHelper::getFirstChildElementByName(segListNode, "Initialization"), list);
+            parseInitSegment(DOMHelper::getFirstChildElementByName(segListNode, "Initialization"), list, info);
 
             if(segListNode->hasAttribute("duration"))
                 list->setDuration(Integer<mtime_t>(segListNode->getAttributeValue("duration")));
@@ -305,18 +304,17 @@ size_t IsoffMainParser::parseSegmentList(Node * segListNode, SegmentInformation 
                 list->timescale.Set(Integer<uint64_t>(segListNode->getAttributeValue("timescale")));
 
             std::vector<Node *>::const_iterator it;
-            for(it = segments.begin(); it != segments.end(); it++)
+            for(it = segments.begin(); it != segments.end(); ++it)
             {
                 Node *segmentURL = *it;
-                std::string mediaUrl = segmentURL->getAttributeValue("media");
-                if(mediaUrl.empty())
-                    continue;
 
                 Segment *seg = new (std::nothrow) Segment(info);
                 if(!seg)
                     continue;
 
-                seg->setSourceUrl(segmentURL->getAttributeValue("media"));
+                std::string mediaUrl = segmentURL->getAttributeValue("media");
+                if(!mediaUrl.empty())
+                    seg->setSourceUrl(mediaUrl);
 
                 if(segmentURL->hasAttribute("mediaRange"))
                 {
@@ -341,12 +339,12 @@ size_t IsoffMainParser::parseSegmentList(Node * segListNode, SegmentInformation 
     return total;
 }
 
-void IsoffMainParser::parseInitSegment(Node *initNode, Initializable<Segment> *init)
+void IsoffMainParser::parseInitSegment(Node *initNode, Initializable<Segment> *init, SegmentInformation *parent)
 {
     if(!initNode)
         return;
 
-    Segment *seg = new InitSegment( currentRepresentation );
+    Segment *seg = new InitSegment( parent );
     seg->setSourceUrl(initNode->getAttributeValue("sourceURL"));
 
     if(initNode->hasAttribute("range"))
@@ -369,7 +367,7 @@ void IsoffMainParser::parseTimeline(Node *node, MediaSegmentTemplate *templ)
     {
         std::vector<Node *> elements = DOMHelper::getElementByTagName(node, "S", false);
         std::vector<Node *>::const_iterator it;
-        for(it = elements.begin(); it != elements.end(); it++)
+        for(it = elements.begin(); it != elements.end(); ++it)
         {
             const Node *s = *it;
             if(!s->hasAttribute("d")) /* Mandatory */
@@ -414,29 +412,6 @@ void IsoffMainParser::parseProgramInformation(Node * node, MPD *mpd)
             info->setMoreInformationUrl(node->getAttributeValue("moreInformationURL"));
 
         mpd->programInfo.Set(info);
-    }
-}
-
-void    IsoffMainParser::print              ()
-{
-    if(mpd)
-    {
-        msg_Dbg(p_stream, "MPD profile=%s mediaPresentationDuration=%ld minBufferTime=%ld",
-                static_cast<std::string>(mpd->getProfile()).c_str(),
-                mpd->duration.Get(),
-                mpd->minBufferTime.Get());
-        msg_Dbg(p_stream, "BaseUrl=%s", mpd->getUrlSegment().toString().c_str());
-
-        std::vector<Period *>::const_iterator i;
-        for(i = mpd->getPeriods().begin(); i != mpd->getPeriods().end(); i++)
-        {
-            std::vector<std::string> debug = (*i)->toString();
-            std::vector<std::string>::const_iterator l;
-            for(l = debug.begin(); l < debug.end(); l++)
-            {
-                msg_Dbg(p_stream, "%s", (*l).c_str());
-            }
-        }
     }
 }
 

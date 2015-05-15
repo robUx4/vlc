@@ -530,8 +530,7 @@ static int OpenConnection( access_t *p_access )
 
     if( p_sys->b_proxy )
     {
-        net_Printf( p_access, p_sys->fd, NULL,
-                    "GET http://%s:%d%s HTTP/1.0\r\n",
+        net_Printf( p_access, p_sys->fd, "GET http://%s:%d%s HTTP/1.0\r\n",
                     p_sys->url.psz_host, p_sys->url.i_port,
                     ( (p_sys->url.psz_path == NULL) ||
                       (*p_sys->url.psz_path == '\0') ) ?
@@ -550,15 +549,14 @@ static int OpenConnection( access_t *p_access )
             b64 = vlc_b64_encode( buf );
             free( buf );
 
-            net_Printf( p_access, p_sys->fd, NULL,
+            net_Printf( p_access, p_sys->fd,
                         "Proxy-Authorization: Basic %s\r\n", b64 );
             free( b64 );
         }
     }
     else
     {
-        net_Printf( p_access, p_sys->fd, NULL,
-                    "GET %s HTTP/1.0\r\n"
+        net_Printf( p_access, p_sys->fd, "GET %s HTTP/1.0\r\n"
                     "Host: %s:%d\r\n",
                     ( (p_sys->url.psz_path == NULL) ||
                       (*p_sys->url.psz_path == '\0') ) ?
@@ -593,7 +591,7 @@ static int Describe( access_t  *p_access, char **ppsz_location )
     if( OpenConnection( p_access ) )
         return VLC_EGENERIC;
 
-    net_Printf( p_access, p_sys->fd, NULL,
+    net_Printf( p_access, p_sys->fd,
                 "Accept: */*\r\n"
                 "User-Agent: "MMSH_USER_AGENT"\r\n"
                 "Pragma: no-cache,rate=1.000000,stream-time=0,stream-offset=0:0,request-context=%d,max-duration=0\r\n"
@@ -602,14 +600,14 @@ static int Describe( access_t  *p_access, char **ppsz_location )
                 p_sys->i_request_context++,
                 GUID_PRINT( p_sys->guid ) );
 
-    if( net_Printf( p_access, p_sys->fd, NULL, "\r\n" ) < 0 )
+    if( net_Printf( p_access, p_sys->fd, "\r\n" ) < 0 )
     {
         msg_Err( p_access, "failed to send request" );
         goto error;
     }
 
     /* Receive the http header */
-    if( ( psz = net_Gets( p_access, p_sys->fd, NULL ) ) == NULL )
+    if( ( psz = net_Gets( p_access, p_sys->fd ) ) == NULL )
     {
         msg_Err( p_access, "failed to read answer" );
         goto error;
@@ -633,7 +631,7 @@ static int Describe( access_t  *p_access, char **ppsz_location )
     free( psz );
     for( ;; )
     {
-        char *psz = net_Gets( p_access, p_sys->fd, NULL );
+        char *psz = net_Gets( p_access, p_sys->fd );
         char *p;
 
         if( psz == NULL )
@@ -816,24 +814,24 @@ static int Start( access_t *p_access, uint64_t i_pos )
     if( OpenConnection( p_access ) )
         return VLC_EGENERIC;
 
-    net_Printf( p_access, p_sys->fd, NULL,
+    net_Printf( p_access, p_sys->fd,
                 "Accept: */*\r\n"
                 "User-Agent: "MMSH_USER_AGENT"\r\n" );
     if( p_sys->b_broadcast )
     {
-        net_Printf( p_access, p_sys->fd, NULL,
+        net_Printf( p_access, p_sys->fd,
                     "Pragma: no-cache,rate=1.000000,request-context=%d\r\n",
                     p_sys->i_request_context++ );
     }
     else
     {
-        net_Printf( p_access, p_sys->fd, NULL,
+        net_Printf( p_access, p_sys->fd,
                     "Pragma: no-cache,rate=1.000000,stream-time=0,stream-offset=%u:%u,request-context=%d,max-duration=0\r\n",
                     (uint32_t)((i_pos >> 32)&0xffffffff),
                     (uint32_t)(i_pos&0xffffffff),
                     p_sys->i_request_context++ );
     }
-    net_Printf( p_access, p_sys->fd, NULL,
+    net_Printf( p_access, p_sys->fd,
                 "Pragma: xPlayStrm=1\r\n"
                 "Pragma: xClientGUID={"GUID_FMT"}\r\n"
                 "Pragma: stream-switch-count=%d\r\n"
@@ -850,21 +848,19 @@ static int Start( access_t *p_access, uint64_t i_pos )
             {
                 i_select = 0;
             }
-            net_Printf( p_access, p_sys->fd, NULL,
-                        "ffff:%x:%d ", i, i_select );
+            net_Printf( p_access, p_sys->fd, "ffff:%x:%d ", i, i_select );
         }
     }
-    net_Printf( p_access, p_sys->fd, NULL, "\r\n" );
-    net_Printf( p_access, p_sys->fd, NULL,
-                "Connection: Close\r\n" );
+    net_Printf( p_access, p_sys->fd, "\r\n" );
+    net_Printf( p_access, p_sys->fd, "Connection: Close\r\n" );
 
-    if( net_Printf( p_access, p_sys->fd, NULL, "\r\n" ) < 0 )
+    if( net_Printf( p_access, p_sys->fd, "\r\n" ) < 0 )
     {
         msg_Err( p_access, "failed to send request" );
         return VLC_EGENERIC;
     }
 
-    psz = net_Gets( p_access, p_sys->fd, NULL );
+    psz = net_Gets( p_access, p_sys->fd );
     if( psz == NULL )
     {
         msg_Err( p_access, "cannot read data 0" );
@@ -883,7 +879,7 @@ static int Start( access_t *p_access, uint64_t i_pos )
     /* FIXME check HTTP code */
     for( ;; )
     {
-        char *psz = net_Gets( p_access, p_sys->fd, NULL );
+        char *psz = net_Gets( p_access, p_sys->fd );
         if( psz == NULL )
         {
             msg_Err( p_access, "cannot read data 1" );
@@ -936,7 +932,7 @@ static int GetPacket( access_t * p_access, chunk_t *p_ck )
      * (4 bytes), decode and then read up to 8 additional bytes to get the
      * entire header.
      */
-    if( net_Read( p_access, p_sys->fd, NULL, p_sys->buffer, 4, true ) < 4 )
+    if( net_Read( p_access, p_sys->fd, p_sys->buffer, 4, true ) < 4 )
     {
        msg_Err( p_access, "cannot read data 2" );
        return VLC_EGENERIC;
@@ -949,7 +945,7 @@ static int GetPacket( access_t * p_access, chunk_t *p_ck )
     if( restsize > 8 )
         restsize = 8;
 
-    if( net_Read( p_access, p_sys->fd, NULL, p_sys->buffer + 4, restsize, true ) < restsize )
+    if( net_Read( p_access, p_sys->fd, p_sys->buffer + 4, restsize, true ) < restsize )
     {
         msg_Err( p_access, "cannot read data 3" );
         return VLC_EGENERIC;
@@ -1000,7 +996,7 @@ static int GetPacket( access_t * p_access, chunk_t *p_ck )
     }
 
     if( (p_ck->i_data > 0) &&
-        (net_Read( p_access, p_sys->fd, NULL, &p_sys->buffer[12],
+        (net_Read( p_access, p_sys->fd, &p_sys->buffer[12],
                    p_ck->i_data, true ) < p_ck->i_data) )
     {
         msg_Err( p_access, "cannot read data 4" );

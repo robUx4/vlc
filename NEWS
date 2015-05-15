@@ -35,6 +35,7 @@ Decoder:
  * Rewrite WPL playlists and add ZPL playlists support (Zune)
  * Support TDSC, Canopus HQX
  * Support HEVC hardware decoding on Windows, using DxVA2
+ * Basic TTML subtitles support
  * Support hardware decoding using Direct3D11
 
 Demuxers:
@@ -74,6 +75,7 @@ Video ouput:
 Video filter:
  * Hardware deinterlacing on the rPI, using MMAL
  * New video filter to convert between fps rates
+ * Added 9-bit and 10-bit support to image adjust filter
 
 Stream Output:
  * Chromecast output module

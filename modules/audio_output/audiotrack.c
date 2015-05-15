@@ -108,6 +108,10 @@ struct aout_sys_t {
 //#define AUDIOTRACK_USE_FLOAT
 //#define AUDIOTRACK_HW_LATENCY
 
+/* Get AudioTrack native sample rate: if activated, most of  the resampling
+ * will be done by VLC */
+#define AUDIOTRACK_NATIVE_SAMPLERATE
+
 #define AUDIO_CHAN_TEXT N_("Audio output channels")
 #define AUDIO_CHAN_LONGTEXT N_("Channels available for audio output. " \
     "If the input has more channels than the output, it will be down-mixed. " \
@@ -279,8 +283,10 @@ InitJNIFields( audio_output_t *p_aout )
 
     GET_ID( GetStaticMethodID, AudioTrack.getMinBufferSize, "getMinBufferSize",
             "(III)I", true );
+#ifdef AUDIOTRACK_NATIVE_SAMPLERATE
     GET_ID( GetStaticMethodID, AudioTrack.getNativeOutputSampleRate,
             "getNativeOutputSampleRate",  "(I)I", true );
+#endif
     GET_CONST_INT( AudioTrack.STATE_INITIALIZED, "STATE_INITIALIZED", true );
     GET_CONST_INT( AudioTrack.MODE_STREAM, "MODE_STREAM", true );
     GET_CONST_INT( AudioTrack.ERROR, "ERROR", true );
@@ -684,7 +690,10 @@ TimeGet( audio_output_t *p_aout, mtime_t *restrict p_delay )
             return 0;
         }
         else
-            msg_Warn( p_aout, "Negative delay, Should not happen !" );
+        {
+            msg_Warn( p_aout, "timing screwed, reset positions" );
+            AudioTrack_ResetPositions( env, p_aout );
+        }
     }
     return -1;
 }
@@ -831,7 +840,7 @@ Start( audio_output_t *p_aout, audio_sample_format_t *restrict p_fmt )
     JNIEnv *env;
     jobject p_audiotrack = NULL;
     int i_nb_channels, i_max_channels, i_audiotrack_size, i_bytes_per_frame,
-        i_native_rate;
+        i_native_rate = 0;
     unsigned int i_rate;
     bool b_spdif;
 
@@ -853,13 +862,11 @@ Start( audio_output_t *p_aout, audio_sample_format_t *restrict p_fmt )
     }
     else
     {
-        i_native_rate = JNI_AT_CALL_STATIC_INT( getNativeOutputSampleRate,
-                                                jfields.AudioManager.STREAM_MUSIC );
+        if (jfields.AudioTrack.getNativeOutputSampleRate)
+            i_native_rate = JNI_AT_CALL_STATIC_INT( getNativeOutputSampleRate,
+                                                    jfields.AudioManager.STREAM_MUSIC );
         if( i_native_rate <= 0 )
-        {
-            msg_Warn( p_aout, "negative native rate ? Should not happen !" );
             i_native_rate = VLC_CLIP( p_sys->fmt.i_rate, 4000, 48000 );
-        }
     }
 
     /* We can only accept U8, S16N, FL32, and AC3 */
@@ -905,10 +912,10 @@ Start( audio_output_t *p_aout, audio_sample_format_t *restrict p_fmt )
         else
             p_sys->fmt.i_physical_channels = AOUT_CHANS_STEREO;
     }
-    i_nb_channels = aout_FormatNbChannels( &p_sys->fmt );
 
     do
     {
+        i_nb_channels = aout_FormatNbChannels( &p_sys->fmt );
         i_bytes_per_frame = i_nb_channels *
                             aout_BitsPerSample( p_sys->fmt.i_format ) / 8;
         i_rate = p_sys->fmt.i_format == VLC_CODEC_SPDIFB ?
@@ -946,7 +953,6 @@ Start( audio_output_t *p_aout, audio_sample_format_t *restrict p_fmt )
                 msg_Warn( p_aout, "5.1 or 7.1 configuration failed, "
                                   "fallback to Stereo" );
                 p_sys->fmt.i_physical_channels = AOUT_CHANS_STEREO;
-                i_nb_channels = aout_FormatNbChannels( &p_sys->fmt );
             }
             else
                 break;

@@ -82,11 +82,18 @@ struct decoder_sys_t
 };
 
 #ifdef HAVE_AVCODEC_MT
-#   define wait_mt(s) vlc_sem_wait( &s->sem_mt )
-#   define post_mt(s) vlc_sem_post( &s->sem_mt )
+static inline void wait_mt(decoder_sys_t *sys)
+{
+    vlc_sem_wait(&sys->sem_mt);
+}
+
+static inline void post_mt(decoder_sys_t *sys)
+{
+    vlc_sem_post(&sys->sem_mt);
+}
 #else
-#   define wait_mt(s)
-#   define post_mt(s)
+# define wait_mt(s) ((void)s)
+# define post_mt(s) ((void)s)
 #endif
 
 /*****************************************************************************
@@ -243,6 +250,7 @@ static void lavc_CopyPicture(decoder_t *dec, picture_t *pic, AVFrame *frame)
 static int OpenVideoCodec( decoder_t *p_dec )
 {
     decoder_sys_t *p_sys = p_dec->p_sys;
+    int ret;
 
     if( p_sys->p_context->extradata_size <= 0 )
     {
@@ -267,7 +275,9 @@ static int OpenVideoCodec( decoder_t *p_dec )
         p_sys->p_context->coded_height = p_dec->fmt_in.video.i_height;
     p_sys->p_context->bits_per_coded_sample = p_dec->fmt_in.video.i_bits_per_pixel;
 
-    int ret = ffmpeg_OpenCodec( p_dec );
+    post_mt( p_sys );
+    ret = ffmpeg_OpenCodec( p_dec );
+    wait_mt( p_sys );
     if( ret < 0 )
         return ret;
 
@@ -292,7 +302,7 @@ static int OpenVideoCodec( decoder_t *p_dec )
             break;
     }
 #endif
-    return VLC_SUCCESS;
+    return 0;
 }
 
 /*****************************************************************************

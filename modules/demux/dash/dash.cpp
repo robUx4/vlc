@@ -43,6 +43,14 @@
 #include "dash.hpp"
 #include "xml/DOMParser.h"
 #include "mpd/MPDFactory.h"
+#include "mpd/Period.h"
+#include "mpd/ProgramInformation.h"
+
+using namespace adaptative::logic;
+using namespace adaptative::playlist;
+using namespace dash::mpd;
+using namespace dash::xml;
+using namespace dash;
 
 /*****************************************************************************
  * Module descriptor
@@ -61,10 +69,10 @@ static void Close   (vlc_object_t *);
 
 #define DASH_LOGIC_TEXT N_("Adaptation Logic")
 
-static const int pi_logics[] = {dash::logic::AbstractAdaptationLogic::RateBased,
-                                dash::logic::AbstractAdaptationLogic::FixedRate,
-                                dash::logic::AbstractAdaptationLogic::AlwaysLowest,
-                                dash::logic::AbstractAdaptationLogic::AlwaysBest};
+static const int pi_logics[] = {AbstractAdaptationLogic::RateBased,
+                                AbstractAdaptationLogic::FixedRate,
+                                AbstractAdaptationLogic::AlwaysLowest,
+                                AbstractAdaptationLogic::AlwaysBest};
 
 static const char *const ppsz_logics[] = { N_("Bandwidth Adaptive"),
                                            N_("Fixed Bandwidth"),
@@ -108,11 +116,11 @@ static int Open(vlc_object_t *p_obj)
         free(psz_mime);
     }
 
-    if(!b_mimematched && !dash::xml::DOMParser::isDash(p_demux->s))
+    if(!b_mimematched && !DOMParser::isDash(p_demux->s))
         return VLC_EGENERIC;
 
     //Build a XML tree
-    dash::xml::DOMParser        parser(p_demux->s);
+    DOMParser        parser(p_demux->s);
     if( !parser.parse() )
     {
         msg_Err( p_demux, "Could not parse MPD" );
@@ -120,7 +128,7 @@ static int Open(vlc_object_t *p_obj)
     }
 
     //Begin the actual MPD parsing:
-    dash::mpd::MPD *mpd = dash::mpd::MPDFactory::create(parser.getRootNode(), p_demux->s, parser.getProfile());
+    MPD *mpd = MPDFactory::create(parser.getRootNode(), p_demux->s, parser.getProfile());
     if(mpd == NULL)
     {
         msg_Err( p_demux, "Cannot create/unknown MPD for profile");
@@ -133,11 +141,11 @@ static int Open(vlc_object_t *p_obj)
 
     p_sys->p_mpd = mpd;
     int logic = var_InheritInteger( p_obj, "dash-logic" );
-    dash::DASHManager*p_dashManager = new dash::DASHManager(p_sys->p_mpd,
-            static_cast<dash::logic::AbstractAdaptationLogic::LogicType>(logic),
+    DASHManager*p_dashManager = new DASHManager(p_sys->p_mpd,
+            static_cast<AbstractAdaptationLogic::LogicType>(logic),
             p_demux->s);
 
-    dash::mpd::Period *period = mpd->getFirstPeriod();
+    BasePeriod *period = mpd->getFirstPeriod();
     if(period && !p_dashManager->start(p_demux))
     {
         delete p_dashManager;
@@ -148,6 +156,8 @@ static int Open(vlc_object_t *p_obj)
     p_demux->p_sys         = p_sys;
     p_demux->pf_demux      = Demux;
     p_demux->pf_control    = Control;
+
+    p_sys->i_nzpcr = 0;
 
     msg_Dbg(p_obj,"opening mpd file (%s)", p_demux->s->psz_path);
 
@@ -160,7 +170,7 @@ static void Close(vlc_object_t *p_obj)
 {
     demux_t                            *p_demux       = (demux_t*) p_obj;
     demux_sys_t                        *p_sys          = (demux_sys_t *) p_demux->p_sys;
-    dash::DASHManager                   *p_dashManager  = p_sys->p_dashManager;
+    DASHManager                        *p_dashManager  = p_sys->p_dashManager;
 
     delete p_dashManager;
     free(p_sys);
@@ -168,28 +178,30 @@ static void Close(vlc_object_t *p_obj)
 /*****************************************************************************
  * Callbacks:
  *****************************************************************************/
+#define DEMUX_INCREMENT (CLOCK_FREQ / 20)
 static int Demux(demux_t *p_demux)
 {
     demux_sys_t *p_sys = p_demux->p_sys;
-    if ( p_sys->p_dashManager->read() > 0 )
+
+    Stream::status status =
+            p_sys->p_dashManager->demux(p_sys->i_nzpcr + DEMUX_INCREMENT);
+    switch(status)
     {
-        if ( p_sys->p_dashManager->esCount() )
-        {
-            mtime_t pcr = p_sys->p_dashManager->getPCR();
-            int group = p_sys->p_dashManager->getGroup();
-            if(group > 0)
-                es_out_Control(p_demux->out, ES_OUT_SET_GROUP_PCR, group, pcr);
-            else
-                es_out_Control(p_demux->out, ES_OUT_SET_PCR, pcr);
-        }
-
-        if( !p_sys->p_dashManager->updateMPD() )
-            return VLC_DEMUXER_EOF;
-
-        return VLC_DEMUXER_SUCCESS;
-    }
-    else
+    case Stream::status_eof:
         return VLC_DEMUXER_EOF;
+    case Stream::status_buffering:
+        break;
+    case Stream::status_demuxed:
+        p_sys->i_nzpcr += DEMUX_INCREMENT;
+        int group = p_sys->p_dashManager->getGroup();
+        es_out_Control(p_demux->out, ES_OUT_SET_GROUP_PCR, group, VLC_TS_0 + p_sys->i_nzpcr);
+        break;
+    }
+
+    if( !p_sys->p_dashManager->updatePlaylist() )
+        return VLC_DEMUXER_EOF;
+
+    return VLC_DEMUXER_SUCCESS;
 }
 
 static int  Control         (demux_t *p_demux, int i_query, va_list args)
@@ -211,7 +223,7 @@ static int  Control         (demux_t *p_demux, int i_query, va_list args)
             break;
 
         case DEMUX_GET_TIME:
-            *(va_arg (args, int64_t *)) = p_sys->p_dashManager->getPCR();
+            *(va_arg (args, int64_t *)) = p_sys->i_nzpcr;
             break;
 
         case DEMUX_GET_LENGTH:
@@ -222,22 +234,30 @@ static int  Control         (demux_t *p_demux, int i_query, va_list args)
             if(!p_sys->p_dashManager->getDuration())
                 return VLC_EGENERIC;
 
-            *(va_arg (args, double *)) = (double) p_sys->p_dashManager->getPCR()
+            *(va_arg (args, double *)) = (double) p_sys->i_nzpcr
                                          / p_sys->p_dashManager->getDuration();
             break;
 
         case DEMUX_SET_POSITION:
+        {
+            int64_t time = p_sys->p_dashManager->getDuration() * va_arg(args, double);
             if(p_sys->p_mpd->isLive() ||
                !p_sys->p_dashManager->getDuration() ||
-               !p_sys->p_dashManager->setPosition( p_sys->p_dashManager->getDuration() * va_arg(args, double)))
+               !p_sys->p_dashManager->setPosition(time))
                 return VLC_EGENERIC;
+            p_sys->i_nzpcr = time;
             break;
+        }
 
         case DEMUX_SET_TIME:
+        {
+            int64_t time = va_arg(args, int64_t);
             if(p_sys->p_mpd->isLive() ||
-               !p_sys->p_dashManager->setPosition(va_arg(args, int64_t)))
+               !p_sys->p_dashManager->setPosition(time))
                 return VLC_EGENERIC;
+            p_sys->i_nzpcr = time;
             break;
+        }
 
         case DEMUX_GET_PTS_DELAY:
             *va_arg (args, int64_t *) = INT64_C(1000) *

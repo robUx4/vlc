@@ -149,7 +149,7 @@ static void msg_rc( intf_thread_t *p_intf, const char *psz_fmt, ... )
     if( p_intf->p_sys->i_socket == -1 )
         utf8_vfprintf( stdout, fmt_eol, args );
     else
-        net_vaPrintf( p_intf, p_intf->p_sys->i_socket, NULL, fmt_eol, args );
+        net_vaPrintf( p_intf, p_intf->p_sys->i_socket, fmt_eol, args );
     va_end( args );
 }
 #define msg_rc( ... ) msg_rc( p_intf, __VA_ARGS__ )
@@ -1877,7 +1877,7 @@ bool ReadCommand( intf_thread_t *p_intf, char *p_buffer, int *pi_size )
 
     while( *pi_size < MAX_LINE_LENGTH &&
            (i_read = net_Read( p_intf, p_intf->p_sys->i_socket == -1 ?
-                       0 /*STDIN_FILENO*/ : p_intf->p_sys->i_socket, NULL,
+                       0 /*STDIN_FILENO*/ : p_intf->p_sys->i_socket,
                   (uint8_t *)p_buffer + *pi_size, 1, false ) ) > 0 )
     {
         if( p_buffer[ *pi_size ] == '\r' || p_buffer[ *pi_size ] == '\n' )

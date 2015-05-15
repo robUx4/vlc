@@ -28,11 +28,6 @@
 
 #define __STDC_CONSTANT_MACROS 1
 
-#undef PACKAGE_NAME
-#ifdef HAVE_CONFIG_H
-# include "config.h"
-#endif
-
 #include "upnp.hpp"
 
 #include <vlc_access.h>
@@ -767,34 +762,28 @@ bool MediaServer::fetchContents()
 
             /* Try to extract all resources in DIDL */
             IXML_NodeList* p_resource_list = ixmlDocument_getElementsByTagName( (IXML_Document*) itemElement, "res" );
-            if ( p_resource_list )
+            if ( p_resource_list && ixmlNodeList_length( p_resource_list ) > 0 )
             {
-                int i_length = ixmlNodeList_length( p_resource_list );
-                for ( int i = 0; i < i_length; i++ )
+                mtime_t i_duration = -1;
+                int i_hours, i_minutes, i_seconds;
+                IXML_Element* p_resource = ( IXML_Element* ) ixmlNodeList_item( p_resource_list, 0 );
+                const char* psz_resource_url = xml_getChildElementValue( p_resource, "res" );
+                if( !psz_resource_url )
+                    continue;
+                const char* psz_duration = ixmlElement_getAttribute( p_resource, "duration" );
+
+                if ( psz_duration )
                 {
-                    mtime_t i_duration = -1;
-                    int i_hours, i_minutes, i_seconds;
-                    IXML_Element* p_resource = ( IXML_Element* ) ixmlNodeList_item( p_resource_list, i );
-                    const char* psz_resource_url = xml_getChildElementValue( p_resource, "res" );
-                    if( !psz_resource_url )
-                        continue;
-                    const char* psz_duration = ixmlElement_getAttribute( p_resource, "duration" );
-
-                    if ( psz_duration )
-                    {
-                        if( sscanf( psz_duration, "%d:%02d:%02d",
-                            &i_hours, &i_minutes, &i_seconds ) )
-                            i_duration = INT64_C(1000000) * ( i_hours*3600 +
-                                                              i_minutes*60 +
-                                                              i_seconds );
-                    }
-
-                    addItem( title, objectID, psz_subtitles, i_duration, psz_resource_url );
+                    if( sscanf( psz_duration, "%d:%02d:%02d",
+                        &i_hours, &i_minutes, &i_seconds ) )
+                        i_duration = INT64_C(1000000) * ( i_hours*3600 +
+                                                          i_minutes*60 +
+                                                          i_seconds );
                 }
-                ixmlNodeList_free( p_resource_list );
+
+                addItem( title, objectID, psz_subtitles, i_duration, psz_resource_url );
             }
-            else
-                continue;
+            ixmlNodeList_free( p_resource_list );
         }
         ixmlNodeList_free( itemNodeList );
     }
@@ -809,36 +798,6 @@ static int ReadDirectory( access_t *p_access, input_item_node_t* p_node )
 
     if ( !server.fetchContents() )
         return VLC_EGENERIC;
-    return VLC_SUCCESS;
-}
-
-static int Control( access_t *, int i_query, va_list args )
-{
-    switch ( i_query )
-    {
-    case ACCESS_CAN_SEEK:
-    case ACCESS_CAN_FASTSEEK:
-    case ACCESS_CAN_PAUSE:
-    case ACCESS_CAN_CONTROL_PACE:
-        *va_arg( args, bool* ) = false;
-        break;
-
-    case ACCESS_GET_SIZE:
-    {
-        *va_arg( args, uint64_t * ) = 0;
-        break;
-    }
-    case ACCESS_GET_PTS_DELAY:
-        *va_arg( args, int64_t * ) = 0;
-        break;
-
-    case ACCESS_SET_PAUSE_STATE:
-        /* Nothing to do */
-        break;
-
-    default:
-        return VLC_EGENERIC;
-    }
     return VLC_SUCCESS;
 }
 
@@ -858,7 +817,6 @@ static int Open( vlc_object_t *p_this )
     }
 
     p_access->pf_readdir = ReadDirectory;
-    ACCESS_SET_CALLBACKS( NULL, NULL, Control, NULL );
 
     return VLC_SUCCESS;
 }

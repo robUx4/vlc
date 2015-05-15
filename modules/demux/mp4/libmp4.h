@@ -1351,12 +1351,6 @@ typedef struct
 
 typedef struct
 {
-    uint32_t i_hvcC;
-    uint8_t *p_hvcC;
-} MP4_Box_data_hvcC_t;
-
-typedef struct
-{
     enum
     {
         DATA_WKT_RESERVED = 0,
@@ -1470,7 +1464,6 @@ typedef union MP4_Box_data_s
 
     MP4_Box_data_tfrf_t *p_tfrf;
     MP4_Box_data_tfxd_t *p_tfxd;
-    MP4_Box_data_hvcC_t *p_hvcC;
     MP4_Box_data_WMA2_t *p_WMA2; /* flip4mac Little endian audio config */
     MP4_Box_data_strf_t *p_strf; /* flip4mac Little endian video config */
     MP4_Box_data_ASF_t  *p_asf;  /* flip4mac asf streams indicator */
@@ -1489,7 +1482,7 @@ typedef struct MP4_Box_s MP4_Box_t;
 /* the most basic structure */
 struct MP4_Box_s
 {
-    off_t        i_pos;      /* absolute position */
+    uint64_t     i_pos;      /* absolute position */
 
     uint32_t     i_type;
     uint32_t     i_shortsize;
@@ -1564,7 +1557,7 @@ static inline size_t mp4_box_headersize( MP4_Box_t *p_box )
         p_str = NULL; \
     }
 
-#define MP4_READBOX_ENTER_PARTIAL( MP4_Box_data_TYPE_t, maxread ) \
+#define MP4_READBOX_ENTER_PARTIAL( MP4_Box_data_TYPE_t, maxread, release ) \
     int64_t i_read = p_box->i_size; \
     if( maxread < (uint64_t)i_read ) i_read = maxread;\
     uint8_t *p_peek, *p_buff; \
@@ -1587,10 +1580,11 @@ static inline size_t mp4_box_headersize( MP4_Box_t *p_box )
     { \
         free( p_buff ); \
         return( 0 ); \
-    }
+    }\
+    p_box->pf_free = release;
 
-#define MP4_READBOX_ENTER( MP4_Box_data_TYPE_t ) \
-    MP4_READBOX_ENTER_PARTIAL( MP4_Box_data_TYPE_t, p_box->i_size )
+#define MP4_READBOX_ENTER( MP4_Box_data_TYPE_t, release ) \
+    MP4_READBOX_ENTER_PARTIAL( MP4_Box_data_TYPE_t, p_box->i_size, release )
 
 #define MP4_READBOX_EXIT( i_code ) \
     do \
@@ -1705,7 +1699,7 @@ MP4_Box_t *MP4_BoxGet( MP4_Box_t *p_box, const char *psz_fmt, ... );
 int MP4_BoxCount( MP4_Box_t *p_box, const char *psz_fmt, ... );
 
 /* Internal functions exposed for MKV demux */
-int MP4_ReadBoxCommon( stream_t *p_stream, MP4_Box_t *p_box );
+int MP4_PeekBoxHeader( stream_t *p_stream, MP4_Box_t *p_box );
 int MP4_ReadBoxContainerChildren( stream_t *p_stream, MP4_Box_t *p_container,
                                   uint32_t i_last_child );
 int MP4_ReadBox_sample_vide( stream_t *p_stream, MP4_Box_t *p_box );

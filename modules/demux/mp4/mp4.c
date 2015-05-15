@@ -4037,7 +4037,7 @@ static MP4_Box_t * LoadNextChunk( demux_t *p_demux )
     return p_chunk;
 }
 
-static bool BoxExistsInRootTree( MP4_Box_t *p_root, uint32_t i_type, off_t i_pos )
+static bool BoxExistsInRootTree( MP4_Box_t *p_root, uint32_t i_type, uint64_t i_pos )
 {
     while ( p_root )
     {
@@ -4460,6 +4460,7 @@ static mp4_fragment_t * GetFragmentByTime( demux_t *p_demux, const mtime_t i_tim
         if ( i_time >= i_base_time &&
              i_time <= i_base_time + i_length )
         {
+            free( pi_tracks_duration_total );
             return p_fragment;
         }
         else
@@ -4562,14 +4563,17 @@ static int LeafParseTRUN( demux_t *p_demux, mp4_track_t *p_track,
             es_out_Control( p_demux->out, ES_OUT_SET_PCR, VLC_TS_0 + i_nzdts );
         }
 
-        if ( p_track->p_es )
+        if ( p_block )
         {
-            p_block->i_dts = VLC_TS_0 + i_nzdts;
-            p_block->i_pts = VLC_TS_0 + i_nzpts;
-            p_block->i_length = CLOCK_FREQ * dur / p_track->i_timescale;
-            MP4_Block_Send( p_demux, p_track, p_block );
+            if ( p_track->p_es )
+            {
+                p_block->i_dts = VLC_TS_0 + i_nzdts;
+                p_block->i_pts = VLC_TS_0 + i_nzpts;
+                p_block->i_length = CLOCK_FREQ * dur / p_track->i_timescale;
+                MP4_Block_Send( p_demux, p_track, p_block );
+            }
+            else block_Release( p_block );
         }
-        else free( p_block );
 
         chunk_size += len;
     }
@@ -5121,7 +5125,8 @@ static int DemuxAsLeaf( demux_t *p_demux )
 
         if ( p_sys->context.i_current_box_type != ATOM_mdat )
         {
-            if ( ! BoxExistsInRootTree( p_sys->p_root, p_sys->context.i_current_box_type, stream_Tell( p_demux->s ) ) )
+            const int i_tell = stream_Tell( p_demux->s );
+            if ( i_tell >= 0 && ! BoxExistsInRootTree( p_sys->p_root, p_sys->context.i_current_box_type, (uint64_t)i_tell ) )
             {// only if !b_probed ??
                 MP4_Box_t *p_vroot = LoadNextChunk( p_demux );
 
