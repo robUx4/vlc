@@ -2367,6 +2367,7 @@ AS_IF([test "${enable_dxva2}" != "no"], [
       [
         AC_CHECK_HEADERS(libavcodec/dxva2.h, [
            AC_MSG_NOTICE([DxVA2 acceleration activated])
+           AC_DEFINE(HAVE_AVCODEC_DXVA2, 1, [Define if the dxva2 module is built])
            have_avcodec_dxva2="yes"
         ],[
     AS_IF([test "${enable_dxva2}" = "yes"],
