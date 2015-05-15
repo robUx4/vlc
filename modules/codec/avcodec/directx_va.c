@@ -31,9 +31,6 @@
 #include <assert.h>
 
 #include <vlc_common.h>
-#include <vlc_picture.h>
-#include <vlc_fourcc.h>
-#include <vlc_plugin.h>
 #include <vlc_codecs.h>
 
 #define COBJMACROS
