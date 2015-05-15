@@ -45,6 +45,7 @@ wxvlc
 vlc_install_dir/*
 plugins.dat
 patches/*
+/*.patch
 
 include/vlc/libvlc_version.h
 
