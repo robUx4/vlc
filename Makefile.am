@@ -92,7 +92,8 @@ DISTCHECK_CONFIGURE_FLAGS = \
 	--disable-lua \
 	--disable-fribidi --disable-glx \
 	--disable-mkv \
-	--with-kde-solid='$${datadir}/kde4/apps'
+	--with-kde-solid='$${datadir}/kde4/apps' \
+	--with-contrib=$(CONTRIB_DIR)
 
 ACLOCAL_AMFLAGS = -I m4
 AUTOMAKE_OPTIONS = \
