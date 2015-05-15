@@ -31,9 +31,7 @@
 
 #include <vlc_common.h>
 #include <vlc_picture.h>
-#include <vlc_fourcc.h>
 #include <vlc_plugin.h>
-#include <vlc_codecs.h>
 
 #include "directx_va.h"
 
@@ -145,9 +143,10 @@ static void D3dDestroyDeviceManager(vlc_va_t *);
 
 static int DxCreateVideoService(vlc_va_t *);
 static void DxDestroyVideoService(vlc_va_t *);
-static int DxFindVideoServiceConversion(vlc_va_t *, GUID *input, const es_format_t *fmt);
+static int DxGetInputList(vlc_va_t *, input_list_t *);
+static int DxSetupOutput(vlc_va_t *, const GUID *);
 
-static int DxCreateVideoDecoder(vlc_va_t *va, int codec_id, const video_format_t *fmt, bool b_threading);
+static int DxCreateVideoDecoder(vlc_va_t *, int codec_id, const video_format_t *fmt, bool b_threading);
 static void DxDestroySurfaces(vlc_va_t *);
 static int DxResetVideoDecoder(vlc_va_t *);
 static void SetupAVCodecContext(vlc_va_t *);
@@ -289,7 +288,8 @@ static int Open(vlc_va_t *va, AVCodecContext *ctx, enum PixelFormat pix_fmt,
     dx_sys->pf_create_decoder_surfaces = DxCreateVideoDecoder;
     dx_sys->pf_destroy_surfaces        = DxDestroySurfaces;
     dx_sys->pf_setup_avcodec_ctx       = SetupAVCodecContext;
-    dx_sys->pf_find_service_conversion = DxFindVideoServiceConversion;
+    dx_sys->pf_get_input_list          = DxGetInputList;
+    dx_sys->pf_setup_output            = DxSetupOutput;
     dx_sys->psz_decoder_dll            = TEXT("DXVA2.DLL");
 
     va->sys = sys;
@@ -515,15 +515,14 @@ static void DxDestroyVideoService(vlc_va_t *va)
         IDirect3DDeviceManager9_CloseDeviceHandle(va->sys->devmng, va->sys->device);
 }
 
-/**
- * Find the best suited decoder mode GUID and render format.
- */
-static int DxFindVideoServiceConversion(vlc_va_t *va, GUID *input, const es_format_t *fmt)
+static void ReleaseInputList(input_list_t *p_list)
 {
-    vlc_va_sys_t *sys = va->sys;
-    directx_sys_t *dx_sys = &va->sys->dx_sys;
+    CoTaskMemFree(p_list->list);
+}
 
-    /* Retreive supported modes from the decoder service */
+static int DxGetInputList(vlc_va_t *va, input_list_t *p_list)
+{
+    directx_sys_t *dx_sys = &va->sys->dx_sys;
     UINT input_count = 0;
     GUID *input_list = NULL;
     if (FAILED(IDirectXVideoDecoderService_GetDecoderDeviceGuids((IDirectXVideoDecoderService*) dx_sys->d3ddec,
@@ -532,80 +531,56 @@ static int DxFindVideoServiceConversion(vlc_va_t *va, GUID *input, const es_form
         msg_Err(va, "IDirectXVideoDecoderService_GetDecoderDeviceGuids failed");
         return VLC_EGENERIC;
     }
-    for (unsigned i = 0; i < input_count; i++) {
-        const GUID *g = &input_list[i];
-        const directx_va_mode_t *mode = directx_va_FindMode(g);
-        if (mode) {
-            msg_Dbg(va, "- '%s' is supported by hardware", mode->name);
+
+    p_list->count = input_count;
+    p_list->list = input_list;
+    p_list->pf_release = ReleaseInputList;
+    return VLC_SUCCESS;
+}
+
+static int DxSetupOutput(vlc_va_t *va, const GUID *input)
+{
+    int err = VLC_EGENERIC;
+    UINT      output_count = 0;
+    D3DFORMAT *output_list = NULL;
+    if (FAILED(IDirectXVideoDecoderService_GetDecoderRenderTargets((IDirectXVideoDecoderService*) va->sys->dx_sys.d3ddec,
+                                                                   input,
+                                                                   &output_count,
+                                                                   &output_list))) {
+        msg_Err(va, "IDirectXVideoDecoderService_GetDecoderRenderTargets failed");
+        return VLC_EGENERIC;
+    }
+
+    for (unsigned j = 0; j < output_count; j++) {
+        const D3DFORMAT f = output_list[j];
+        const d3d_format_t *format = D3dFindFormat(f);
+        if (format) {
+            msg_Dbg(va, "%s is supported for output", format->name);
         } else {
-            msg_Warn(va, "- Unknown GUID = " GUID_FMT, GUID_PRINT( *g ) );
+            msg_Dbg(va, "%d is supported for output (%4.4s)", f, (const char*)&f);
         }
     }
 
-    /* Try all supported mode by our priority */
-    const directx_va_mode_t *mode = DXVA_MODES;
-    for (; mode->name; ++mode) {
-        if (!mode->codec || mode->codec != dx_sys->codec_id)
-            continue;
+    /* */
+    for (unsigned j = 0; d3d_formats[j].name; j++) {
+        const d3d_format_t *format = &d3d_formats[j];
 
         /* */
         bool is_supported = false;
-        for (const GUID *g = &input_list[0]; !is_supported && g < &input_list[input_count]; g++) {
-            is_supported = IsEqualGUID(mode->guid, g);
-        }
-        if ( is_supported )
-        {
-            is_supported = directx_va_ProfileSupported( mode, fmt );
-            if (!is_supported)
-                msg_Warn( va, "Unsupported profile for DXVA2 HWAccel: %d", fmt->i_profile );
+        for (unsigned k = 0; !is_supported && k < output_count; k++) {
+            is_supported = format->format == output_list[k];
         }
         if (!is_supported)
             continue;
 
-        /* */
-        msg_Dbg(va, "Trying to use '%s' as input", mode->name);
-        UINT      output_count = 0;
-        D3DFORMAT *output_list = NULL;
-        if (FAILED(IDirectXVideoDecoderService_GetDecoderRenderTargets((IDirectXVideoDecoderService*) dx_sys->d3ddec, mode->guid,
-                                                                       &output_count,
-                                                                       &output_list))) {
-            msg_Err(va, "IDirectXVideoDecoderService_GetDecoderRenderTargets failed");
-            continue;
-        }
-        for (unsigned j = 0; j < output_count; j++) {
-            const D3DFORMAT f = output_list[j];
-            const d3d_format_t *format = D3dFindFormat(f);
-            if (format) {
-                msg_Dbg(va, "%s is supported for output", format->name);
-            } else {
-                msg_Dbg(va, "%d is supported for output (%4.4s)", f, (const char*)&f);
-            }
-        }
-
-        /* */
-        for (unsigned j = 0; d3d_formats[j].name; j++) {
-            const d3d_format_t *format = &d3d_formats[j];
-
-            /* */
-            bool is_supported = false;
-            for (unsigned k = 0; !is_supported && k < output_count; k++) {
-                is_supported = format->format == output_list[k];
-            }
-            if (!is_supported)
-                continue;
-
-            /* We have our solution */
-            msg_Dbg(va, "Using '%s' to decode to '%s'", mode->name, format->name);
-            *input  = *mode->guid;
-            sys->render = format->format;
-            CoTaskMemFree(output_list);
-            CoTaskMemFree(input_list);
-            return VLC_SUCCESS;
-        }
-        CoTaskMemFree(output_list);
+        /* We have our solution */
+        msg_Dbg(va, "Using decoder '%s'", format->name);
+        va->sys->render = format->format;
+        err = VLC_SUCCESS;
+        break;
     }
-    CoTaskMemFree(input_list);
-    return VLC_EGENERIC;
+    CoTaskMemFree(output_list);
+    return err;
 }
 
 /**

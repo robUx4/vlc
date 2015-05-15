@@ -37,7 +37,6 @@
 #include <vlc_common.h>
 
 #include <libavcodec/avcodec.h>
-#include "avcodec.h"
 #include "va.h"
 
 #include <unknwn.h>
@@ -49,14 +48,18 @@ typedef struct {
     const int    *p_profiles; // NULL or ends with 0
 } directx_va_mode_t;
 
-const directx_va_mode_t DXVA_MODES[];
-
 /* */
 typedef struct {
     int                refcount;
     unsigned int       order;
     vlc_mutex_t        *p_lock;
 } vlc_va_surface_t;
+
+typedef struct input_list_t {
+    void (*pf_release)(struct input_list_t *);
+    GUID *list;
+    unsigned count;
+} input_list_t;
 
 #define MAX_SURFACE_COUNT (64)
 typedef struct
@@ -105,12 +108,21 @@ typedef struct
     int (*pf_create_video_service)(vlc_va_t *);
     void (*pf_destroy_video_service)(vlc_va_t *);
 
-    int (*pf_find_service_conversion)(vlc_va_t *, GUID *input, const es_format_t *fmt);
+    /**
+     * Read the list of possible input GUIDs
+     */
+    int (*pf_get_input_list)(vlc_va_t *, input_list_t *);
+    /**
+     * Find a suitable decoder configuration for the input and set the
+     * internal state to use that output
+     */
+    int (*pf_setup_output)(vlc_va_t *, const GUID *input);
 
     /**
      * Create the DirectX surfaces in hw_surface and the decoder in decoder
      */
-    int (*pf_create_decoder_surfaces)(vlc_va_t *, int codec_id, const video_format_t *fmt, bool b_threading);
+    int (*pf_create_decoder_surfaces)(vlc_va_t *, int codec_id,
+                                      const video_format_t *fmt, bool b_threading);
     /**
      * Destroy resources allocated with the surfaces except from hw_surface objects
      */
@@ -127,8 +139,5 @@ void directx_va_Close(vlc_va_t *, directx_sys_t *);
 int directx_va_Setup(vlc_va_t *, directx_sys_t *, AVCodecContext *avctx, vlc_fourcc_t *chroma);
 int directx_va_Get(vlc_va_t *, directx_sys_t *, picture_t *pic, uint8_t **data);
 void directx_va_Release(void *opaque, uint8_t *data);
-
-const directx_va_mode_t *directx_va_FindMode(const GUID *guid);
-bool directx_va_ProfileSupported(const directx_va_mode_t *mode, const es_format_t *fmt);
 
 #endif /* AVCODEC_DIRECTX_VA_H */

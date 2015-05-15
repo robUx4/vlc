@@ -28,12 +28,6 @@
 # include "config.h"
 #endif
 
-# if _WIN32_WINNT < 0x600
-/* d3d11 needs Vista support */
-#  undef _WIN32_WINNT
-#  define _WIN32_WINNT 0x600
-# endif
-
 #include <assert.h>
 
 #include <vlc_common.h>
@@ -42,13 +36,11 @@
 #include <vlc_plugin.h>
 #include <vlc_codecs.h>
 
-#include <libavcodec/avcodec.h>
 #define COBJMACROS
 
 #include "directx_va.h"
 
 #include "avcodec.h"
-#include "va.h"
 #include "../../packetizer/h264_nal.h"
 
 static const int PROF_MPEG2_SIMPLE[] = { FF_PROFILE_MPEG2_SIMPLE, 0 };
@@ -151,7 +143,7 @@ DEFINE_GUID(DXVA_ModeH263_E,                        0x1b81be07, 0xa0c7, 0x11d3, 
 DEFINE_GUID(DXVA_ModeH263_F,                        0x1b81be08, 0xa0c7, 0x11d3, 0xb9, 0x84, 0x00, 0xc0, 0x4f, 0x2e, 0x73, 0xc5);
 
 /* XXX Prefered modes must come first */
-const directx_va_mode_t DXVA_MODES[] = {
+static const directx_va_mode_t DXVA_MODES[] = {
     /* MPEG-1/2 */
     { "MPEG-1 decoder, restricted profile A",                                         &DXVA_ModeMPEG1_A,                      0, NULL },
     { "MPEG-2 decoder, restricted profile A",                                         &DXVA_ModeMPEG2_A,                      0, NULL },
@@ -240,12 +232,13 @@ const directx_va_mode_t DXVA_MODES[] = {
     { NULL, NULL, 0, NULL }
 };
 
+static int FindVideoServiceConversion(vlc_va_t *, directx_sys_t *, GUID *input, const es_format_t *fmt);
 static void DestroyVideoDecoder(vlc_va_t *, directx_sys_t *);
 static void DestroyVideoService(vlc_va_t *, directx_sys_t *);
 static void DestroyDeviceManager(vlc_va_t *, directx_sys_t *);
 static void DestroyDevice(vlc_va_t *, directx_sys_t *);
 
-const directx_va_mode_t *directx_va_FindMode(const GUID *guid)
+static const directx_va_mode_t *FindDxvaMode(const GUID *guid)
 {
     for (unsigned i = 0; DXVA_MODES[i].name; i++) {
         if (IsEqualGUID(DXVA_MODES[i].guid, guid))
@@ -452,8 +445,8 @@ int directx_va_Open(vlc_va_t *va, directx_sys_t *dx_sys,
     }
 
     /* */
-    if (dx_sys->pf_find_service_conversion(va, &dx_sys->input, fmt)) {
-        msg_Err(va, "DxFindVideoServiceConversion failed");
+    if (FindVideoServiceConversion(va, dx_sys, &dx_sys->input, fmt)) {
+        msg_Err(va, "FindVideoServiceConversion failed");
         goto error;
     }
 
@@ -465,7 +458,7 @@ error:
     return VLC_EGENERIC;
 }
 
-bool directx_va_ProfileSupported(const directx_va_mode_t *mode, const es_format_t *fmt)
+static bool IsProfileSupported(const directx_va_mode_t *mode, const es_format_t *fmt)
 {
     bool is_supported = mode->p_profiles == NULL || !mode->p_profiles[0];
     if (!is_supported)
@@ -500,6 +493,61 @@ void DestroyVideoService(vlc_va_t *va, directx_sys_t *dx_sys)
 #if DEBUG_LEAK
     dx_sys->d3ddec = NULL;
 #endif
+}
+
+/**
+ * Find the best suited decoder mode GUID and render format.
+ */
+static int FindVideoServiceConversion(vlc_va_t *va, directx_sys_t *dx_sys, GUID *input, const es_format_t *fmt)
+{
+    input_list_t p_list = { 0 };
+    int err = dx_sys->pf_get_input_list(va, &p_list);
+    if (err != VLC_SUCCESS)
+        return err;
+
+    /* Retreive supported modes from the decoder service */
+    for (unsigned i = 0; i < p_list.count; i++) {
+        const GUID *g = &p_list.list[i];
+        const directx_va_mode_t *mode = FindDxvaMode(g);
+        if (mode) {
+            msg_Dbg(va, "- '%s' is supported by hardware", mode->name);
+        } else {
+            msg_Warn(va, "- Unknown GUID = " GUID_FMT, GUID_PRINT( *g ) );
+        }
+    }
+
+    /* Try all supported mode by our priority */
+    const directx_va_mode_t *mode = DXVA_MODES;
+    for (; mode->name; ++mode) {
+        if (!mode->codec || mode->codec != dx_sys->codec_id)
+            continue;
+
+        /* */
+        bool is_supported = false;
+        for (const GUID *g = &p_list.list[0]; !is_supported && g < &p_list.list[p_list.count]; g++) {
+            is_supported = IsEqualGUID(mode->guid, g);
+        }
+        if ( is_supported )
+        {
+            is_supported = IsProfileSupported( mode, fmt );
+            if (!is_supported)
+                msg_Warn( va, "Unsupported profile for HWAccel: %d", fmt->i_profile );
+        }
+        if (!is_supported)
+            continue;
+
+        /* */
+        msg_Dbg(va, "Trying to use '%s' as input", mode->name);
+        if (dx_sys->pf_setup_output(va, mode->guid)==VLC_SUCCESS)
+        {
+            *input = *mode->guid;
+            err = VLC_SUCCESS;
+            break;
+        }
+    }
+
+    p_list.pf_release(&p_list);
+    return err;
 }
 
 void DestroyDeviceManager(vlc_va_t *va, directx_sys_t *dx_sys)
