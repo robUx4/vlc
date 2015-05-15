@@ -120,6 +120,7 @@ $Id$
  * dvdnav: access module for DVDs with libdvdnav
  * dvdread: input module for accessing DVDs, uses libdvdread
  * dxva2: DxVA2 hardware-accelerated decoding
+ * d3d11va: Direct3D11 hardware-accelerated decoding
  * dynamicoverlay: subpicture filter using shared memory that can be written to by external applications
  * edummy: dummy encoder
  * egl_android: Android EGL video output
