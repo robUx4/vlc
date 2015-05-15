@@ -229,7 +229,7 @@ static const directx_va_mode_t DXVA_MODES[] = {
     { NULL, NULL, 0, NULL }
 };
 
-static int FindVideoServiceConversion(vlc_va_t *, directx_sys_t *, GUID *input, const es_format_t *fmt);
+static int FindVideoServiceConversion(vlc_va_t *, directx_sys_t *, const es_format_t *fmt);
 static void DestroyVideoDecoder(vlc_va_t *, directx_sys_t *);
 static void DestroyVideoService(vlc_va_t *, directx_sys_t *);
 static void DestroyDeviceManager(vlc_va_t *, directx_sys_t *);
@@ -310,6 +310,12 @@ int directx_va_Setup(vlc_va_t *va, directx_sys_t *dx_sys, AVCodecContext *avctx,
 
     if (dx_sys->pf_create_decoder_surfaces(va, dx_sys->codec_id, &fmt, avctx->active_thread_type & FF_THREAD_FRAME))
         return VLC_EGENERIC;
+
+    if (avctx->coded_width != dx_sys->surface_width ||
+        avctx->coded_height != dx_sys->surface_height)
+        msg_Warn( va, "surface dimensions (%dx%d) differ from avcodec dimensions (%dx%d)",
+                  dx_sys->surface_width, dx_sys->surface_height,
+                  avctx->coded_width, avctx->coded_height);
 
     for (int i = 0; i < dx_sys->surface_count; i++) {
         vlc_va_surface_t *surface = &dx_sys->surface[i];
@@ -442,7 +448,7 @@ int directx_va_Open(vlc_va_t *va, directx_sys_t *dx_sys,
     }
 
     /* */
-    if (FindVideoServiceConversion(va, dx_sys, &dx_sys->input, fmt)) {
+    if (FindVideoServiceConversion(va, dx_sys, fmt)) {
         msg_Err(va, "FindVideoServiceConversion failed");
         goto error;
     }
@@ -455,7 +461,7 @@ error:
     return VLC_EGENERIC;
 }
 
-static bool IsProfileSupported(const directx_va_mode_t *mode, const es_format_t *fmt)
+static bool profile_supported(const directx_va_mode_t *mode, const es_format_t *fmt)
 {
     bool is_supported = mode->p_profiles == NULL || !mode->p_profiles[0];
     if (!is_supported)
@@ -495,7 +501,7 @@ void DestroyVideoService(vlc_va_t *va, directx_sys_t *dx_sys)
 /**
  * Find the best suited decoder mode GUID and render format.
  */
-static int FindVideoServiceConversion(vlc_va_t *va, directx_sys_t *dx_sys, GUID *input, const es_format_t *fmt)
+static int FindVideoServiceConversion(vlc_va_t *va, directx_sys_t *dx_sys, const es_format_t *fmt)
 {
     input_list_t p_list = { 0 };
     int err = dx_sys->pf_get_input_list(va, &p_list);
@@ -526,7 +532,7 @@ static int FindVideoServiceConversion(vlc_va_t *va, directx_sys_t *dx_sys, GUID 
         }
         if ( is_supported )
         {
-            is_supported = IsProfileSupported( mode, fmt );
+            is_supported = profile_supported( mode, fmt );
             if (!is_supported)
                 msg_Warn( va, "Unsupported profile for HWAccel: %d", fmt->i_profile );
         }
@@ -537,7 +543,7 @@ static int FindVideoServiceConversion(vlc_va_t *va, directx_sys_t *dx_sys, GUID 
         msg_Dbg(va, "Trying to use '%s' as input", mode->name);
         if (dx_sys->pf_setup_output(va, mode->guid)==VLC_SUCCESS)
         {
-            *input = *mode->guid;
+            dx_sys->input = *mode->guid;
             err = VLC_SUCCESS;
             break;
         }

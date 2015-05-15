@@ -258,15 +258,9 @@ static int CheckDevice(vlc_va_t *va)
     return VLC_SUCCESS;
 }
 
-/* FIXME it is nearly common with VAAPI */
 static int Get(vlc_va_t *va, picture_t *pic, uint8_t **data)
 {
     return directx_va_Get(va, &va->sys->dx_sys, pic, data);
-}
-
-static void Release(void *opaque, uint8_t *data)
-{
-    directx_va_Release(opaque, data);
 }
 
 #if D3D11_DR
@@ -325,7 +319,7 @@ static int Open(vlc_va_t *va, AVCodecContext *ctx, enum PixelFormat pix_fmt,
         return VLC_ENOMEM;
 
     sys->p_copy_cache = calloc(1, sizeof(*sys->p_copy_cache));
-    if (!sys->p_copy_cache) {
+    if (unlikely(sys->p_copy_cache == NULL)) {
          err = VLC_ENOMEM;
          goto error;
     }
@@ -333,11 +327,6 @@ static int Open(vlc_va_t *va, AVCodecContext *ctx, enum PixelFormat pix_fmt,
 #if defined(NDEBUG) && defined(HAVE_DXGIDEBUG_H)
     sys->dxgidebug_dll = LoadLibrary(TEXT("DXGIDEBUG.DLL"));
 #endif
-
-    va->setup   = Setup;
-    va->get     = Get;
-    va->release = Release;
-    va->extract = Extract;
 
     dx_sys = &sys->dx_sys;
 
@@ -371,6 +360,10 @@ static int Open(vlc_va_t *va, AVCodecContext *ctx, enum PixelFormat pix_fmt,
 
     /* TODO print the hardware name/vendor for debugging purposes */
     va->description = DxDescribe(dx_sys);
+    va->setup   = Setup;
+    va->get     = Get;
+    va->release = directx_va_Release;
+    va->extract = Extract;
 
     return VLC_SUCCESS;
 
@@ -607,7 +600,7 @@ static int DxGetInputList(vlc_va_t *va, input_list_t *p_list)
 
     p_list->count = input_count;
     p_list->list = calloc(input_count, sizeof(*p_list->list));
-    if (!p_list->list) {
+    if (unlikely(p_list->list == NULL)) {
         return VLC_ENOMEM;
     }
     p_list->pf_release = ReleaseInputList;
@@ -652,7 +645,7 @@ static int DxSetupOutput(vlc_va_t *va, const GUID *input)
             continue;
 
         /* We have our solution */
-        msg_Dbg(va, "Using decoder '%s'", format->name);
+        msg_Dbg(va, "Using decoder output '%s'", format->name);
         va->sys->render = format->format;
         return VLC_SUCCESS;
     }
@@ -664,8 +657,6 @@ static int DxSetupOutput(vlc_va_t *va, const GUID *input)
  */
 static int DxCreateDecoderSurfaces(vlc_va_t *va, int codec_id, const video_format_t *fmt, bool b_threading)
 {
-    VLC_UNUSED(fmt);
-
     vlc_va_sys_t *sys = va->sys;
     directx_sys_t *dx_sys = &va->sys->dx_sys;
     HRESULT hr;
@@ -738,8 +729,8 @@ static int DxCreateDecoderSurfaces(vlc_va_t *va, int codec_id, const video_forma
     D3D11_VIDEO_DECODER_DESC decoderDesc;
     ZeroMemory(&decoderDesc, sizeof(decoderDesc));
     decoderDesc.Guid = dx_sys->input;
-    decoderDesc.SampleWidth = dx_sys->surface_width;
-    decoderDesc.SampleHeight = dx_sys->surface_height;
+    decoderDesc.SampleWidth = fmt->i_width;
+    decoderDesc.SampleHeight = fmt->i_height;
     decoderDesc.OutputFormat = sys->render;
 
     UINT cfg_count;
@@ -801,7 +792,7 @@ static int DxCreateDecoderSurfaces(vlc_va_t *va, int codec_id, const video_forma
     }
     dx_sys->decoder = (IUnknown*) decoder;
 
-    msg_Dbg(va, "DxCreateVideoDecoder succeed");
+    msg_Dbg(va, "DxCreateDecoderSurfaces succeed");
     return VLC_SUCCESS;
 }
 

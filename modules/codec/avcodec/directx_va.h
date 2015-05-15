@@ -1,6 +1,8 @@
 /*****************************************************************************
  * directx_va.h: DirectX Generic Video Acceleration helpers
  *****************************************************************************
+ * Copyright (C) 2009 Geoffroy Couprie
+ * Copyright (C) 2009 Laurent Aimar
  * Copyright (C) 2015 Steve Lhomme
  * $Id$
  *
