@@ -295,9 +295,6 @@ static void Close(vlc_va_t *va, AVCodecContext *ctx)
 #if defined(NDEBUG) && defined(HAVE_DXGIDEBUG_H)
     if (sys->dxgidebug_dll)
         FreeLibrary(sys->dxgidebug_dll);
-#if DEBUG_LEAK
-    va->sys->dxgidebug_dll = NULL;
-#endif
 #endif
 
     free((char *)va->description);
@@ -405,9 +402,6 @@ static int D3dCreateDevice(vlc_va_t *va)
     }
     dx_sys->d3ddev = (IUnknown*) d3ddev;
     va->sys->d3dctx = d3dctx;
-#if DEBUG_LEAK
-    msg_Err(va, "Created ID3D11Device 0x%p / ID3D11DeviceContext 0x%p", d3ddev, d3dctx);
-#endif
 
     ID3D11VideoContext *d3dvidctx = NULL;
     hr = ID3D11DeviceContext_QueryInterface(d3dctx, &IID_ID3D11VideoContext, (void **)&d3dvidctx);
@@ -416,9 +410,6 @@ static int D3dCreateDevice(vlc_va_t *va)
        return VLC_EGENERIC;
     }
     va->sys->d3dvidctx = d3dvidctx;
-#if DEBUG_LEAK
-    msg_Err(va, "Got ID3D11VideoContext 0x%p", d3dvidctx);
-#endif
 
 #if defined(NDEBUG) && defined(HAVE_DXGIDEBUG_H)
     HRESULT (WINAPI  * pf_DXGIGetDebugInterface)(const GUID *riid, void **ppDebug);
@@ -446,10 +437,6 @@ static void D3dDestroyDevice(vlc_va_t *va)
         ID3D11VideoContext_Release(va->sys->d3dvidctx);
     if (va->sys->d3dctx)
         ID3D11DeviceContext_Release(va->sys->d3dctx);
-#if DEBUG_LEAK
-    va->sys->d3dvidctx = NULL;
-    va->sys->d3dctx = NULL;
-#endif
 }
 /**
  * It describes our Direct3D object
@@ -571,9 +558,6 @@ static int DxCreateVideoService(vlc_va_t *va)
        return VLC_EGENERIC;
     }
     dx_sys->d3ddec = (IUnknown*) d3dviddev;
-#if DEBUG_LEAK
-    msg_Err(va, "Got ID3D11VideoDevice 0x%p", d3dviddev);
-#endif
 
     return VLC_SUCCESS;
 }
@@ -666,9 +650,6 @@ static int DxCreateDecoderSurfaces(vlc_va_t *va, int codec_id, const video_forma
     if (SUCCEEDED(hr)) {
         ID3D10Multithread_SetMultithreadProtected(pMultithread, b_threading && dx_sys->thread_count > 1);
         ID3D10Multithread_Release(pMultithread);
-#if DEBUG_LEAK
-    msg_Err(va, "Got ID3D10Multithread 0x%p", pMultithread);
-#endif
     }
 
     D3D11_TEXTURE2D_DESC texDesc;
@@ -808,7 +789,4 @@ static void DxDestroySurfaces(vlc_va_t *va)
 
     if (va->sys->staging)
         ID3D11Resource_Release(va->sys->staging);
-#if DEBUG_LEAK
-    va->sys->staging = NULL;
-#endif
 }

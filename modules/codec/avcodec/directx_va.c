@@ -403,9 +403,6 @@ void directx_va_Close(vlc_va_t *va, directx_sys_t *dx_sys)
 
     if (dx_sys->hdecoder_dll)
         FreeLibrary(dx_sys->hdecoder_dll);
-#if DEBUG_LEAK
-    dx_sys->hdecoder_dll = NULL;
-#endif
 
     vlc_mutex_destroy( &dx_sys->surface_lock );
 }
@@ -493,9 +490,6 @@ void DestroyVideoService(vlc_va_t *va, directx_sys_t *dx_sys)
     dx_sys->pf_destroy_video_service(va);
     if (dx_sys->d3ddec)
         IUnknown_Release(dx_sys->d3ddec);
-#if DEBUG_LEAK
-    dx_sys->d3ddec = NULL;
-#endif
 }
 
 /**
@@ -563,7 +557,4 @@ void DestroyDevice(vlc_va_t *va, directx_sys_t *dx_sys)
     dx_sys->pf_destroy_device(va);
     if (dx_sys->d3ddev)
         IUnknown_Release( dx_sys->d3ddev );
-#if DEBUG_LEAK
-    dx_sys->d3ddev = NULL;
-#endif
 }
