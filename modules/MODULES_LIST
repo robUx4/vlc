@@ -83,6 +83,7 @@ $Id$
  * croppadd: Crop/Padd image filter
  * crystalhd: crystalhd decoder
  * cvdsub: CVD subtitles decoder
+ * d3d11va: Direct3D11 hardware-accelerated decoding
  * daala: a daala video decoder/packetizer using libdaala
  * dash: MPEG DASH playback
  * dbus: D-Bus control interface
@@ -119,8 +120,8 @@ $Id$
  * dvbsub: decoder module for subs in dvb streams
  * dvdnav: access module for DVDs with libdvdnav
  * dvdread: input module for accessing DVDs, uses libdvdread
+ * dxa9: Convert D3D9 surfaces to planes
  * dxva2: DxVA2 hardware-accelerated decoding
- * d3d11va: Direct3D11 hardware-accelerated decoding
  * dynamicoverlay: subpicture filter using shared memory that can be written to by external applications
  * edummy: dummy encoder
  * egl_android: Android EGL video output
