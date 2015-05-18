@@ -285,8 +285,6 @@ static void Direct3D9UnlockSurface(picture_t *);
 
 static void Prepare(vout_display_t *vd, picture_t *picture, subpicture_t *subpicture)
 {
-    VLC_UNUSED(subpicture);
-
     vout_display_sys_t *sys = vd->sys;
     LPDIRECT3DSURFACE9 surface = picture->p_sys->surface;
 
@@ -334,8 +332,6 @@ static void Prepare(vout_display_t *vd, picture_t *picture, subpicture_t *subpic
 
 static void Display(vout_display_t *vd, picture_t *picture, subpicture_t *subpicture)
 {
-    VLC_UNUSED(subpicture);
-
     vout_display_sys_t *sys = vd->sys;
     LPDIRECT3DDEVICE9 d3ddev = sys->d3ddev;
 
