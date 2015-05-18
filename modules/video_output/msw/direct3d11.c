@@ -24,6 +24,11 @@
 # include "config.h"
 #endif
 
+#define DEPTH_STENCIL 1
+#define CUSTOM_VERTEX_SHADER 1
+#define CUSTOM_PIXEL_SHADER 1
+#define SUBPICTURE_TARGET 1
+
 #include <vlc_common.h>
 #include <vlc_plugin.h>
 #include <vlc_vout_display.h>
@@ -122,6 +127,7 @@ static int  Direct3D11CreateResources (vout_display_t *, video_format_t *);
 static void Direct3D11DestroyResources(vout_display_t *);
 
 static int  Direct3D11MapTexture(picture_t *);
+static int Direct3D11MapSubpicture(vout_display_t *,subpicture_t *);
 
 /* All the #if USE_DXGI contain an alternative method to setup dx11
    They both need to be benchmarked to see which performs better */
@@ -423,6 +429,10 @@ static int Open(vlc_object_t *object)
 
     /* TODO : subtitle support */
     info.subpicture_chromas   = NULL;
+    info.subpicture_chromas = d3d_subpicture_chromas; /* only the same pixel format as the source is supported ? */
+    //sys->pSubpictureChromas[0] = sys->vlcFormat;
+    //sys->pSubpictureChromas[1] = 0;
+    //info.subpicture_chromas = sys->pSubpictureChromas;
 
     video_format_Clean(&vd->fmt);
     video_format_Copy(&vd->fmt, &fmt);
@@ -458,16 +468,24 @@ static void Close(vlc_object_t *object)
 static void Prepare(vout_display_t *vd, picture_t *picture, subpicture_t *subpicture)
 {
     vout_display_sys_t *sys = vd->sys;
-    VLC_UNUSED(subpicture);
     VLC_UNUSED(picture);
 
     /* float ClearColor[4] = { 1.0f, 0.125f, 0.3f, 1.0f }; */
     /* ID3D11DeviceContext_ClearRenderTargetView(sys->d3dcontext,sys->d3drenderTargetView, ClearColor); */
+#if DEPTH_STENCIL
     ID3D11DeviceContext_ClearDepthStencilView(sys->d3dcontext,sys->d3ddepthStencilView, D3D11_CLEAR_DEPTH, 1.0f, 0);
 
+    if (subpicture)
+        Direct3D11MapSubpicture(vd, subpicture);
+#endif
+
     /* Render the quad */
+#if CUSTOM_VERTEX_SHADER
     ID3D11DeviceContext_VSSetShader(sys->d3dcontext, sys->d3dvertexShader, NULL, 0);
+#endif
+#if CUSTOM_PIXEL_SHADER
     ID3D11DeviceContext_PSSetShader(sys->d3dcontext, sys->d3dpixelShader, NULL, 0);
+#endif
     ID3D11DeviceContext_PSSetShaderResources(sys->d3dcontext, 0, 1, &sys->d3dresViewY);
 
     if( sys->d3dFormatUV )
@@ -480,6 +498,9 @@ static void Prepare(vout_display_t *vd, picture_t *picture, subpicture_t *subpic
 static void Display(vout_display_t *vd, picture_t *picture, subpicture_t *subpicture)
 {
     vout_display_sys_t *sys = vd->sys;
+
+#if DEPTH_STENCIL
+#endif
 
     IDXGISwapChain_Present(sys->dxgiswapChain, 0, 0);
 
@@ -559,7 +580,7 @@ static int Direct3D11Open(vout_display_t *vd, video_format_t *fmt)
         D3D_FEATURE_LEVEL_9_1
     };
 
-# if !defined(NDEBUG) && defined(_MSC_VER)
+# if !defined(NDEBUG) // && defined(_MSC_VER)
     creationFlags |= D3D11_CREATE_DEVICE_DEBUG;
 # endif
 
@@ -657,19 +678,26 @@ static int Direct3D11Open(vout_display_t *vd, video_format_t *fmt)
     }
 
     hr = IDXGIDevice_GetAdapter(pDXGIDevice, &sys->dxgiadapter);
+    IDXGIAdapter_Release(pDXGIDevice);
     if (FAILED(hr)) {
        msg_Err(vd, "Could not get the DXGI Adapter. (hr=0x%lX)", hr);
        return VLC_EGENERIC;
     }
 
     hr = IDXGIAdapter_GetParent(sys->dxgiadapter, &IID_IDXGIFactory, (void **)&sys->dxgifactory);
+    IDXGIAdapter_Release(sys->dxgiadapter);
+    IDXGIAdapter_Release(sys->dxgiadapter);
+    sys->dxgiadapter = NULL;
     if (FAILED(hr)) {
+        IDXGIAdapter_Release(sys->dxgiadapter);
+        sys->dxgiadapter = NULL;
        msg_Err(vd, "Could not get the DXGI Factory. (hr=0x%lX)", hr);
        return VLC_EGENERIC;
     }
 
     hr = IDXGIFactory_CreateSwapChain(sys->dxgifactory, (IUnknown *)sys->d3ddevice, &scd, &sys->dxgiswapChain);
-
+    IDXGIFactory_Release(sys->dxgifactory);
+    sys->dxgifactory = NULL;
     if (FAILED(hr)) {
        msg_Err(vd, "Could not create the SwapChain. (hr=0x%lX)", hr);
        return VLC_EGENERIC;
@@ -792,6 +820,8 @@ static void Direct3D11Close(vout_display_t *vd)
     Direct3D11DestroyResources(vd);
     if ( sys->d3dcontext )
         ID3D11DeviceContext_Release(sys->d3dcontext);
+    if (sys->dxgiswapChain)
+        IDXGISwapChain_Release(sys->dxgiswapChain);
     if ( sys->d3ddevice )
         ID3D11Device_Release(sys->d3ddevice);
     msg_Dbg(vd, "Direct3D11 device adapter closed");
@@ -803,7 +833,9 @@ static int Direct3D11CreateResources(vout_display_t *vd, video_format_t *fmt)
 {
     vout_display_sys_t *sys = vd->sys;
     ID3D11Texture2D* pBackBuffer = NULL;
+#if DEPTH_STENCIL
     ID3D11Texture2D* pDepthStencil= NULL;
+#endif
     HRESULT hr;
 
     fmt->i_chroma = sys->vlcFormat;
@@ -814,7 +846,7 @@ static int Direct3D11CreateResources(vout_display_t *vd, video_format_t *fmt)
        return VLC_EGENERIC;
     }
 
-    hr = ID3D11Device_CreateRenderTargetView(sys->d3ddevice, (ID3D11Resource *)pBackBuffer, NULL, &sys->d3drenderTargetView);
+    hr = ID3D11Device_CreateRenderTargetView(sys->d3ddevice, (ID3D11Resource *)pBackBuffer, NULL, &sys->d3drenderTargetView[0]);
 
     ID3D11Texture2D_Release(pBackBuffer);
 
@@ -823,6 +855,54 @@ static int Direct3D11CreateResources(vout_display_t *vd, video_format_t *fmt)
        return VLC_EGENERIC;
     }
 
+#if SUBPICTURE_TARGET
+    D3D11_TEXTURE2D_DESC spuStagingTexDesc;
+    ZeroMemory(&spuStagingTexDesc, sizeof(spuStagingTexDesc));
+    spuStagingTexDesc.Width = fmt->i_visible_width;
+    spuStagingTexDesc.Height = fmt->i_visible_height;
+    spuStagingTexDesc.MipLevels = 1;
+    spuStagingTexDesc.ArraySize = 1;
+    spuStagingTexDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;//sys->d3dFormatTex;
+    spuStagingTexDesc.SampleDesc.Count = 1;
+    spuStagingTexDesc.Usage = D3D11_USAGE_STAGING;
+    spuStagingTexDesc.BindFlags = 0;
+    spuStagingTexDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+
+    hr = ID3D11Device_CreateTexture2D(sys->d3ddevice, &spuStagingTexDesc, NULL, &sys->spuStagingTexture);
+    if (FAILED(hr)) {
+       msg_Err(vd, "Could not create the depth subpicture staging texture. (hr=0x%lX)", hr);
+       return VLC_EGENERIC;
+    }
+
+    ID3D11Texture2D *spuRenderTexture;
+
+    D3D11_TEXTURE2D_DESC subpictureTexDesc;
+    ZeroMemory(&subpictureTexDesc, sizeof(subpictureTexDesc));
+    subpictureTexDesc.Width = fmt->i_visible_width;
+    subpictureTexDesc.Height = fmt->i_visible_height;
+    subpictureTexDesc.MipLevels = 1;
+    subpictureTexDesc.ArraySize = 1;
+    subpictureTexDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;//sys->d3dFormatTex;
+    subpictureTexDesc.SampleDesc.Count = 1;
+    subpictureTexDesc.Usage = D3D11_USAGE_DEFAULT;
+    subpictureTexDesc.BindFlags = D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE;
+    subpictureTexDesc.CPUAccessFlags = 0;
+
+    hr = ID3D11Device_CreateTexture2D(sys->d3ddevice, &subpictureTexDesc, NULL, &spuRenderTexture);
+    if (FAILED(hr)) {
+       msg_Err(vd, "Could not create the depth subpicture texture. (hr=0x%lX)", hr);
+       return VLC_EGENERIC;
+    }
+
+    hr = ID3D11Device_CreateRenderTargetView(sys->d3ddevice, (ID3D11Resource *)spuRenderTexture, NULL, &sys->d3drenderTargetView[1]);
+    ID3D11Texture2D_Release(spuRenderTexture);
+    if (FAILED(hr)) {
+       msg_Err(vd, "Could not create the subpicture target view. (hr=0x%lX)", hr);
+       return VLC_EGENERIC;
+    }
+#endif
+
+#if DEPTH_STENCIL
     D3D11_TEXTURE2D_DESC deptTexDesc;
     memset(&deptTexDesc, 0,sizeof(deptTexDesc));
     deptTexDesc.ArraySize = 1;
@@ -860,7 +940,43 @@ static int Direct3D11CreateResources(vout_display_t *vd, video_format_t *fmt)
        return VLC_EGENERIC;
     }
 
-    ID3D11DeviceContext_OMSetRenderTargets(sys->d3dcontext, 1, &sys->d3drenderTargetView, sys->d3ddepthStencilView);
+    ID3D11DeviceContext_OMSetRenderTargets(sys->d3dcontext, 2, sys->d3drenderTargetView, sys->d3ddepthStencilView);
+
+    ID3D11BlendState *pSpuBlendState;
+    D3D11_BLEND_DESC spuBlendDesc;
+    ZeroMemory(&spuBlendDesc, sizeof(spuBlendDesc));
+    spuBlendDesc.RenderTarget[0].BlendEnable = TRUE;
+    spuBlendDesc.RenderTarget[0].SrcBlend = D3D11_BLEND_ONE;
+    spuBlendDesc.RenderTarget[0].DestBlend = D3D11_BLEND_ZERO;
+    spuBlendDesc.RenderTarget[0].BlendOp = D3D11_BLEND_OP_ADD;
+
+    spuBlendDesc.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_ONE;
+    spuBlendDesc.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_ZERO;
+    spuBlendDesc.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_ADD;
+
+    spuBlendDesc.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
+
+    spuBlendDesc.RenderTarget[1].BlendEnable = TRUE;
+    spuBlendDesc.RenderTarget[1].SrcBlend = D3D11_BLEND_ONE;
+    spuBlendDesc.RenderTarget[1].DestBlend = D3D11_BLEND_ZERO;
+    spuBlendDesc.RenderTarget[1].BlendOp = D3D11_BLEND_OP_ADD;
+
+    spuBlendDesc.RenderTarget[1].SrcBlendAlpha = D3D11_BLEND_ONE;
+    spuBlendDesc.RenderTarget[1].DestBlendAlpha = D3D11_BLEND_ZERO;
+    spuBlendDesc.RenderTarget[1].BlendOpAlpha = D3D11_BLEND_OP_ADD;
+
+    spuBlendDesc.RenderTarget[1].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
+    hr = ID3D11Device_CreateBlendState(sys->d3ddevice, &spuBlendDesc, &pSpuBlendState);
+    if (FAILED(hr)) {
+       msg_Err(vd, "Could not create SPU blend state. (hr=0x%lX)", hr);
+       return VLC_EGENERIC;
+    }
+    ID3D11DeviceContext_OMSetBlendState(sys->d3dcontext, pSpuBlendState, NULL, 0xFFFFFFFF);
+
+#else
+    ID3D11DeviceContext_OMSetRenderTargets(sys->d3dcontext, 1, &sys->d3drenderTargetView, NULL);
+#endif
+
 
     D3D11_VIEWPORT vp;
     vp.Width = (FLOAT)fmt->i_visible_width;
@@ -874,6 +990,7 @@ static int Direct3D11CreateResources(vout_display_t *vd, video_format_t *fmt)
 
     ID3DBlob* pVSBlob = NULL;
 
+#if CUSTOM_VERTEX_SHADER
     /* TODO : Match the version to the D3D_FEATURE_LEVEL */
     hr = D3DCompile(globVertexShaderDefault, strlen(globVertexShaderDefault),
                     NULL, NULL, NULL, "VS", "vs_4_0_level_9_1", 0, 0, &pVSBlob, NULL);
@@ -909,7 +1026,9 @@ static int Direct3D11CreateResources(vout_display_t *vd, video_format_t *fmt)
     }
 
     ID3D11DeviceContext_IASetInputLayout(sys->d3dcontext, pVertexLayout);
+#endif
 
+#if CUSTOM_PIXEL_SHADER
     ID3DBlob* pPSBlob = NULL;
 
     /* TODO : Match the version to the D3D_FEATURE_LEVEL */
@@ -931,6 +1050,7 @@ static int Direct3D11CreateResources(vout_display_t *vd, video_format_t *fmt)
       msg_Err(vd, "Failed to create the pixel shader.");
       return VLC_EGENERIC;
     }
+#endif
 
     float vertices[] = {
     -1.0f, -1.0f, -1.0f, 0.0f, 1.0f,
@@ -939,6 +1059,7 @@ static int Direct3D11CreateResources(vout_display_t *vd, video_format_t *fmt)
     -1.0f,  1.0f, -1.0f, 0.0f, 0.0f,
     };
 
+#if CUSTOM_VERTEX_SHADER
     D3D11_BUFFER_DESC bd;
     memset(&bd, 0, sizeof(bd));
     bd.Usage = D3D11_USAGE_DEFAULT;
@@ -987,6 +1108,7 @@ static int Direct3D11CreateResources(vout_display_t *vd, video_format_t *fmt)
     ID3D11Buffer_Release(pVertexBuffer);
 
     ID3D11DeviceContext_IASetPrimitiveTopology(sys->d3dcontext, D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+#endif
 
     D3D11_TEXTURE2D_DESC texDesc;
     memset(&texDesc, 0, sizeof(texDesc));
@@ -1117,3 +1239,21 @@ static int Direct3D11MapTexture(picture_t *picture)
     ID3D11DeviceContext_Unmap(picture->p_sys->context,(ID3D11Resource *)picture->p_sys->texture, 0);
     return res;
 }
+
+static int Direct3D11MapSubpicture(vout_display_t *vd, subpicture_t *picture)
+{
+    vout_display_sys_t *sys = vd->sys;
+    D3D11_MAPPED_SUBRESOURCE mappedResource;
+    HRESULT hr;
+
+    hr = ID3D11DeviceContext_Map(sys->d3dcontext, (ID3D11Resource *)sys->spuStagingTexture, 0, D3D11_MAP_WRITE, 0, &mappedResource);
+    if( FAILED(hr) )
+    {
+        msg_Dbg( vd, "failed to map the texture (hr=0x%lX)", hr );
+        return VLC_EGENERIC;
+    }
+    /* TODO res = CommonUpdatePicture(picture, NULL, mappedResource.pData, mappedResource.RowPitch);*/
+    ID3D11DeviceContext_Unmap(sys->d3dcontext,(ID3D11Resource *)sys->spuStagingTexture, 0);
+    return VLC_SUCCESS;
+}
+

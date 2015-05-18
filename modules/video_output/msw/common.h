@@ -165,7 +165,7 @@ struct vout_display_sys_t
     ID3D11Texture2D          *d3dtexture;
     ID3D11ShaderResourceView *d3dresViewY;
     ID3D11ShaderResourceView *d3dresViewUV;
-    ID3D11RenderTargetView   *d3drenderTargetView;
+    ID3D11RenderTargetView   *d3drenderTargetView[2];
     ID3D11DepthStencilView   *d3ddepthStencilView;
     ID3D11VertexShader       *d3dvertexShader;
     ID3D11PixelShader        *d3dpixelShader;
@@ -178,6 +178,8 @@ struct vout_display_sys_t
     DXGI_FORMAT              d3dFormatUV;
     vlc_fourcc_t             vlcFormat;
     const char               *d3dPxShader;
+    vlc_fourcc_t             pSubpictureChromas[2];
+    ID3D11Texture2D          *spuStagingTexture;
 #endif
 
 #ifdef MODULE_NAME_IS_direct3d9
