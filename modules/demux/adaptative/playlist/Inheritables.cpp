@@ -1,11 +1,7 @@
 /*****************************************************************************
- * SegmentInfoCommon.cpp: Implement the common part for both SegmentInfoDefault
- *                        and SegmentInfo
+ * Inheritables.cpp
  *****************************************************************************
- * Copyright (C) 1998-2007 VLC authors and VideoLAN
- * $Id$
- *
- * Authors: Hugo Beauzée-Luyssen <beauze.h@gmail.com>
+ * Copyright (C) 1998-2015 VLC authors and VideoLAN
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU Lesser General Public License as published by
@@ -26,41 +22,38 @@
 # include "config.h"
 #endif
 
-#include "SegmentInfoCommon.h"
+#include "Inheritables.hpp"
+#include "SegmentTimeline.h"
 
 using namespace adaptative::playlist;
 
-SegmentInfoCommon::SegmentInfoCommon( ICanonicalUrl *parent ) :
-    ICanonicalUrl( parent ), Initializable(), Indexable(),
-    startIndex( 0 )
+Timelineable::Timelineable()
 {
-    duration.Set(0);
+    segmentTimeline.Set(NULL);
 }
 
-SegmentInfoCommon::~SegmentInfoCommon()
+Timelineable::~Timelineable()
+{
+    delete segmentTimeline.Get();
+}
+
+TimescaleAble::TimescaleAble(TimescaleAble *parent)
+{
+    timescale.Set(0);
+    parentTimescale = parent;
+}
+
+TimescaleAble::~TimescaleAble()
 {
 }
 
-int         SegmentInfoCommon::getStartIndex() const
+uint64_t TimescaleAble::inheritTimescale() const
 {
-    return this->startIndex;
+    if(timescale.Get())
+        return timescale.Get();
+    else if(parentTimescale)
+        return parentTimescale->inheritTimescale();
+    else
+        return 1;
 }
 
-void        SegmentInfoCommon::setStartIndex(int startIndex)
-{
-    if ( startIndex >= 0 )
-        this->startIndex = startIndex;
-}
-
-void SegmentInfoCommon::appendBaseURL(const std::string &url)
-{
-    this->baseURLs.push_back( url );
-}
-
-Url SegmentInfoCommon::getUrlSegment() const
-{
-    Url ret = getParentUrlSegment();
-    if (!baseURLs.empty())
-        ret.append(baseURLs.front());
-    return ret;
-}

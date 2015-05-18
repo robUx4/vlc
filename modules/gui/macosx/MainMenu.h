@@ -25,25 +25,28 @@
 #import <vlc_common.h>
 #import <vlc_interface.h>
 
+@class AboutWindowController;
+@class AddonsWindowController;
+@class HelpWindowController;
+
 @interface VLCMainMenu : NSObject
 {
     intf_thread_t *p_intf;
     BOOL b_mainMenu_setup;
-    BOOL b_nib_about_loaded;
     BOOL b_nib_videoeffects_loaded;
     BOOL b_nib_audioeffects_loaded;
     BOOL b_nib_tracksynchro_loaded;
     BOOL b_nib_bookmarks_loaded;
     BOOL b_nib_convertandsave_loaded;
-    BOOL b_nib_addonmanager_loaded;
 
-    id o_about;                 /* VLAboutBox     */
+    AboutWindowController *o_about;
+    HelpWindowController  *o_helpWin;
     id o_videoeffects;          /* VLCVideoEffects */
     id o_audioeffects;          /* VLCAudioEffects */
     id o_trackSynchronization;  /* VLCTrackSynchronization */
     id o_bookmarks;             /* VLCBookmarks */
     id o_convertandsave;        /* VLCConvertAndSave */
-    id o_addonManager;          /* VLCAddonManager */
+    AddonsWindowController *o_addonsController;
 
     id o_extMgr;                /* Extensions Manager */
 
@@ -346,4 +349,3 @@
 - (int)type;
 
 @end
-

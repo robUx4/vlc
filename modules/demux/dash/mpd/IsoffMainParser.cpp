@@ -298,11 +298,12 @@ size_t IsoffMainParser::parseSegmentList(Node * segListNode, SegmentInformation 
             parseInitSegment(DOMHelper::getFirstChildElementByName(segListNode, "Initialization"), list, info);
 
             if(segListNode->hasAttribute("duration"))
-                list->setDuration(Integer<mtime_t>(segListNode->getAttributeValue("duration")));
+                list->duration.Set(Integer<uint64_t>(segListNode->getAttributeValue("duration")));
 
             if(segListNode->hasAttribute("timescale"))
                 list->timescale.Set(Integer<uint64_t>(segListNode->getAttributeValue("timescale")));
 
+            uint64_t nzStartTime = 0;
             std::vector<Node *>::const_iterator it;
             for(it = segments.begin(); it != segments.end(); ++it)
             {
@@ -323,11 +324,14 @@ size_t IsoffMainParser::parseSegmentList(Node * segListNode, SegmentInformation 
                     seg->setByteRange(atoi(range.substr(0, pos).c_str()), atoi(range.substr(pos + 1, range.size()).c_str()));
                 }
 
-                if(totaltime || list->getDuration())
+                if(totaltime || list->duration.Get())
                 {
                     seg->startTime.Set(totaltime);
-                    totaltime += list->getDuration();
+                    totaltime += list->duration.Get();
                 }
+
+                seg->startTime.Set(VLC_TS_0 + nzStartTime);
+                nzStartTime += CLOCK_FREQ * list->duration.Get();
 
                 list->addSegment(seg);
                 total++;

@@ -47,7 +47,7 @@
 #import "ExtensionsManager.h"
 #import "ConvertAndSave.h"
 #import "DebugMessageVisualizer.h"
-#import "AddonManager.h"
+#import "AddonsWindowController.h"
 
 @implementation VLCMainMenu
 static VLCMainMenu *_o_sharedInstance = nil;
@@ -94,8 +94,10 @@ static VLCMainMenu *_o_sharedInstance = nil;
 {
     [[NSNotificationCenter defaultCenter] removeObserver: self];
 
-    if (b_nib_about_loaded)
-        [o_about release];
+    [o_about release];
+    [o_helpWin release];
+
+    [o_addonsController release];
 
     if (b_nib_videoeffects_loaded)
         [o_videoeffects release];
@@ -1172,13 +1174,10 @@ static VLCMainMenu *_o_sharedInstance = nil;
 
 - (IBAction)openAddonManager:(id)sender
 {
-    if (!o_addonManager)
-        o_addonManager = [[VLCAddonManager alloc] init];
+    if (!o_addonsController)
+        o_addonsController = [[AddonsWindowController alloc] init];
 
-    if (!b_nib_addonmanager_loaded)
-        b_nib_addonmanager_loaded = [NSBundle loadNibNamed:@"AddonManager" owner:NSApp];
-
-    [o_addonManager showWindow];
+    [o_addonsController showWindow:self];
 }
 
 - (IBAction)showMessagesPanel:(id)showMessagesPanel
@@ -1200,11 +1199,8 @@ static VLCMainMenu *_o_sharedInstance = nil;
 
 - (void)initAbout
 {
-    if (! o_about)
-        o_about = [[VLAboutBox alloc] init];
-
-    if (!b_nib_about_loaded)
-        b_nib_about_loaded = [NSBundle loadNibNamed:@"About" owner: NSApp];
+    if (!o_about)
+        o_about = [[AboutWindowController alloc] init];
 }
 
 - (IBAction)viewAbout:(id)sender
@@ -1221,8 +1217,10 @@ static VLCMainMenu *_o_sharedInstance = nil;
 
 - (IBAction)viewHelp:(id)sender
 {
-    [self initAbout];
-    [o_about showHelp];
+    if (!o_helpWin)
+        o_helpWin = [[HelpWindowController alloc] init];
+
+    [o_helpWin showHelp];
 }
 
 - (IBAction)openReadMe:(id)sender
@@ -1264,7 +1262,7 @@ static VLCMainMenu *_o_sharedInstance = nil;
 
 - (IBAction)viewErrorsAndWarnings:(id)sender
 {
-    [[[[VLCMain sharedInstance] coreDialogProvider] errorPanel] showPanel];
+    [[[[VLCMain sharedInstance] coreDialogProvider] errorPanel] showWindow:self];
 }
 
 - (IBAction)showInformationPanel:(id)sender
