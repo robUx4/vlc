@@ -24,7 +24,7 @@
 # include "config.h"
 #endif
 
-#define DEPTH_STENCIL 1
+#define DEPTH_STENCIL 0
 #define CUSTOM_VERTEX_SHADER 1
 #define CUSTOM_PIXEL_SHADER 1
 #define SUBPICTURE_TARGET 1
@@ -476,10 +476,10 @@ static void Prepare(vout_display_t *vd, picture_t *picture, subpicture_t *subpic
     /* ID3D11DeviceContext_ClearRenderTargetView(sys->d3dcontext,sys->d3drenderTargetView, ClearColor); */
 #if DEPTH_STENCIL
     ID3D11DeviceContext_ClearDepthStencilView(sys->d3dcontext,sys->d3ddepthStencilView, D3D11_CLEAR_DEPTH, 1.0f, 0);
+#endif
 
     if (subpicture)
         Direct3D11MapSubpicture(vd, picture, subpicture);
-#endif
 
     /* Render the quad */
 #if CUSTOM_VERTEX_SHADER
@@ -934,21 +934,6 @@ static int Direct3D11CreateResources(vout_display_t *vd, video_format_t *fmt)
 
     ID3D11DeviceContext_OMSetRenderTargets(sys->d3dcontext, 2, sys->d3drenderTargetView, sys->d3ddepthStencilView);
 
-    /* TODO disable depth testing as we're only doing 2D
-     * see https://msdn.microsoft.com/en-us/library/windows/desktop/bb205074%28v=vs.85%29.aspx
-     * see http://rastertek.com/dx11tut11.html
-    */
-    D3D11_DEPTH_STENCIL_DESC stencilDesc = {
-        .DepthEnable   = FALSE,
-        .StencilEnable = FALSE,
-    };
-    hr = ID3D11Device_CreateDepthStencilState(sys->d3ddevice, &stencilDesc, &sys->pDepthStencilState );
-    if (SUCCEEDED(hr)) {
-        ID3D11DeviceContext_OMSetDepthStencilState(sys->d3dcontext, sys->pDepthStencilState, 0);
-        /* OMSetDepthStencilState keeps a ref */
-        ID3D11DepthStencilState_Release(sys->pDepthStencilState);
-    }
-
     ID3D11BlendState *pSpuBlendState;
     D3D11_BLEND_DESC spuBlendDesc = { 0 };
     spuBlendDesc.RenderTarget[0].BlendEnable = TRUE;
@@ -983,6 +968,20 @@ static int Direct3D11CreateResources(vout_display_t *vd, video_format_t *fmt)
     ID3D11DeviceContext_OMSetRenderTargets(sys->d3dcontext, 1, &sys->d3drenderTargetView, NULL);
 #endif
 
+    /* TODO disable depth testing as we're only doing 2D
+     * see https://msdn.microsoft.com/en-us/library/windows/desktop/bb205074%28v=vs.85%29.aspx
+     * see http://rastertek.com/dx11tut11.html
+    */
+    D3D11_DEPTH_STENCIL_DESC stencilDesc = {
+        .DepthEnable   = FALSE,
+        .StencilEnable = FALSE,
+    };
+    hr = ID3D11Device_CreateDepthStencilState(sys->d3ddevice, &stencilDesc, &sys->pDepthStencilState );
+    if (SUCCEEDED(hr)) {
+        ID3D11DeviceContext_OMSetDepthStencilState(sys->d3dcontext, sys->pDepthStencilState, 0);
+        /* OMSetDepthStencilState keeps a ref */
+        ID3D11DepthStencilState_Release(sys->pDepthStencilState);
+    }
 
     D3D11_VIEWPORT vp;
     vp.Width = (FLOAT)fmt->i_visible_width;
