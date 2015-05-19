@@ -499,9 +499,6 @@ static void Display(vout_display_t *vd, picture_t *picture, subpicture_t *subpic
 {
     vout_display_sys_t *sys = vd->sys;
 
-#if DEPTH_STENCIL
-#endif
-
     IDXGISwapChain_Present(sys->dxgiswapChain, 0, 0);
 
     picture_Release(picture);
@@ -938,7 +935,17 @@ static int Direct3D11CreateResources(vout_display_t *vd, video_format_t *fmt)
     /* TODO disable depth testing as we're only doing 2D
      * see https://msdn.microsoft.com/en-us/library/windows/desktop/bb205074%28v=vs.85%29.aspx
      * see http://rastertek.com/dx11tut11.html
-    ID3D11Device_OMSetDepthStencilState(sys->d3ddevice, ); */
+    */
+    D3D11_DEPTH_STENCIL_DESC stencilDesc = {
+        .DepthEnable   = FALSE,
+        .StencilEnable = FALSE,
+    };
+    hr = ID3D11Device_CreateDepthStencilState(sys->d3ddevice, &stencilDesc, &sys->pDepthStencilState );
+    if (SUCCEEDED(hr)) {
+        ID3D11DeviceContext_OMSetDepthStencilState(sys->d3dcontext, sys->pDepthStencilState, 0);
+        /* OMSetDepthStencilState keeps a ref */
+        ID3D11DepthStencilState_Release(sys->pDepthStencilState);
+    }
 
     ID3D11BlendState *pSpuBlendState;
     D3D11_BLEND_DESC spuBlendDesc = { 0 };
@@ -1211,6 +1218,10 @@ static void Direct3D11DestroyResources(vout_display_t *vd)
         picture_pool_Release(sys->pool);
     }
     sys->pool = NULL;
+    if (sys->pDepthStencilState) {
+        ID3D11DepthStencilState_Release(sys->pDepthStencilState);
+        sys->pDepthStencilState = NULL;
+    }
 
     msg_Dbg(vd, "Direct3D11 resources destroyed");
 }
