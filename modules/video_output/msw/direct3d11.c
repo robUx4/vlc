@@ -119,6 +119,15 @@ typedef struct d3d_vertex_t {
     D3DXVECTOR2 texture;
 } d3d_vertex_t;
 
+typedef struct d3d_region_t {
+    DXGI_FORMAT        format;
+    unsigned           width;
+    unsigned           height;
+    ID3D11Buffer       *pVertexBuffer;
+    ID3D11Buffer       *pIndexBuffer;
+    ID3D11Texture2D    *texture;
+} d3d_region_t;
+
 
 static int  Open(vlc_object_t *);
 static void Close(vlc_object_t *object);
@@ -136,7 +145,7 @@ static int  Direct3D11CreateResources (vout_display_t *, video_format_t *);
 static void Direct3D11DestroyResources(vout_display_t *);
 
 static int  Direct3D11MapTexture(picture_t *);
-static int Direct3D11MapSubpicture(vout_display_t *, picture_t *,subpicture_t *);
+static int Direct3D11MapSubpicture(vout_display_t *, int *, d3d_region_t **, subpicture_t *);
 
 /* All the #if USE_DXGI contain an alternative method to setup dx11
    They both need to be benchmarked to see which performs better */
@@ -485,8 +494,13 @@ static void Prepare(vout_display_t *vd, picture_t *picture, subpicture_t *subpic
     ID3D11DeviceContext_ClearDepthStencilView(sys->d3dcontext,sys->d3ddepthStencilView, D3D11_CLEAR_DEPTH, 1.0f, 0);
 #endif
 
-    if (subpicture)
-        Direct3D11MapSubpicture(vd, picture, subpicture);
+    if (subpicture) {
+        int subpicture_region_count     = 0;
+        d3d_region_t *subpicture_region = NULL;
+        Direct3D11MapSubpicture(vd, &subpicture_region_count, &subpicture_region, subpicture);
+        sys->d3dregion_count = subpicture_region_count;
+        sys->d3dregion       = subpicture_region;
+    }
 
 }
 
@@ -495,12 +509,6 @@ static void Display(vout_display_t *vd, picture_t *picture, subpicture_t *subpic
     vout_display_sys_t *sys = vd->sys;
 
     /* no ID3D11Device operations should come here */
-
-    UINT stride = sizeof(d3d_vertex_t);
-    UINT offset = 0;
-    ID3D11DeviceContext_IASetVertexBuffers(sys->d3dcontext, 0, 1, &sys->pVertexBuffer, &stride, &offset);
-
-    ID3D11DeviceContext_IASetIndexBuffer(sys->d3dcontext, sys->pIndexBuffer, DXGI_FORMAT_R16_UINT, 0);
 
     /* Render the quad */
 #if CUSTOM_VERTEX_SHADER
@@ -516,13 +524,21 @@ static void Display(vout_display_t *vd, picture_t *picture, subpicture_t *subpic
     ID3D11DeviceContext_PSSetSamplers(sys->d3dcontext, 0, 1, &sys->d3dsampState);
 #endif
 
+    UINT stride = sizeof(d3d_vertex_t);
+    UINT offset = 0;
+    ID3D11DeviceContext_IASetVertexBuffers(sys->d3dcontext, 0, 1, &sys->pVertexBuffer, &stride, &offset);
+    ID3D11DeviceContext_IASetIndexBuffer(sys->d3dcontext, sys->pIndexBuffer, DXGI_FORMAT_R16_UINT, 0);
+
     ID3D11DeviceContext_DrawIndexed(sys->d3dcontext, 6, 0, 0);
+
     if (subpicture) {
         // draw the additional vertices
-        int count = 0;
-        for (subpicture_region_t *r = subpicture->p_region; r; r = r->p_next)
-            count++;
-        ID3D11DeviceContext_DrawIndexed(sys->d3dcontext, 6 * count, 6, 0);
+        for (int i = 0; i < sys->d3dregion_count; ++i) {
+            d3d_region_t *d3dr = &sys->d3dregion[i];
+            ID3D11DeviceContext_IASetVertexBuffers(sys->d3dcontext, 0, 1, &d3dr->pVertexBuffer, &stride, &offset);
+            ID3D11DeviceContext_IASetIndexBuffer(sys->d3dcontext, d3dr->pIndexBuffer, DXGI_FORMAT_R16_UINT, 0);
+            ID3D11DeviceContext_DrawIndexed(sys->d3dcontext, 6, 0, 0);
+        }
     }
     IDXGISwapChain_Present(sys->dxgiswapChain, 0, 0);
 
@@ -1265,33 +1281,25 @@ static int Direct3D11MapTexture(picture_t *picture)
     return res;
 }
 
-typedef struct d3d_region_t {
-    DXGI_FORMAT        format;
-    unsigned           width;
-    unsigned           height;
-    ID3D11Buffer       *pVerticesBuffer;
-    ID3D11Buffer       *pIndicesBuffer;
-    ID3D11Texture2D    *texture;
-} d3d_region_t;
-
-static int Direct3D11MapSubpicture(vout_display_t *vd, picture_t *picture, subpicture_t *subpicture)
+static int Direct3D11MapSubpicture(vout_display_t *vd, int *subpicture_region_count,
+                                   d3d_region_t **region, subpicture_t *subpicture)
 {
     vout_display_sys_t *sys = vd->sys;
     D3D11_MAPPED_SUBRESOURCE mappedResource;
     HRESULT hr;
-    int res;
 
     int count = 0;
     for (subpicture_region_t *r = subpicture->p_region; r; r = r->p_next)
         count++;
 
-    d3d_region_t *region = calloc(count, sizeof(d3d_region_t));
-    if (unlikely(region==NULL))
+    *region = calloc(count, sizeof(d3d_region_t));
+    if (unlikely(*region==NULL))
         return VLC_ENOMEM;
+    *subpicture_region_count = count;
 
     int i = 0;
     for (subpicture_region_t *r = subpicture->p_region; r; r = r->p_next, i++) {
-        d3d_region_t *d3dr = &region[i];
+        d3d_region_t *d3dr = &(*region)[i];
 
         d3dr->texture = NULL;
         for (int j = 0; j < sys->d3dregion_count; j++) {
@@ -1322,7 +1330,7 @@ static int Direct3D11MapSubpicture(vout_display_t *vd, picture_t *picture, subpi
             vertexBufferDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
             vertexBufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
 
-            hr = ID3D11Device_CreateBuffer(sys->d3ddevice, &vertexBufferDesc, NULL, &d3dr->pVerticesBuffer);
+            hr = ID3D11Device_CreateBuffer(sys->d3ddevice, &vertexBufferDesc, NULL, &d3dr->pVertexBuffer);
 
             /* create the index of the vertices */
             WORD indices[] = {
@@ -1338,7 +1346,7 @@ static int Direct3D11MapSubpicture(vout_display_t *vd, picture_t *picture, subpi
             D3D11_SUBRESOURCE_DATA indexInit = {
                 .pSysMem = indices,
             };
-            hr = ID3D11Device_CreateBuffer(sys->d3ddevice, &indexBufferDesc, &indexInit, &d3dr->pIndicesBuffer);
+            hr = ID3D11Device_CreateBuffer(sys->d3ddevice, &indexBufferDesc, &indexInit, &d3dr->pIndexBuffer);
 
             D3D11_TEXTURE2D_DESC regionTexDesc = { 0 };
             regionTexDesc.Width = d3dr->width;
@@ -1419,7 +1427,7 @@ static int Direct3D11MapSubpicture(vout_display_t *vd, picture_t *picture, subpi
         float top    = 2.0f * (dst.top    - subpicture->i_original_picture_height) / subpicture->i_original_picture_height;
         float bottom = 2.0f * (dst.bottom - subpicture->i_original_picture_height) / subpicture->i_original_picture_height;
 
-        hr = ID3D11DeviceContext_Map(sys->d3dcontext, (ID3D11Resource *)d3dr->pVerticesBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource);
+        hr = ID3D11DeviceContext_Map(sys->d3dcontext, (ID3D11Resource *)d3dr->pVertexBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource);
         if( SUCCEEDED(hr) ) {
             d3d_vertex_t *dst_data = mappedResource.pData;
 
@@ -1451,7 +1459,7 @@ static int Direct3D11MapSubpicture(vout_display_t *vd, picture_t *picture, subpi
             dst_data[3].texture.x = 0.0f;
             dst_data[3].texture.y = 0.0f;
 
-            ID3D11DeviceContext_Unmap(sys->d3dcontext, (ID3D11Resource *)d3dr->pVerticesBuffer, 0);
+            ID3D11DeviceContext_Unmap(sys->d3dcontext, (ID3D11Resource *)d3dr->pVertexBuffer, 0);
         } else {
             msg_Err(vd, "Failed to lock the texture (hr=0x%lX)", hr );
         }
