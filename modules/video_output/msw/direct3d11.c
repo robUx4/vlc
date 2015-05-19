@@ -113,6 +113,13 @@ struct picture_sys_t
     vout_display_t      *vd;
 };
 
+/* matches the D3D11_INPUT_ELEMENT_DESC we setup */
+typedef struct d3d_vertex_t {
+    D3DXVECTOR3 position;
+    D3DXVECTOR2 texture;
+} d3d_vertex_t;
+
+
 static int  Open(vlc_object_t *);
 static void Close(vlc_object_t *object);
 
@@ -472,8 +479,8 @@ static void Prepare(vout_display_t *vd, picture_t *picture, subpicture_t *subpic
     vout_display_sys_t *sys = vd->sys;
     VLC_UNUSED(picture);
 
-    /* float ClearColor[4] = { 1.0f, 0.125f, 0.3f, 1.0f }; */
-    /* ID3D11DeviceContext_ClearRenderTargetView(sys->d3dcontext,sys->d3drenderTargetView, ClearColor); */
+     /*float ClearColor[4] = { 1.0f, 0.125f, 0.3f, 1.0f };
+     ID3D11DeviceContext_ClearRenderTargetView(sys->d3dcontext, sys->d3drenderTargetView[0], ClearColor);*/
 #if DEPTH_STENCIL
     ID3D11DeviceContext_ClearDepthStencilView(sys->d3dcontext,sys->d3ddepthStencilView, D3D11_CLEAR_DEPTH, 1.0f, 0);
 #endif
@@ -481,26 +488,42 @@ static void Prepare(vout_display_t *vd, picture_t *picture, subpicture_t *subpic
     if (subpicture)
         Direct3D11MapSubpicture(vd, picture, subpicture);
 
-    /* Render the quad */
-#if CUSTOM_VERTEX_SHADER
-    ID3D11DeviceContext_VSSetShader(sys->d3dcontext, sys->d3dvertexShader, NULL, 0);
-#endif
-#if CUSTOM_PIXEL_SHADER
-    ID3D11DeviceContext_PSSetShader(sys->d3dcontext, sys->d3dpixelShader, NULL, 0);
-#endif
-    ID3D11DeviceContext_PSSetShaderResources(sys->d3dcontext, 0, 1, &sys->d3dresViewY);
-
-    if( sys->d3dFormatUV )
-        ID3D11DeviceContext_PSSetShaderResources(sys->d3dcontext, 1, 1, &sys->d3dresViewUV);
-
-    ID3D11DeviceContext_PSSetSamplers(sys->d3dcontext, 0, 1, &sys->d3dsampState);
-    ID3D11DeviceContext_DrawIndexed(sys->d3dcontext, 6, 0, 0);
 }
 
 static void Display(vout_display_t *vd, picture_t *picture, subpicture_t *subpicture)
 {
     vout_display_sys_t *sys = vd->sys;
 
+    /* no ID3D11Device operations should come here */
+
+    UINT stride = sizeof(d3d_vertex_t);
+    UINT offset = 0;
+    ID3D11DeviceContext_IASetVertexBuffers(sys->d3dcontext, 0, 1, &sys->pVertexBuffer, &stride, &offset);
+
+    ID3D11DeviceContext_IASetIndexBuffer(sys->d3dcontext, sys->pIndexBuffer, DXGI_FORMAT_R16_UINT, 0);
+
+    /* Render the quad */
+#if CUSTOM_VERTEX_SHADER
+    ID3D11DeviceContext_VSSetShader(sys->d3dcontext, sys->d3dvertexShader, NULL, 0);
+#endif
+#if CUSTOM_PIXEL_SHADER
+    ID3D11DeviceContext_PSSetShader(sys->d3dcontext, sys->d3dpixelShader, NULL, 0);
+    ID3D11DeviceContext_PSSetShaderResources(sys->d3dcontext, 0, 1, &sys->d3dresViewY);
+
+    if( sys->d3dFormatUV )
+        ID3D11DeviceContext_PSSetShaderResources(sys->d3dcontext, 1, 1, &sys->d3dresViewUV);
+
+    ID3D11DeviceContext_PSSetSamplers(sys->d3dcontext, 0, 1, &sys->d3dsampState);
+#endif
+
+    ID3D11DeviceContext_DrawIndexed(sys->d3dcontext, 6, 0, 0);
+    if (subpicture) {
+        // draw the additional vertices
+        int count = 0;
+        for (subpicture_region_t *r = subpicture->p_region; r; r = r->p_next)
+            count++;
+        ID3D11DeviceContext_DrawIndexed(sys->d3dcontext, 6 * count, 6, 0);
+    }
     IDXGISwapChain_Present(sys->dxgiswapChain, 0, 0);
 
     picture_Release(picture);
@@ -965,7 +988,7 @@ static int Direct3D11CreateResources(vout_display_t *vd, video_format_t *fmt)
     ID3D11DeviceContext_OMSetBlendState(sys->d3dcontext, pSpuBlendState, NULL, 0xFFFFFFFF);
 
 #else
-    ID3D11DeviceContext_OMSetRenderTargets(sys->d3dcontext, 1, &sys->d3drenderTargetView, NULL);
+    ID3D11DeviceContext_OMSetRenderTargets(sys->d3dcontext, 1, &sys->d3drenderTargetView[0], NULL);
 #endif
 
     /* TODO disable depth testing as we're only doing 2D
@@ -988,7 +1011,7 @@ static int Direct3D11CreateResources(vout_display_t *vd, video_format_t *fmt)
     vp.Height = (FLOAT)fmt->i_visible_height;
     vp.MinDepth = 0.0f;
     vp.MaxDepth = 1.0f;
-    vp.TopLeftX = 0;
+    vp.TopLeftX = 0; // TODO handle the offset ?
     vp.TopLeftY = 0;
 
     ID3D11DeviceContext_RSSetViewports(sys->d3dcontext, 1, &vp);
@@ -1076,19 +1099,12 @@ static int Direct3D11CreateResources(vout_display_t *vd, video_format_t *fmt)
         .pSysMem = vertices,
     };
 
-    ID3D11Buffer* pVertexBuffer = NULL;
-    hr = ID3D11Device_CreateBuffer(sys->d3ddevice, &bd, &InitData, &pVertexBuffer);
+    hr = ID3D11Device_CreateBuffer(sys->d3ddevice, &bd, &InitData, &sys->pVertexBuffer);
 
     if(FAILED(hr)) {
       msg_Err(vd, "Failed to create vertex buffer.");
       return VLC_EGENERIC;
     }
-
-    UINT stride = sizeof(float) * 5;
-    UINT offset = 0;
-    ID3D11DeviceContext_IASetVertexBuffers(sys->d3dcontext, 0, 1, &pVertexBuffer, &stride, &offset);
-
-    ID3D11Buffer_Release(pVertexBuffer);
 
     WORD indices[] = {
       3, 1, 0,
@@ -1101,16 +1117,11 @@ static int Direct3D11CreateResources(vout_display_t *vd, video_format_t *fmt)
     bd.CPUAccessFlags = 0;
     InitData.pSysMem = indices;
 
-    ID3D11Buffer* pIndexBuffer = NULL;
-    hr = ID3D11Device_CreateBuffer(sys->d3ddevice, &bd, &InitData, &pIndexBuffer);
+    hr = ID3D11Device_CreateBuffer(sys->d3ddevice, &bd, &InitData, &sys->pIndexBuffer);
     if(FAILED(hr)) {
       msg_Err(vd, "Failed to create index buffer.");
       return VLC_EGENERIC;
     }
-
-    ID3D11DeviceContext_IASetIndexBuffer(sys->d3dcontext, pIndexBuffer, DXGI_FORMAT_R16_UINT, 0);
-
-    ID3D11Buffer_Release(pIndexBuffer);
 
     ID3D11DeviceContext_IASetPrimitiveTopology(sys->d3dcontext, D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 #endif
@@ -1225,6 +1236,15 @@ static void Direct3D11DestroyResources(vout_display_t *vd)
         ID3D11DepthStencilState_Release(sys->pDepthStencilState);
         sys->pDepthStencilState = NULL;
     }
+    if (sys->pVertexBuffer) {
+        ID3D11Buffer_Release(sys->pVertexBuffer);
+        sys->pVertexBuffer = NULL;
+    }
+    if (sys->pIndexBuffer) {
+        ID3D11Buffer_Release(sys->pIndexBuffer);
+        sys->pVertexBuffer = NULL;
+    }
+
 
     msg_Dbg(vd, "Direct3D11 resources destroyed");
 }
@@ -1244,11 +1264,6 @@ static int Direct3D11MapTexture(picture_t *picture)
     ID3D11DeviceContext_Unmap(picture->p_sys->context,(ID3D11Resource *)picture->p_sys->texture, 0);
     return res;
 }
-
-typedef struct d3d_vertex_t {
-    D3DXVECTOR3 position;
-    D3DXVECTOR2 texture;
-} d3d_vertex_t;
 
 typedef struct d3d_region_t {
     DXGI_FORMAT        format;

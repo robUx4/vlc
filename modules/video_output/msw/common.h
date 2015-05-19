@@ -179,6 +179,12 @@ struct vout_display_sys_t
     vlc_fourcc_t             vlcFormat;
     const char               *d3dPxShader;
 
+    // main texture
+    ID3D11Buffer             *pVertexBuffer;
+    ID3D11Buffer             *pIndexBuffer;
+
+    ID3D11DepthStencilState  *pDepthStencilState;
+
     // SPU
     vlc_fourcc_t             pSubpictureChromas[2];
     ID3D11Texture2D          *spuStagingTexture;
