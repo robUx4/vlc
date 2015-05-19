@@ -36,6 +36,8 @@
 #define COBJMACROS
 #define INITGUID
 #include <d3d11.h>
+#include <d3dx9math.h>
+// TODO #include <directxmath.h>
 
 /* avoided until we can pass ISwapchainPanel without c++/cx mode
 # include <windows.ui.xaml.media.dxinterop.h> */
@@ -1057,11 +1059,12 @@ static int Direct3D11CreateResources(vout_display_t *vd, video_format_t *fmt)
 #endif
 
 #if CUSTOM_VERTEX_SHADER
+    // triangles {pos: x,y,z  / texture: x,y}
     float vertices[] = {
-    -1.0f, -1.0f, -1.0f, 0.0f, 1.0f,
-     1.0f, -1.0f, -1.0f, 1.0f, 1.0f,
-     1.0f,  1.0f, -1.0f, 1.0f, 0.0f,
-    -1.0f,  1.0f, -1.0f, 0.0f, 0.0f,
+    -1.0f, -1.0f, -1.0f,  0.0f, 1.0f, // bottom left
+     1.0f, -1.0f, -1.0f,  1.0f, 1.0f, // bottom right
+     1.0f,  1.0f, -1.0f,  1.0f, 0.0f, // top right
+    -1.0f,  1.0f, -1.0f,  0.0f, 0.0f, // top left
     };
 
     D3D11_BUFFER_DESC bd = { 0 };
@@ -1070,8 +1073,9 @@ static int Direct3D11CreateResources(vout_display_t *vd, video_format_t *fmt)
     bd.BindFlags = D3D11_BIND_VERTEX_BUFFER;
     bd.CPUAccessFlags = 0;
 
-    D3D11_SUBRESOURCE_DATA InitData = { 0 };
-    InitData.pSysMem = vertices;
+    D3D11_SUBRESOURCE_DATA InitData = {
+        .pSysMem = vertices,
+    };
 
     ID3D11Buffer* pVertexBuffer = NULL;
     hr = ID3D11Device_CreateBuffer(sys->d3ddevice, &bd, &InitData, &pVertexBuffer);
@@ -1242,11 +1246,17 @@ static int Direct3D11MapTexture(picture_t *picture)
     return res;
 }
 
+typedef struct d3d_vertex_t {
+    D3DXVECTOR3 position;
+    D3DXVECTOR2 texture;
+} d3d_vertex_t;
+
 typedef struct d3d_region_t {
     DXGI_FORMAT        format;
     unsigned           width;
     unsigned           height;
-    //TODO D3DXVECTOR3       vertex[4];
+    ID3D11Buffer       *pVerticesBuffer;
+    ID3D11Buffer       *pIndicesBuffer;
     ID3D11Texture2D    *texture;
 } d3d_region_t;
 
@@ -1290,6 +1300,31 @@ static int Direct3D11MapSubpicture(vout_display_t *vd, picture_t *picture, subpi
             d3dr->format = sys->d3dregion_format;
             d3dr->width  = r->fmt.i_visible_width;
             d3dr->height = r->fmt.i_visible_height;
+
+            /* create the vertices to position the texture */
+            D3D11_BUFFER_DESC vertexBufferDesc = { 0 };
+            vertexBufferDesc.Usage = D3D11_USAGE_DYNAMIC;
+            vertexBufferDesc.ByteWidth = sizeof(d3d_vertex_t) * 4;
+            vertexBufferDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
+            vertexBufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+
+            hr = ID3D11Device_CreateBuffer(sys->d3ddevice, &vertexBufferDesc, NULL, &d3dr->pVerticesBuffer);
+
+            /* create the index of the vertices */
+            WORD indices[] = {
+              3, 1, 0,
+              2, 1, 3,
+            };
+
+            D3D11_BUFFER_DESC indexBufferDesc = { 0 };
+            indexBufferDesc.Usage = D3D11_USAGE_DEFAULT;
+            indexBufferDesc.ByteWidth = sizeof(WORD) * 6;
+            indexBufferDesc.BindFlags = D3D11_BIND_INDEX_BUFFER;
+
+            D3D11_SUBRESOURCE_DATA indexInit = {
+                .pSysMem = indices,
+            };
+            hr = ID3D11Device_CreateBuffer(sys->d3ddevice, &indexBufferDesc, &indexInit, &d3dr->pIndicesBuffer);
 
             D3D11_TEXTURE2D_DESC regionTexDesc = { 0 };
             regionTexDesc.Width = d3dr->width;
@@ -1339,8 +1374,7 @@ static int Direct3D11MapSubpicture(vout_display_t *vd, picture_t *picture, subpi
                 }
             }
             ID3D11DeviceContext_Unmap(sys->d3dcontext, (ID3D11Resource *)d3dr->texture, 0);
-        }
-        else {
+        } else {
             msg_Err(vd, "Failed to lock the texture (hr=0x%lX)", hr );
         }
 
@@ -1364,6 +1398,49 @@ static int Direct3D11MapSubpicture(vout_display_t *vd, picture_t *picture, subpi
         dst.right  = dst.left + scale_w * r->fmt.i_visible_width,
         dst.top    = video.top  + scale_h * r->i_y,
         dst.bottom = dst.top  + scale_h * r->fmt.i_visible_height;
+
+        // adjust with the center at 0,0 and the edges at -1/1
+        float left   = ((float)dst.left   / subpicture->i_original_picture_width ) * 2.0f - 1.0f;
+        float right  = ((float)dst.right  / subpicture->i_original_picture_width ) * 2.0f - 1.0f;
+        float top    = 2.0f * (dst.top    - subpicture->i_original_picture_height) / subpicture->i_original_picture_height;
+        float bottom = 2.0f * (dst.bottom - subpicture->i_original_picture_height) / subpicture->i_original_picture_height;
+
+        hr = ID3D11DeviceContext_Map(sys->d3dcontext, (ID3D11Resource *)d3dr->pVerticesBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource);
+        if( SUCCEEDED(hr) ) {
+            d3d_vertex_t *dst_data = mappedResource.pData;
+
+            // bottom left
+            dst_data[0].position.x = left;
+            dst_data[0].position.y = bottom;
+            dst_data[0].position.z = -1.0f;
+            dst_data[0].texture.x = 0.0f;
+            dst_data[0].texture.y = 1.0f;
+
+            // bottom right
+            dst_data[1].position.x = right;
+            dst_data[1].position.y = bottom;
+            dst_data[1].position.z = -1.0f;
+            dst_data[1].texture.x = 1.0f;
+            dst_data[1].texture.y = 1.0f;
+
+            // top right
+            dst_data[2].position.x = right;
+            dst_data[2].position.y = top;
+            dst_data[2].position.z = -1.0f;
+            dst_data[2].texture.x = 1.0f;
+            dst_data[2].texture.y = 0.0f;
+
+            // top left
+            dst_data[3].position.x = left;
+            dst_data[3].position.y = top;
+            dst_data[3].position.z = -1.0f;
+            dst_data[3].texture.x = 0.0f;
+            dst_data[3].texture.y = 0.0f;
+
+            ID3D11DeviceContext_Unmap(sys->d3dcontext, (ID3D11Resource *)d3dr->pVerticesBuffer, 0);
+        } else {
+            msg_Err(vd, "Failed to lock the texture (hr=0x%lX)", hr );
+        }
 #if 0
         Direct3D9SetupVertices(d3dr->vertex,
                               src, src, dst,
