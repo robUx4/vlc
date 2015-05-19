@@ -178,8 +178,13 @@ struct vout_display_sys_t
     DXGI_FORMAT              d3dFormatUV;
     vlc_fourcc_t             vlcFormat;
     const char               *d3dPxShader;
+
+    // SPU
     vlc_fourcc_t             pSubpictureChromas[2];
     ID3D11Texture2D          *spuStagingTexture;
+    DXGI_FORMAT              d3dregion_format;
+    int                      d3dregion_count;
+    struct d3d_region_t      *d3dregion;
 #endif
 
 #ifdef MODULE_NAME_IS_direct3d9

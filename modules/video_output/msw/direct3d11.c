@@ -127,7 +127,7 @@ static int  Direct3D11CreateResources (vout_display_t *, video_format_t *);
 static void Direct3D11DestroyResources(vout_display_t *);
 
 static int  Direct3D11MapTexture(picture_t *);
-static int Direct3D11MapSubpicture(vout_display_t *,subpicture_t *);
+static int Direct3D11MapSubpicture(vout_display_t *, picture_t *,subpicture_t *);
 
 /* All the #if USE_DXGI contain an alternative method to setup dx11
    They both need to be benchmarked to see which performs better */
@@ -476,7 +476,7 @@ static void Prepare(vout_display_t *vd, picture_t *picture, subpicture_t *subpic
     ID3D11DeviceContext_ClearDepthStencilView(sys->d3dcontext,sys->d3ddepthStencilView, D3D11_CLEAR_DEPTH, 1.0f, 0);
 
     if (subpicture)
-        Direct3D11MapSubpicture(vd, subpicture);
+        Direct3D11MapSubpicture(vd, picture, subpicture);
 #endif
 
     /* Render the quad */
@@ -584,8 +584,7 @@ static int Direct3D11Open(vout_display_t *vd, video_format_t *fmt)
     creationFlags |= D3D11_CREATE_DEVICE_DEBUG;
 # endif
 
-    DXGI_SWAP_CHAIN_DESC scd;
-    memset(&scd, 0, sizeof(scd));
+    DXGI_SWAP_CHAIN_DESC scd = { 0 };
     scd.BufferCount = 1;
     scd.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
     scd.SampleDesc.Count = 1;
@@ -623,8 +622,7 @@ static int Direct3D11Open(vout_display_t *vd, video_format_t *fmt)
        return VLC_EGENERIC;
     }
 
-    DXGI_MODE_DESC md;
-    memset(&md, 0, sizeof(md));
+    DXGI_MODE_DESC md = { 0 };
     md.Width  = fmt->i_visible_width;
     md.Height = fmt->i_visible_height;
     md.Format = scd.BufferDesc.Format;
@@ -856,13 +854,12 @@ static int Direct3D11CreateResources(vout_display_t *vd, video_format_t *fmt)
     }
 
 #if SUBPICTURE_TARGET
-    D3D11_TEXTURE2D_DESC spuStagingTexDesc;
-    ZeroMemory(&spuStagingTexDesc, sizeof(spuStagingTexDesc));
+    D3D11_TEXTURE2D_DESC spuStagingTexDesc = { 0 };
     spuStagingTexDesc.Width = fmt->i_visible_width;
     spuStagingTexDesc.Height = fmt->i_visible_height;
     spuStagingTexDesc.MipLevels = 1;
     spuStagingTexDesc.ArraySize = 1;
-    spuStagingTexDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;//sys->d3dFormatTex;
+    spuStagingTexDesc.Format = DXGI_FORMAT_R8G8B8A8_UINT;//sys->d3dFormatTex;
     spuStagingTexDesc.SampleDesc.Count = 1;
     spuStagingTexDesc.Usage = D3D11_USAGE_STAGING;
     spuStagingTexDesc.BindFlags = 0;
@@ -876,13 +873,12 @@ static int Direct3D11CreateResources(vout_display_t *vd, video_format_t *fmt)
 
     ID3D11Texture2D *spuRenderTexture;
 
-    D3D11_TEXTURE2D_DESC subpictureTexDesc;
-    ZeroMemory(&subpictureTexDesc, sizeof(subpictureTexDesc));
+    D3D11_TEXTURE2D_DESC subpictureTexDesc = { 0 };
     subpictureTexDesc.Width = fmt->i_visible_width;
     subpictureTexDesc.Height = fmt->i_visible_height;
     subpictureTexDesc.MipLevels = 1;
     subpictureTexDesc.ArraySize = 1;
-    subpictureTexDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;//sys->d3dFormatTex;
+    subpictureTexDesc.Format = DXGI_FORMAT_R8G8B8A8_UINT;//sys->d3dFormatTex;
     subpictureTexDesc.SampleDesc.Count = 1;
     subpictureTexDesc.Usage = D3D11_USAGE_DEFAULT;
     subpictureTexDesc.BindFlags = D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE;
@@ -903,8 +899,7 @@ static int Direct3D11CreateResources(vout_display_t *vd, video_format_t *fmt)
 #endif
 
 #if DEPTH_STENCIL
-    D3D11_TEXTURE2D_DESC deptTexDesc;
-    memset(&deptTexDesc, 0,sizeof(deptTexDesc));
+    D3D11_TEXTURE2D_DESC deptTexDesc = { 0 };
     deptTexDesc.ArraySize = 1;
     deptTexDesc.BindFlags = D3D11_BIND_DEPTH_STENCIL;
     deptTexDesc.CPUAccessFlags = 0;
@@ -924,9 +919,7 @@ static int Direct3D11CreateResources(vout_display_t *vd, video_format_t *fmt)
        return VLC_EGENERIC;
     }
 
-    D3D11_DEPTH_STENCIL_VIEW_DESC depthViewDesc;
-    memset(&depthViewDesc, 0, sizeof(depthViewDesc));
-
+    D3D11_DEPTH_STENCIL_VIEW_DESC depthViewDesc = { 0 };
     depthViewDesc.Format = deptTexDesc.Format;
     depthViewDesc.ViewDimension = D3D11_DSV_DIMENSION_TEXTURE2D;
     depthViewDesc.Texture2D.MipSlice = 0;
@@ -942,9 +935,13 @@ static int Direct3D11CreateResources(vout_display_t *vd, video_format_t *fmt)
 
     ID3D11DeviceContext_OMSetRenderTargets(sys->d3dcontext, 2, sys->d3drenderTargetView, sys->d3ddepthStencilView);
 
+    /* TODO disable depth testing as we're only doing 2D
+     * see https://msdn.microsoft.com/en-us/library/windows/desktop/bb205074%28v=vs.85%29.aspx
+     * see http://rastertek.com/dx11tut11.html
+    ID3D11Device_OMSetDepthStencilState(sys->d3ddevice, ); */
+
     ID3D11BlendState *pSpuBlendState;
-    D3D11_BLEND_DESC spuBlendDesc;
-    ZeroMemory(&spuBlendDesc, sizeof(spuBlendDesc));
+    D3D11_BLEND_DESC spuBlendDesc = { 0 };
     spuBlendDesc.RenderTarget[0].BlendEnable = TRUE;
     spuBlendDesc.RenderTarget[0].SrcBlend = D3D11_BLEND_ONE;
     spuBlendDesc.RenderTarget[0].DestBlend = D3D11_BLEND_ZERO;
@@ -988,9 +985,9 @@ static int Direct3D11CreateResources(vout_display_t *vd, video_format_t *fmt)
 
     ID3D11DeviceContext_RSSetViewports(sys->d3dcontext, 1, &vp);
 
+#if CUSTOM_VERTEX_SHADER
     ID3DBlob* pVSBlob = NULL;
 
-#if CUSTOM_VERTEX_SHADER
     /* TODO : Match the version to the D3D_FEATURE_LEVEL */
     hr = D3DCompile(globVertexShaderDefault, strlen(globVertexShaderDefault),
                     NULL, NULL, NULL, "VS", "vs_4_0_level_9_1", 0, 0, &pVSBlob, NULL);
@@ -1052,6 +1049,7 @@ static int Direct3D11CreateResources(vout_display_t *vd, video_format_t *fmt)
     }
 #endif
 
+#if CUSTOM_VERTEX_SHADER
     float vertices[] = {
     -1.0f, -1.0f, -1.0f, 0.0f, 1.0f,
      1.0f, -1.0f, -1.0f, 1.0f, 1.0f,
@@ -1059,16 +1057,13 @@ static int Direct3D11CreateResources(vout_display_t *vd, video_format_t *fmt)
     -1.0f,  1.0f, -1.0f, 0.0f, 0.0f,
     };
 
-#if CUSTOM_VERTEX_SHADER
-    D3D11_BUFFER_DESC bd;
-    memset(&bd, 0, sizeof(bd));
+    D3D11_BUFFER_DESC bd = { 0 };
     bd.Usage = D3D11_USAGE_DEFAULT;
     bd.ByteWidth = sizeof(float) * 5 * 4;
     bd.BindFlags = D3D11_BIND_VERTEX_BUFFER;
     bd.CPUAccessFlags = 0;
 
-    D3D11_SUBRESOURCE_DATA InitData;
-    memset(&InitData, 0, sizeof(InitData));
+    D3D11_SUBRESOURCE_DATA InitData = { 0 };
     InitData.pSysMem = vertices;
 
     ID3D11Buffer* pVertexBuffer = NULL;
@@ -1110,8 +1105,7 @@ static int Direct3D11CreateResources(vout_display_t *vd, video_format_t *fmt)
     ID3D11DeviceContext_IASetPrimitiveTopology(sys->d3dcontext, D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 #endif
 
-    D3D11_TEXTURE2D_DESC texDesc;
-    memset(&texDesc, 0, sizeof(texDesc));
+    D3D11_TEXTURE2D_DESC texDesc = { 0 };
     texDesc.Width = fmt->i_visible_width;
     texDesc.Height = fmt->i_visible_height;
     texDesc.MipLevels = texDesc.ArraySize = 1;
@@ -1128,8 +1122,7 @@ static int Direct3D11CreateResources(vout_display_t *vd, video_format_t *fmt)
         return VLC_EGENERIC;
     }
 
-    D3D11_SHADER_RESOURCE_VIEW_DESC resviewDesc;
-    memset(&resviewDesc, 0, sizeof(resviewDesc));
+    D3D11_SHADER_RESOURCE_VIEW_DESC resviewDesc = { 0 };
     resviewDesc.Format = sys->d3dFormatY;
     resviewDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
     resviewDesc.Texture2D.MipLevels = texDesc.MipLevels;
@@ -1152,8 +1145,7 @@ static int Direct3D11CreateResources(vout_display_t *vd, video_format_t *fmt)
         }
     }
 
-    D3D11_SAMPLER_DESC sampDesc;
-    memset(&sampDesc, 0, sizeof(sampDesc));
+    D3D11_SAMPLER_DESC sampDesc = { 0 };
     sampDesc.Filter = D3D11_FILTER_MIN_MAG_MIP_POINT;
     sampDesc.AddressU = D3D11_TEXTURE_ADDRESS_CLAMP;
     sampDesc.AddressV = D3D11_TEXTURE_ADDRESS_CLAMP;
@@ -1192,8 +1184,7 @@ static int Direct3D11CreateResources(vout_display_t *vd, video_format_t *fmt)
     }
     sys->picsys = picsys;
 
-    picture_pool_configuration_t pool_cfg;
-    memset(&pool_cfg, 0, sizeof(pool_cfg));
+    picture_pool_configuration_t pool_cfg = { 0 };
     pool_cfg.picture_count = 1;
     pool_cfg.picture       = &picture;
     pool_cfg.lock          = Direct3D11MapTexture;
@@ -1240,20 +1231,134 @@ static int Direct3D11MapTexture(picture_t *picture)
     return res;
 }
 
-static int Direct3D11MapSubpicture(vout_display_t *vd, subpicture_t *picture)
+typedef struct d3d_region_t {
+    DXGI_FORMAT        format;
+    unsigned           width;
+    unsigned           height;
+    //TODO D3DXVECTOR3       vertex[4];
+    ID3D11Texture2D    *texture;
+} d3d_region_t;
+
+static int Direct3D11MapSubpicture(vout_display_t *vd, picture_t *picture, subpicture_t *subpicture)
 {
     vout_display_sys_t *sys = vd->sys;
     D3D11_MAPPED_SUBRESOURCE mappedResource;
     HRESULT hr;
+    int res;
 
-    hr = ID3D11DeviceContext_Map(sys->d3dcontext, (ID3D11Resource *)sys->spuStagingTexture, 0, D3D11_MAP_WRITE, 0, &mappedResource);
-    if( FAILED(hr) )
-    {
-        msg_Dbg( vd, "failed to map the texture (hr=0x%lX)", hr );
-        return VLC_EGENERIC;
+    int count = 0;
+    for (subpicture_region_t *r = subpicture->p_region; r; r = r->p_next)
+        count++;
+
+    d3d_region_t *region = calloc(count, sizeof(d3d_region_t));
+    if (unlikely(region==NULL))
+        return VLC_ENOMEM;
+
+    int i = 0;
+    for (subpicture_region_t *r = subpicture->p_region; r; r = r->p_next, i++) {
+        d3d_region_t *d3dr = &region[i];
+
+        d3dr->texture = NULL;
+        for (int j = 0; j < sys->d3dregion_count; j++) {
+            d3d_region_t *cache = &sys->d3dregion[j];
+            if (cache->texture &&
+                cache->format == sys->d3dregion_format &&
+                cache->width  == r->fmt.i_visible_width &&
+                cache->height == r->fmt.i_visible_height) {
+#ifndef NDEBUG
+                msg_Dbg(vd, "Reusing %dx%d texture for OSD",
+                        cache->width, cache->height);
+#endif
+                *d3dr = *cache;
+                memset(cache, 0, sizeof(*cache));
+                break;
+            }
+        }
+
+        if (!d3dr->texture) {
+            d3dr->format = sys->d3dregion_format;
+            d3dr->width  = r->fmt.i_visible_width;
+            d3dr->height = r->fmt.i_visible_height;
+
+            D3D11_TEXTURE2D_DESC regionTexDesc = { 0 };
+            regionTexDesc.Width = d3dr->width;
+            regionTexDesc.Height = d3dr->height;
+            regionTexDesc.MipLevels = 1;
+            regionTexDesc.ArraySize = 1;
+            regionTexDesc.Format = DXGI_FORMAT_R8G8B8A8_UINT;//sys->d3dFormatTex;
+            regionTexDesc.SampleDesc.Count = 1;
+            regionTexDesc.Usage = D3D11_USAGE_DYNAMIC;
+            regionTexDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+            regionTexDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+
+            hr = ID3D11Device_CreateTexture2D(sys->d3ddevice, &regionTexDesc, NULL, &d3dr->texture);
+            if (FAILED(hr)) {
+                d3dr->texture = NULL;
+                msg_Err(vd, "Failed to create %dx%d texture for OSD (hr=0x%0lx)",
+                        d3dr->width, d3dr->height, hr);
+                continue;
+            }
+            sys->d3dregion_format = regionTexDesc.Format;
+#ifndef NDEBUG
+            msg_Dbg(vd, "Created %dx%d texture for OSD",
+                    r->fmt.i_visible_width, r->fmt.i_visible_height);
+#endif
+        }
+
+        hr = ID3D11DeviceContext_Map(sys->d3dcontext, (ID3D11Resource *)d3dr->texture, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource);
+        if( SUCCEEDED(hr) ) {
+            uint8_t  *dst_data   = mappedResource.pData;
+            int       dst_pitch  = mappedResource.RowPitch;
+            const int src_offset = r->fmt.i_y_offset * r->p_picture->p->i_pitch +
+                                   r->fmt.i_x_offset * r->p_picture->p->i_pixel_pitch;
+            uint8_t  *src_data   = &r->p_picture->p->p_pixels[src_offset];
+            int       src_pitch  = r->p_picture->p->i_pitch;
+            for (unsigned y = 0; y < r->fmt.i_visible_height; y++) {
+                int copy_pitch = __MIN(dst_pitch, r->p_picture->p->i_visible_pitch);
+                if (d3dr->format == DXGI_FORMAT_R8G8B8A8_UINT) {
+                    memcpy(&dst_data[y * dst_pitch], &src_data[y * src_pitch],
+                           copy_pitch);
+                } else {
+                    for (int x = 0; x < copy_pitch; x += 4) {
+                        dst_data[y * dst_pitch + x + 0] = src_data[y * src_pitch + x + 2];
+                        dst_data[y * dst_pitch + x + 1] = src_data[y * src_pitch + x + 1];
+                        dst_data[y * dst_pitch + x + 2] = src_data[y * src_pitch + x + 0];
+                        dst_data[y * dst_pitch + x + 3] = src_data[y * src_pitch + x + 3];
+                    }
+                }
+            }
+            ID3D11DeviceContext_Unmap(sys->d3dcontext, (ID3D11Resource *)d3dr->texture, 0);
+        }
+        else {
+            msg_Err(vd, "Failed to lock the texture (hr=0x%lX)", hr );
+        }
+
+        /* TODO render each region in a texture
+         * render the sum of all the textures into a texture of the right size (spu preallocated?)
+         */
+
+        /* Map the subpicture to sys->rect_dest */
+        RECT src;
+        src.left   = 0;
+        src.right  = src.left + r->fmt.i_visible_width;
+        src.top    = 0;
+        src.bottom = src.top  + r->fmt.i_visible_height;
+
+        const RECT video = sys->rect_dest;
+        const float scale_w = (float)(video.right  - video.left) / subpicture->i_original_picture_width;
+        const float scale_h = (float)(video.bottom - video.top)  / subpicture->i_original_picture_height;
+
+        RECT dst;
+        dst.left   = video.left + scale_w * r->i_x,
+        dst.right  = dst.left + scale_w * r->fmt.i_visible_width,
+        dst.top    = video.top  + scale_h * r->i_y,
+        dst.bottom = dst.top  + scale_h * r->fmt.i_visible_height;
+#if 0
+        Direct3D9SetupVertices(d3dr->vertex,
+                              src, src, dst,
+                              subpicture->i_alpha * r->i_alpha / 255, ORIENT_NORMAL);
+#endif
     }
-    /* TODO res = CommonUpdatePicture(picture, NULL, mappedResource.pData, mappedResource.RowPitch);*/
-    ID3D11DeviceContext_Unmap(sys->d3dcontext,(ID3D11Resource *)sys->spuStagingTexture, 0);
     return VLC_SUCCESS;
 }
 
