@@ -24,11 +24,6 @@
 # include "config.h"
 #endif
 
-#define DEPTH_STENCIL 1
-#define CUSTOM_VERTEX_SHADER 1
-#define CUSTOM_PIXEL_SHADER 1
-#define CUSTOM_SAMPLER_STATE 1
-
 #include <vlc_common.h>
 #include <vlc_plugin.h>
 #include <vlc_vout_display.h>
@@ -482,20 +477,11 @@ static void Prepare(vout_display_t *vd, picture_t *picture, subpicture_t *subpic
 
     /* float ClearColor[4] = { 1.0f, 0.125f, 0.3f, 1.0f }; */
     /* ID3D11DeviceContext_ClearRenderTargetView(sys->d3dcontext,sys->d3drenderTargetView, ClearColor); */
-#if DEPTH_STENCIL
     ID3D11DeviceContext_ClearDepthStencilView(sys->d3dcontext,sys->d3ddepthStencilView, D3D11_CLEAR_DEPTH, 1.0f, 0);
-#endif
 
-#if CUSTOM_VERTEX_SHADER
     ID3D11DeviceContext_VSSetShader(sys->d3dcontext, sys->d3dvertexShader, NULL, 0);
-#endif
-
-#if CUSTOM_SAMPLER_STATE
-    ID3D11DeviceContext_PSSetSamplers(sys->d3dcontext, 0, 1, &sys->d3dsampState);
-#endif
-#if CUSTOM_PIXEL_SHADER
     ID3D11DeviceContext_PSSetShader(sys->d3dcontext, sys->d3dpixelShader, NULL, 0);
-#endif
+    ID3D11DeviceContext_PSSetSamplers(sys->d3dcontext, 0, 1, &sys->d3dsampState);
 
     if (subpicture) {
         int subpicture_region_count      = 0;
@@ -513,6 +499,7 @@ static void DisplayD3DPicture(vout_display_sys_t *sys, d3d_picture_t *d3dr)
 
     /* Render the quad */
     ID3D11DeviceContext_PSSetShaderResources(sys->d3dcontext, 0, 1, &d3dr->pResourceViewYRGB);
+
     if( sys->d3dFormatUV )
         ID3D11DeviceContext_PSSetShaderResources(sys->d3dcontext, 1, 1, &d3dr->pResourceViewUV);
 
@@ -868,9 +855,7 @@ static int Direct3D11CreateResources(vout_display_t *vd, video_format_t *fmt)
 {
     vout_display_sys_t *sys = vd->sys;
     ID3D11Texture2D* pBackBuffer = NULL;
-#if DEPTH_STENCIL
     ID3D11Texture2D* pDepthStencil= NULL;
-#endif
     HRESULT hr;
 
     fmt->i_chroma = sys->vlcFormat;
@@ -890,7 +875,6 @@ static int Direct3D11CreateResources(vout_display_t *vd, video_format_t *fmt)
        return VLC_EGENERIC;
     }
 
-#if DEPTH_STENCIL
     D3D11_TEXTURE2D_DESC deptTexDesc;
     memset(&deptTexDesc, 0,sizeof(deptTexDesc));
     deptTexDesc.ArraySize = 1;
@@ -960,10 +944,6 @@ static int Direct3D11CreateResources(vout_display_t *vd, video_format_t *fmt)
     }
     ID3D11DeviceContext_OMSetBlendState(sys->d3dcontext, pSpuBlendState, NULL, 0xFFFFFFFF);
 
-#else
-    ID3D11DeviceContext_OMSetRenderTargets(sys->d3dcontext, 1, &sys->d3drenderTargetView, NULL);
-#endif
-
     /* disable depth testing as we're only doing 2D
      * see https://msdn.microsoft.com/en-us/library/windows/desktop/bb205074%28v=vs.85%29.aspx
      * see http://rastertek.com/dx11tut11.html
@@ -1001,7 +981,6 @@ static int Direct3D11CreateResources(vout_display_t *vd, video_format_t *fmt)
 
     ID3D11DeviceContext_RSSetViewports(sys->d3dcontext, 1, &vp);
 
-#if CUSTOM_VERTEX_SHADER
     ID3DBlob* pVSBlob = NULL;
 
     /* TODO : Match the version to the D3D_FEATURE_LEVEL */
@@ -1039,9 +1018,7 @@ static int Direct3D11CreateResources(vout_display_t *vd, video_format_t *fmt)
     }
 
     ID3D11DeviceContext_IASetInputLayout(sys->d3dcontext, pVertexLayout);
-#endif
 
-#if CUSTOM_PIXEL_SHADER
     ID3DBlob* pPSBlob = NULL;
 
     /* TODO : Match the version to the D3D_FEATURE_LEVEL */
@@ -1063,7 +1040,6 @@ static int Direct3D11CreateResources(vout_display_t *vd, video_format_t *fmt)
       msg_Err(vd, "Failed to create the pixel shader.");
       return VLC_EGENERIC;
     }
-#endif
 
     ID3D11DeviceContext_IASetPrimitiveTopology(sys->d3dcontext, D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
@@ -1080,7 +1056,6 @@ static int Direct3D11CreateResources(vout_display_t *vd, video_format_t *fmt)
         return VLC_EGENERIC;
     }
 
-#if CUSTOM_SAMPLER_STATE
     D3D11_SAMPLER_DESC sampDesc = { 0 };
     sampDesc.Filter = D3D11_FILTER_MIN_MAG_MIP_POINT;
     sampDesc.AddressU = D3D11_TEXTURE_ADDRESS_CLAMP;
@@ -1091,7 +1066,6 @@ static int Direct3D11CreateResources(vout_display_t *vd, video_format_t *fmt)
     sampDesc.MaxLOD = D3D11_FLOAT32_MAX;
 
     hr = ID3D11Device_CreateSamplerState(sys->d3ddevice, &sampDesc, &sys->d3dsampState);
-#endif
 
     if (FAILED(hr)) {
         msg_Err(vd, "Could not Create the D3d11 Sampler State. (hr=0x%lX)", hr);
@@ -1262,6 +1236,19 @@ static void Direct3D11DestroyResources(vout_display_t *vd)
     ReleaseD3DPicture(&sys->d3dpic);
     for (int i = 0; i < sys->d3dregion_count; ++i)
         ReleaseD3DPicture(&sys->d3dregions[i]);
+
+    if (sys->d3drenderTargetView) {
+        ID3D11RenderTargetView_Release(sys->d3drenderTargetView);
+        sys->d3drenderTargetView = NULL;
+    }
+    if (sys->d3ddepthStencilView) {
+        ID3D11DepthStencilView_Release(sys->d3ddepthStencilView);
+        sys->d3ddepthStencilView = NULL;
+    }
+    if (sys->d3dsampState) {
+        ID3D11SamplerState_Release(sys->d3dsampState);
+        sys->d3dsampState = NULL;
+    }
 
     msg_Dbg(vd, "Direct3D11 resources destroyed");
 }
