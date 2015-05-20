@@ -172,7 +172,8 @@ struct vout_display_sys_t
 #endif
     ID3D11Device             *d3ddevice;       /* D3D device */
     ID3D11DeviceContext      *d3dcontext;      /* D3D context */
-    ID3D11RenderTargetView   *d3drenderTargetView[2];
+    d3d_picture_t            d3dpic;
+    ID3D11RenderTargetView   *d3drenderTargetView;
     ID3D11DepthStencilView   *d3ddepthStencilView;
     ID3D11VertexShader       *d3dvertexShader;
     ID3D11PixelShader        *d3dpixelShader;
@@ -180,10 +181,6 @@ struct vout_display_sys_t
     ID3D11SamplerState       *d3dsampState;
     picture_sys_t            *picsys;
     D3D_FEATURE_LEVEL        d3dfeaturelevel;
-
-    /* Y/RGB picture */
-    d3d_picture_t            d3dpic;
-
     DXGI_FORMAT              d3dFormatTex;
     DXGI_FORMAT              d3dFormatY;
     DXGI_FORMAT              d3dFormatUV;
@@ -194,7 +191,6 @@ struct vout_display_sys_t
 
     // SPU
     vlc_fourcc_t             pSubpictureChromas[2];
-    ID3D11Texture2D          *spuStagingTexture;
     DXGI_FORMAT              d3dregion_format;
     int                      d3dregion_count;
     struct d3d_picture_t     *d3dregions;
