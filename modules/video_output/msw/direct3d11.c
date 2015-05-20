@@ -94,6 +94,7 @@ static const d3d_format_t d3d_formats[] = {
     { "Y410",     DXGI_FORMAT_Y410,           VLC_CODEC_I444_10L, DXGI_FORMAT_R10G10B10A2_UNORM,  0 },
     { "NV11",     DXGI_FORMAT_NV11,           VLC_CODEC_I411,     DXGI_FORMAT_R8_UNORM,           DXGI_FORMAT_R8G8_UNORM },
 #endif
+    { "R8G8B8A8", DXGI_FORMAT_R8G8B8A8_UNORM, VLC_CODEC_RGBA,     DXGI_FORMAT_R8G8B8A8_UNORM,     0 },
     { "B8G8R8A8", DXGI_FORMAT_B8G8R8A8_UNORM, VLC_CODEC_BGRA,     DXGI_FORMAT_B8G8R8A8_UNORM,     0 },
     { "R8G8B8X8", DXGI_FORMAT_B8G8R8X8_UNORM, VLC_CODEC_RGB32,    DXGI_FORMAT_B8G8R8X8_UNORM,     0 },
     { "B5G6R5",   DXGI_FORMAT_B5G6R5_UNORM,   VLC_CODEC_RGB16,    DXGI_FORMAT_B5G6R5_UNORM,       0 },
@@ -120,12 +121,14 @@ typedef struct d3d_vertex_t {
 } d3d_vertex_t;
 
 typedef struct d3d_region_t {
-    DXGI_FORMAT        format;
-    unsigned           width;
-    unsigned           height;
-    ID3D11Buffer       *pVertexBuffer;
-    ID3D11Buffer       *pIndexBuffer;
-    ID3D11Texture2D    *texture;
+    DXGI_FORMAT               format;
+    unsigned                  width;
+    unsigned                  height;
+    ID3D11Buffer              *pVertexBuffer;
+    ID3D11Buffer              *pIndexBuffer;
+    ID3D11Texture2D           *pTexture;
+    ID3D11ShaderResourceView  *pResourceViewYRGB;
+    ID3D11ShaderResourceView  *pResourceViewUV;
 } d3d_region_t;
 
 
@@ -494,6 +497,15 @@ static void Prepare(vout_display_t *vd, picture_t *picture, subpicture_t *subpic
     ID3D11DeviceContext_ClearDepthStencilView(sys->d3dcontext,sys->d3ddepthStencilView, D3D11_CLEAR_DEPTH, 1.0f, 0);
 #endif
 
+#if CUSTOM_VERTEX_SHADER
+    ID3D11DeviceContext_VSSetShader(sys->d3dcontext, sys->d3dvertexShader, NULL, 0);
+#endif
+
+#if CUSTOM_PIXEL_SHADER
+    ID3D11DeviceContext_PSSetSamplers(sys->d3dcontext, 0, 1, &sys->d3dsampState);
+    ID3D11DeviceContext_PSSetShader(sys->d3dcontext, sys->d3dpixelShader, NULL, 0);
+#endif
+
     if (subpicture) {
         int subpicture_region_count     = 0;
         d3d_region_t *subpicture_region = NULL;
@@ -501,7 +513,6 @@ static void Prepare(vout_display_t *vd, picture_t *picture, subpicture_t *subpic
         sys->d3dregion_count = subpicture_region_count;
         sys->d3dregion       = subpicture_region;
     }
-
 }
 
 static void Display(vout_display_t *vd, picture_t *picture, subpicture_t *subpicture)
@@ -511,35 +522,41 @@ static void Display(vout_display_t *vd, picture_t *picture, subpicture_t *subpic
     /* no ID3D11Device operations should come here */
 
     /* Render the quad */
-#if CUSTOM_VERTEX_SHADER
-    ID3D11DeviceContext_VSSetShader(sys->d3dcontext, sys->d3dvertexShader, NULL, 0);
-#endif
 #if CUSTOM_PIXEL_SHADER
-    ID3D11DeviceContext_PSSetShader(sys->d3dcontext, sys->d3dpixelShader, NULL, 0);
     ID3D11DeviceContext_PSSetShaderResources(sys->d3dcontext, 0, 1, &sys->d3dresViewY);
-
     if( sys->d3dFormatUV )
         ID3D11DeviceContext_PSSetShaderResources(sys->d3dcontext, 1, 1, &sys->d3dresViewUV);
-
-    ID3D11DeviceContext_PSSetSamplers(sys->d3dcontext, 0, 1, &sys->d3dsampState);
 #endif
 
     UINT stride = sizeof(d3d_vertex_t);
     UINT offset = 0;
+
+    D3D11_BUFFER_DESC vertexBuf1;
+    d3d_vertex_t *pVertices1;
+    ID3D11Buffer_GetDesc(sys->pVertexBuffer, &vertexBuf1);
     ID3D11DeviceContext_IASetVertexBuffers(sys->d3dcontext, 0, 1, &sys->pVertexBuffer, &stride, &offset);
     ID3D11DeviceContext_IASetIndexBuffer(sys->d3dcontext, sys->pIndexBuffer, DXGI_FORMAT_R16_UINT, 0);
-
     ID3D11DeviceContext_DrawIndexed(sys->d3dcontext, 6, 0, 0);
 
     if (subpicture) {
         // draw the additional vertices
         for (int i = 0; i < sys->d3dregion_count; ++i) {
             d3d_region_t *d3dr = &sys->d3dregion[i];
+
+            D3D11_BUFFER_DESC vertexBuf2;
+            d3d_vertex_t *pVertices2;
+            ID3D11Buffer_GetDesc(d3dr->pVertexBuffer, &vertexBuf2);
+
+            ID3D11DeviceContext_PSSetShaderResources(sys->d3dcontext, 0, 1, &d3dr->pResourceViewYRGB);
+            if( sys->d3dFormatUV )
+                ID3D11DeviceContext_PSSetShaderResources(sys->d3dcontext, 1, 1, &d3dr->pResourceViewUV);
+
             ID3D11DeviceContext_IASetVertexBuffers(sys->d3dcontext, 0, 1, &d3dr->pVertexBuffer, &stride, &offset);
             ID3D11DeviceContext_IASetIndexBuffer(sys->d3dcontext, d3dr->pIndexBuffer, DXGI_FORMAT_R16_UINT, 0);
             ID3D11DeviceContext_DrawIndexed(sys->d3dcontext, 6, 0, 0);
         }
     }
+
     IDXGISwapChain_Present(sys->dxgiswapChain, 0, 0);
 
     picture_Release(picture);
@@ -1167,7 +1184,7 @@ static int Direct3D11CreateResources(vout_display_t *vd, video_format_t *fmt)
     hr = ID3D11Device_CreateShaderResourceView(sys->d3ddevice, (ID3D11Resource *)sys->d3dtexture, &resviewDesc, &sys->d3dresViewY);
     if (FAILED(hr)) {
         if(sys->d3dtexture) ID3D11Texture2D_Release(sys->d3dtexture);
-        msg_Err(vd, "Could not Create the Y D3d11 Texture ResourceView. (hr=0x%lX)", hr);
+        msg_Err(vd, "Could not Create the Y/RGB D3d11 Texture ResourceView. (hr=0x%lX)", hr);
         return VLC_EGENERIC;
     }
 
@@ -1301,10 +1318,10 @@ static int Direct3D11MapSubpicture(vout_display_t *vd, int *subpicture_region_co
     for (subpicture_region_t *r = subpicture->p_region; r; r = r->p_next, i++) {
         d3d_region_t *d3dr = &(*region)[i];
 
-        d3dr->texture = NULL;
+        d3dr->pTexture = NULL;
         for (int j = 0; j < sys->d3dregion_count; j++) {
             d3d_region_t *cache = &sys->d3dregion[j];
-            if (cache->texture &&
+            if (cache->pTexture &&
                 cache->format == sys->d3dregion_format &&
                 cache->width  == r->fmt.i_visible_width &&
                 cache->height == r->fmt.i_visible_height) {
@@ -1318,7 +1335,7 @@ static int Direct3D11MapSubpicture(vout_display_t *vd, int *subpicture_region_co
             }
         }
 
-        if (!d3dr->texture) {
+        if (!d3dr->pTexture) {
             d3dr->format = sys->d3dregion_format;
             d3dr->width  = r->fmt.i_visible_width;
             d3dr->height = r->fmt.i_visible_height;
@@ -1354,19 +1371,44 @@ static int Direct3D11MapSubpicture(vout_display_t *vd, int *subpicture_region_co
             regionTexDesc.Height = d3dr->height;
             regionTexDesc.MipLevels = 1;
             regionTexDesc.ArraySize = 1;
-            regionTexDesc.Format = DXGI_FORMAT_R8G8B8A8_UINT;//sys->d3dFormatTex;
+            regionTexDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM; //sys->d3dFormatTex;
             regionTexDesc.SampleDesc.Count = 1;
             regionTexDesc.Usage = D3D11_USAGE_DYNAMIC;
             regionTexDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
             regionTexDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
 
-            hr = ID3D11Device_CreateTexture2D(sys->d3ddevice, &regionTexDesc, NULL, &d3dr->texture);
+            hr = ID3D11Device_CreateTexture2D(sys->d3ddevice, &regionTexDesc, NULL, &d3dr->pTexture);
             if (FAILED(hr)) {
-                d3dr->texture = NULL;
+                d3dr->pTexture = NULL;
                 msg_Err(vd, "Failed to create %dx%d texture for OSD (hr=0x%0lx)",
                         d3dr->width, d3dr->height, hr);
                 continue;
             }
+
+            D3D11_SHADER_RESOURCE_VIEW_DESC resViewDesc = { 0 };
+            resViewDesc.Format = regionTexDesc.Format;
+            resViewDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
+            resViewDesc.Texture2D.MipLevels = regionTexDesc.MipLevels;
+
+            hr = ID3D11Device_CreateShaderResourceView(sys->d3ddevice, (ID3D11Resource *)d3dr->pTexture, &resViewDesc, &d3dr->pResourceViewYRGB);
+            if (FAILED(hr)) {
+                if(sys->d3dtexture) ID3D11Texture2D_Release(d3dr->pTexture);
+                msg_Err(vd, "Could not Create the Y/RGB D3d11 Texture ResourceView. (hr=0x%lX)", hr);
+                return VLC_EGENERIC;
+            }
+            d3dr->format = resViewDesc.Format;
+
+            if( sys->d3dFormatUV )
+            {
+                resViewDesc.Format = sys->d3dFormatUV;
+                hr = ID3D11Device_CreateShaderResourceView(sys->d3ddevice, (ID3D11Resource *)d3dr->pTexture, &resViewDesc, &d3dr->pResourceViewUV);
+                if (FAILED(hr)) {
+                    if(sys->d3dtexture) ID3D11Texture2D_Release(d3dr->pTexture);
+                    msg_Err(vd, "Could not Create the UV D3d11 Texture ResourceView. (hr=0x%lX)", hr);
+                    return VLC_EGENERIC;
+                }
+            }
+
             sys->d3dregion_format = regionTexDesc.Format;
 #ifndef NDEBUG
             msg_Dbg(vd, "Created %dx%d texture for OSD",
@@ -1374,14 +1416,27 @@ static int Direct3D11MapSubpicture(vout_display_t *vd, int *subpicture_region_co
 #endif
         }
 
-        hr = ID3D11DeviceContext_Map(sys->d3dcontext, (ID3D11Resource *)d3dr->texture, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource);
+        //ID3D11DeviceContext_UpdateSubresource(sys->d3dcontext, (ID3D11Resource *)d3dr->pTexture, 0, NULL, );
+
+        hr = ID3D11DeviceContext_Map(sys->d3dcontext, (ID3D11Resource *)d3dr->pTexture, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource);
         if( SUCCEEDED(hr) ) {
-            uint8_t  *dst_data   = mappedResource.pData;
+            uint8_t   *dst_data  = mappedResource.pData;
             int       dst_pitch  = mappedResource.RowPitch;
             const int src_offset = r->fmt.i_y_offset * r->p_picture->p->i_pitch +
                                    r->fmt.i_x_offset * r->p_picture->p->i_pixel_pitch;
             uint8_t  *src_data   = &r->p_picture->p->p_pixels[src_offset];
             int       src_pitch  = r->p_picture->p->i_pitch;
+#if 1
+            for (unsigned y = 0; y < r->fmt.i_visible_height; y++) {
+                int copy_pitch = __MIN(dst_pitch, r->p_picture->p->i_visible_pitch);
+                for (int x = 0; x < copy_pitch; x += 4) {
+                    dst_data[y * dst_pitch + x + 0] = 0;
+                    dst_data[y * dst_pitch + x + 1] = 0;
+                    dst_data[y * dst_pitch + x + 2] = 128;
+                    dst_data[y * dst_pitch + x + 3] = 0;
+                }
+            }
+#else
             for (unsigned y = 0; y < r->fmt.i_visible_height; y++) {
                 int copy_pitch = __MIN(dst_pitch, r->p_picture->p->i_visible_pitch);
                 if (d3dr->format == DXGI_FORMAT_R8G8B8A8_UINT) {
@@ -1396,7 +1451,8 @@ static int Direct3D11MapSubpicture(vout_display_t *vd, int *subpicture_region_co
                     }
                 }
             }
-            ID3D11DeviceContext_Unmap(sys->d3dcontext, (ID3D11Resource *)d3dr->texture, 0);
+#endif
+            ID3D11DeviceContext_Unmap(sys->d3dcontext, (ID3D11Resource *)d3dr->pTexture, 0);
         } else {
             msg_Err(vd, "Failed to lock the texture (hr=0x%lX)", hr );
         }
