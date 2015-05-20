@@ -51,6 +51,16 @@
  *****************************************************************************/
 #include "events.h"
 
+#ifdef MODULE_NAME_IS_direct3d11
+typedef struct d3d_picture_t {
+    ID3D11Buffer              *pVertexBuffer;
+    ID3D11Buffer              *pIndexBuffer;
+    ID3D11Texture2D           *pTexture;
+    ID3D11ShaderResourceView  *pResourceViewYRGB;
+    ID3D11ShaderResourceView  *pResourceViewUV;
+} d3d_picture_t;
+#endif
+
 /*****************************************************************************
  * vout_sys_t: video output method descriptor
  *****************************************************************************
@@ -172,11 +182,7 @@ struct vout_display_sys_t
     D3D_FEATURE_LEVEL        d3dfeaturelevel;
 
     /* Y/RGB picture */
-    ID3D11Buffer             *pVertexBuffer;
-    ID3D11Buffer             *pIndexBuffer;
-    ID3D11Texture2D          *d3dtexture;
-    ID3D11ShaderResourceView *d3dresViewY;
-    ID3D11ShaderResourceView *d3dresViewUV;
+    d3d_picture_t            d3dpic;
 
     DXGI_FORMAT              d3dFormatTex;
     DXGI_FORMAT              d3dFormatY;

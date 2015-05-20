@@ -43,14 +43,6 @@
 /* avoided until we can pass ISwapchainPanel without c++/cx mode
 # include <windows.ui.xaml.media.dxinterop.h> */
 
-typedef struct d3d_picture_t {
-    ID3D11Buffer              *pVertexBuffer;
-    ID3D11Buffer              *pIndexBuffer;
-    ID3D11Texture2D           *pTexture;
-    ID3D11ShaderResourceView  *pResourceViewYRGB;
-    ID3D11ShaderResourceView  *pResourceViewUV;
-} d3d_picture_t;
-
 #include "common.h"
 
 #if !VLC_WINSTORE_APP
@@ -515,6 +507,20 @@ static void Prepare(vout_display_t *vd, picture_t *picture, subpicture_t *subpic
     }
 }
 
+static void DisplayD3DPicture(vout_display_sys_t *sys, d3d_picture_t *d3dr)
+{
+    UINT stride = sizeof(d3d_vertex_t);
+    UINT offset = 0;
+
+    ID3D11DeviceContext_PSSetShaderResources(sys->d3dcontext, 0, 1, &d3dr->pResourceViewYRGB);
+    if( sys->d3dFormatUV )
+        ID3D11DeviceContext_PSSetShaderResources(sys->d3dcontext, 1, 1, &d3dr->pResourceViewUV);
+
+    ID3D11DeviceContext_IASetVertexBuffers(sys->d3dcontext, 0, 1, &d3dr->pVertexBuffer, &stride, &offset);
+    ID3D11DeviceContext_IASetIndexBuffer(sys->d3dcontext, d3dr->pIndexBuffer, DXGI_FORMAT_R16_UINT, 0);
+    ID3D11DeviceContext_DrawIndexed(sys->d3dcontext, 6, 0, 0);
+}
+
 static void Display(vout_display_t *vd, picture_t *picture, subpicture_t *subpicture)
 {
     vout_display_sys_t *sys = vd->sys;
@@ -522,33 +528,12 @@ static void Display(vout_display_t *vd, picture_t *picture, subpicture_t *subpic
     /* no ID3D11Device operations should come here */
 
     /* Render the quad */
-#if CUSTOM_PIXEL_SHADER
-    ID3D11DeviceContext_PSSetShaderResources(sys->d3dcontext, 0, 1, &sys->d3dresViewY);
-    if( sys->d3dFormatUV )
-        ID3D11DeviceContext_PSSetShaderResources(sys->d3dcontext, 1, 1, &sys->d3dresViewUV);
-#endif
-
-    UINT stride = sizeof(d3d_vertex_t);
-    UINT offset = 0;
-
-    D3D11_BUFFER_DESC vertexBuf1;
-    d3d_vertex_t *pVertices1;
-    ID3D11Buffer_GetDesc(sys->pVertexBuffer, &vertexBuf1);
-    ID3D11DeviceContext_IASetVertexBuffers(sys->d3dcontext, 0, 1, &sys->pVertexBuffer, &stride, &offset);
-    ID3D11DeviceContext_IASetIndexBuffer(sys->d3dcontext, sys->pIndexBuffer, DXGI_FORMAT_R16_UINT, 0);
-    ID3D11DeviceContext_DrawIndexed(sys->d3dcontext, 6, 0, 0);
+    DisplayD3DPicture(sys, &sys->d3dpic);
 
     if (subpicture) {
         // draw the additional vertices
         for (int i = 0; i < sys->d3dregion_count; ++i) {
-            d3d_picture_t *d3dr = &sys->d3dregions[i];
-            ID3D11DeviceContext_PSSetShaderResources(sys->d3dcontext, 0, 1, &d3dr->pResourceViewYRGB);
-            if( sys->d3dFormatUV )
-                ID3D11DeviceContext_PSSetShaderResources(sys->d3dcontext, 1, 1, &d3dr->pResourceViewUV);
-
-            ID3D11DeviceContext_IASetVertexBuffers(sys->d3dcontext, 0, 1, &d3dr->pVertexBuffer, &stride, &offset);
-            ID3D11DeviceContext_IASetIndexBuffer(sys->d3dcontext, d3dr->pIndexBuffer, DXGI_FORMAT_R16_UINT, 0);
-            ID3D11DeviceContext_DrawIndexed(sys->d3dcontext, 6, 0, 0);
+            DisplayD3DPicture(sys, &sys->d3dregions[i]);
         }
     }
 
@@ -1139,7 +1124,7 @@ static int Direct3D11CreateResources(vout_display_t *vd, video_format_t *fmt)
         .pSysMem = vertices,
     };
 
-    hr = ID3D11Device_CreateBuffer(sys->d3ddevice, &bd, &InitData, &sys->pVertexBuffer);
+    hr = ID3D11Device_CreateBuffer(sys->d3ddevice, &bd, &InitData, &sys->d3dpic.pVertexBuffer);
 
     if(FAILED(hr)) {
       msg_Err(vd, "Failed to create vertex buffer.");
@@ -1157,7 +1142,7 @@ static int Direct3D11CreateResources(vout_display_t *vd, video_format_t *fmt)
     bd.CPUAccessFlags = 0;
     InitData.pSysMem = indices;
 
-    hr = ID3D11Device_CreateBuffer(sys->d3ddevice, &bd, &InitData, &sys->pIndexBuffer);
+    hr = ID3D11Device_CreateBuffer(sys->d3ddevice, &bd, &InitData, &sys->d3dpic.pIndexBuffer);
     if(FAILED(hr)) {
       msg_Err(vd, "Failed to create index buffer.");
       return VLC_EGENERIC;
@@ -1177,7 +1162,7 @@ static int Direct3D11CreateResources(vout_display_t *vd, video_format_t *fmt)
     texDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
     texDesc.MiscFlags = 0;
 
-    hr = ID3D11Device_CreateTexture2D(sys->d3ddevice, &texDesc, NULL, &sys->d3dtexture);
+    hr = ID3D11Device_CreateTexture2D(sys->d3ddevice, &texDesc, NULL, &sys->d3dpic.pTexture);
     if (FAILED(hr)) {
         msg_Err(vd, "Could not Create the D3d11 Texture. (hr=0x%lX)", hr);
         return VLC_EGENERIC;
@@ -1188,9 +1173,9 @@ static int Direct3D11CreateResources(vout_display_t *vd, video_format_t *fmt)
     resviewDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
     resviewDesc.Texture2D.MipLevels = texDesc.MipLevels;
 
-    hr = ID3D11Device_CreateShaderResourceView(sys->d3ddevice, (ID3D11Resource *)sys->d3dtexture, &resviewDesc, &sys->d3dresViewY);
+    hr = ID3D11Device_CreateShaderResourceView(sys->d3ddevice, (ID3D11Resource *)sys->d3dpic.pTexture, &resviewDesc, &sys->d3dpic.pResourceViewYRGB);
     if (FAILED(hr)) {
-        if(sys->d3dtexture) ID3D11Texture2D_Release(sys->d3dtexture);
+        if(sys->d3dpic.pTexture) ID3D11Texture2D_Release(sys->d3dpic.pTexture);
         msg_Err(vd, "Could not Create the Y/RGB D3d11 Texture ResourceView. (hr=0x%lX)", hr);
         return VLC_EGENERIC;
     }
@@ -1198,9 +1183,9 @@ static int Direct3D11CreateResources(vout_display_t *vd, video_format_t *fmt)
     if( sys->d3dFormatUV )
     {
         resviewDesc.Format = sys->d3dFormatUV;
-        hr = ID3D11Device_CreateShaderResourceView(sys->d3ddevice, (ID3D11Resource *)sys->d3dtexture, &resviewDesc, &sys->d3dresViewUV);
+        hr = ID3D11Device_CreateShaderResourceView(sys->d3ddevice, (ID3D11Resource *)sys->d3dpic.pTexture, &resviewDesc, &sys->d3dpic.pResourceViewUV);
         if (FAILED(hr)) {
-            if(sys->d3dtexture) ID3D11Texture2D_Release(sys->d3dtexture);
+            if(sys->d3dpic.pTexture) ID3D11Texture2D_Release(sys->d3dpic.pTexture);
             msg_Err(vd, "Could not Create the UV D3d11 Texture ResourceView. (hr=0x%lX)", hr);
             return VLC_EGENERIC;
         }
@@ -1220,18 +1205,18 @@ static int Direct3D11CreateResources(vout_display_t *vd, video_format_t *fmt)
 #endif
 
     if (FAILED(hr)) {
-      if(sys->d3dtexture) ID3D11Texture2D_Release(sys->d3dtexture);
+      if(sys->d3dpic.pTexture) ID3D11Texture2D_Release(sys->d3dpic.pTexture);
       msg_Err(vd, "Could not Create the D3d11 Sampler State. (hr=0x%lX)", hr);
       return VLC_EGENERIC;
     }
 
     picture_sys_t *picsys = malloc(sizeof(*picsys));
     if (unlikely(picsys == NULL)) {
-        if(sys->d3dtexture) ID3D11Texture2D_Release(sys->d3dtexture);
+        if(sys->d3dpic.pTexture) ID3D11Texture2D_Release(sys->d3dpic.pTexture);
         return VLC_ENOMEM;
     }
 
-    picsys->texture  = sys->d3dtexture;
+    picsys->texture  = sys->d3dpic.pTexture;
     picsys->context  = sys->d3dcontext;
     picsys->vd       = vd;
 
@@ -1241,7 +1226,7 @@ static int Direct3D11CreateResources(vout_display_t *vd, video_format_t *fmt)
 
     picture_t *picture = picture_NewFromResource(fmt, &resource);
     if (!picture) {
-        if(sys->d3dtexture) ID3D11Texture2D_Release(sys->d3dtexture);
+        if(sys->d3dpic.pTexture) ID3D11Texture2D_Release(sys->d3dpic.pTexture);
         free(picsys);
         return VLC_ENOMEM;
     }
@@ -1255,7 +1240,7 @@ static int Direct3D11CreateResources(vout_display_t *vd, video_format_t *fmt)
     sys->pool = picture_pool_NewExtended(&pool_cfg);
     if (!sys->pool) {
         picture_Release(picture);
-        if(sys->d3dtexture) ID3D11Texture2D_Release(sys->d3dtexture);
+        if(sys->d3dpic.pTexture) ID3D11Texture2D_Release(sys->d3dpic.pTexture);
         return VLC_ENOMEM;
     }
 
@@ -1278,15 +1263,14 @@ static void Direct3D11DestroyResources(vout_display_t *vd)
         ID3D11DepthStencilState_Release(sys->pDepthStencilState);
         sys->pDepthStencilState = NULL;
     }
-    if (sys->pVertexBuffer) {
-        ID3D11Buffer_Release(sys->pVertexBuffer);
-        sys->pVertexBuffer = NULL;
+    if (sys->d3dpic.pVertexBuffer) {
+        ID3D11Buffer_Release(sys->d3dpic.pVertexBuffer);
+        sys->d3dpic.pVertexBuffer = NULL;
     }
-    if (sys->pIndexBuffer) {
-        ID3D11Buffer_Release(sys->pIndexBuffer);
-        sys->pVertexBuffer = NULL;
+    if (sys->d3dpic.pIndexBuffer) {
+        ID3D11Buffer_Release(sys->d3dpic.pIndexBuffer);
+        sys->d3dpic.pVertexBuffer = NULL;
     }
-
 
     msg_Dbg(vd, "Direct3D11 resources destroyed");
 }
@@ -1400,7 +1384,7 @@ static int Direct3D11MapSubpicture(vout_display_t *vd, int *subpicture_region_co
 
             hr = ID3D11Device_CreateShaderResourceView(sys->d3ddevice, (ID3D11Resource *)d3dr->pTexture, &resViewDesc, &d3dr->pResourceViewYRGB);
             if (FAILED(hr)) {
-                if(sys->d3dtexture) ID3D11Texture2D_Release(d3dr->pTexture);
+                if(sys->d3dpic.pTexture) ID3D11Texture2D_Release(d3dr->pTexture);
                 msg_Err(vd, "Could not Create the Y/RGB D3d11 Texture ResourceView. (hr=0x%lX)", hr);
                 return VLC_EGENERIC;
             }
@@ -1410,7 +1394,7 @@ static int Direct3D11MapSubpicture(vout_display_t *vd, int *subpicture_region_co
                 resViewDesc.Format = sys->d3dFormatUV;
                 hr = ID3D11Device_CreateShaderResourceView(sys->d3ddevice, (ID3D11Resource *)d3dr->pTexture, &resViewDesc, &d3dr->pResourceViewUV);
                 if (FAILED(hr)) {
-                    if(sys->d3dtexture) ID3D11Texture2D_Release(d3dr->pTexture);
+                    if(sys->d3dpic.pTexture) ID3D11Texture2D_Release(d3dr->pTexture);
                     msg_Err(vd, "Could not Create the UV D3d11 Texture ResourceView. (hr=0x%lX)", hr);
                     return VLC_EGENERIC;
                 }
