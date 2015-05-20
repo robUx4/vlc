@@ -1413,10 +1413,6 @@ static int Direct3D11MapSubpicture(vout_display_t *vd, int *subpicture_region_co
             msg_Err(vd, "Failed to lock the texture (hr=0x%lX)", hr );
         }
 
-        /* TODO render each region in a texture
-         * render the sum of all the textures into a texture of the right size (spu preallocated?)
-         */
-
         /* Map the subpicture to sys->rect_dest */
         RECT src;
         src.left   = 0;
