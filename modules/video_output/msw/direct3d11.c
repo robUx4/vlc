@@ -24,9 +24,10 @@
 # include "config.h"
 #endif
 
-#define DEPTH_STENCIL 0
+#define DEPTH_STENCIL 1
 #define CUSTOM_VERTEX_SHADER 1
 #define CUSTOM_PIXEL_SHADER 1
+#define CUSTOM_SAMPLER_STATE 1
 #define SUBPICTURE_TARGET 1
 
 #include <vlc_common.h>
@@ -501,8 +502,10 @@ static void Prepare(vout_display_t *vd, picture_t *picture, subpicture_t *subpic
     ID3D11DeviceContext_VSSetShader(sys->d3dcontext, sys->d3dvertexShader, NULL, 0);
 #endif
 
-#if CUSTOM_PIXEL_SHADER
+#if CUSTOM_SAMPLER_STATE
     ID3D11DeviceContext_PSSetSamplers(sys->d3dcontext, 0, 1, &sys->d3dsampState);
+#endif
+#if CUSTOM_PIXEL_SHADER
     ID3D11DeviceContext_PSSetShader(sys->d3dcontext, sys->d3dpixelShader, NULL, 0);
 #endif
 
@@ -993,8 +996,8 @@ static int Direct3D11CreateResources(vout_display_t *vd, video_format_t *fmt)
     ID3D11BlendState *pSpuBlendState;
     D3D11_BLEND_DESC spuBlendDesc = { 0 };
     spuBlendDesc.RenderTarget[0].BlendEnable = TRUE;
-    spuBlendDesc.RenderTarget[0].SrcBlend = D3D11_BLEND_ONE;
-    spuBlendDesc.RenderTarget[0].DestBlend = D3D11_BLEND_ZERO;
+    spuBlendDesc.RenderTarget[0].SrcBlend = D3D11_BLEND_SRC_ALPHA;
+    spuBlendDesc.RenderTarget[0].DestBlend = D3D11_BLEND_INV_SRC_ALPHA;
     spuBlendDesc.RenderTarget[0].BlendOp = D3D11_BLEND_OP_ADD;
 
     spuBlendDesc.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_ONE;
@@ -1030,8 +1033,22 @@ static int Direct3D11CreateResources(vout_display_t *vd, video_format_t *fmt)
     */
     D3D11_DEPTH_STENCIL_DESC stencilDesc = {
         .DepthEnable   = FALSE,
-        .StencilEnable = FALSE,
+        .StencilEnable = TRUE,
     };
+    stencilDesc.DepthEnable = false;
+    stencilDesc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ALL;
+    stencilDesc.DepthFunc = D3D11_COMPARISON_LESS;
+    stencilDesc.StencilEnable = true;
+    stencilDesc.StencilReadMask = 0xFF;
+    stencilDesc.StencilWriteMask = 0xFF;
+    stencilDesc.FrontFace.StencilFailOp = D3D11_STENCIL_OP_KEEP;
+    stencilDesc.FrontFace.StencilDepthFailOp = D3D11_STENCIL_OP_INCR;
+    stencilDesc.FrontFace.StencilPassOp = D3D11_STENCIL_OP_KEEP;
+    stencilDesc.FrontFace.StencilFunc = D3D11_COMPARISON_ALWAYS;
+    stencilDesc.BackFace.StencilFailOp = D3D11_STENCIL_OP_KEEP;
+    stencilDesc.BackFace.StencilDepthFailOp = D3D11_STENCIL_OP_DECR;
+    stencilDesc.BackFace.StencilPassOp = D3D11_STENCIL_OP_KEEP;
+    stencilDesc.BackFace.StencilFunc = D3D11_COMPARISON_ALWAYS;
     hr = ID3D11Device_CreateDepthStencilState(sys->d3ddevice, &stencilDesc, &sys->pDepthStencilState );
     if (SUCCEEDED(hr)) {
         ID3D11DeviceContext_OMSetDepthStencilState(sys->d3dcontext, sys->pDepthStencilState, 0);
@@ -1199,6 +1216,7 @@ static int Direct3D11CreateResources(vout_display_t *vd, video_format_t *fmt)
         }
     }
 
+#if CUSTOM_SAMPLER_STATE
     D3D11_SAMPLER_DESC sampDesc = { 0 };
     sampDesc.Filter = D3D11_FILTER_MIN_MAG_MIP_POINT;
     sampDesc.AddressU = D3D11_TEXTURE_ADDRESS_CLAMP;
@@ -1209,6 +1227,7 @@ static int Direct3D11CreateResources(vout_display_t *vd, video_format_t *fmt)
     sampDesc.MaxLOD = D3D11_FLOAT32_MAX;
 
     hr = ID3D11Device_CreateSamplerState(sys->d3ddevice, &sampDesc, &sys->d3dsampState);
+#endif
 
     if (FAILED(hr)) {
       if(sys->d3dtexture) ID3D11Texture2D_Release(sys->d3dtexture);
@@ -1426,28 +1445,32 @@ static int Direct3D11MapSubpicture(vout_display_t *vd, int *subpicture_region_co
                                    r->fmt.i_x_offset * r->p_picture->p->i_pixel_pitch;
             uint8_t  *src_data   = &r->p_picture->p->p_pixels[src_offset];
             int       src_pitch  = r->p_picture->p->i_pitch;
-#if 1
+#if 0
             for (unsigned y = 0; y < r->fmt.i_visible_height; y++) {
                 int copy_pitch = __MIN(dst_pitch, r->p_picture->p->i_visible_pitch);
                 for (int x = 0; x < copy_pitch; x += 4) {
                     dst_data[y * dst_pitch + x + 0] = 0;
                     dst_data[y * dst_pitch + x + 1] = 0;
                     dst_data[y * dst_pitch + x + 2] = 128;
-                    dst_data[y * dst_pitch + x + 3] = 0;
+                    dst_data[y * dst_pitch + x + 3] = 128;
                 }
             }
 #else
-            for (unsigned y = 0; y < r->fmt.i_visible_height; y++) {
+            if (dst_pitch == r->p_picture->p->i_visible_pitch) {
+                memcpy(dst_data, src_data, r->fmt.i_visible_height * dst_pitch);
+            } else {
                 int copy_pitch = __MIN(dst_pitch, r->p_picture->p->i_visible_pitch);
-                if (d3dr->format == DXGI_FORMAT_R8G8B8A8_UINT) {
-                    memcpy(&dst_data[y * dst_pitch], &src_data[y * src_pitch],
-                           copy_pitch);
-                } else {
-                    for (int x = 0; x < copy_pitch; x += 4) {
-                        dst_data[y * dst_pitch + x + 0] = src_data[y * src_pitch + x + 2];
-                        dst_data[y * dst_pitch + x + 1] = src_data[y * src_pitch + x + 1];
-                        dst_data[y * dst_pitch + x + 2] = src_data[y * src_pitch + x + 0];
-                        dst_data[y * dst_pitch + x + 3] = src_data[y * src_pitch + x + 3];
+                for (unsigned y = 0; y < r->fmt.i_visible_height; y++) {
+                    if (d3dr->format == DXGI_FORMAT_R8G8B8A8_UNORM) {
+                        memcpy(&dst_data[y * dst_pitch], &src_data[y * src_pitch],
+                               copy_pitch);
+                    } else {
+                        for (int x = 0; x < copy_pitch; x += 4) {
+                            dst_data[y * dst_pitch + x + 0] = src_data[y * src_pitch + x + 2];
+                            dst_data[y * dst_pitch + x + 1] = src_data[y * src_pitch + x + 1];
+                            dst_data[y * dst_pitch + x + 2] = src_data[y * src_pitch + x + 0];
+                            dst_data[y * dst_pitch + x + 3] = src_data[y * src_pitch + x + 3];
+                        }
                     }
                 }
             }
