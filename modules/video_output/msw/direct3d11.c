@@ -1325,9 +1325,9 @@ static int Direct3D11MapSubpicture(vout_display_t *vd, int *subpicture_region_co
 
             /* create the vertices to position the texture */
             D3D11_BUFFER_DESC vertexBufferDesc = { 0 };
-            vertexBufferDesc.Usage = D3D11_USAGE_DYNAMIC;
             vertexBufferDesc.ByteWidth = sizeof(d3d_vertex_t) * 4;
             vertexBufferDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
+            vertexBufferDesc.Usage = D3D11_USAGE_DYNAMIC;
             vertexBufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
 
             hr = ID3D11Device_CreateBuffer(sys->d3ddevice, &vertexBufferDesc, NULL, &d3dr->pVertexBuffer);
@@ -1338,10 +1338,11 @@ static int Direct3D11MapSubpicture(vout_display_t *vd, int *subpicture_region_co
               2, 1, 3,
             };
 
-            D3D11_BUFFER_DESC indexBufferDesc = { 0 };
-            indexBufferDesc.Usage = D3D11_USAGE_DEFAULT;
-            indexBufferDesc.ByteWidth = sizeof(WORD) * 6;
-            indexBufferDesc.BindFlags = D3D11_BIND_INDEX_BUFFER;
+            D3D11_BUFFER_DESC indexBufferDesc = {
+                .Usage = D3D11_USAGE_DEFAULT,
+                .ByteWidth = sizeof(WORD) * 6,
+                .BindFlags = D3D11_BIND_INDEX_BUFFER,
+            };
 
             D3D11_SUBRESOURCE_DATA indexInit = {
                 .pSysMem = indices,
@@ -1424,8 +1425,8 @@ static int Direct3D11MapSubpicture(vout_display_t *vd, int *subpicture_region_co
         // adjust with the center at 0,0 and the edges at -1/1
         float left   = ((float)dst.left   / subpicture->i_original_picture_width ) * 2.0f - 1.0f;
         float right  = ((float)dst.right  / subpicture->i_original_picture_width ) * 2.0f - 1.0f;
-        float top    = 2.0f * (dst.top    - subpicture->i_original_picture_height) / subpicture->i_original_picture_height;
-        float bottom = 2.0f * (dst.bottom - subpicture->i_original_picture_height) / subpicture->i_original_picture_height;
+        float top    = 1.0f - 2.0f * dst.top    / subpicture->i_original_picture_height;
+        float bottom = 1.0f - 2.0f * dst.bottom / subpicture->i_original_picture_height;
 
         hr = ID3D11DeviceContext_Map(sys->d3dcontext, (ID3D11Resource *)d3dr->pVertexBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource);
         if( SUCCEEDED(hr) ) {
@@ -1461,7 +1462,7 @@ static int Direct3D11MapSubpicture(vout_display_t *vd, int *subpicture_region_co
 
             ID3D11DeviceContext_Unmap(sys->d3dcontext, (ID3D11Resource *)d3dr->pVertexBuffer, 0);
         } else {
-            msg_Err(vd, "Failed to lock the texture (hr=0x%lX)", hr );
+            msg_Err(vd, "Failed to lock the subpicture vertex buffer (hr=0x%lX)", hr );
         }
 #if 0
         Direct3D9SetupVertices(d3dr->vertex,
