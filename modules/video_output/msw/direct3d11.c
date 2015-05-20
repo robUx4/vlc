@@ -43,6 +43,14 @@
 /* avoided until we can pass ISwapchainPanel without c++/cx mode
 # include <windows.ui.xaml.media.dxinterop.h> */
 
+typedef struct d3d_picture_t {
+    ID3D11Buffer              *pVertexBuffer;
+    ID3D11Buffer              *pIndexBuffer;
+    ID3D11Texture2D           *pTexture;
+    ID3D11ShaderResourceView  *pResourceViewYRGB;
+    ID3D11ShaderResourceView  *pResourceViewUV;
+} d3d_picture_t;
+
 #include "common.h"
 
 #if !VLC_WINSTORE_APP
@@ -121,17 +129,6 @@ typedef struct d3d_vertex_t {
     D3DXVECTOR2 texture;
 } d3d_vertex_t;
 
-typedef struct d3d_region_t {
-    DXGI_FORMAT               format;
-    unsigned                  width;
-    unsigned                  height;
-    ID3D11Buffer              *pVertexBuffer;
-    ID3D11Buffer              *pIndexBuffer;
-    ID3D11Texture2D           *pTexture;
-    ID3D11ShaderResourceView  *pResourceViewYRGB;
-    ID3D11ShaderResourceView  *pResourceViewUV;
-} d3d_region_t;
-
 
 static int  Open(vlc_object_t *);
 static void Close(vlc_object_t *object);
@@ -149,7 +146,7 @@ static int  Direct3D11CreateResources (vout_display_t *, video_format_t *);
 static void Direct3D11DestroyResources(vout_display_t *);
 
 static int  Direct3D11MapTexture(picture_t *);
-static int Direct3D11MapSubpicture(vout_display_t *, int *, d3d_region_t **, subpicture_t *);
+static int Direct3D11MapSubpicture(vout_display_t *, int *, d3d_picture_t **, subpicture_t *);
 
 /* All the #if USE_DXGI contain an alternative method to setup dx11
    They both need to be benchmarked to see which performs better */
@@ -510,11 +507,11 @@ static void Prepare(vout_display_t *vd, picture_t *picture, subpicture_t *subpic
 #endif
 
     if (subpicture) {
-        int subpicture_region_count     = 0;
-        d3d_region_t *subpicture_region = NULL;
+        int subpicture_region_count      = 0;
+        d3d_picture_t *subpicture_region = NULL;
         Direct3D11MapSubpicture(vd, &subpicture_region_count, &subpicture_region, subpicture);
         sys->d3dregion_count = subpicture_region_count;
-        sys->d3dregion       = subpicture_region;
+        sys->d3dregions      = subpicture_region;
     }
 }
 
@@ -544,12 +541,7 @@ static void Display(vout_display_t *vd, picture_t *picture, subpicture_t *subpic
     if (subpicture) {
         // draw the additional vertices
         for (int i = 0; i < sys->d3dregion_count; ++i) {
-            d3d_region_t *d3dr = &sys->d3dregion[i];
-
-            D3D11_BUFFER_DESC vertexBuf2;
-            d3d_vertex_t *pVertices2;
-            ID3D11Buffer_GetDesc(d3dr->pVertexBuffer, &vertexBuf2);
-
+            d3d_picture_t *d3dr = &sys->d3dregions[i];
             ID3D11DeviceContext_PSSetShaderResources(sys->d3dcontext, 0, 1, &d3dr->pResourceViewYRGB);
             if( sys->d3dFormatUV )
                 ID3D11DeviceContext_PSSetShaderResources(sys->d3dcontext, 1, 1, &d3dr->pResourceViewUV);
@@ -1316,47 +1308,46 @@ static int Direct3D11MapTexture(picture_t *picture)
 }
 
 static int Direct3D11MapSubpicture(vout_display_t *vd, int *subpicture_region_count,
-                                   d3d_region_t **region, subpicture_t *subpicture)
+                                   d3d_picture_t **region, subpicture_t *subpicture)
 {
     vout_display_sys_t *sys = vd->sys;
     D3D11_MAPPED_SUBRESOURCE mappedResource;
     HRESULT hr;
+    D3D11_TEXTURE2D_DESC texDesc;
 
     int count = 0;
     for (subpicture_region_t *r = subpicture->p_region; r; r = r->p_next)
         count++;
 
-    *region = calloc(count, sizeof(d3d_region_t));
+    *region = calloc(count, sizeof(d3d_picture_t));
     if (unlikely(*region==NULL))
         return VLC_ENOMEM;
     *subpicture_region_count = count;
 
     int i = 0;
     for (subpicture_region_t *r = subpicture->p_region; r; r = r->p_next, i++) {
-        d3d_region_t *d3dr = &(*region)[i];
+        d3d_picture_t *d3dr = &(*region)[i];
 
         d3dr->pTexture = NULL;
         for (int j = 0; j < sys->d3dregion_count; j++) {
-            d3d_region_t *cache = &sys->d3dregion[j];
-            if (cache->pTexture &&
-                cache->format == sys->d3dregion_format &&
-                cache->width  == r->fmt.i_visible_width &&
-                cache->height == r->fmt.i_visible_height) {
+            d3d_picture_t *cache = &sys->d3dregions[j];
+            if (cache->pTexture) {
+                ID3D11Texture2D_GetDesc( cache->pTexture, &texDesc );
+                if (texDesc.Format == sys->d3dregion_format &&
+                    texDesc.Width  == r->fmt.i_visible_width &&
+                    texDesc.Height == r->fmt.i_visible_height) {
 #ifndef NDEBUG
-                msg_Dbg(vd, "Reusing %dx%d texture for OSD",
-                        cache->width, cache->height);
+                    msg_Dbg(vd, "Reusing %dx%d texture for OSD",
+                            texDesc.Width, texDesc.Height);
 #endif
-                *d3dr = *cache;
-                memset(cache, 0, sizeof(*cache));
-                break;
+                    *d3dr = *cache;
+                    memset(cache, 0, sizeof(*cache));
+                    break;
+                }
             }
         }
 
         if (!d3dr->pTexture) {
-            d3dr->format = sys->d3dregion_format;
-            d3dr->width  = r->fmt.i_visible_width;
-            d3dr->height = r->fmt.i_visible_height;
-
             /* create the vertices to position the texture */
             D3D11_BUFFER_DESC vertexBufferDesc = { 0 };
             vertexBufferDesc.ByteWidth = sizeof(d3d_vertex_t) * 4;
@@ -1384,8 +1375,8 @@ static int Direct3D11MapSubpicture(vout_display_t *vd, int *subpicture_region_co
             hr = ID3D11Device_CreateBuffer(sys->d3ddevice, &indexBufferDesc, &indexInit, &d3dr->pIndexBuffer);
 
             D3D11_TEXTURE2D_DESC regionTexDesc = { 0 };
-            regionTexDesc.Width = d3dr->width;
-            regionTexDesc.Height = d3dr->height;
+            regionTexDesc.Width = r->fmt.i_visible_width;
+            regionTexDesc.Height = r->fmt.i_visible_height;
             regionTexDesc.MipLevels = 1;
             regionTexDesc.ArraySize = 1;
             regionTexDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM; //sys->d3dFormatTex;
@@ -1398,7 +1389,7 @@ static int Direct3D11MapSubpicture(vout_display_t *vd, int *subpicture_region_co
             if (FAILED(hr)) {
                 d3dr->pTexture = NULL;
                 msg_Err(vd, "Failed to create %dx%d texture for OSD (hr=0x%0lx)",
-                        d3dr->width, d3dr->height, hr);
+                        regionTexDesc.Width, regionTexDesc.Height, hr);
                 continue;
             }
 
@@ -1413,7 +1404,6 @@ static int Direct3D11MapSubpicture(vout_display_t *vd, int *subpicture_region_co
                 msg_Err(vd, "Could not Create the Y/RGB D3d11 Texture ResourceView. (hr=0x%lX)", hr);
                 return VLC_EGENERIC;
             }
-            d3dr->format = resViewDesc.Format;
 
             if( sys->d3dFormatUV )
             {
@@ -1429,12 +1419,11 @@ static int Direct3D11MapSubpicture(vout_display_t *vd, int *subpicture_region_co
             sys->d3dregion_format = regionTexDesc.Format;
 #ifndef NDEBUG
             msg_Dbg(vd, "Created %dx%d texture for OSD",
-                    r->fmt.i_visible_width, r->fmt.i_visible_height);
+                    regionTexDesc.Width, regionTexDesc.Height);
 #endif
         }
 
-        //ID3D11DeviceContext_UpdateSubresource(sys->d3dcontext, (ID3D11Resource *)d3dr->pTexture, 0, NULL, );
-
+        ID3D11Texture2D_GetDesc( d3dr->pTexture, &texDesc );
         hr = ID3D11DeviceContext_Map(sys->d3dcontext, (ID3D11Resource *)d3dr->pTexture, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource);
         if( SUCCEEDED(hr) ) {
             uint8_t   *dst_data  = mappedResource.pData;
@@ -1459,7 +1448,7 @@ static int Direct3D11MapSubpicture(vout_display_t *vd, int *subpicture_region_co
             } else {
                 int copy_pitch = __MIN(dst_pitch, r->p_picture->p->i_visible_pitch);
                 for (unsigned y = 0; y < r->fmt.i_visible_height; y++) {
-                    if (d3dr->format == DXGI_FORMAT_R8G8B8A8_UNORM) {
+                    if (texDesc.Format == DXGI_FORMAT_R8G8B8A8_UNORM) {
                         memcpy(&dst_data[y * dst_pitch], &src_data[y * src_pitch],
                                copy_pitch);
                     } else {
