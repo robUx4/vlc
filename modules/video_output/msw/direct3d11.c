@@ -709,10 +709,7 @@ static int Direct3D11Open(vout_display_t *vd, video_format_t *fmt)
     hr = IDXGIAdapter_GetParent(sys->dxgiadapter, &IID_IDXGIFactory, (void **)&sys->dxgifactory);
     IDXGIAdapter_Release(sys->dxgiadapter);
     IDXGIAdapter_Release(sys->dxgiadapter);
-    sys->dxgiadapter = NULL;
     if (FAILED(hr)) {
-       IDXGIAdapter_Release(sys->dxgiadapter);
-       sys->dxgiadapter = NULL;
        msg_Err(vd, "Could not get the DXGI Factory. (hr=0x%lX)", hr);
        return VLC_EGENERIC;
     }
@@ -840,12 +837,22 @@ static void Direct3D11Close(vout_display_t *vd)
     vout_display_sys_t *sys = vd->sys;
 
     Direct3D11DestroyResources(vd);
-    if ( sys->d3dcontext )
+    if ( sys->d3dcontext ) {
         ID3D11DeviceContext_Release(sys->d3dcontext);
-    if (sys->dxgiswapChain)
+        sys->d3dcontext = NULL;
+    }
+    if (sys->dxgiswapChain) {
         IDXGISwapChain_Release(sys->dxgiswapChain);
-    if ( sys->d3ddevice )
-        ID3D11Device_Release(sys->d3ddevice);
+        sys->dxgiswapChain = NULL;
+    }
+    if (sys->dxgiadapter) {
+        IDXGIAdapter_Release(sys->dxgiadapter);
+        sys->dxgiadapter = NULL;
+    }
+    /*if ( sys->d3ddevice ) {
+        ID3D11Device_Release(sys->d3ddevice); // leaking
+        sys->d3ddevice = NULL;
+    }*/
     msg_Dbg(vd, "Direct3D11 device adapter closed");
 }
 
@@ -943,6 +950,7 @@ static int Direct3D11CreateResources(vout_display_t *vd, video_format_t *fmt)
        return VLC_EGENERIC;
     }
     ID3D11DeviceContext_OMSetBlendState(sys->d3dcontext, pSpuBlendState, NULL, 0xFFFFFFFF);
+    ID3D11BlendState_Release(pSpuBlendState);
 
     /* disable depth testing as we're only doing 2D
      * see https://msdn.microsoft.com/en-us/library/windows/desktop/bb205074%28v=vs.85%29.aspx
@@ -967,8 +975,6 @@ static int Direct3D11CreateResources(vout_display_t *vd, video_format_t *fmt)
     hr = ID3D11Device_CreateDepthStencilState(sys->d3ddevice, &stencilDesc, &sys->pDepthStencilState );
     if (SUCCEEDED(hr)) {
         ID3D11DeviceContext_OMSetDepthStencilState(sys->d3dcontext, sys->pDepthStencilState, 0);
-        ID3D11DepthStencilState_Release(sys->pDepthStencilState);
-        /* OMSetDepthStencilState still holds a ref */
     }
 
     D3D11_VIEWPORT vp;
@@ -1006,9 +1012,8 @@ static int Direct3D11CreateResources(vout_display_t *vd, video_format_t *fmt)
     { "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT,    0, 12, D3D11_INPUT_PER_VERTEX_DATA, 0},
     };
 
-    ID3D11InputLayout* pVertexLayout = NULL;
     hr = ID3D11Device_CreateInputLayout(sys->d3ddevice, layout, 2, (void *)ID3D10Blob_GetBufferPointer(pVSBlob),
-                                        ID3D10Blob_GetBufferSize(pVSBlob), &pVertexLayout);
+                                        ID3D10Blob_GetBufferSize(pVSBlob), &sys->d3dvertexLayout);
 
     ID3D10Blob_Release(pVSBlob);
 
@@ -1017,7 +1022,7 @@ static int Direct3D11CreateResources(vout_display_t *vd, video_format_t *fmt)
       return VLC_EGENERIC;
     }
 
-    ID3D11DeviceContext_IASetInputLayout(sys->d3dcontext, pVertexLayout);
+    ID3D11DeviceContext_IASetInputLayout(sys->d3dcontext, sys->d3dvertexLayout);
 
     ID3DBlob* pPSBlob = NULL;
 
@@ -1078,7 +1083,9 @@ static int Direct3D11CreateResources(vout_display_t *vd, video_format_t *fmt)
     }
 
     picsys->texture  = sys->d3dpic.pTexture;
+    ID3D11Texture2D_AddRef(picsys->texture);
     picsys->context  = sys->d3dcontext;
+    ID3D11DeviceContext_AddRef(picsys->context);
     picsys->vd       = vd;
 
     picture_resource_t resource = { .p_sys = picsys };
@@ -1226,17 +1233,18 @@ static void Direct3D11DestroyResources(vout_display_t *vd)
     if (sys->pool) {
         picture_sys_t *picsys = sys->picsys;
         ID3D11Texture2D_Release(picsys->texture);
+        ID3D11DeviceContext_Release(picsys->context);
         picture_pool_Release(sys->pool);
     }
     sys->pool = NULL;
-    if (sys->pDepthStencilState) {
-        ID3D11DepthStencilState_Release(sys->pDepthStencilState);
-        sys->pDepthStencilState = NULL;
-    }
     ReleaseD3DPicture(&sys->d3dpic);
     for (int i = 0; i < sys->d3dregion_count; ++i)
         ReleaseD3DPicture(&sys->d3dregions[i]);
 
+    if (sys->pDepthStencilState) {
+        ID3D11DepthStencilState_Release(sys->pDepthStencilState);
+        sys->pDepthStencilState = NULL;
+    }
     if (sys->d3drenderTargetView) {
         ID3D11RenderTargetView_Release(sys->d3drenderTargetView);
         sys->d3drenderTargetView = NULL;
@@ -1248,6 +1256,18 @@ static void Direct3D11DestroyResources(vout_display_t *vd)
     if (sys->d3dsampState) {
         ID3D11SamplerState_Release(sys->d3dsampState);
         sys->d3dsampState = NULL;
+    }
+    if (sys->d3dvertexLayout) {
+        ID3D11SamplerState_Release(sys->d3dvertexLayout);
+        sys->d3dvertexLayout = NULL;
+    }
+    if (sys->d3dvertexShader) {
+        ID3D11VertexShader_Release(sys->d3dvertexShader);
+        sys->d3dvertexShader = NULL;
+    }
+    if (sys->d3dpixelShader) {
+        ID3D11VertexShader_Release(sys->d3dpixelShader);
+        sys->d3dvertexShader = NULL;
     }
 
     msg_Dbg(vd, "Direct3D11 resources destroyed");
