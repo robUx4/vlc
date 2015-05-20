@@ -1390,17 +1390,6 @@ static int Direct3D11MapSubpicture(vout_display_t *vd, int *subpicture_region_co
                                    r->fmt.i_x_offset * r->p_picture->p->i_pixel_pitch;
             uint8_t  *src_data   = &r->p_picture->p->p_pixels[src_offset];
             int       src_pitch  = r->p_picture->p->i_pitch;
-#if 0
-            for (unsigned y = 0; y < r->fmt.i_visible_height; y++) {
-                int copy_pitch = __MIN(dst_pitch, r->p_picture->p->i_visible_pitch);
-                for (int x = 0; x < copy_pitch; x += 4) {
-                    dst_data[y * dst_pitch + x + 0] = 0;
-                    dst_data[y * dst_pitch + x + 1] = 0;
-                    dst_data[y * dst_pitch + x + 2] = 128;
-                    dst_data[y * dst_pitch + x + 3] = 128;
-                }
-            }
-#else
             if (dst_pitch == r->p_picture->p->i_visible_pitch) {
                 memcpy(dst_data, src_data, r->fmt.i_visible_height * dst_pitch);
             } else {
@@ -1419,7 +1408,6 @@ static int Direct3D11MapSubpicture(vout_display_t *vd, int *subpicture_region_co
                     }
                 }
             }
-#endif
             ID3D11DeviceContext_Unmap(sys->d3dcontext, (ID3D11Resource *)d3dr->pTexture, 0);
         } else {
             msg_Err(vd, "Failed to lock the texture (hr=0x%lX)", hr );
@@ -1488,11 +1476,6 @@ static int Direct3D11MapSubpicture(vout_display_t *vd, int *subpicture_region_co
         } else {
             msg_Err(vd, "Failed to lock the subpicture vertex buffer (hr=0x%lX)", hr );
         }
-#if 0
-        Direct3D9SetupVertices(d3dr->vertex,
-                              src, src, dst,
-                              subpicture->i_alpha * r->i_alpha / 255, ORIENT_NORMAL);
-#endif
     }
     return VLC_SUCCESS;
 }
