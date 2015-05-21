@@ -97,11 +97,6 @@ static const d3d_format_t d3d_formats[] = {
     { NULL, 0, 0, 0, 0}
 };
 
-static const vlc_fourcc_t d3d_subpicture_chromas[] = {
-    VLC_CODEC_RGBA,
-    0
-};
-
 struct picture_sys_t
 {
     ID3D11Texture2D     *texture;
@@ -479,6 +474,8 @@ static void Prepare(vout_display_t *vd, picture_t *picture, subpicture_t *subpic
     /* ID3D11DeviceContext_ClearRenderTargetView(sys->d3dcontext,sys->d3drenderTargetView, ClearColor); */
     ID3D11DeviceContext_ClearDepthStencilView(sys->d3dcontext,sys->d3ddepthStencilView, D3D11_CLEAR_DEPTH, 1.0f, 0);
 
+    ID3D11DeviceContext_IASetIndexBuffer(sys->d3dcontext, sys->pQuadIndices, DXGI_FORMAT_R16_UINT, 0);
+
     ID3D11DeviceContext_VSSetShader(sys->d3dcontext, sys->d3dvertexShader, NULL, 0);
     ID3D11DeviceContext_PSSetShader(sys->d3dcontext, sys->d3dpixelShader, NULL, 0);
     ID3D11DeviceContext_PSSetSamplers(sys->d3dcontext, 0, 1, &sys->d3dsampState);
@@ -504,7 +501,6 @@ static void DisplayD3DPicture(vout_display_sys_t *sys, d3d_quad_t *d3dr)
         ID3D11DeviceContext_PSSetShaderResources(sys->d3dcontext, 1, 1, &d3dr->pResourceViewUV);
 
     ID3D11DeviceContext_IASetVertexBuffers(sys->d3dcontext, 0, 1, &d3dr->pVertexBuffer, &stride, &offset);
-    ID3D11DeviceContext_IASetIndexBuffer(sys->d3dcontext, sys->pQuadIndices, DXGI_FORMAT_R16_UINT, 0);
     ID3D11DeviceContext_DrawIndexed(sys->d3dcontext, 6, 0, 0);
 }
 
