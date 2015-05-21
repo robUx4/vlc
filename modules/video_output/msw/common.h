@@ -193,7 +193,7 @@ struct vout_display_sys_t
     vlc_fourcc_t             pSubpictureChromas[2];
     DXGI_FORMAT              d3dregion_format;
     int                      d3dregion_count;
-    struct d3d_quad_t        *d3dregions;
+    picture_t                **d3dregions;
 #endif
 
 #ifdef MODULE_NAME_IS_direct3d9

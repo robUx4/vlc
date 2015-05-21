@@ -24,6 +24,8 @@
 # include "config.h"
 #endif
 
+#define USE_DXGI 0
+
 #include <vlc_common.h>
 #include <vlc_plugin.h>
 #include <vlc_vout_display.h>
@@ -110,7 +112,6 @@ typedef struct d3d_vertex_t {
     D3DXVECTOR2 texture;
 } d3d_vertex_t;
 
-
 static int  Open(vlc_object_t *);
 static void Close(vlc_object_t *object);
 
@@ -127,10 +128,11 @@ static int  Direct3D11CreateResources (vout_display_t *, video_format_t *);
 static void Direct3D11DestroyResources(vout_display_t *);
 
 static int  Direct3D11MapTexture(picture_t *);
-static int Direct3D11MapSubpicture(vout_display_t *, int *, d3d_quad_t **, subpicture_t *);
+static void Direct3D11DeleteRegions(int, picture_t **);
+static int Direct3D11MapSubpicture(vout_display_t *, int *, picture_t ***, subpicture_t *);
 
-static int AllocD3DPicture(vout_display_t *, const video_format_t *, d3d_quad_t *, const float vertices[5 * 4]);
-static void ReleaseD3DPicture(d3d_quad_t *);
+static int AllocQuad(vout_display_t *, const video_format_t *, d3d_quad_t *, const float vertices[5 * 4]);
+static void ReleaseQuad(d3d_quad_t *);
 
 /* All the #if USE_DXGI contain an alternative method to setup dx11
    They both need to be benchmarked to see which performs better */
@@ -481,11 +483,12 @@ static void Prepare(vout_display_t *vd, picture_t *picture, subpicture_t *subpic
     ID3D11DeviceContext_PSSetSamplers(sys->d3dcontext, 0, 1, &sys->d3dsampState);
 
     if (subpicture) {
-        int subpicture_region_count      = 0;
-        d3d_quad_t *subpicture_region = NULL;
-        Direct3D11MapSubpicture(vd, &subpicture_region_count, &subpicture_region, subpicture);
+        int subpicture_region_count    = 0;
+        picture_t **subpicture_regions = NULL;
+        Direct3D11MapSubpicture(vd, &subpicture_region_count, &subpicture_regions, subpicture);
+        Direct3D11DeleteRegions(sys->d3dregion_count, sys->d3dregions);
         sys->d3dregion_count = subpicture_region_count;
-        sys->d3dregions      = subpicture_region;
+        sys->d3dregions      = subpicture_regions;
     }
 }
 
@@ -516,7 +519,7 @@ static void Display(vout_display_t *vd, picture_t *picture, subpicture_t *subpic
     if (subpicture) {
         // draw the additional vertices
         for (int i = 0; i < sys->d3dregion_count; ++i) {
-            DisplayD3DPicture(sys, &sys->d3dregions[i]);
+            DisplayD3DPicture(sys, (d3d_quad_t *) sys->d3dregions[i]->p_sys);
         }
     }
 
@@ -1075,7 +1078,7 @@ static int Direct3D11CreateResources(vout_display_t *vd, video_format_t *fmt)
         -1.0f,  1.0f, -1.0f,  0.0f, 0.0f, // top left
     };
 
-    if (AllocD3DPicture( vd, fmt, &sys->picQuad, vertices )!=VLC_SUCCESS) {
+    if (AllocQuad( vd, fmt, &sys->picQuad, vertices )!=VLC_SUCCESS) {
         msg_Err(vd, "Could not Create the main quad picture. (hr=0x%lX)", hr);
         return VLC_EGENERIC;
     }
@@ -1133,7 +1136,7 @@ static int Direct3D11CreateResources(vout_display_t *vd, video_format_t *fmt)
     return VLC_SUCCESS;
 }
 
-static int AllocD3DPicture(vout_display_t *vd, const video_format_t *fmt, d3d_quad_t *d3dr, const float vertices[5 * 4])
+static int AllocQuad(vout_display_t *vd, const video_format_t *fmt, d3d_quad_t *d3dr, const float vertices[5 * 4])
 {
     vout_display_sys_t *sys = vd->sys;
     HRESULT hr;
@@ -1198,11 +1201,11 @@ static int AllocD3DPicture(vout_display_t *vd, const video_format_t *fmt, d3d_qu
     return VLC_SUCCESS;
 
 error:
-    ReleaseD3DPicture(d3dr);
+    ReleaseQuad(d3dr);
     return VLC_EGENERIC;
 }
 
-static void ReleaseD3DPicture(d3d_quad_t *d3dr)
+static void ReleaseQuad(d3d_quad_t *d3dr)
 {
     if (d3dr->pVertexBuffer) {
         ID3D11Buffer_Release(d3dr->pVertexBuffer);
@@ -1234,9 +1237,10 @@ static void Direct3D11DestroyResources(vout_display_t *vd)
         picture_pool_Release(sys->pool);
     }
     sys->pool = NULL;
-    ReleaseD3DPicture(&sys->picQuad);
-    for (int i = 0; i < sys->d3dregion_count; ++i)
-        ReleaseD3DPicture(&sys->d3dregions[i]);
+
+    ReleaseQuad(&sys->picQuad);
+    Direct3D11DeleteRegions(sys->d3dregion_count, sys->d3dregions);
+    sys->d3dregion_count = 0;
 
     if (sys->pQuadIndices) {
         ID3D11Buffer_Release(sys->pQuadIndices);
@@ -1290,8 +1294,24 @@ static int Direct3D11MapTexture(picture_t *picture)
     return res;
 }
 
+static void Direct3D11DeleteRegions(int count, picture_t **region)
+{
+    for (int i = 0; i < count; ++i) {
+        if (region[i]) {
+            picture_Release(region[i]);
+        }
+    }
+    free(region);
+}
+
+static void DestroyPictureQuad(picture_t *p_picture)
+{
+    ReleaseQuad( (d3d_quad_t *) p_picture->p_sys );
+    free( p_picture );
+}
+
 static int Direct3D11MapSubpicture(vout_display_t *vd, int *subpicture_region_count,
-                                   d3d_quad_t **region, subpicture_t *subpicture)
+                                   picture_t ***region, subpicture_t *subpicture)
 {
     vout_display_sys_t *sys = vd->sys;
     D3D11_MAPPED_SUBRESOURCE mappedResource;
@@ -1303,20 +1323,17 @@ static int Direct3D11MapSubpicture(vout_display_t *vd, int *subpicture_region_co
     for (subpicture_region_t *r = subpicture->p_region; r; r = r->p_next)
         count++;
 
-    *region = calloc(count, sizeof(d3d_quad_t));
+    *region = calloc(count, sizeof(picture_t *));
     if (unlikely(*region==NULL))
         return VLC_ENOMEM;
     *subpicture_region_count = count;
 
     int i = 0;
     for (subpicture_region_t *r = subpicture->p_region; r; r = r->p_next, i++) {
-        d3d_quad_t *d3dr = &(*region)[i];
-
-        d3dr->pTexture = NULL;
         for (int j = 0; j < sys->d3dregion_count; j++) {
-            d3d_quad_t *cache = &sys->d3dregions[j];
-            if (cache->pTexture) {
-                ID3D11Texture2D_GetDesc( cache->pTexture, &texDesc );
+            picture_t *cache = sys->d3dregions[j];
+            if (((d3d_quad_t *) cache->p_sys)->pTexture) {
+                ID3D11Texture2D_GetDesc( ((d3d_quad_t *) cache->p_sys)->pTexture, &texDesc );
                 if (texDesc.Format == sys->d3dregion_format &&
                     texDesc.Width  == r->fmt.i_visible_width &&
                     texDesc.Height == r->fmt.i_visible_height) {
@@ -1324,18 +1341,50 @@ static int Direct3D11MapSubpicture(vout_display_t *vd, int *subpicture_region_co
                     msg_Dbg(vd, "Reusing %dx%d texture for OSD",
                             texDesc.Width, texDesc.Height);
 #endif
-                    *d3dr = *cache;
-                    memset(cache, 0, sizeof(*cache));
+                    (*region)[i] = cache;
+                    memset(cache, 0, sizeof(*cache)); // do not reuse this cached value
                     break;
                 }
             }
         }
 
-        if (!d3dr->pTexture) {
-            err = AllocD3DPicture(vd, &r->fmt, d3dr, NULL);
+        picture_t *d3dr = (*region)[i];
+        if (d3dr == NULL) {
+            d3d_quad_t *d3dquad = calloc(1, sizeof(*d3dquad));
+            if (unlikely(d3dquad==NULL)) {
+                continue;
+            }
+            err = AllocQuad(vd, &r->fmt, d3dquad, NULL);
             if (err != VLC_SUCCESS) {
                 msg_Err(vd, "Failed to create %dx%d texture for OSD",
                         r->fmt.i_visible_width, r->fmt.i_visible_height);
+                free(d3dquad);
+                continue;
+            }
+            picture_resource_t picres = {
+                .p_sys      = (picture_sys_t *) d3dquad,
+                .pf_destroy = DestroyPictureQuad,
+            };
+            (*region)[i] = picture_NewFromResource(&r->fmt, &picres);
+            if ((*region)[i] == NULL) {
+                msg_Err(vd, "Failed to create %dx%d picture for OSD",
+                        r->fmt.i_visible_width, r->fmt.i_visible_height);
+                ReleaseQuad(d3dquad);
+                continue;
+            }
+            d3dr = (*region)[i];
+            hr = ID3D11DeviceContext_Map(sys->d3dcontext, (ID3D11Resource *)((d3d_quad_t *) d3dr->p_sys)->pTexture, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource);
+            if( SUCCEEDED(hr) ) {
+                err = CommonUpdatePicture(d3dr, NULL, mappedResource.pData, mappedResource.RowPitch);
+                ID3D11DeviceContext_Unmap(sys->d3dcontext, (ID3D11Resource *)((d3d_quad_t *) d3dr->p_sys)->pTexture, 0);
+                if (err != VLC_SUCCESS) {
+                    msg_Err(vd, "Failed to set the buffer on the OSD picture" );
+                    picture_Release(d3dr);
+                    continue;
+                }
+            } else {
+                msg_Err(vd, "Failed to lock the OSD texture (hr=0x%lX)", hr );
+                picture_Release(d3dr);
                 continue;
             }
 #ifndef NDEBUG
@@ -1344,39 +1393,7 @@ static int Direct3D11MapSubpicture(vout_display_t *vd, int *subpicture_region_co
 #endif
         }
 
-        ID3D11Texture2D_GetDesc( d3dr->pTexture, &texDesc );
-        sys->d3dregion_format = texDesc.Format;
-
-        hr = ID3D11DeviceContext_Map(sys->d3dcontext, (ID3D11Resource *)d3dr->pTexture, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource);
-        if( SUCCEEDED(hr) ) {
-            uint8_t   *dst_data  = mappedResource.pData;
-            int       dst_pitch  = mappedResource.RowPitch;
-            const int src_offset = r->fmt.i_y_offset * r->p_picture->p->i_pitch +
-                                   r->fmt.i_x_offset * r->p_picture->p->i_pixel_pitch;
-            uint8_t  *src_data   = &r->p_picture->p->p_pixels[src_offset];
-            int       src_pitch  = r->p_picture->p->i_pitch;
-            if (dst_pitch == r->p_picture->p->i_visible_pitch) {
-                memcpy(dst_data, src_data, r->fmt.i_visible_height * dst_pitch);
-            } else {
-                int copy_pitch = __MIN(dst_pitch, r->p_picture->p->i_visible_pitch);
-                for (unsigned y = 0; y < r->fmt.i_visible_height; y++) {
-                    if (texDesc.Format == DXGI_FORMAT_R8G8B8A8_UNORM) {
-                        memcpy(&dst_data[y * dst_pitch], &src_data[y * src_pitch],
-                               copy_pitch);
-                    } else {
-                        for (int x = 0; x < copy_pitch; x += 4) {
-                            dst_data[y * dst_pitch + x + 0] = src_data[y * src_pitch + x + 2];
-                            dst_data[y * dst_pitch + x + 1] = src_data[y * src_pitch + x + 1];
-                            dst_data[y * dst_pitch + x + 2] = src_data[y * src_pitch + x + 0];
-                            dst_data[y * dst_pitch + x + 3] = src_data[y * src_pitch + x + 3];
-                        }
-                    }
-                }
-            }
-            ID3D11DeviceContext_Unmap(sys->d3dcontext, (ID3D11Resource *)d3dr->pTexture, 0);
-        } else {
-            msg_Err(vd, "Failed to lock the texture (hr=0x%lX)", hr );
-        }
+        picture_CopyPixels(d3dr, r->p_picture);
 
         /* Map the subpicture to sys->rect_dest */
         RECT src;
@@ -1401,7 +1418,7 @@ static int Direct3D11MapSubpicture(vout_display_t *vd, int *subpicture_region_co
         float top    = 1.0f - 2.0f * dst.top    / subpicture->i_original_picture_height;
         float bottom = 1.0f - 2.0f * dst.bottom / subpicture->i_original_picture_height;
 
-        hr = ID3D11DeviceContext_Map(sys->d3dcontext, (ID3D11Resource *)d3dr->pVertexBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource);
+        hr = ID3D11DeviceContext_Map(sys->d3dcontext, (ID3D11Resource *)((d3d_quad_t *) d3dr->p_sys)->pVertexBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource);
         if( SUCCEEDED(hr) ) {
             d3d_vertex_t *dst_data = mappedResource.pData;
 
@@ -1433,7 +1450,7 @@ static int Direct3D11MapSubpicture(vout_display_t *vd, int *subpicture_region_co
             dst_data[3].texture.x = 0.0f;
             dst_data[3].texture.y = 0.0f;
 
-            ID3D11DeviceContext_Unmap(sys->d3dcontext, (ID3D11Resource *)d3dr->pVertexBuffer, 0);
+            ID3D11DeviceContext_Unmap(sys->d3dcontext, (ID3D11Resource *)((d3d_quad_t *) d3dr->p_sys)->pVertexBuffer, 0);
         } else {
             msg_Err(vd, "Failed to lock the subpicture vertex buffer (hr=0x%lX)", hr );
         }
