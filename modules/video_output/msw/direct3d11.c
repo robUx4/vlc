@@ -332,6 +332,8 @@ static const char *globPixelShaderBiplanarYUV_BT709_2RGB = "\
   }\
 ";
 
+static void Manage(vout_display_t *vd);
+
 static int Open(vlc_object_t *object)
 {
     vout_display_t *vd = (vout_display_t *)object;
@@ -457,7 +459,7 @@ static int Open(vlc_object_t *object)
     vd->prepare = Prepare;
     vd->display = Display;
     vd->control = CommonControl;
-    vd->manage  = CommonManage;
+    vd->manage  = Manage;
 
     msg_Dbg(vd, "Direct3D11 Open Succeeded");
 
@@ -478,6 +480,87 @@ static void Close(vlc_object_t *object)
     CommonClean(vd);
     Direct3D11Destroy(vd);
     free(vd->sys);
+}
+
+static void Manage(vout_display_t *vd)
+{
+    vout_display_sys_t *sys = vd->sys;
+
+    RECT size_before = sys->rect_dest_clipped;
+    CommonManage(vd);
+
+#define RECTWidth(r) (r.right - r.left)
+#define RECTHeight(r) (r.bottom - r.top)
+    if (RECTWidth(size_before)  != RECTWidth(sys->rect_dest_clipped) ||
+        RECTHeight(size_before) != RECTHeight(sys->rect_dest_clipped))
+    {
+        HRESULT hr;
+        ID3D11Texture2D* pDepthStencil;
+        ID3D11Texture2D* pBackBuffer;
+
+        msg_Err(vd, "Manage detected size change");
+
+        if (sys->d3drenderTargetView) {
+            ULONG ref = ID3D11RenderTargetView_Release(sys->d3drenderTargetView);
+            sys->d3drenderTargetView = NULL;
+        }
+        if (sys->d3ddepthStencilView) {
+            ULONG ref = ID3D11DepthStencilView_Release(sys->d3ddepthStencilView);
+            sys->d3ddepthStencilView = NULL;
+        }
+
+        hr = IDXGISwapChain_ResizeBuffers(sys->dxgiswapChain, 1, RECTWidth(sys->rect_dest_clipped),
+                                     RECTHeight(sys->rect_dest_clipped),
+                                     DXGI_FORMAT_R8G8B8A8_UNORM, 0);
+
+        hr = IDXGISwapChain_GetBuffer(sys->dxgiswapChain, 0, &IID_ID3D11Texture2D, (LPVOID *)&pBackBuffer);
+        if (FAILED(hr)) {
+           msg_Err(vd, "Could not get the backbuffer from the Swapchain. (hr=0x%lX)", hr);
+           return;
+        }
+
+        hr = ID3D11Device_CreateRenderTargetView(sys->d3ddevice, (ID3D11Resource *)pBackBuffer, NULL, &sys->d3drenderTargetView);
+        ID3D11Texture2D_Release(pBackBuffer);
+
+        D3D11_TEXTURE2D_DESC deptTexDesc;
+        memset(&deptTexDesc, 0,sizeof(deptTexDesc));
+        deptTexDesc.ArraySize = 1;
+        deptTexDesc.BindFlags = D3D11_BIND_DEPTH_STENCIL;
+        deptTexDesc.CPUAccessFlags = 0;
+        deptTexDesc.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
+        deptTexDesc.Width = RECTWidth(sys->rect_dest_clipped);
+        deptTexDesc.Height = RECTHeight(sys->rect_dest_clipped);
+        deptTexDesc.MipLevels = 1;
+        deptTexDesc.MiscFlags = 0;
+        deptTexDesc.SampleDesc.Count = 1;
+        deptTexDesc.SampleDesc.Quality = 0;
+        deptTexDesc.Usage = D3D11_USAGE_DEFAULT;
+
+        hr = ID3D11Device_CreateTexture2D(sys->d3ddevice, &deptTexDesc, NULL, &pDepthStencil);
+        if (FAILED(hr)) {
+           msg_Err(vd, "Could not create the depth stencil texture. (hr=0x%lX)", hr);
+           return;
+        }
+
+        D3D11_DEPTH_STENCIL_VIEW_DESC depthViewDesc;
+        memset(&depthViewDesc, 0, sizeof(depthViewDesc));
+
+        depthViewDesc.Format = deptTexDesc.Format;
+        depthViewDesc.ViewDimension = D3D11_DSV_DIMENSION_TEXTURE2D;
+        depthViewDesc.Texture2D.MipSlice = 0;
+
+        hr = ID3D11Device_CreateDepthStencilView(sys->d3ddevice, (ID3D11Resource *)pDepthStencil, &depthViewDesc, &sys->d3ddepthStencilView);
+        ID3D11Texture2D_Release(pDepthStencil);
+
+        if (FAILED(hr)) {
+           msg_Err(vd, "Could not create the depth stencil view. (hr=0x%lX)", hr);
+           return;
+        }
+
+        ID3D11DeviceContext_OMSetRenderTargets(sys->d3dcontext, 1, &sys->d3drenderTargetView, sys->d3ddepthStencilView);
+    }
+#undef RECTWidth
+#undef RECTHeight
 }
 
 static void Prepare(vout_display_t *vd, picture_t *picture, subpicture_t *subpicture)
@@ -1086,10 +1169,10 @@ static int Direct3D11CreateResources(vout_display_t *vd, video_format_t *fmt)
 
     // triangles {pos: x,y,z  / texture: x,y  /  diffuse}
     float vertices[4 * sizeof(d3d_vertex_t)] = {
-        -1.0f, -1.0f, -1.0f,  0.0f, 1.0f,  1.0f, // bottom left
-         1.0f, -1.0f, -1.0f,  1.0f, 1.0f,  1.0f, // bottom right
-         1.0f,  1.0f, -1.0f,  1.0f, 0.0f,  1.0f, // top right
-        -1.0f,  1.0f, -1.0f,  0.0f, 0.0f,  1.0f, // top left
+        -1.0f, -1.0f, 0.0f,  0.0f, 1.0f,  1.0f, // bottom left
+         1.0f, -1.0f, 0.0f,  1.0f, 1.0f,  1.0f, // bottom right
+         1.0f,  1.0f, 0.0f,  1.0f, 0.0f,  1.0f, // top right
+        -1.0f,  1.0f, 0.0f,  0.0f, 0.0f,  1.0f, // top left
     };
 
     if (AllocQuad( vd, fmt, &sys->picQuad, vertices )!=VLC_SUCCESS) {
@@ -1441,7 +1524,7 @@ static int Direct3D11MapSubpicture(vout_display_t *vd, int *subpicture_region_co
             // bottom left
             dst_data[0].position.x = left;
             dst_data[0].position.y = bottom;
-            dst_data[0].position.z = -1.0f;
+            dst_data[0].position.z = 0.0f;
             dst_data[0].texture.x = 0.0f;
             dst_data[0].texture.y = 1.0f;
             dst_data[0].diffuse   = diffuse;
@@ -1449,7 +1532,7 @@ static int Direct3D11MapSubpicture(vout_display_t *vd, int *subpicture_region_co
             // bottom right
             dst_data[1].position.x = right;
             dst_data[1].position.y = bottom;
-            dst_data[1].position.z = -1.0f;
+            dst_data[1].position.z = 0.0f;
             dst_data[1].texture.x = 1.0f;
             dst_data[1].texture.y = 1.0f;
             dst_data[1].diffuse   = diffuse;
@@ -1457,7 +1540,7 @@ static int Direct3D11MapSubpicture(vout_display_t *vd, int *subpicture_region_co
             // top right
             dst_data[2].position.x = right;
             dst_data[2].position.y = top;
-            dst_data[2].position.z = -1.0f;
+            dst_data[2].position.z = 0.0f;
             dst_data[2].texture.x = 1.0f;
             dst_data[2].texture.y = 0.0f;
             dst_data[2].diffuse   = diffuse;
@@ -1465,7 +1548,7 @@ static int Direct3D11MapSubpicture(vout_display_t *vd, int *subpicture_region_co
             // top left
             dst_data[3].position.x = left;
             dst_data[3].position.y = top;
-            dst_data[3].position.z = -1.0f;
+            dst_data[3].position.z = 0.0f;
             dst_data[3].texture.x = 0.0f;
             dst_data[3].texture.y = 0.0f;
             dst_data[3].diffuse   = diffuse;
