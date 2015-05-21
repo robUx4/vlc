@@ -132,10 +132,10 @@ static int  Direct3D11CreateResources (vout_display_t *, video_format_t *);
 static void Direct3D11DestroyResources(vout_display_t *);
 
 static int  Direct3D11MapTexture(picture_t *);
-static int Direct3D11MapSubpicture(vout_display_t *, int *, d3d_picture_t **, subpicture_t *);
+static int Direct3D11MapSubpicture(vout_display_t *, int *, d3d_quad_t **, subpicture_t *);
 
-static int AllocD3DPicture(vout_display_t *, const video_format_t *, d3d_picture_t *, const float vertices[5 * 4]);
-static void ReleaseD3DPicture(d3d_picture_t *);
+static int AllocD3DPicture(vout_display_t *, const video_format_t *, d3d_quad_t *, const float vertices[5 * 4]);
+static void ReleaseD3DPicture(d3d_quad_t *);
 
 /* All the #if USE_DXGI contain an alternative method to setup dx11
    They both need to be benchmarked to see which performs better */
@@ -485,14 +485,14 @@ static void Prepare(vout_display_t *vd, picture_t *picture, subpicture_t *subpic
 
     if (subpicture) {
         int subpicture_region_count      = 0;
-        d3d_picture_t *subpicture_region = NULL;
+        d3d_quad_t *subpicture_region = NULL;
         Direct3D11MapSubpicture(vd, &subpicture_region_count, &subpicture_region, subpicture);
         sys->d3dregion_count = subpicture_region_count;
         sys->d3dregions      = subpicture_region;
     }
 }
 
-static void DisplayD3DPicture(vout_display_sys_t *sys, d3d_picture_t *d3dr)
+static void DisplayD3DPicture(vout_display_sys_t *sys, d3d_quad_t *d3dr)
 {
     UINT stride = sizeof(d3d_vertex_t);
     UINT offset = 0;
@@ -504,7 +504,7 @@ static void DisplayD3DPicture(vout_display_sys_t *sys, d3d_picture_t *d3dr)
         ID3D11DeviceContext_PSSetShaderResources(sys->d3dcontext, 1, 1, &d3dr->pResourceViewUV);
 
     ID3D11DeviceContext_IASetVertexBuffers(sys->d3dcontext, 0, 1, &d3dr->pVertexBuffer, &stride, &offset);
-    ID3D11DeviceContext_IASetIndexBuffer(sys->d3dcontext, d3dr->pIndexBuffer, DXGI_FORMAT_R16_UINT, 0);
+    ID3D11DeviceContext_IASetIndexBuffer(sys->d3dcontext, sys->pQuadIndices, DXGI_FORMAT_R16_UINT, 0);
     ID3D11DeviceContext_DrawIndexed(sys->d3dcontext, 6, 0, 0);
 }
 
@@ -515,7 +515,7 @@ static void Display(vout_display_t *vd, picture_t *picture, subpicture_t *subpic
     /* no ID3D11Device operations should come here */
 
     /* Render the quad */
-    DisplayD3DPicture(sys, &sys->d3dpic);
+    DisplayD3DPicture(sys, &sys->picQuad);
 
     if (subpicture) {
         // draw the additional vertices
@@ -1046,6 +1046,29 @@ static int Direct3D11CreateResources(vout_display_t *vd, video_format_t *fmt)
       return VLC_EGENERIC;
     }
 
+    /* create the index of the vertices */
+    WORD indices[] = {
+      3, 1, 0,
+      2, 1, 3,
+    };
+
+    D3D11_BUFFER_DESC quadDesc = {
+        .Usage = D3D11_USAGE_DEFAULT,
+        .ByteWidth = sizeof(WORD) * 6,
+        .BindFlags = D3D11_BIND_INDEX_BUFFER,
+        .CPUAccessFlags = 0,
+    };
+
+    D3D11_SUBRESOURCE_DATA quadIndicesInit = {
+        .pSysMem = indices,
+    };
+
+    hr = ID3D11Device_CreateBuffer(sys->d3ddevice, &quadDesc, &quadIndicesInit, &sys->pQuadIndices);
+    if(FAILED(hr)) {
+        msg_Err(vd, "Could not Create the common quad indices. (hr=0x%lX)", hr);
+        return VLC_EGENERIC;
+    }
+
     ID3D11DeviceContext_IASetPrimitiveTopology(sys->d3dcontext, D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
     // triangles {pos: x,y,z  / texture: x,y}
@@ -1056,8 +1079,8 @@ static int Direct3D11CreateResources(vout_display_t *vd, video_format_t *fmt)
         -1.0f,  1.0f, -1.0f,  0.0f, 0.0f, // top left
     };
 
-    if (AllocD3DPicture( vd, fmt, &sys->d3dpic, vertices )!=VLC_SUCCESS) {
-        msg_Err(vd, "Could not Create the main render picture. (hr=0x%lX)", hr);
+    if (AllocD3DPicture( vd, fmt, &sys->picQuad, vertices )!=VLC_SUCCESS) {
+        msg_Err(vd, "Could not Create the main quad picture. (hr=0x%lX)", hr);
         return VLC_EGENERIC;
     }
 
@@ -1082,7 +1105,7 @@ static int Direct3D11CreateResources(vout_display_t *vd, video_format_t *fmt)
         return VLC_ENOMEM;
     }
 
-    picsys->texture  = sys->d3dpic.pTexture;
+    picsys->texture  = sys->picQuad.pTexture;
     ID3D11Texture2D_AddRef(picsys->texture);
     picsys->context  = sys->d3dcontext;
     ID3D11DeviceContext_AddRef(picsys->context);
@@ -1114,7 +1137,7 @@ static int Direct3D11CreateResources(vout_display_t *vd, video_format_t *fmt)
     return VLC_SUCCESS;
 }
 
-static int AllocD3DPicture(vout_display_t *vd, const video_format_t *fmt, d3d_picture_t *d3dr, const float vertices[5 * 4])
+static int AllocD3DPicture(vout_display_t *vd, const video_format_t *fmt, d3d_quad_t *d3dr, const float vertices[5 * 4])
 {
     vout_display_sys_t *sys = vd->sys;
     HRESULT hr;
@@ -1133,24 +1156,6 @@ static int AllocD3DPicture(vout_display_t *vd, const video_format_t *fmt, d3d_pi
     hr = ID3D11Device_CreateBuffer(sys->d3ddevice, &bd, vertices==NULL ? NULL : &InitData, &d3dr->pVertexBuffer);
     if(FAILED(hr)) {
       msg_Err(vd, "Failed to create vertex buffer.");
-      goto error;
-    }
-
-    /* create the index of the vertices */
-    WORD indices[] = {
-      3, 1, 0,
-      2, 1, 3,
-    };
-
-    bd.Usage = D3D11_USAGE_DEFAULT;
-    bd.ByteWidth = sizeof(WORD)*6;
-    bd.BindFlags = D3D11_BIND_INDEX_BUFFER;
-    bd.CPUAccessFlags = 0;
-    InitData.pSysMem = indices;
-
-    hr = ID3D11Device_CreateBuffer(sys->d3ddevice, &bd, &InitData, &d3dr->pIndexBuffer);
-    if(FAILED(hr)) {
-      msg_Err(vd, "Failed to create index buffer.");
       goto error;
     }
 
@@ -1201,15 +1206,11 @@ error:
     return VLC_EGENERIC;
 }
 
-static void ReleaseD3DPicture(d3d_picture_t *d3dr)
+static void ReleaseD3DPicture(d3d_quad_t *d3dr)
 {
     if (d3dr->pVertexBuffer) {
         ID3D11Buffer_Release(d3dr->pVertexBuffer);
         d3dr->pVertexBuffer = NULL;
-    }
-    if (d3dr->pIndexBuffer) {
-        ID3D11Buffer_Release(d3dr->pIndexBuffer);
-        d3dr->pIndexBuffer = NULL;
     }
     if (d3dr->pTexture) {
         ID3D11Texture2D_Release(d3dr->pTexture);
@@ -1237,10 +1238,14 @@ static void Direct3D11DestroyResources(vout_display_t *vd)
         picture_pool_Release(sys->pool);
     }
     sys->pool = NULL;
-    ReleaseD3DPicture(&sys->d3dpic);
+    ReleaseD3DPicture(&sys->picQuad);
     for (int i = 0; i < sys->d3dregion_count; ++i)
         ReleaseD3DPicture(&sys->d3dregions[i]);
 
+    if (sys->pQuadIndices) {
+        ID3D11Buffer_Release(sys->pQuadIndices);
+        sys->pQuadIndices = NULL;
+    }
     if (sys->pDepthStencilState) {
         ID3D11DepthStencilState_Release(sys->pDepthStencilState);
         sys->pDepthStencilState = NULL;
@@ -1290,7 +1295,7 @@ static int Direct3D11MapTexture(picture_t *picture)
 }
 
 static int Direct3D11MapSubpicture(vout_display_t *vd, int *subpicture_region_count,
-                                   d3d_picture_t **region, subpicture_t *subpicture)
+                                   d3d_quad_t **region, subpicture_t *subpicture)
 {
     vout_display_sys_t *sys = vd->sys;
     D3D11_MAPPED_SUBRESOURCE mappedResource;
@@ -1302,18 +1307,18 @@ static int Direct3D11MapSubpicture(vout_display_t *vd, int *subpicture_region_co
     for (subpicture_region_t *r = subpicture->p_region; r; r = r->p_next)
         count++;
 
-    *region = calloc(count, sizeof(d3d_picture_t));
+    *region = calloc(count, sizeof(d3d_quad_t));
     if (unlikely(*region==NULL))
         return VLC_ENOMEM;
     *subpicture_region_count = count;
 
     int i = 0;
     for (subpicture_region_t *r = subpicture->p_region; r; r = r->p_next, i++) {
-        d3d_picture_t *d3dr = &(*region)[i];
+        d3d_quad_t *d3dr = &(*region)[i];
 
         d3dr->pTexture = NULL;
         for (int j = 0; j < sys->d3dregion_count; j++) {
-            d3d_picture_t *cache = &sys->d3dregions[j];
+            d3d_quad_t *cache = &sys->d3dregions[j];
             if (cache->pTexture) {
                 ID3D11Texture2D_GetDesc( cache->pTexture, &texDesc );
                 if (texDesc.Format == sys->d3dregion_format &&

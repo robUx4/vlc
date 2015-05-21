@@ -52,13 +52,12 @@
 #include "events.h"
 
 #ifdef MODULE_NAME_IS_direct3d11
-typedef struct d3d_picture_t {
+typedef struct d3d_quad_t {
     ID3D11Buffer              *pVertexBuffer;
-    ID3D11Buffer              *pIndexBuffer;
     ID3D11Texture2D           *pTexture;
     ID3D11ShaderResourceView  *pResourceViewYRGB;
     ID3D11ShaderResourceView  *pResourceViewUV;
-} d3d_picture_t;
+} d3d_quad_t;
 #endif
 
 /*****************************************************************************
@@ -172,7 +171,8 @@ struct vout_display_sys_t
 #endif
     ID3D11Device             *d3ddevice;       /* D3D device */
     ID3D11DeviceContext      *d3dcontext;      /* D3D context */
-    d3d_picture_t            d3dpic;
+    ID3D11Buffer             *pQuadIndices;
+    d3d_quad_t               picQuad;
     ID3D11RenderTargetView   *d3drenderTargetView;
     ID3D11DepthStencilView   *d3ddepthStencilView;
     ID3D11VertexShader       *d3dvertexShader;
@@ -193,7 +193,7 @@ struct vout_display_sys_t
     vlc_fourcc_t             pSubpictureChromas[2];
     DXGI_FORMAT              d3dregion_format;
     int                      d3dregion_count;
-    struct d3d_picture_t     *d3dregions;
+    struct d3d_quad_t        *d3dregions;
 #endif
 
 #ifdef MODULE_NAME_IS_direct3d9
