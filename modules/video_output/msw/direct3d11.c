@@ -110,6 +110,7 @@ struct picture_sys_t
 typedef struct d3d_vertex_t {
     D3DXVECTOR3 position;
     D3DXVECTOR2 texture;
+    FLOAT       diffuse;
 } d3d_vertex_t;
 
 static int  Open(vlc_object_t *);
@@ -131,7 +132,7 @@ static int  Direct3D11MapTexture(picture_t *);
 static void Direct3D11DeleteRegions(int, picture_t **);
 static int Direct3D11MapSubpicture(vout_display_t *, int *, picture_t ***, subpicture_t *);
 
-static int AllocQuad(vout_display_t *, const video_format_t *, d3d_quad_t *, const float vertices[5 * 4]);
+static int AllocQuad(vout_display_t *, const video_format_t *, d3d_quad_t *, const float vertices[4 * sizeof(d3d_vertex_t)]);
 static void ReleaseQuad(d3d_quad_t *);
 
 /* All the #if USE_DXGI contain an alternative method to setup dx11
@@ -148,12 +149,14 @@ static const char* globVertexShaderDefault = "\
   {\
     float4 Position   : POSITION;\
     float2 Texture    : TEXCOORD0;\
+    float  Diffuse    : DIFFUSE;\
   };\
   \
   struct VS_OUTPUT\
   {\
     float4 Position   : SV_POSITION;\
     float2 Texture    : TEXCOORD0;\
+    float  Diffuse    : DIFFUSE;\
   };\
   \
   VS_OUTPUT VS( VS_INPUT In )\
@@ -161,6 +164,7 @@ static const char* globVertexShaderDefault = "\
     VS_OUTPUT Output;\
     Output.Position = float4(In.Position.xy, 0.0f, 1.0f);\
     Output.Texture = In.Texture;\
+    Output.Diffuse = In.Diffuse;\
     return Output;\
   }\
 ";
@@ -173,11 +177,16 @@ static const char* globPixelShaderDefault = "\
   {\
     float4 Position   : SV_POSITION;\
     float2 Texture    : TEXCOORD0;\
+    float  Diffuse    : DIFFUSE;\
   };\
   \
   float4 PS( PS_INPUT In ) : SV_TARGET\
   {\
-    return shaderTexture.Sample(SampleType, In.Texture);\
+    float4 rgba; \
+    \
+    rgba = shaderTexture.Sample(SampleType, In.Texture);\
+    rgba.a = rgba.a * In.Diffuse;\
+    return rgba; \
   }\
 ";
 
@@ -190,6 +199,7 @@ static const char *globPixelShaderBiplanarI420_BT601_2RGB = "\
   {\
     float4 Position   : SV_POSITION;\
     float2 Texture    : TEXCOORD0;\
+    float  Diffuse    : DIFFUSE;\
   };\
   \
   float4 PS( PS_INPUT In ) : SV_TARGET\
@@ -217,7 +227,7 @@ static const char *globPixelShaderBiplanarI420_BT601_2RGB = "\
     rgba.x = saturate(Y + 1.596026785714286 * VCr);\
     rgba.y = saturate(Y - 0.812967647237771 * VCr - 0.391762290094914 * UCb);\
     rgba.z = saturate(Y + 2.017232142857142 * UCb);\
-    rgba.w = 1.0;\
+    rgba.a = rgba.a * In.Diffuse;\
     return rgba;\
   }\
 ";
@@ -231,6 +241,7 @@ static const char *globPixelShaderBiplanarI420_BT709_2RGB = "\
   {\
     float4 Position   : SV_POSITION;\
     float2 Texture    : TEXCOORD0;\
+    float  Diffuse    : DIFFUSE;\
   };\
   \
   float4 PS( PS_INPUT In ) : SV_TARGET\
@@ -258,7 +269,7 @@ static const char *globPixelShaderBiplanarI420_BT709_2RGB = "\
     rgba.x = saturate(Y + 1.792741071428571 * VCr);\
     rgba.y = saturate(Y - 0.532909328559444 * VCr - 0.21324861427373 * UCb);\
     rgba.z = saturate(Y + 2.112401785714286 * UCb);\
-    rgba.w = 1.0;\
+    rgba.a = rgba.a * In.Diffuse;\
     return rgba;\
   }\
 ";
@@ -272,6 +283,7 @@ static const char *globPixelShaderBiplanarYUV_BT601_2RGB = "\
   {\
     float4 Position   : SV_POSITION;\
     float2 Texture    : TEXCOORD0;\
+    float  Diffuse    : DIFFUSE;\
   };\
   \
   float4 PS( PS_INPUT In ) : SV_TARGET\
@@ -286,7 +298,7 @@ static const char *globPixelShaderBiplanarYUV_BT601_2RGB = "\
     rgba.x = saturate(yuv.x + 1.596026785714286 * yuv.z);\
     rgba.y = saturate(yuv.x - 0.812967647237771 * yuv.z - 0.391762290094914 * yuv.y);\
     rgba.z = saturate(yuv.x + 2.017232142857142 * yuv.y);\
-    rgba.w = 1.0;\
+    rgba.a = rgba.a * In.Diffuse;\
     return rgba;\
   }\
 ";
@@ -300,6 +312,7 @@ static const char *globPixelShaderBiplanarYUV_BT709_2RGB = "\
   {\
     float4 Position   : SV_POSITION;\
     float2 Texture    : TEXCOORD0;\
+    float  Diffuse    : DIFFUSE;\
   };\
   \
   float4 PS( PS_INPUT In ) : SV_TARGET\
@@ -314,7 +327,7 @@ static const char *globPixelShaderBiplanarYUV_BT709_2RGB = "\
     rgba.x = saturate(yuv.x + 1.792741071428571 * yuv.z);\
     rgba.y = saturate(yuv.x - 0.532909328559444 * yuv.z - 0.21324861427373 * yuv.y);\
     rgba.z = saturate(yuv.x + 2.112401785714286 * yuv.y);\
-    rgba.w = 1.0;\
+    rgba.a = rgba.a * In.Diffuse;\
     return rgba;\
   }\
 ";
@@ -1009,9 +1022,10 @@ static int Direct3D11CreateResources(vout_display_t *vd, video_format_t *fmt)
     D3D11_INPUT_ELEMENT_DESC layout[] = {
     { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0,  0, D3D11_INPUT_PER_VERTEX_DATA, 0},
     { "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT,    0, 12, D3D11_INPUT_PER_VERTEX_DATA, 0},
+    { "DIFFUSE",  0, DXGI_FORMAT_R32_FLOAT,       0, 20, D3D11_INPUT_PER_VERTEX_DATA, 0},
     };
 
-    hr = ID3D11Device_CreateInputLayout(sys->d3ddevice, layout, 2, (void *)ID3D10Blob_GetBufferPointer(pVSBlob),
+    hr = ID3D11Device_CreateInputLayout(sys->d3ddevice, layout, 3, (void *)ID3D10Blob_GetBufferPointer(pVSBlob),
                                         ID3D10Blob_GetBufferSize(pVSBlob), &sys->d3dvertexLayout);
 
     ID3D10Blob_Release(pVSBlob);
@@ -1070,12 +1084,12 @@ static int Direct3D11CreateResources(vout_display_t *vd, video_format_t *fmt)
 
     ID3D11DeviceContext_IASetPrimitiveTopology(sys->d3dcontext, D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
-    // triangles {pos: x,y,z  / texture: x,y}
-    float vertices[5 * 4] = {
-        -1.0f, -1.0f, -1.0f,  0.0f, 1.0f, // bottom left
-         1.0f, -1.0f, -1.0f,  1.0f, 1.0f, // bottom right
-         1.0f,  1.0f, -1.0f,  1.0f, 0.0f, // top right
-        -1.0f,  1.0f, -1.0f,  0.0f, 0.0f, // top left
+    // triangles {pos: x,y,z  / texture: x,y  /  diffuse}
+    float vertices[4 * sizeof(d3d_vertex_t)] = {
+        -1.0f, -1.0f, -1.0f,  0.0f, 1.0f,  1.0f, // bottom left
+         1.0f, -1.0f, -1.0f,  1.0f, 1.0f,  1.0f, // bottom right
+         1.0f,  1.0f, -1.0f,  1.0f, 0.0f,  1.0f, // top right
+        -1.0f,  1.0f, -1.0f,  0.0f, 0.0f,  1.0f, // top left
     };
 
     if (AllocQuad( vd, fmt, &sys->picQuad, vertices )!=VLC_SUCCESS) {
@@ -1136,7 +1150,7 @@ static int Direct3D11CreateResources(vout_display_t *vd, video_format_t *fmt)
     return VLC_SUCCESS;
 }
 
-static int AllocQuad(vout_display_t *vd, const video_format_t *fmt, d3d_quad_t *d3dr, const float vertices[5 * 4])
+static int AllocQuad(vout_display_t *vd, const video_format_t *fmt, d3d_quad_t *d3dr, const float vertices[4 * sizeof(d3d_vertex_t)])
 {
     vout_display_sys_t *sys = vd->sys;
     HRESULT hr;
@@ -1418,6 +1432,8 @@ static int Direct3D11MapSubpicture(vout_display_t *vd, int *subpicture_region_co
         float top    = 1.0f - 2.0f * dst.top    / subpicture->i_original_picture_height;
         float bottom = 1.0f - 2.0f * dst.bottom / subpicture->i_original_picture_height;
 
+        float diffuse = (float)r->i_alpha / 255.0f;
+
         hr = ID3D11DeviceContext_Map(sys->d3dcontext, (ID3D11Resource *)((d3d_quad_t *) d3dr->p_sys)->pVertexBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource);
         if( SUCCEEDED(hr) ) {
             d3d_vertex_t *dst_data = mappedResource.pData;
@@ -1428,6 +1444,7 @@ static int Direct3D11MapSubpicture(vout_display_t *vd, int *subpicture_region_co
             dst_data[0].position.z = -1.0f;
             dst_data[0].texture.x = 0.0f;
             dst_data[0].texture.y = 1.0f;
+            dst_data[0].diffuse   = diffuse;
 
             // bottom right
             dst_data[1].position.x = right;
@@ -1435,6 +1452,7 @@ static int Direct3D11MapSubpicture(vout_display_t *vd, int *subpicture_region_co
             dst_data[1].position.z = -1.0f;
             dst_data[1].texture.x = 1.0f;
             dst_data[1].texture.y = 1.0f;
+            dst_data[1].diffuse   = diffuse;
 
             // top right
             dst_data[2].position.x = right;
@@ -1442,6 +1460,7 @@ static int Direct3D11MapSubpicture(vout_display_t *vd, int *subpicture_region_co
             dst_data[2].position.z = -1.0f;
             dst_data[2].texture.x = 1.0f;
             dst_data[2].texture.y = 0.0f;
+            dst_data[2].diffuse   = diffuse;
 
             // top left
             dst_data[3].position.x = left;
@@ -1449,6 +1468,7 @@ static int Direct3D11MapSubpicture(vout_display_t *vd, int *subpicture_region_co
             dst_data[3].position.z = -1.0f;
             dst_data[3].texture.x = 0.0f;
             dst_data[3].texture.y = 0.0f;
+            dst_data[3].diffuse   = diffuse;
 
             ID3D11DeviceContext_Unmap(sys->d3dcontext, (ID3D11Resource *)((d3d_quad_t *) d3dr->p_sys)->pVertexBuffer, 0);
         } else {
