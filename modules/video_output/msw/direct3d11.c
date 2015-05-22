@@ -4,6 +4,7 @@
  * Copyright (C) 2014-2015 VLC authors and VideoLAN
  *
  * Authors: Martell Malone <martellmalone@gmail.com>
+ *          Steve Lhomme <robux4@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU Lesser General Public License as published by
@@ -498,7 +499,8 @@ static void Manage(vout_display_t *vd)
         ID3D11Texture2D* pDepthStencil;
         ID3D11Texture2D* pBackBuffer;
 
-        msg_Err(vd, "Manage detected size change");
+        msg_Dbg(vd, "Manage detected size change %dx%d", RECTWidth(sys->rect_dest_clipped),
+                RECTHeight(sys->rect_dest_clipped));
 
         if (sys->d3drenderTargetView) {
             ULONG ref = ID3D11RenderTargetView_Release(sys->d3drenderTargetView);
@@ -515,7 +517,7 @@ static void Manage(vout_display_t *vd)
 
         hr = IDXGISwapChain_GetBuffer(sys->dxgiswapChain, 0, &IID_ID3D11Texture2D, (LPVOID *)&pBackBuffer);
         if (FAILED(hr)) {
-           msg_Err(vd, "Could not get the backbuffer from the Swapchain. (hr=0x%lX)", hr);
+           msg_Err(vd, "Could not get the backbuffer for the Swapchain. (hr=0x%lX)", hr);
            return;
         }
 
@@ -558,6 +560,16 @@ static void Manage(vout_display_t *vd)
         }
 
         ID3D11DeviceContext_OMSetRenderTargets(sys->d3dcontext, 1, &sys->d3drenderTargetView, sys->d3ddepthStencilView);
+
+        D3D11_VIEWPORT vp;
+        vp.Width = (FLOAT)RECTWidth(sys->rect_dest_clipped);
+        vp.Height = (FLOAT)RECTHeight(sys->rect_dest_clipped);
+        vp.MinDepth = 0.0f;
+        vp.MaxDepth = 1.0f;
+        vp.TopLeftX = 0; // TODO handle the offset ?
+        vp.TopLeftY = 0;
+
+        ID3D11DeviceContext_RSSetViewports(sys->d3dcontext, 1, &vp);
     }
 #undef RECTWidth
 #undef RECTHeight
