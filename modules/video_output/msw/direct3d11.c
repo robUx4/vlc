@@ -136,7 +136,9 @@ static int  Direct3D11MapTexture(picture_t *);
 static void Direct3D11DeleteRegions(int, picture_t **);
 static int Direct3D11MapSubpicture(vout_display_t *, int *, picture_t ***, subpicture_t *);
 
-static int AllocQuad(vout_display_t *, const video_format_t *, d3d_quad_t *, const float vertices[4 * sizeof(d3d_vertex_t)]);
+static int AllocQuad(vout_display_t *, const video_format_t *, d3d_quad_t *,
+                     d3d_quad_cfg_t *, ID3D11PixelShader *,
+                     const float vertices[4 * sizeof(d3d_vertex_t)]);
 static void ReleaseQuad(d3d_quad_t *);
 
 /* All the #if USE_DXGI contain an alternative method to setup dx11
@@ -451,7 +453,7 @@ static int Open(vlc_object_t *object)
     info.has_pictures_invalid = true;
     info.has_event_thread     = true;
 
-    sys->pSubpictureChromas[0] = sys->vlcFormat;
+    sys->pSubpictureChromas[0] = VLC_CODEC_RGBA;
     sys->pSubpictureChromas[1] = 0;
     info.subpicture_chromas = sys->pSubpictureChromas;
 
@@ -598,7 +600,6 @@ static void Prepare(vout_display_t *vd, picture_t *picture, subpicture_t *subpic
     ID3D11DeviceContext_IASetIndexBuffer(sys->d3dcontext, sys->pQuadIndices, DXGI_FORMAT_R16_UINT, 0);
 
     ID3D11DeviceContext_VSSetShader(sys->d3dcontext, sys->d3dvertexShader, NULL, 0);
-    ID3D11DeviceContext_PSSetShader(sys->d3dcontext, sys->d3dpixelShader, NULL, 0);
     ID3D11DeviceContext_PSSetSamplers(sys->d3dcontext, 0, 1, &sys->d3dsampState);
 
     if (subpicture) {
@@ -617,9 +618,9 @@ static void DisplayD3DPicture(vout_display_sys_t *sys, d3d_quad_t *d3dr)
     UINT offset = 0;
 
     /* Render the quad */
+    ID3D11DeviceContext_PSSetShader(sys->d3dcontext, d3dr->pPixelShader, NULL, 0);
     ID3D11DeviceContext_PSSetShaderResources(sys->d3dcontext, 0, 1, &d3dr->pResourceViewYRGB);
-
-    if( sys->d3dFormatUV )
+    if( d3dr->pResourceViewUV )
         ID3D11DeviceContext_PSSetShaderResources(sys->d3dcontext, 1, 1, &d3dr->pResourceViewUV);
 
     ID3D11DeviceContext_IASetVertexBuffers(sys->d3dcontext, 0, 1, &d3dr->pVertexBuffer, &stride, &offset);
@@ -878,10 +879,10 @@ static int Direct3D11Open(vout_display_t *vd, video_format_t *fmt)
                     ( i_formatSupport & D3D11_FORMAT_SUPPORT_TEXTURE2D ))
             {
                 msg_Dbg(vd, "Using pixel format %s", d3d_formats[i].name );
-                sys->d3dFormatTex = d3d_formats[i].formatTexture;
-                sys->vlcFormat    = d3d_formats[i].fourcc;
-                sys->d3dFormatY   = d3d_formats[i].formatY;
-                sys->d3dFormatUV  = d3d_formats[i].formatUV;
+                sys->vlcFormat = d3d_formats[i].fourcc;
+                sys->picQuadConfig.textureFormat      = d3d_formats[i].formatTexture;
+                sys->picQuadConfig.resourceFormatYRGB = d3d_formats[i].formatY;
+                sys->picQuadConfig.resourceFormatUV   = d3d_formats[i].formatUV;
                 break;
             }
         }
@@ -899,10 +900,10 @@ static int Direct3D11Open(vout_display_t *vd, video_format_t *fmt)
                     ( i_formatSupport & D3D11_FORMAT_SUPPORT_TEXTURE2D ))
             {
                 msg_Dbg(vd, "Using pixel format %s", d3d_formats[i].name );
-                sys->d3dFormatTex = d3d_formats[i].formatTexture;
-                sys->vlcFormat    = d3d_formats[i].fourcc;
-                sys->d3dFormatY   = d3d_formats[i].formatY;
-                sys->d3dFormatUV  = d3d_formats[i].formatUV;
+                sys->vlcFormat = d3d_formats[i].fourcc;
+                sys->picQuadConfig.textureFormat      = d3d_formats[i].formatTexture;
+                sys->picQuadConfig.resourceFormatYRGB = d3d_formats[i].formatY;
+                sys->picQuadConfig.resourceFormatUV   = d3d_formats[i].formatUV;
                 break;
             }
         }
@@ -917,24 +918,25 @@ static int Direct3D11Open(vout_display_t *vd, video_format_t *fmt)
     {
     case VLC_CODEC_NV12:
         if( fmt->i_height > 576 )
-            sys->d3dPxShader = globPixelShaderBiplanarYUV_BT709_2RGB;
+            sys->psz_picPxShader = globPixelShaderBiplanarYUV_BT709_2RGB;
         else
-            sys->d3dPxShader = globPixelShaderBiplanarYUV_BT601_2RGB;
+            sys->psz_picPxShader = globPixelShaderBiplanarYUV_BT601_2RGB;
         break;
     case VLC_CODEC_YV12:
     case VLC_CODEC_I420:
         if( fmt->i_height > 576 )
-            sys->d3dPxShader = globPixelShaderBiplanarI420_BT709_2RGB;
+            sys->psz_picPxShader = globPixelShaderBiplanarI420_BT709_2RGB;
         else
-            sys->d3dPxShader = globPixelShaderBiplanarI420_BT601_2RGB;
+            sys->psz_picPxShader = globPixelShaderBiplanarI420_BT601_2RGB;
         break;
     case VLC_CODEC_RGB32:
     case VLC_CODEC_BGRA:
     case VLC_CODEC_RGB16:
     default:
-        sys->d3dPxShader = globPixelShaderDefault;
+        sys->psz_picPxShader = globPixelShaderDefault;
         break;
     }
+    sys->psz_rgbaPxShader = globPixelShaderDefault;
 
     UpdateRects(vd, NULL, NULL, true);
 
@@ -1093,28 +1095,6 @@ static int Direct3D11CreateResources(vout_display_t *vd, video_format_t *fmt)
 
     ID3D11DeviceContext_IASetInputLayout(sys->d3dcontext, sys->d3dvertexLayout);
 
-    ID3DBlob* pPSBlob = NULL;
-
-    /* TODO : Match the version to the D3D_FEATURE_LEVEL */
-    hr = D3DCompile(sys->d3dPxShader, strlen(sys->d3dPxShader),
-                    NULL, NULL, NULL, "PS", "ps_4_0_level_9_1", 0, 0, &pPSBlob, NULL);
-
-
-    if( FAILED(hr)) {
-      msg_Err(vd, "The Pixel Shader is invalid. (hr=0x%lX)", hr );
-      return VLC_EGENERIC;
-    }
-
-    hr = ID3D11Device_CreatePixelShader(sys->d3ddevice, (void *)ID3D10Blob_GetBufferPointer(pPSBlob),
-                                        ID3D10Blob_GetBufferSize(pPSBlob), NULL, &sys->d3dpixelShader);
-
-    ID3D10Blob_Release(pPSBlob);
-
-    if(FAILED(hr)) {
-      msg_Err(vd, "Failed to create the pixel shader.");
-      return VLC_EGENERIC;
-    }
-
     /* create the index of the vertices */
     WORD indices[] = {
       3, 1, 0,
@@ -1140,6 +1120,46 @@ static int Direct3D11CreateResources(vout_display_t *vd, video_format_t *fmt)
 
     ID3D11DeviceContext_IASetPrimitiveTopology(sys->d3dcontext, D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
+    ID3D11PixelShader *pPicQuadShader;
+    ID3DBlob* pPSBlob = NULL;
+
+    /* TODO : Match the version to the D3D_FEATURE_LEVEL */
+    hr = D3DCompile(sys->psz_picPxShader, strlen(sys->psz_picPxShader),
+                    NULL, NULL, NULL, "PS", "ps_4_0_level_9_1", 0, 0, &pPSBlob, NULL);
+    if( FAILED(hr)) {
+      msg_Err(vd, "The Pixel Shader is invalid. (hr=0x%lX)", hr );
+      return VLC_EGENERIC;
+    }
+
+    hr = ID3D11Device_CreatePixelShader(sys->d3ddevice, (void *)ID3D10Blob_GetBufferPointer(pPSBlob),
+                                        ID3D10Blob_GetBufferSize(pPSBlob), NULL, &pPicQuadShader);
+
+    ID3D10Blob_Release(pPSBlob);
+
+    if(FAILED(hr)) {
+      msg_Err(vd, "Failed to create the pixel shader.");
+      return VLC_EGENERIC;
+    }
+
+    hr = D3DCompile(sys->psz_rgbaPxShader, strlen(sys->psz_rgbaPxShader),
+                    NULL, NULL, NULL, "PS", "ps_4_0_level_9_1", 0, 0, &pPSBlob, NULL);
+    if( FAILED(hr)) {
+      ID3D11PixelShader_Release(pPicQuadShader);
+      msg_Err(vd, "The RGBA Pixel Shader is invalid. (hr=0x%lX)", hr );
+      return VLC_EGENERIC;
+    }
+
+    hr = ID3D11Device_CreatePixelShader(sys->d3ddevice, (void *)ID3D10Blob_GetBufferPointer(pPSBlob),
+                                        ID3D10Blob_GetBufferSize(pPSBlob), NULL, &sys->pSPUPixelShader);
+
+    ID3D10Blob_Release(pPSBlob);
+
+    if(FAILED(hr)) {
+      ID3D11PixelShader_Release(pPicQuadShader);
+      msg_Err(vd, "Failed to create the pixel shader.");
+      return VLC_EGENERIC;
+    }
+
     // triangles {pos: x,y,z  / texture: x,y  /  opacity}
     float vertices[4 * sizeof(d3d_vertex_t)] = {
         -1.0f, -1.0f, 0.0f,  0.0f, 1.0f,  1.0f, // bottom left
@@ -1148,10 +1168,12 @@ static int Direct3D11CreateResources(vout_display_t *vd, video_format_t *fmt)
         -1.0f,  1.0f, 0.0f,  0.0f, 0.0f,  1.0f, // top left
     };
 
-    if (AllocQuad( vd, fmt, &sys->picQuad, vertices )!=VLC_SUCCESS) {
+    if (AllocQuad( vd, fmt, &sys->picQuad, &sys->picQuadConfig, pPicQuadShader, vertices )!=VLC_SUCCESS) {
+        ID3D11PixelShader_Release(pPicQuadShader);
         msg_Err(vd, "Could not Create the main quad picture. (hr=0x%lX)", hr);
         return VLC_EGENERIC;
     }
+    ID3D11PixelShader_Release(pPicQuadShader);
 
     D3D11_SAMPLER_DESC sampDesc = { 0 };
     sampDesc.Filter = D3D11_FILTER_MIN_MAG_LINEAR_MIP_POINT;
@@ -1206,7 +1228,9 @@ static int Direct3D11CreateResources(vout_display_t *vd, video_format_t *fmt)
     return VLC_SUCCESS;
 }
 
-static int AllocQuad(vout_display_t *vd, const video_format_t *fmt, d3d_quad_t *d3dr, const float vertices[4 * sizeof(d3d_vertex_t)])
+static int AllocQuad(vout_display_t *vd, const video_format_t *fmt, d3d_quad_t *d3dr,
+                     d3d_quad_cfg_t *cfg, ID3D11PixelShader *pPixelShader,
+                     const float vertices[4 * sizeof(d3d_vertex_t)])
 {
     vout_display_sys_t *sys = vd->sys;
     HRESULT hr;
@@ -1233,7 +1257,7 @@ static int AllocQuad(vout_display_t *vd, const video_format_t *fmt, d3d_quad_t *
     texDesc.Width = fmt->i_visible_width;
     texDesc.Height = fmt->i_visible_height;
     texDesc.MipLevels = texDesc.ArraySize = 1;
-    texDesc.Format = sys->d3dFormatTex;
+    texDesc.Format = cfg->textureFormat;
     texDesc.SampleDesc.Count = 1;
     texDesc.Usage = D3D11_USAGE_DYNAMIC;
     texDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
@@ -1248,7 +1272,7 @@ static int AllocQuad(vout_display_t *vd, const video_format_t *fmt, d3d_quad_t *
 
     D3D11_SHADER_RESOURCE_VIEW_DESC resviewDesc;
     memset(&resviewDesc, 0, sizeof(resviewDesc));
-    resviewDesc.Format = sys->d3dFormatY;
+    resviewDesc.Format = cfg->resourceFormatYRGB;
     resviewDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
     resviewDesc.Texture2D.MipLevels = texDesc.MipLevels;
 
@@ -1258,15 +1282,18 @@ static int AllocQuad(vout_display_t *vd, const video_format_t *fmt, d3d_quad_t *
         goto error;
     }
 
-    if( sys->d3dFormatUV )
+    if( cfg->resourceFormatUV )
     {
-        resviewDesc.Format = sys->d3dFormatUV;
+        resviewDesc.Format = cfg->resourceFormatUV;
         hr = ID3D11Device_CreateShaderResourceView(sys->d3ddevice, (ID3D11Resource *)d3dr->pTexture, &resviewDesc, &d3dr->pResourceViewUV);
         if (FAILED(hr)) {
             msg_Err(vd, "Could not Create the UV D3d11 Texture ResourceView. (hr=0x%lX)", hr);
             goto error;
         }
     }
+
+    d3dr->pPixelShader = pPixelShader;
+    ID3D11PixelShader_AddRef(d3dr->pPixelShader);
 
     return VLC_SUCCESS;
 
@@ -1292,6 +1319,10 @@ static void ReleaseQuad(d3d_quad_t *d3dr)
     if (d3dr->pResourceViewUV) {
         ID3D11ShaderResourceView_Release(d3dr->pResourceViewUV);
         d3dr->pResourceViewUV = NULL;
+    }
+    if (d3dr->pPixelShader) {
+        ID3D11VertexShader_Release(d3dr->pPixelShader);
+        d3dr->pPixelShader = NULL;
     }
 }
 
@@ -1340,8 +1371,8 @@ static void Direct3D11DestroyResources(vout_display_t *vd)
         ID3D11VertexShader_Release(sys->d3dvertexShader);
         sys->d3dvertexShader = NULL;
     }
-    if (sys->d3dpixelShader) {
-        ID3D11VertexShader_Release(sys->d3dpixelShader);
+    if (sys->pSPUPixelShader) {
+        ID3D11VertexShader_Release(sys->pSPUPixelShader);
         sys->d3dvertexShader = NULL;
     }
 
@@ -1424,7 +1455,11 @@ static int Direct3D11MapSubpicture(vout_display_t *vd, int *subpicture_region_co
             if (unlikely(d3dquad==NULL)) {
                 continue;
             }
-            err = AllocQuad(vd, &r->fmt, d3dquad, NULL);
+            d3d_quad_cfg_t rgbaCfg = {
+                .textureFormat      = DXGI_FORMAT_R8G8B8A8_UNORM,
+                .resourceFormatYRGB = DXGI_FORMAT_R8G8B8A8_UNORM,
+            };
+            err = AllocQuad(vd, &r->fmt, d3dquad, &rgbaCfg, sys->pSPUPixelShader, NULL);
             if (err != VLC_SUCCESS) {
                 msg_Err(vd, "Failed to create %dx%d texture for OSD",
                         r->fmt.i_visible_width, r->fmt.i_visible_height);
