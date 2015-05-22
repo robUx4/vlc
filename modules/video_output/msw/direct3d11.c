@@ -1024,22 +1024,22 @@ static int Direct3D11CreateResources(vout_display_t *vd, video_format_t *fmt)
      * see https://msdn.microsoft.com/en-us/library/windows/desktop/bb205074%28v=vs.85%29.aspx
      * see http://rastertek.com/dx11tut11.html
     */
-    D3D11_DEPTH_STENCIL_DESC stencilDesc = {
-        .DepthEnable   = FALSE,
-        .StencilEnable = TRUE,
-        .DepthWriteMask               = D3D11_DEPTH_WRITE_MASK_ALL,
-        .DepthFunc                    = D3D11_COMPARISON_LESS,
-        .StencilReadMask              = 0xFF,
-        .StencilWriteMask             = 0xFF,
-        .FrontFace.StencilFailOp      = D3D11_STENCIL_OP_KEEP,
-        .FrontFace.StencilDepthFailOp = D3D11_STENCIL_OP_INCR,
-        .FrontFace.StencilPassOp      = D3D11_STENCIL_OP_KEEP,
-        .FrontFace.StencilFunc        = D3D11_COMPARISON_ALWAYS,
-        .BackFace.StencilFailOp       = D3D11_STENCIL_OP_KEEP,
-        .BackFace.StencilDepthFailOp  = D3D11_STENCIL_OP_DECR,
-        .BackFace.StencilPassOp       = D3D11_STENCIL_OP_KEEP,
-        .BackFace.StencilFunc         = D3D11_COMPARISON_ALWAYS,
-    };
+    D3D11_DEPTH_STENCIL_DESC stencilDesc;
+    ZeroMemory(&stencilDesc, sizeof(stencilDesc));
+    stencilDesc.DepthEnable                  = FALSE;
+    stencilDesc.StencilEnable                = TRUE;
+    stencilDesc.DepthWriteMask               = D3D11_DEPTH_WRITE_MASK_ALL;
+    stencilDesc.DepthFunc                    = D3D11_COMPARISON_LESS;
+    stencilDesc.StencilReadMask              = 0xFF;
+    stencilDesc.StencilWriteMask             = 0xFF;
+    stencilDesc.FrontFace.StencilFailOp      = D3D11_STENCIL_OP_KEEP;
+    stencilDesc.FrontFace.StencilDepthFailOp = D3D11_STENCIL_OP_INCR;
+    stencilDesc.FrontFace.StencilPassOp      = D3D11_STENCIL_OP_KEEP;
+    stencilDesc.FrontFace.StencilFunc        = D3D11_COMPARISON_ALWAYS;
+    stencilDesc.BackFace.StencilFailOp       = D3D11_STENCIL_OP_KEEP;
+    stencilDesc.BackFace.StencilDepthFailOp  = D3D11_STENCIL_OP_DECR;
+    stencilDesc.BackFace.StencilPassOp       = D3D11_STENCIL_OP_KEEP;
+    stencilDesc.BackFace.StencilFunc         = D3D11_COMPARISON_ALWAYS;
     hr = ID3D11Device_CreateDepthStencilState(sys->d3ddevice, &stencilDesc, &sys->pDepthStencilState );
     if (SUCCEEDED(hr)) {
         ID3D11DeviceContext_OMSetDepthStencilState(sys->d3dcontext, sys->pDepthStencilState, 0);
