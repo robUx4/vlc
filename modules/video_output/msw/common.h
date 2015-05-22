@@ -180,7 +180,6 @@ struct vout_display_sys_t
     ID3D11InputLayout        *d3dvertexLayout;
     ID3D11SamplerState       *d3dsampState;
     picture_sys_t            *picsys;
-    D3D_FEATURE_LEVEL        d3dfeaturelevel;
     DXGI_FORMAT              d3dFormatTex;
     DXGI_FORMAT              d3dFormatY;
     DXGI_FORMAT              d3dFormatUV;

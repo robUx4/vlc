@@ -784,7 +784,7 @@ static int Direct3D11Open(vout_display_t *vd, video_format_t *fmt)
                     D3D_DRIVER_TYPE_UNKNOWN, NULL, creationFlags,
                     featureLevels, ARRAYSIZE(featureLevels),
                     D3D11_SDK_VERSION, &scd, &sys->dxgiswapChain,
-                    &sys->d3ddevice, &sys->d3dfeaturelevel, &sys->d3dcontext);
+                    &sys->d3ddevice, NULL, &sys->d3dcontext);
     if (FAILED(hr)) {
        msg_Err(vd, "Could not Create the D3D11 device and SwapChain. (hr=0x%lX)", hr);
        return VLC_EGENERIC;
@@ -800,8 +800,8 @@ static int Direct3D11Open(vout_display_t *vd, video_format_t *fmt)
 
     for (UINT driver = 0; driver < ARRAYSIZE(driverAttempts); driver++) {
         hr = D3D11CreateDevice(NULL, driverAttempts[driver], NULL, creationFlags,
-                    featureLevels, ARRAYSIZE(featureLevels), D3D11_SDK_VERSION,
-                    &sys->d3ddevice, &sys->d3dfeaturelevel, &sys->d3dcontext);
+                    NULL, 0, D3D11_SDK_VERSION,
+                    &sys->d3ddevice, NULL, &sys->d3dcontext);
         if (SUCCEEDED(hr)) break;
     }
 
