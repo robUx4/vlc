@@ -563,7 +563,7 @@ static HRESULT UpdateBackBuffer(vout_display_t *vd)
     vp.Height = (FLOAT)RECTHeight(sys->rect_dest_clipped);
     vp.MinDepth = 0.0f;
     vp.MaxDepth = 1.0f;
-    vp.TopLeftX = 0; // TODO handle the offset ?
+    vp.TopLeftX = 0;
     vp.TopLeftY = 0;
 
     ID3D11DeviceContext_RSSetViewports(sys->d3dcontext, 1, &vp);
@@ -1159,8 +1159,20 @@ static int Direct3D11CreateResources(vout_display_t *vd, video_format_t *fmt)
       msg_Err(vd, "Failed to create the pixel shader.");
       return VLC_EGENERIC;
     }
+#if 0
+    float left   = -1.0f - (float) (fmt->i_x_offset)                                                / ((float)fmt->i_visible_width / 2.0f);
+    float right  =  1.0f + (float) (fmt->i_width  - fmt->i_x_offset - (float)fmt->i_visible_width)  / ((float)fmt->i_visible_width / 2.0f);
+    float top    =  1.0f + (float) (fmt->i_y_offset)                                                / ((float)fmt->i_visible_height / 2.0f);
+    float bottom = -1.0f - (float) (fmt->i_height - fmt->i_y_offset - (float)fmt->i_visible_height) / ((float)fmt->i_visible_height / 2.0f);
 
     // triangles {pos: x,y,z  / texture: x,y  /  opacity}
+    float vertices[4 * sizeof(d3d_vertex_t)] = {
+        left,  bottom, 0.0f,  0.0f, 1.0f,  1.0f, // bottom left
+        right, bottom, 0.0f,  1.0f, 1.0f,  1.0f, // bottom right
+        right, top,    0.0f,  1.0f, 0.0f,  1.0f, // top right
+        left,  top,    0.0f,  0.0f, 0.0f,  1.0f, // top left
+    };
+#endif
     float vertices[4 * sizeof(d3d_vertex_t)] = {
         -1.0f, -1.0f, 0.0f,  0.0f, 1.0f,  1.0f, // bottom left
          1.0f, -1.0f, 0.0f,  1.0f, 1.0f,  1.0f, // bottom right
@@ -1203,8 +1215,10 @@ static int Direct3D11CreateResources(vout_display_t *vd, video_format_t *fmt)
     picsys->vd       = vd;
 
     picture_resource_t resource = { .p_sys = picsys };
-    for (int i = 0; i < PICTURE_PLANE_MAX; i++)
-        resource.p[i].i_lines = fmt->i_visible_height / (i > 0 ? 2 : 1);
+    for (int i = 0; i < PICTURE_PLANE_MAX; i++) {
+        resource.p[i].i_lines = fmt->i_height / (i > 0 ? 2 : 1);
+        //resource.p[i].i_pitch = fmt->i_width;
+    }
 
     picture_t *picture = picture_NewFromResource(fmt, &resource);
     if (!picture) {
@@ -1254,6 +1268,8 @@ static int AllocQuad(vout_display_t *vd, const video_format_t *fmt, d3d_quad_t *
 
     D3D11_TEXTURE2D_DESC texDesc;
     memset(&texDesc, 0, sizeof(texDesc));
+    //texDesc.Width = fmt->i_width;
+    //texDesc.Height = fmt->i_height;
     texDesc.Width = fmt->i_visible_width;
     texDesc.Height = fmt->i_visible_height;
     texDesc.MipLevels = texDesc.ArraySize = 1;
