@@ -231,7 +231,7 @@ static const char *globPixelShaderBiplanarI420_BT601_2RGB = "\
     rgba.x = saturate(Y + 1.596026785714286 * VCr);\
     rgba.y = saturate(Y - 0.812967647237771 * VCr - 0.391762290094914 * UCb);\
     rgba.z = saturate(Y + 2.017232142857142 * UCb);\
-    rgba.a = rgba.a * In.Opacity;\
+    rgba.a = In.Opacity;\
     return rgba;\
   }\
 ";
@@ -273,7 +273,7 @@ static const char *globPixelShaderBiplanarI420_BT709_2RGB = "\
     rgba.x = saturate(Y + 1.792741071428571 * VCr);\
     rgba.y = saturate(Y - 0.532909328559444 * VCr - 0.21324861427373 * UCb);\
     rgba.z = saturate(Y + 2.112401785714286 * UCb);\
-    rgba.a = rgba.a * In.Opacity;\
+    rgba.a = In.Opacity;\
     return rgba;\
   }\
 ";
@@ -302,7 +302,7 @@ static const char *globPixelShaderBiplanarYUV_BT601_2RGB = "\
     rgba.x = saturate(yuv.x + 1.596026785714286 * yuv.z);\
     rgba.y = saturate(yuv.x - 0.812967647237771 * yuv.z - 0.391762290094914 * yuv.y);\
     rgba.z = saturate(yuv.x + 2.017232142857142 * yuv.y);\
-    rgba.a = rgba.a * In.Opacity;\
+    rgba.a = In.Opacity;\
     return rgba;\
   }\
 ";
@@ -331,7 +331,7 @@ static const char *globPixelShaderBiplanarYUV_BT709_2RGB = "\
     rgba.x = saturate(yuv.x + 1.792741071428571 * yuv.z);\
     rgba.y = saturate(yuv.x - 0.532909328559444 * yuv.z - 0.21324861427373 * yuv.y);\
     rgba.z = saturate(yuv.x + 2.112401785714286 * yuv.y);\
-    rgba.a = rgba.a * In.Opacity;\
+    rgba.a = In.Opacity;\
     return rgba;\
   }\
 ";
