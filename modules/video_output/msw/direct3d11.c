@@ -605,9 +605,6 @@ static void Prepare(vout_display_t *vd, picture_t *picture, subpicture_t *subpic
     /* ID3D11DeviceContext_ClearRenderTargetView(sys->d3dcontext,sys->d3drenderTargetView, ClearColor); */
     ID3D11DeviceContext_ClearDepthStencilView(sys->d3dcontext,sys->d3ddepthStencilView, D3D11_CLEAR_DEPTH, 1.0f, 0);
 
-    ID3D11DeviceContext_VSSetShader(sys->d3dcontext, sys->d3dvertexShader, NULL, 0);
-    ID3D11DeviceContext_PSSetSamplers(sys->d3dcontext, 0, 1, &sys->d3dsampState);
-
     if (subpicture) {
         int subpicture_region_count    = 0;
         picture_t **subpicture_regions = NULL;
@@ -1099,14 +1096,17 @@ static int Direct3D11CreateResources(vout_display_t *vd, video_format_t *fmt)
       return VLC_EGENERIC;
     }
 
+    ID3D11VertexShader *d3dvertexShader;
     hr = ID3D11Device_CreateVertexShader(sys->d3ddevice, (void *)ID3D10Blob_GetBufferPointer(pVSBlob),
-                                        ID3D10Blob_GetBufferSize(pVSBlob), NULL, &sys->d3dvertexShader);
+                                        ID3D10Blob_GetBufferSize(pVSBlob), NULL, &d3dvertexShader);
 
     if(FAILED(hr)) {
       ID3D11Device_Release(pVSBlob);
       msg_Err(vd, "Failed to create the vertex shader.");
       return VLC_EGENERIC;
     }
+    ID3D11DeviceContext_VSSetShader(sys->d3dcontext, d3dvertexShader, NULL, 0);
+    ID3D11VertexShader_Release(d3dvertexShader);
 
     D3D11_INPUT_ELEMENT_DESC layout[] = {
     { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0,  0, D3D11_INPUT_PER_VERTEX_DATA, 0},
@@ -1234,12 +1234,15 @@ static int Direct3D11CreateResources(vout_display_t *vd, video_format_t *fmt)
     sampDesc.MinLOD = 0;
     sampDesc.MaxLOD = D3D11_FLOAT32_MAX;
 
-    hr = ID3D11Device_CreateSamplerState(sys->d3ddevice, &sampDesc, &sys->d3dsampState);
+    ID3D11SamplerState *d3dsampState;
+    hr = ID3D11Device_CreateSamplerState(sys->d3ddevice, &sampDesc, &d3dsampState);
 
     if (FAILED(hr)) {
         msg_Err(vd, "Could not Create the D3d11 Sampler State. (hr=0x%lX)", hr);
         return VLC_EGENERIC;
     }
+    ID3D11DeviceContext_PSSetSamplers(sys->d3dcontext, 0, 1, &d3dsampState);
+    ID3D11SamplerState_Release(d3dsampState);
 
     picture_sys_t *picsys = malloc(sizeof(*picsys));
     if (unlikely(picsys == NULL)) {
@@ -1405,21 +1408,13 @@ static void Direct3D11DestroyResources(vout_display_t *vd)
         ID3D11DepthStencilView_Release(sys->d3ddepthStencilView);
         sys->d3ddepthStencilView = NULL;
     }
-    if (sys->d3dsampState) {
-        ID3D11SamplerState_Release(sys->d3dsampState);
-        sys->d3dsampState = NULL;
-    }
     if (sys->d3dvertexLayout) {
         ID3D11SamplerState_Release(sys->d3dvertexLayout);
         sys->d3dvertexLayout = NULL;
     }
-    if (sys->d3dvertexShader) {
-        ID3D11VertexShader_Release(sys->d3dvertexShader);
-        sys->d3dvertexShader = NULL;
-    }
     if (sys->pSPUPixelShader) {
         ID3D11VertexShader_Release(sys->pSPUPixelShader);
-        sys->d3dvertexShader = NULL;
+        sys->pSPUPixelShader = NULL;
     }
 
     msg_Dbg(vd, "Direct3D11 resources destroyed");

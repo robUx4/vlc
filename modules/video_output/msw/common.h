@@ -184,9 +184,7 @@ struct vout_display_sys_t
     d3d_quad_cfg_t           picQuadConfig;
     ID3D11RenderTargetView   *d3drenderTargetView;
     ID3D11DepthStencilView   *d3ddepthStencilView;
-    ID3D11VertexShader       *d3dvertexShader;
     ID3D11InputLayout        *d3dvertexLayout;
-    ID3D11SamplerState       *d3dsampState;
     picture_sys_t            *picsys;
     vlc_fourcc_t             vlcFormat;
     const char               *d3dPxShader;
