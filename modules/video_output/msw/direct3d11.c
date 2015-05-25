@@ -1113,8 +1113,9 @@ static int Direct3D11CreateResources(vout_display_t *vd, video_format_t *fmt)
     { "OPACITY",  0, DXGI_FORMAT_R32_FLOAT,       0, 20, D3D11_INPUT_PER_VERTEX_DATA, 0},
     };
 
+    ID3D11InputLayout *d3dvertexLayout;
     hr = ID3D11Device_CreateInputLayout(sys->d3ddevice, layout, 3, (void *)ID3D10Blob_GetBufferPointer(pVSBlob),
-                                        ID3D10Blob_GetBufferSize(pVSBlob), &sys->d3dvertexLayout);
+                                        ID3D10Blob_GetBufferSize(pVSBlob), &d3dvertexLayout);
 
     ID3D10Blob_Release(pVSBlob);
 
@@ -1123,7 +1124,8 @@ static int Direct3D11CreateResources(vout_display_t *vd, video_format_t *fmt)
       return VLC_EGENERIC;
     }
 
-    ID3D11DeviceContext_IASetInputLayout(sys->d3dcontext, sys->d3dvertexLayout);
+    ID3D11DeviceContext_IASetInputLayout(sys->d3dcontext, d3dvertexLayout);
+    ID3D11SamplerState_Release(d3dvertexLayout);
 
     /* create the index of the vertices */
     WORD indices[] = {
@@ -1159,6 +1161,8 @@ static int Direct3D11CreateResources(vout_display_t *vd, video_format_t *fmt)
     /* TODO : Match the version to the D3D_FEATURE_LEVEL */
     hr = D3DCompile(sys->d3dPxShader, strlen(sys->d3dPxShader),
                     NULL, NULL, NULL, "PS", "ps_4_0_level_9_1", 0, 0, &pPSBlob, NULL);
+
+
     if( FAILED(hr)) {
       msg_Err(vd, "The Pixel Shader is invalid. (hr=0x%lX)", hr );
       return VLC_EGENERIC;
@@ -1224,7 +1228,8 @@ static int Direct3D11CreateResources(vout_display_t *vd, video_format_t *fmt)
     }
     ID3D11PixelShader_Release(pPicQuadShader);
 
-    D3D11_SAMPLER_DESC sampDesc = { 0 };
+    D3D11_SAMPLER_DESC sampDesc;
+    memset(&sampDesc, 0, sizeof(sampDesc));
     sampDesc.Filter = D3D11_FILTER_MIN_MAG_LINEAR_MIP_POINT;
     sampDesc.AddressU = D3D11_TEXTURE_ADDRESS_WRAP;
     sampDesc.AddressV = D3D11_TEXTURE_ADDRESS_WRAP;
@@ -1237,8 +1242,8 @@ static int Direct3D11CreateResources(vout_display_t *vd, video_format_t *fmt)
     hr = ID3D11Device_CreateSamplerState(sys->d3ddevice, &sampDesc, &d3dsampState);
 
     if (FAILED(hr)) {
-        msg_Err(vd, "Could not Create the D3d11 Sampler State. (hr=0x%lX)", hr);
-        return VLC_EGENERIC;
+      msg_Err(vd, "Could not Create the D3d11 Sampler State. (hr=0x%lX)", hr);
+      return VLC_EGENERIC;
     }
 
     ID3D11DeviceContext_PSSetSamplers(sys->d3dcontext, 0, 1, &d3dsampState);
@@ -1268,7 +1273,8 @@ static int Direct3D11CreateResources(vout_display_t *vd, video_format_t *fmt)
     }
     sys->picsys = picsys;
 
-    picture_pool_configuration_t pool_cfg = { 0 };
+    picture_pool_configuration_t pool_cfg;
+    memset(&pool_cfg, 0, sizeof(pool_cfg));
     pool_cfg.picture_count = 1;
     pool_cfg.picture       = &picture;
     pool_cfg.lock          = Direct3D11MapTexture;
@@ -1407,10 +1413,6 @@ static void Direct3D11DestroyResources(vout_display_t *vd)
     if (sys->d3ddepthStencilView) {
         ID3D11DepthStencilView_Release(sys->d3ddepthStencilView);
         sys->d3ddepthStencilView = NULL;
-    }
-    if (sys->d3dvertexLayout) {
-        ID3D11SamplerState_Release(sys->d3dvertexLayout);
-        sys->d3dvertexLayout = NULL;
     }
     if (sys->pSPUPixelShader) {
         ID3D11VertexShader_Release(sys->pSPUPixelShader);
