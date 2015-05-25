@@ -450,10 +450,10 @@ static int PutAction( intf_thread_t *p_intf, int i_action )
                 }
                 else
                 {
-                    int64_t i_current_subdelay = var_GetTime( p_input, "spu-delay" );
+                    int64_t i_current_subdelay = var_GetInteger( p_input, "spu-delay" );
                     int64_t i_additional_subdelay = p_sys->subtitle_delaybookmarks.i_time_audio - p_sys->subtitle_delaybookmarks.i_time_subtitle;
                     int64_t i_total_subdelay = i_current_subdelay + i_additional_subdelay;
-                    var_SetTime( p_input, "spu-delay", i_total_subdelay);
+                    var_SetInteger( p_input, "spu-delay", i_total_subdelay);
                     ClearChannels( p_intf, p_vout );
                     DisplayMessage( p_vout, _( "Sub sync: corrected %i ms (total delay = %i ms)" ),
                                             (int)(i_additional_subdelay / 1000),
@@ -466,7 +466,7 @@ static int PutAction( intf_thread_t *p_intf, int i_action )
         }
         case ACTIONID_SUBSYNC_RESET:
         {
-            var_SetTime( p_input, "spu-delay", 0);
+            var_SetInteger( p_input, "spu-delay", 0);
             ClearChannels( p_intf, p_vout );
             DisplayMessage( p_vout, _( "Sub sync: delay reset" ) );
             p_sys->subtitle_delaybookmarks.i_time_audio = 0;
@@ -493,9 +493,9 @@ static int PutAction( intf_thread_t *p_intf, int i_action )
                     var_FreeList( &list, &list2 );
                     break;
                 }
-                int64_t i_delay = var_GetTime( p_input, "spu-delay" ) + diff;
+                int64_t i_delay = var_GetInteger( p_input, "spu-delay" ) + diff;
 
-                var_SetTime( p_input, "spu-delay", i_delay );
+                var_SetInteger( p_input, "spu-delay", i_delay );
                 ClearChannels( p_intf, p_vout );
                 DisplayMessage( p_vout, _( "Subtitle delay %i ms" ),
                                 (int)(i_delay/1000) );
@@ -509,9 +509,10 @@ static int PutAction( intf_thread_t *p_intf, int i_action )
             int diff = (i_action == ACTIONID_AUDIODELAY_UP) ? 50000 : -50000;
             if( p_input )
             {
-                int64_t i_delay = var_GetTime( p_input, "audio-delay" ) + diff;
+                int64_t i_delay = var_GetInteger( p_input, "audio-delay" )
+                                  + diff;
 
-                var_SetTime( p_input, "audio-delay", i_delay );
+                var_SetInteger( p_input, "audio-delay", i_delay );
                 ClearChannels( p_intf, p_vout );
                 DisplayMessage( p_vout, _( "Audio delay %i ms" ),
                                  (int)(i_delay/1000) );
@@ -739,7 +740,7 @@ static int PutAction( intf_thread_t *p_intf, int i_action )
             mtime_t it = var_InheritInteger( p_input, varname );
             if( it < 0 )
                 break;
-            var_SetTime( p_input, "time-offset", it * sign * CLOCK_FREQ );
+            var_SetInteger( p_input, "time-offset", it * sign * CLOCK_FREQ );
             DisplayPosition( p_intf, p_vout, p_input );
             break;
         }
@@ -1179,30 +1180,29 @@ static void DisplayPosition( intf_thread_t *p_intf, vout_thread_t *p_vout,
 {
     char psz_duration[MSTRTIME_MAX_SIZE];
     char psz_time[MSTRTIME_MAX_SIZE];
-    vlc_value_t time, pos;
-    mtime_t i_seconds;
 
     if( p_vout == NULL ) return;
 
     ClearChannels( p_intf, p_vout );
 
-    var_Get( p_input, "time", &time );
-    i_seconds = time.i_time / 1000000;
-    secstotimestr ( psz_time, i_seconds );
+    int64_t t = var_GetInteger( p_input, "time" ) / CLOCK_FREQ;
+    int64_t l = var_GetInteger( p_input, "length" ) / CLOCK_FREQ;
 
-    var_Get( p_input, "length", &time );
-    if( time.i_time > 0 )
+    secstotimestr( psz_time, t );
+
+    if( l > 0 )
     {
-        secstotimestr( psz_duration, time.i_time / 1000000 );
+        secstotimestr( psz_duration, l );
         DisplayMessage( p_vout, "%s / %s", psz_time, psz_duration );
     }
-    else if( i_seconds > 0 )
+    else if( t > 0 )
     {
         DisplayMessage( p_vout, "%s", psz_time );
     }
 
     if( var_GetBool( p_vout, "fullscreen" ) )
     {
+        vlc_value_t pos;
         var_Get( p_input, "position", &pos );
         vout_OSDSlider( p_vout, p_intf->p_sys->slider_chan,
                         pos.f_float * 100, OSD_HOR_SLIDER );

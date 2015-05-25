@@ -248,17 +248,6 @@ void input_Stop( input_thread_t *p_input )
     input_ControlPush( p_input, INPUT_CONTROL_SET_DIE, NULL );
 }
 
-void input_Join( input_thread_t *p_input )
-{
-    if( p_input->p->is_running )
-        vlc_join( p_input->p->thread, NULL );
-}
-
-void input_Release( input_thread_t *p_input )
-{
-    vlc_object_release( p_input );
-}
-
 /**
  * Close an input
  *
@@ -266,8 +255,9 @@ void input_Release( input_thread_t *p_input )
  */
 void input_Close( input_thread_t *p_input )
 {
-    input_Join( p_input );
-    input_Release( p_input );
+    if( p_input->p->is_running )
+        vlc_join( p_input->p->thread, NULL );
+    vlc_object_release( p_input );
 }
 
 /**
@@ -534,12 +524,6 @@ static void *Run( void *obj )
 
     if( !Init( p_input ) )
     {
-        if( var_InheritBool( p_input, "start-paused" ) )
-        {
-            const mtime_t i_control_date = mdate();
-            ControlPause( p_input, i_control_date );
-        }
-
         MainLoop( p_input, true ); /* FIXME it can be wrong (like with VLM) */
 
         /* Clean up */
@@ -637,7 +621,7 @@ static int MainLoopTryRepeat( input_thread_t *p_input, mtime_t *pi_start_mdate )
     /* Seek to start position */
     if( p_input->p->i_start > 0 )
     {
-        val.i_time = p_input->p->i_start;
+        val.i_int = p_input->p->i_start;
         input_ControlPush( p_input, INPUT_CONTROL_SET_TIME, &val );
     }
     else
@@ -695,8 +679,12 @@ static void MainLoop( input_thread_t *p_input, bool b_interactive )
     mtime_t i_start_mdate = mdate();
     mtime_t i_intf_update = 0;
     mtime_t i_last_seek_mdate = 0;
+
+    if( b_interactive && var_InheritBool( p_input, "start-paused" ) )
+        ControlPause( p_input, i_start_mdate );
+
     bool b_pause_after_eof = b_interactive &&
-                             var_CreateGetBool( p_input, "play-and-pause" );
+                             var_InheritBool( p_input, "play-and-pause" );
 
     while( vlc_object_alive( p_input ) && !p_input->b_error )
     {
@@ -740,7 +728,6 @@ static void MainLoop( input_thread_t *p_input, bool b_interactive )
             {
                 if( MainLoopTryRepeat( p_input, &i_start_mdate ) )
                     break;
-                b_pause_after_eof = var_GetBool( p_input, "play-and-pause" );
             }
 
             /* Update interface and statistics */
@@ -930,7 +917,7 @@ static void StartTitle( input_thread_t * p_input )
         msg_Dbg( p_input, "starting at time: %ds",
                  (int)( p_input->p->i_start / CLOCK_FREQ ) );
 
-        s.i_time = p_input->p->i_start;
+        s.i_int = p_input->p->i_start;
         input_ControlPush( p_input, INPUT_CONTROL_SET_TIME, &s );
     }
     if( p_input->p->i_stop > 0 && p_input->p->i_stop <= p_input->p->i_start )
@@ -962,7 +949,7 @@ static void LoadSubtitles( input_thread_t *p_input )
 
     const int i_delay = var_CreateGetInteger( p_input, "sub-delay" );
     if( i_delay != 0 )
-        var_SetTime( p_input, "spu-delay", (mtime_t)i_delay * 100000 );
+        var_SetInteger( p_input, "spu-delay", (mtime_t)i_delay * 100000 );
 
     /* Look for and add subtitle files */
     unsigned i_flags = SUB_FORCED;
@@ -1086,8 +1073,8 @@ static void UpdatePtsDelay( input_thread_t *p_input )
         i_pts_delay = 0;
 
     /* Take care of audio/spu delay */
-    const mtime_t i_audio_delay = var_GetTime( p_input, "audio-delay" );
-    const mtime_t i_spu_delay   = var_GetTime( p_input, "spu-delay" );
+    const mtime_t i_audio_delay = var_GetInteger( p_input, "audio-delay" );
+    const mtime_t i_spu_delay   = var_GetInteger( p_input, "spu-delay" );
     const mtime_t i_extra_delay = __MIN( i_audio_delay, i_spu_delay );
     if( i_extra_delay < 0 )
         i_pts_delay -= i_extra_delay;
@@ -1684,7 +1671,7 @@ static bool Control( input_thread_t *p_input,
                 break;
             }
 
-            i_time = val.i_time;
+            i_time = val.i_int;
             if( i_time < 0 )
                 i_time = 0;
 
@@ -1847,12 +1834,12 @@ static bool Control( input_thread_t *p_input,
             break;
 
         case INPUT_CONTROL_SET_AUDIO_DELAY:
-            input_SendEventAudioDelay( p_input, val.i_time );
+            input_SendEventAudioDelay( p_input, val.i_int );
             UpdatePtsDelay( p_input );
             break;
 
         case INPUT_CONTROL_SET_SPU_DELAY:
-            input_SendEventSubtitleDelay( p_input, val.i_time );
+            input_SendEventSubtitleDelay( p_input, val.i_int );
             UpdatePtsDelay( p_input );
             break;
 
@@ -1904,7 +1891,7 @@ static bool Control( input_thread_t *p_input,
             if( i_type == INPUT_CONTROL_SET_SEEKPOINT_PREV )
             {
                 int64_t i_seekpoint_time = p_input->p->input.title[i_title]->seekpoint[i_seekpoint]->i_time_offset;
-                int64_t i_input_time = var_GetTime( p_input, "time" );
+                int64_t i_input_time = var_GetInteger( p_input, "time" );
                 if( i_seekpoint_time >= 0 && i_input_time >= 0 )
                 {
                     if( i_input_time < i_seekpoint_time + 3000000 )
@@ -2033,7 +2020,7 @@ static bool Control( input_thread_t *p_input,
                 break;
             }
 
-            val.i_time = time_offset;
+            val.i_int = time_offset;
             b_force_update = Control( p_input, INPUT_CONTROL_SET_TIME, val );
             break;
         }

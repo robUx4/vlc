@@ -44,9 +44,11 @@
 # warning Uho, your IPv6 support is broken and has been disabled. Fix your C library.
 # undef AF_INET6
 #endif
-
 #ifndef AF_LOCAL
 # define AF_LOCAL AF_UNIX
+#endif
+#if !defined(MSG_NOSIGNAL) && defined(SO_NOSIGPIPE)
+# define MSG_NOSIGNAL 0
 #endif
 /* Required yet non-standard cmsg functions */
 #ifndef CMSG_ALIGN
@@ -192,6 +194,10 @@ int main (int argc, char *argv[])
         return 1;
     if (pair[0] < 3)
         goto error; /* we want 0, 1 and 2 open */
+
+#ifdef SO_NOSIGPIPE
+    setsockopt(pair[1], SOL_SOCKET, SO_NOSIGPIPE, &(int){ 1 }, sizeof (int));
+#endif
 
     pid_t pid = fork ();
     switch (pid)

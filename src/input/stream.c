@@ -192,7 +192,7 @@ static void AStreamPrebufferStream( stream_t *s );
 static int  AReadStream( stream_t *s, void *p_read, unsigned int i_read );
 
 /* ReadDir */
-static int  AStreamReadDir( stream_t *s, input_item_node_t *p_node );
+static input_item_t *AStreamReadDir( stream_t *s );
 
 /* Common */
 static int  AStreamGenericError( ) { return VLC_EGENERIC; }
@@ -644,7 +644,13 @@ static int AStreamControl( stream_t *s, int i_query, va_list args )
         case STREAM_IS_DIRECTORY:
         {
             bool *pb_canreaddir = va_arg( args, bool * );
+            bool *pb_dirsorted = va_arg( args, bool * );
+            bool *pb_dircanloop = va_arg( args, bool * );
             *pb_canreaddir = p_sys->method == STREAM_METHOD_READDIR;
+            if( pb_dirsorted )
+                *pb_dirsorted = p_access->info.b_dir_sorted;
+            if( pb_dircanloop )
+                *pb_dircanloop = p_access->info.b_dir_can_loop;
             return VLC_SUCCESS;
         }
 
@@ -924,11 +930,8 @@ static int AStreamSeekBlock( stream_t *s, uint64_t i_pos )
 
     if( b_seek )
     {
-        int64_t i_start, i_end;
         /* Do the access seek */
-        i_start = mdate();
         if( ASeek( s, i_pos ) ) return VLC_EGENERIC;
-        i_end = mdate();
 
         /* Release data */
         block_ChainRelease( p_sys->block.p_first );
@@ -1840,11 +1843,11 @@ static int ASeek( stream_t *s, uint64_t i_pos )
     return p_access->pf_seek( p_access, i_pos );
 }
 
-static int AStreamReadDir( stream_t *s, input_item_node_t *p_node )
+static input_item_t *AStreamReadDir( stream_t *s )
 {
     access_t *p_access = s->p_sys->p_access;
 
-    return p_access->pf_readdir( p_access, p_node );
+    return p_access->pf_readdir( p_access );
 }
 
 /**
@@ -1979,10 +1982,11 @@ block_t *stream_BlockRemaining( stream_t *s, int i_max_size )
 }
 
 /**
- * Returns a node containing all the input_item of the directory pointer by
- * this stream. returns VLC_SUCCESS on success.
+ * Read the next input_item_t from the directory stream. It returns the next
+ * input item on success or NULL in case of error or end of stream. The item
+ * must be released with input_item_Release.
  */
-int stream_ReadDir( stream_t *s, input_item_node_t *p_node )
+input_item_t *stream_ReadDir( stream_t *s )
 {
-    return s->pf_readdir( s, p_node );
+    return s->pf_readdir( s );
 }

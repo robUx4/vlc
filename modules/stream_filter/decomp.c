@@ -46,6 +46,8 @@
 # undef HAVE_VMSPLICE
 #endif
 
+#include <signal.h>
+
 static int  OpenGzip (vlc_object_t *);
 static int  OpenBzip2 (vlc_object_t *);
 static int  OpenXZ (vlc_object_t *);
@@ -111,6 +113,11 @@ static void *Thread (void *data)
 #endif
     int fd = p_sys->write_fd;
     bool error = false;
+    sigset_t set;
+
+    sigemptyset(&set);
+    sigaddset(&set, SIGPIPE);
+    pthread_sigmask(SIG_BLOCK, &set, NULL);
 
     do
     {

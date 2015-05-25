@@ -47,8 +47,17 @@ static int Control(stream_t *p_stream, int i_query, va_list args)
     switch( i_query )
     {
         case STREAM_IS_DIRECTORY:
-            *va_arg( args, bool* ) = true;
+        {
+            bool *pb_canreaddir = va_arg( args, bool * );
+            bool *pb_dirsorted = va_arg( args, bool * );
+            bool *pb_dircanloop = va_arg( args, bool * );
+            *pb_canreaddir = true;
+            if (pb_dirsorted)
+                *pb_dirsorted = false;
+            if (pb_dircanloop)
+                pb_dircanloop = false;
             break;
+        }
 
         case STREAM_CAN_SEEK:
         case STREAM_CAN_FASTSEEK:
@@ -132,39 +141,34 @@ static ssize_t SeekCallback(struct archive *p_archive, void *p_object, ssize_t i
     return stream_Tell(p_stream->p_source);
 }
 
-static int Browse(stream_t *p_stream, input_item_node_t *p_node)
+static input_item_t *Browse(stream_t *p_stream)
 {
     stream_sys_t *p_sys = p_stream->p_sys;
     struct archive_entry *p_entry;
+    input_item_t *p_item = NULL;
 
-    while(archive_read_next_header(p_sys->p_archive, &p_entry) == ARCHIVE_OK)
+    if (archive_read_next_header(p_sys->p_archive, &p_entry) == ARCHIVE_OK)
     {
         char *psz_uri = NULL;
         char *psz_access_uri = NULL;
         int i_ret = asprintf(&psz_access_uri, "%s://%s%c%s", p_stream->psz_access,
                              p_stream->psz_path, ARCHIVE_SEP_CHAR, archive_entry_pathname(p_entry));
         if (i_ret == -1)
-            goto error;
+            return NULL;
         i_ret = asprintf(&psz_uri, "archive://%s", psz_access_uri);
         free(psz_access_uri);
         if( i_ret == -1 )
-            goto error;
+            return NULL;
 
         input_item_t *p_item = input_item_New(psz_uri, archive_entry_pathname(p_entry));
         free( psz_uri );
         if(p_item == NULL)
-            goto error;
+            return NULL;
 
-        input_item_CopyOptions(p_node->p_item, p_item);
-        input_item_node_AppendItem(p_node, p_item);
         msg_Dbg(p_stream, "declaring playlist entry %s", archive_entry_pathname(p_entry));
-        input_item_Release(p_item);
     }
 
-    return VLC_SUCCESS;
-
-error:
-    return VLC_ENOITEM;
+    return p_item;
 }
 
 int StreamOpen(vlc_object_t *p_object)

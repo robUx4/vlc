@@ -324,14 +324,14 @@ input_event_changed( vlc_object_t * p_this, char const * psz_cmd,
         /* */
         event.type = libvlc_MediaPlayerTimeChanged;
         event.u.media_player_time_changed.new_time =
-           from_mtime(var_GetTime( p_input, "time" ));
+           from_mtime(var_GetInteger( p_input, "time" ));
         libvlc_event_send( p_mi->p_event_manager, &event );
     }
     else if( newval.i_int == INPUT_EVENT_LENGTH )
     {
         event.type = libvlc_MediaPlayerLengthChanged;
         event.u.media_player_length_changed.new_length =
-           from_mtime(var_GetTime( p_input, "length" ));
+           from_mtime(var_GetInteger( p_input, "length" ));
         libvlc_event_send( p_mi->p_event_manager, &event );
     }
     else if( newval.i_int == INPUT_EVENT_CACHE )
@@ -871,7 +871,7 @@ int libvlc_media_player_play( libvlc_media_player_t *p_mi )
         var_DelCallback( p_input_thread, "can-pause", input_pausable_changed, p_mi );
         var_DelCallback( p_input_thread, "program-scrambled", input_scrambled_changed, p_mi );
         var_DelCallback( p_input_thread, "can-seek", input_seekable_changed, p_mi );
-        vlc_object_release( p_input_thread );
+        input_Close( p_input_thread );
         libvlc_printerr( "Input initialization failure" );
         return -1;
     }
@@ -1158,7 +1158,7 @@ libvlc_time_t libvlc_media_player_get_length(
     if( !p_input_thread )
         return -1;
 
-    i_time = from_mtime(var_GetTime( p_input_thread, "length" ));
+    i_time = from_mtime(var_GetInteger( p_input_thread, "length" ));
     vlc_object_release( p_input_thread );
 
     return i_time;
@@ -1173,7 +1173,7 @@ libvlc_time_t libvlc_media_player_get_time( libvlc_media_player_t *p_mi )
     if( !p_input_thread )
         return -1;
 
-    i_time = from_mtime(var_GetTime( p_input_thread , "time" ));
+    i_time = from_mtime(var_GetInteger( p_input_thread , "time" ));
     vlc_object_release( p_input_thread );
     return i_time;
 }
@@ -1187,7 +1187,7 @@ void libvlc_media_player_set_time( libvlc_media_player_t *p_mi,
     if( !p_input_thread )
         return;
 
-    var_SetTime( p_input_thread, "time", to_mtime(i_time) );
+    var_SetInteger( p_input_thread, "time", to_mtime(i_time) );
     vlc_object_release( p_input_thread );
 }
 
@@ -1266,19 +1266,15 @@ int libvlc_media_player_get_chapter_count_for_title(
                                  libvlc_media_player_t *p_mi,
                                  int i_title )
 {
-    input_thread_t *p_input_thread;
     vlc_value_t val;
 
-    p_input_thread = libvlc_get_input_thread ( p_mi );
+    input_thread_t *p_input_thread = libvlc_get_input_thread ( p_mi );
     if( !p_input_thread )
         return -1;
 
-    char *psz_name;
-    if( asprintf( &psz_name,  "title %2i", i_title ) == -1 )
-    {
-        vlc_object_release( p_input_thread );
-        return -1;
-    }
+    char psz_name[sizeof ("title ") + 3 * sizeof (int)];
+    sprintf( psz_name, "title %2u", i_title );
+
     int i_ret = var_Change( p_input_thread, psz_name, VLC_VAR_CHOICESCOUNT, &val, NULL );
     vlc_object_release( p_input_thread );
     free( psz_name );

@@ -83,8 +83,7 @@ static block_t* Block( access_t * );
 static int      Seek( access_t *, uint64_t );
 static int      Control( access_t *, int, va_list );
 
-static int      DirControl( access_t *, int, va_list );
-static int      DirRead( access_t *p_access, input_item_node_t *p_current_node );
+static input_item_t* DirRead( access_t *p_access );
 
 struct access_sys_t
 {
@@ -111,8 +110,10 @@ static int Open( vlc_object_t* p_this )
 {
     access_t*   p_access = (access_t*)p_this;
     access_sys_t* p_sys;
+    const char* psz_path;
     char* psz_username = NULL;
     char* psz_password = NULL;
+    char* psz_remote_home = NULL;
     int i_port;
     int i_ret;
     vlc_url_t url;
@@ -129,8 +130,7 @@ static int Open( vlc_object_t* p_this )
     p_sys->i_socket = -1;
 
     /* Parse the URL */
-    const char* path = p_access->psz_location;
-    vlc_UrlParse( &url, path, 0 );
+    vlc_UrlParse( &url, p_access->psz_location, 0 );
 
     /* Check for some parameters */
     if( EMPTY_STR( url.psz_host ) )
@@ -250,18 +250,42 @@ static int Open( vlc_object_t* p_this )
         goto error;
     }
 
+    /* No path, default to user Home */
+    if( !url.psz_path )
+    {
+        const size_t i_size = 1024;
+        int i_ret;
+
+        psz_remote_home = malloc( i_size );
+        if( !psz_remote_home )
+            goto error;
+
+        i_ret = libssh2_sftp_symlink_ex( p_sys->sftp_session, ".", 1,
+                                         psz_remote_home, i_size - 1,
+                                         LIBSSH2_SFTP_REALPATH );
+        if( i_ret <= 0 )
+        {
+            msg_Err( p_access, "Impossible to get the Home directory" );
+            goto error;
+        }
+        psz_remote_home[i_ret] = '\0';
+        psz_path = psz_remote_home;
+    }
+    else
+        psz_path = url.psz_path;
+
     /* Get some information */
     LIBSSH2_SFTP_ATTRIBUTES attributes;
-    if( libssh2_sftp_stat( p_sys->sftp_session, url.psz_path, &attributes ) )
+    if( libssh2_sftp_stat( p_sys->sftp_session, psz_path, &attributes ) )
     {
-        msg_Err( p_access, "Impossible to get information about the remote path %s", url.psz_path );
+        msg_Err( p_access, "Impossible to get information about the remote path %s", psz_path );
         goto error;
     }
 
     if( !LIBSSH2_SFTP_S_ISDIR( attributes.permissions ))
     {
         /* Open the given file */
-        p_sys->file = libssh2_sftp_open( p_sys->sftp_session, url.psz_path, LIBSSH2_FXF_READ, 0 );
+        p_sys->file = libssh2_sftp_open( p_sys->sftp_session, psz_path, LIBSSH2_FXF_READ, 0 );
         p_sys->filesize = attributes.filesize;
 
         ACCESS_SET_CALLBACKS( NULL, Block, Control, Seek );
@@ -269,9 +293,10 @@ static int Open( vlc_object_t* p_this )
     else
     {
         /* Open the given directory */
-        p_sys->file = libssh2_sftp_opendir( p_sys->sftp_session, url.psz_path );
+        p_sys->file = libssh2_sftp_opendir( p_sys->sftp_session, psz_path );
 
         p_access->pf_readdir = DirRead;
+        p_access->info.b_dir_can_loop = true;
 
         if( p_sys->file )
         {
@@ -284,7 +309,7 @@ static int Open( vlc_object_t* p_this )
 
     if( !p_sys->file )
     {
-        msg_Err( p_access, "Unable to open the remote path %s", url.psz_path );
+        msg_Err( p_access, "Unable to open the remote path %s", psz_path );
         goto error;
     }
 
@@ -292,6 +317,7 @@ static int Open( vlc_object_t* p_this )
 
     free( psz_password );
     free( psz_username );
+    free( psz_remote_home );
     vlc_UrlClean( &url );
     return VLC_SUCCESS;
 
@@ -302,6 +328,7 @@ error:
         libssh2_session_free( p_sys->ssh_session );
     free( psz_password );
     free( psz_username );
+    free( psz_remote_home );
     vlc_UrlClean( &url );
     net_Close( p_sys->i_socket );
     free( p_sys );
@@ -424,10 +451,11 @@ static int Control( access_t* p_access, int i_query, va_list args )
  * Directory access
  *****************************************************************************/
 
-static int DirRead (access_t *p_access, input_item_node_t *p_current_node)
+static input_item_t* DirRead( access_t *p_access )
 {
     access_sys_t *p_sys = p_access->p_sys;
     LIBSSH2_SFTP_ATTRIBUTES attrs;
+    input_item_t *p_item = NULL;
     int err;
     /* Allocate 1024 bytes for file name. Longer names are skipped.
      * libssh2 does not support seeking in directory streams.
@@ -438,9 +466,9 @@ static int DirRead (access_t *p_access, input_item_node_t *p_current_node)
     char *psz_file = malloc( i_size );
 
     if( !psz_file )
-        return VLC_ENOMEM;
+        return NULL;
 
-    while( 0 != ( err = libssh2_sftp_readdir( p_sys->file, psz_file, i_size, &attrs ) ) )
+    while( !p_item && 0 != ( err = libssh2_sftp_readdir( p_sys->file, psz_file, i_size, &attrs ) ) )
     {
         if( err < 0 )
         {
@@ -479,29 +507,25 @@ static int DirRead (access_t *p_access, input_item_node_t *p_current_node)
         free( psz_uri );
 
         int i_type = LIBSSH2_SFTP_S_ISDIR( attrs.permissions ) ? ITEM_TYPE_DIRECTORY : ITEM_TYPE_FILE;
-        input_item_t *p_new = input_item_NewWithTypeExt( psz_full_uri, psz_file,
-                                                         0, NULL, 0, 0, i_type, 1 );
+        p_item = input_item_NewWithTypeExt( psz_full_uri, psz_file,
+                                            0, NULL, 0, 0, i_type, 1 );
 
-        if( p_new == NULL )
+        if( p_item == NULL )
         {
             free( psz_full_uri );
-            continue;
+            break;
         }
 
         /* Here we save on the node the credentials that allowed us to login.
          * That way the user isn't prompted more than once for credentials */
         if( p_sys->psz_password_opt )
-            input_item_AddOption( p_new, p_sys->psz_password_opt, VLC_INPUT_OPTION_TRUSTED );
+            input_item_AddOption( p_item, p_sys->psz_password_opt, VLC_INPUT_OPTION_TRUSTED );
         if( p_sys->psz_username_opt )
-            input_item_AddOption( p_new, p_sys->psz_username_opt, VLC_INPUT_OPTION_TRUSTED );
-
-        input_item_CopyOptions( p_current_node->p_item, p_new );
-        input_item_node_AppendItem( p_current_node, p_new );
+            input_item_AddOption( p_item, p_sys->psz_username_opt, VLC_INPUT_OPTION_TRUSTED );
 
         free( psz_full_uri );
-        input_item_Release( p_new );
     }
 
     free( psz_file );
-    return VLC_SUCCESS;
+    return p_item;
 }
