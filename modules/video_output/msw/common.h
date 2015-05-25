@@ -192,8 +192,6 @@ struct vout_display_sys_t
     const char               *d3dPxShader;
     const char               *psz_rgbaPxShader;
 
-    ID3D11DepthStencilState  *pDepthStencilState;
-
     // SPU
     ID3D11PixelShader        *pSPUPixelShader;
     DXGI_FORMAT              d3dregion_format;

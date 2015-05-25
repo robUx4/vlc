@@ -1043,9 +1043,12 @@ static int Direct3D11CreateResources(vout_display_t *vd, video_format_t *fmt)
     stencilDesc.BackFace.StencilDepthFailOp  = D3D11_STENCIL_OP_DECR;
     stencilDesc.BackFace.StencilPassOp       = D3D11_STENCIL_OP_KEEP;
     stencilDesc.BackFace.StencilFunc         = D3D11_COMPARISON_ALWAYS;
-    hr = ID3D11Device_CreateDepthStencilState(sys->d3ddevice, &stencilDesc, &sys->pDepthStencilState );
+
+    ID3D11DepthStencilState *pDepthStencilState;
+    hr = ID3D11Device_CreateDepthStencilState(sys->d3ddevice, &stencilDesc, &pDepthStencilState );
     if (SUCCEEDED(hr)) {
-        ID3D11DeviceContext_OMSetDepthStencilState(sys->d3dcontext, sys->pDepthStencilState, 0);
+        ID3D11DeviceContext_OMSetDepthStencilState(sys->d3dcontext, pDepthStencilState, 0);
+        ID3D11DepthStencilState_Release(pDepthStencilState);
     }
 
     D3D11_VIEWPORT vp;
@@ -1363,10 +1366,6 @@ static void Direct3D11DestroyResources(vout_display_t *vd)
     Direct3D11DeleteRegions(sys->d3dregion_count, sys->d3dregions);
     sys->d3dregion_count = 0;
 
-    if (sys->pDepthStencilState) {
-        ID3D11DepthStencilState_Release(sys->pDepthStencilState);
-        sys->pDepthStencilState = NULL;
-    }
     if (sys->d3drenderTargetView) {
         ID3D11RenderTargetView_Release(sys->d3drenderTargetView);
         sys->d3drenderTargetView = NULL;
