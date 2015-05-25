@@ -35,7 +35,6 @@
 #define INITGUID
 #include <d3d11.h>
 #include <d3dx9math.h>
-// TODO #include <directxmath.h>
 
 /* avoided until we can pass ISwapchainPanel without c++/cx mode
 # include <windows.ui.xaml.media.dxinterop.h> */
@@ -106,9 +105,6 @@ static const d3d_format_t d3d_formats[] = {
     { NULL, 0, 0, 0, 0}
 };
 
-#define RECTWidth(r)   (int)(r.right - r.left)
-#define RECTHeight(r)  (int)(r.bottom - r.top)
-
 struct picture_sys_t
 {
     ID3D11Texture2D     *texture;
@@ -122,6 +118,9 @@ typedef struct d3d_vertex_t {
     D3DXVECTOR2 texture;
     FLOAT       opacity;
 } d3d_vertex_t;
+
+#define RECTWidth(r)   (int)(r.right - r.left)
+#define RECTHeight(r)  (int)(r.bottom - r.top)
 
 static int  Open(vlc_object_t *);
 static void Close(vlc_object_t *object);
@@ -146,6 +145,8 @@ static int AllocQuad(vout_display_t *, const video_format_t *, d3d_quad_t *,
                      d3d_quad_cfg_t *, ID3D11PixelShader *,
                      const float vertices[4 * sizeof(d3d_vertex_t)]);
 static void ReleaseQuad(d3d_quad_t *);
+
+static void Manage(vout_display_t *vd);
 
 /* All the #if USE_DXGI contain an alternative method to setup dx11
    They both need to be benchmarked to see which performs better */
@@ -343,8 +344,6 @@ static const char *globPixelShaderBiplanarYUV_BT709_2RGB = "\
     return rgba;\
   }\
 ";
-
-static void Manage(vout_display_t *vd);
 
 static int Open(vlc_object_t *object)
 {
@@ -623,6 +622,7 @@ static void DisplayD3DPicture(vout_display_sys_t *sys, d3d_quad_t *quad)
     /* Render the quad */
     ID3D11DeviceContext_PSSetShader(sys->d3dcontext, quad->d3dpixelShader, NULL, 0);
     ID3D11DeviceContext_PSSetShaderResources(sys->d3dcontext, 0, 1, &quad->d3dresViewY);
+
     if( quad->d3dresViewUV )
         ID3D11DeviceContext_PSSetShaderResources(sys->d3dcontext, 1, 1, &quad->d3dresViewUV);
 
@@ -984,18 +984,12 @@ static void Direct3D11Close(vout_display_t *vd)
     vout_display_sys_t *sys = vd->sys;
 
     Direct3D11DestroyResources(vd);
-    if (sys->dxgiswapChain) {
+    if (sys->dxgiswapChain)
         IDXGISwapChain_Release(sys->dxgiswapChain);
-        sys->dxgiswapChain = NULL;
-    }
-    if ( sys->d3dcontext ) {
+    if ( sys->d3dcontext )
         ID3D11DeviceContext_Release(sys->d3dcontext);
-        sys->d3dcontext = NULL;
-    }
-    if ( sys->d3ddevice ) {
+    if ( sys->d3ddevice )
         ID3D11Device_Release(sys->d3ddevice);
-        sys->d3ddevice = NULL;
-    }
     msg_Dbg(vd, "Direct3D11 device adapter closed");
 }
 
@@ -1078,7 +1072,7 @@ static int Direct3D11CreateResources(vout_display_t *vd, video_format_t *fmt)
     vp.Height = (FLOAT)fmt->i_visible_height;
     vp.MinDepth = 0.0f;
     vp.MaxDepth = 1.0f;
-    vp.TopLeftX = 0; // TODO handle the offset ?
+    vp.TopLeftX = 0;
     vp.TopLeftY = 0;
 
     ID3D11DeviceContext_RSSetViewports(sys->d3dcontext, 1, &vp);
@@ -1154,7 +1148,6 @@ static int Direct3D11CreateResources(vout_display_t *vd, video_format_t *fmt)
 
     ID3D11DeviceContext_IASetPrimitiveTopology(sys->d3dcontext, D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
-    ID3D11PixelShader *pPicQuadShader;
     ID3DBlob* pPSBlob = NULL;
 
     /* TODO : Match the version to the D3D_FEATURE_LEVEL */
@@ -1167,6 +1160,7 @@ static int Direct3D11CreateResources(vout_display_t *vd, video_format_t *fmt)
       return VLC_EGENERIC;
     }
 
+    ID3D11PixelShader *pPicQuadShader;
     hr = ID3D11Device_CreatePixelShader(sys->d3ddevice, (void *)ID3D10Blob_GetBufferPointer(pPSBlob),
                                         ID3D10Blob_GetBufferSize(pPSBlob), NULL, &pPicQuadShader);
 
@@ -1214,10 +1208,10 @@ static int Direct3D11CreateResources(vout_display_t *vd, video_format_t *fmt)
     };
 #endif
     float vertices[4 * sizeof(d3d_vertex_t)] = {
-        -1.0f, -1.0f, 0.0f,  0.0f, 1.0f,  1.0f, // bottom left
-         1.0f, -1.0f, 0.0f,  1.0f, 1.0f,  1.0f, // bottom right
-         1.0f,  1.0f, 0.0f,  1.0f, 0.0f,  1.0f, // top right
-        -1.0f,  1.0f, 0.0f,  0.0f, 0.0f,  1.0f, // top left
+    -1.0f, -1.0f, -1.0f,  0.0f, 1.0f,  1.0f, // bottom left
+     1.0f, -1.0f, -1.0f,  1.0f, 1.0f,  1.0f, // bottom right
+     1.0f,  1.0f, -1.0f,  1.0f, 0.0f,  1.0f, // top right
+    -1.0f,  1.0f, -1.0f,  0.0f, 0.0f,  1.0f, // top left
     };
 
     if (AllocQuad( vd, fmt, &sys->picQuad, &sys->picQuadConfig, pPicQuadShader, vertices )!=VLC_SUCCESS) {
@@ -1253,9 +1247,7 @@ static int Direct3D11CreateResources(vout_display_t *vd, video_format_t *fmt)
     }
 
     picsys->texture  = sys->picQuad.pTexture;
-    ID3D11Texture2D_AddRef(picsys->texture);
     picsys->context  = sys->d3dcontext;
-    ID3D11DeviceContext_AddRef(picsys->context);
     picsys->vd       = vd;
 
     picture_resource_t resource = { .p_sys = picsys };
@@ -1269,6 +1261,8 @@ static int Direct3D11CreateResources(vout_display_t *vd, video_format_t *fmt)
         free(picsys);
         return VLC_ENOMEM;
     }
+    ID3D11Texture2D_AddRef(picsys->texture);
+    ID3D11DeviceContext_AddRef(picsys->context);
     sys->picsys = picsys;
 
     picture_pool_configuration_t pool_cfg;
@@ -1365,26 +1359,16 @@ error:
 
 static void ReleaseQuad(d3d_quad_t *quad)
 {
-    if (quad->pVertexBuffer) {
+    if (quad->pVertexBuffer)
         ID3D11Buffer_Release(quad->pVertexBuffer);
-        quad->pVertexBuffer = NULL;
-    }
-    if (quad->pTexture) {
+    if (quad->pTexture)
         ID3D11Texture2D_Release(quad->pTexture);
-        quad->pTexture = NULL;
-    }
-    if (quad->d3dresViewY) {
+    if (quad->d3dresViewY)
         ID3D11ShaderResourceView_Release(quad->d3dresViewY);
-        quad->d3dresViewY = NULL;
-    }
-    if (quad->d3dresViewUV) {
+    if (quad->d3dresViewUV)
         ID3D11ShaderResourceView_Release(quad->d3dresViewUV);
-        quad->d3dresViewUV = NULL;
-    }
-    if (quad->d3dpixelShader) {
+    if (quad->d3dpixelShader)
         ID3D11VertexShader_Release(quad->d3dpixelShader);
-        quad->d3dpixelShader = NULL;
-    }
 }
 
 static void Direct3D11DestroyResources(vout_display_t *vd)
@@ -1404,18 +1388,12 @@ static void Direct3D11DestroyResources(vout_display_t *vd)
     Direct3D11DeleteRegions(sys->d3dregion_count, sys->d3dregions);
     sys->d3dregion_count = 0;
 
-    if (sys->d3drenderTargetView) {
+    if (sys->d3drenderTargetView)
         ID3D11RenderTargetView_Release(sys->d3drenderTargetView);
-        sys->d3drenderTargetView = NULL;
-    }
-    if (sys->d3ddepthStencilView) {
+    if (sys->d3ddepthStencilView)
         ID3D11DepthStencilView_Release(sys->d3ddepthStencilView);
-        sys->d3ddepthStencilView = NULL;
-    }
-    if (sys->pSPUPixelShader) {
+    if (sys->pSPUPixelShader)
         ID3D11VertexShader_Release(sys->pSPUPixelShader);
-        sys->pSPUPixelShader = NULL;
-    }
 
     msg_Dbg(vd, "Direct3D11 resources destroyed");
 }
