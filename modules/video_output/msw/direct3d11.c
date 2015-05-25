@@ -100,6 +100,11 @@ static const d3d_format_t d3d_formats[] = {
     { NULL, 0, 0, 0, 0}
 };
 
+static const vlc_fourcc_t d3d_subpicture_chromas[] = {
+    VLC_CODEC_RGBA,
+    0
+};
+
 #define RECTWidth(r)   (int)(r.right - r.left)
 #define RECTHeight(r)  (int)(r.bottom - r.top)
 
@@ -453,9 +458,7 @@ static int Open(vlc_object_t *object)
     info.has_pictures_invalid = true;
     info.has_event_thread     = true;
 
-    sys->pSubpictureChromas[0] = VLC_CODEC_RGBA;
-    sys->pSubpictureChromas[1] = 0;
-    info.subpicture_chromas = sys->pSubpictureChromas;
+    info.subpicture_chromas = d3d_subpicture_chromas;
 
     video_format_Clean(&vd->fmt);
     video_format_Copy(&vd->fmt, &fmt);

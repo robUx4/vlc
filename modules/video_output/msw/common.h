@@ -196,7 +196,6 @@ struct vout_display_sys_t
     ID3D11DepthStencilState  *pDepthStencilState;
 
     // SPU
-    vlc_fourcc_t             pSubpictureChromas[2];
     ID3D11PixelShader        *pSPUPixelShader;
     DXGI_FORMAT              d3dregion_format;
     int                      d3dregion_count;
