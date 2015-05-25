@@ -180,7 +180,6 @@ struct vout_display_sys_t
 #endif
     ID3D11Device             *d3ddevice;       /* D3D device */
     ID3D11DeviceContext      *d3dcontext;      /* D3D context */
-    ID3D11Buffer             *pQuadIndices;
     d3d_quad_t               picQuad;
     d3d_quad_cfg_t           picQuadConfig;
     ID3D11RenderTargetView   *d3drenderTargetView;
@@ -190,7 +189,7 @@ struct vout_display_sys_t
     ID3D11SamplerState       *d3dsampState;
     picture_sys_t            *picsys;
     vlc_fourcc_t             vlcFormat;
-    const char               *psz_picPxShader;
+    const char               *d3dPxShader;
     const char               *psz_rgbaPxShader;
 
     ID3D11DepthStencilState  *pDepthStencilState;

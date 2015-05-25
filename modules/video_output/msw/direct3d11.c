@@ -600,8 +600,6 @@ static void Prepare(vout_display_t *vd, picture_t *picture, subpicture_t *subpic
     /* ID3D11DeviceContext_ClearRenderTargetView(sys->d3dcontext,sys->d3drenderTargetView, ClearColor); */
     ID3D11DeviceContext_ClearDepthStencilView(sys->d3dcontext,sys->d3ddepthStencilView, D3D11_CLEAR_DEPTH, 1.0f, 0);
 
-    ID3D11DeviceContext_IASetIndexBuffer(sys->d3dcontext, sys->pQuadIndices, DXGI_FORMAT_R16_UINT, 0);
-
     ID3D11DeviceContext_VSSetShader(sys->d3dcontext, sys->d3dvertexShader, NULL, 0);
     ID3D11DeviceContext_PSSetSamplers(sys->d3dcontext, 0, 1, &sys->d3dsampState);
 
@@ -921,22 +919,22 @@ static int Direct3D11Open(vout_display_t *vd, video_format_t *fmt)
     {
     case VLC_CODEC_NV12:
         if( fmt->i_height > 576 )
-            sys->psz_picPxShader = globPixelShaderBiplanarYUV_BT709_2RGB;
+            sys->d3dPxShader = globPixelShaderBiplanarYUV_BT709_2RGB;
         else
-            sys->psz_picPxShader = globPixelShaderBiplanarYUV_BT601_2RGB;
+            sys->d3dPxShader = globPixelShaderBiplanarYUV_BT601_2RGB;
         break;
     case VLC_CODEC_YV12:
     case VLC_CODEC_I420:
         if( fmt->i_height > 576 )
-            sys->psz_picPxShader = globPixelShaderBiplanarI420_BT709_2RGB;
+            sys->d3dPxShader = globPixelShaderBiplanarI420_BT709_2RGB;
         else
-            sys->psz_picPxShader = globPixelShaderBiplanarI420_BT601_2RGB;
+            sys->d3dPxShader = globPixelShaderBiplanarI420_BT601_2RGB;
         break;
     case VLC_CODEC_RGB32:
     case VLC_CODEC_BGRA:
     case VLC_CODEC_RGB16:
     default:
-        sys->psz_picPxShader = globPixelShaderDefault;
+        sys->d3dPxShader = globPixelShaderDefault;
         break;
     }
     sys->psz_rgbaPxShader = globPixelShaderDefault;
@@ -1115,11 +1113,14 @@ static int Direct3D11CreateResources(vout_display_t *vd, video_format_t *fmt)
         .pSysMem = indices,
     };
 
-    hr = ID3D11Device_CreateBuffer(sys->d3ddevice, &quadDesc, &quadIndicesInit, &sys->pQuadIndices);
+    ID3D11Buffer *pQuadIndices;
+    hr = ID3D11Device_CreateBuffer(sys->d3ddevice, &quadDesc, &quadIndicesInit, &pQuadIndices);
     if(FAILED(hr)) {
         msg_Err(vd, "Could not Create the common quad indices. (hr=0x%lX)", hr);
         return VLC_EGENERIC;
     }
+    ID3D11DeviceContext_IASetIndexBuffer(sys->d3dcontext, pQuadIndices, DXGI_FORMAT_R16_UINT, 0);
+    ID3D11Buffer_Release(pQuadIndices);
 
     ID3D11DeviceContext_IASetPrimitiveTopology(sys->d3dcontext, D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
@@ -1127,7 +1128,7 @@ static int Direct3D11CreateResources(vout_display_t *vd, video_format_t *fmt)
     ID3DBlob* pPSBlob = NULL;
 
     /* TODO : Match the version to the D3D_FEATURE_LEVEL */
-    hr = D3DCompile(sys->psz_picPxShader, strlen(sys->psz_picPxShader),
+    hr = D3DCompile(sys->d3dPxShader, strlen(sys->d3dPxShader),
                     NULL, NULL, NULL, "PS", "ps_4_0_level_9_1", 0, 0, &pPSBlob, NULL);
     if( FAILED(hr)) {
       msg_Err(vd, "The Pixel Shader is invalid. (hr=0x%lX)", hr );
@@ -1362,10 +1363,6 @@ static void Direct3D11DestroyResources(vout_display_t *vd)
     Direct3D11DeleteRegions(sys->d3dregion_count, sys->d3dregions);
     sys->d3dregion_count = 0;
 
-    if (sys->pQuadIndices) {
-        ID3D11Buffer_Release(sys->pQuadIndices);
-        sys->pQuadIndices = NULL;
-    }
     if (sys->pDepthStencilState) {
         ID3D11DepthStencilState_Release(sys->pDepthStencilState);
         sys->pDepthStencilState = NULL;
