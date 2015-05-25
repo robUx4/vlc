@@ -56,6 +56,9 @@ static int  Open(vlc_object_t *);
 static void Close(vlc_object_t *);
 
 #define D3D11_HELP N_("Recommended video output for Windows 8 and later versions")
+#define HW_BLENDING_TEXT N_("Use hardware blending support")
+#define HW_BLENDING_LONGTEXT N_(\
+    "Try to use hardware acceleration for subtitle/OSD blending.")
 
 vlc_module_begin ()
     set_shortname("Direct3D11")
@@ -63,6 +66,9 @@ vlc_module_begin ()
     set_help(D3D11_HELP)
     set_category(CAT_VIDEO)
     set_subcategory(SUBCAT_VIDEO_VOUT)
+
+    add_bool("direct3d11-hw-blending", true, HW_BLENDING_TEXT, HW_BLENDING_LONGTEXT, true)
+
     set_capability("vout display", 240)
     add_shortcut("direct3d11")
     set_callbacks(Open, Close)
@@ -98,11 +104,6 @@ static const d3d_format_t d3d_formats[] = {
     { "B5G6R5",   DXGI_FORMAT_B5G6R5_UNORM,   VLC_CODEC_RGB16,    DXGI_FORMAT_B5G6R5_UNORM,       0 },
 
     { NULL, 0, 0, 0, 0}
-};
-
-static const vlc_fourcc_t d3d_subpicture_chromas[] = {
-    VLC_CODEC_RGBA,
-    0
 };
 
 #define RECTWidth(r)   (int)(r.right - r.left)
@@ -458,7 +459,11 @@ static int Open(vlc_object_t *object)
     info.has_pictures_invalid = true;
     info.has_event_thread     = true;
 
-    info.subpicture_chromas = d3d_subpicture_chromas;
+    if (var_InheritBool(vd, "direct3d11-hw-blending") &&
+        sys->d3dregion_format != DXGI_FORMAT_UNKNOWN)
+        info.subpicture_chromas = sys->pSubpictureChromas;
+    else
+        info.subpicture_chromas = NULL;
 
     video_format_Clean(&vd->fmt);
     video_format_Copy(&vd->fmt, &fmt);
@@ -711,17 +716,6 @@ static int Direct3D11Open(vout_display_t *vd, video_format_t *fmt)
     UINT creationFlags = 0;
     HRESULT hr = S_OK;
 
-    static const D3D_FEATURE_LEVEL featureLevels[] =
-    {
-        D3D_FEATURE_LEVEL_11_1,
-        D3D_FEATURE_LEVEL_11_0,
-        D3D_FEATURE_LEVEL_10_1,
-        D3D_FEATURE_LEVEL_10_0,
-        D3D_FEATURE_LEVEL_9_3,
-        D3D_FEATURE_LEVEL_9_2,
-        D3D_FEATURE_LEVEL_9_1
-    };
-
 # if !defined(NDEBUG) // && defined(_MSC_VER)
     creationFlags |= D3D11_CREATE_DEVICE_DEBUG;
 # endif
@@ -750,6 +744,16 @@ static int Direct3D11Open(vout_display_t *vd, video_format_t *fmt)
 # endif
 
 # if USE_DXGI
+    static const D3D_FEATURE_LEVEL featureLevels[] =
+    {
+        D3D_FEATURE_LEVEL_11_1,
+        D3D_FEATURE_LEVEL_11_0,
+        D3D_FEATURE_LEVEL_10_1,
+        D3D_FEATURE_LEVEL_10_0,
+        D3D_FEATURE_LEVEL_9_3,
+        D3D_FEATURE_LEVEL_9_2,
+        D3D_FEATURE_LEVEL_9_1
+    };
 
     /* TODO : list adapters for the user to choose from */
     hr = IDXGIFactory_EnumAdapters(sys->dxgifactory, 0, &sys->dxgiadapter);
@@ -869,15 +873,16 @@ static int Direct3D11Open(vout_display_t *vd, video_format_t *fmt)
         i_src_chroma = fmt->i_chroma;
 
     // look for the request pixel format first
+    UINT i_quadSupportFlags = D3D11_FORMAT_SUPPORT_TEXTURE2D | D3D11_FORMAT_SUPPORT_SHADER_LOAD;
+    UINT i_formatSupport;
     for (unsigned i = 0; d3d_formats[i].name != 0; i++)
     {
         if( i_src_chroma == d3d_formats[i].fourcc)
         {
-            UINT i_formatSupport;
             if( SUCCEEDED( ID3D11Device_CheckFormatSupport(sys->d3ddevice,
                                                            d3d_formats[i].formatTexture,
                                                            &i_formatSupport)) &&
-                    ( i_formatSupport & D3D11_FORMAT_SUPPORT_TEXTURE2D ))
+                    ( i_formatSupport & i_quadSupportFlags ))
             {
                 msg_Dbg(vd, "Using pixel format %s", d3d_formats[i].name );
                 sys->vlcFormat = d3d_formats[i].fourcc;
@@ -894,11 +899,10 @@ static int Direct3D11Open(vout_display_t *vd, video_format_t *fmt)
     {
         for (unsigned i = 0; d3d_formats[i].name != 0; i++)
         {
-            UINT i_formatSupport;
             if( SUCCEEDED( ID3D11Device_CheckFormatSupport(sys->d3ddevice,
                                                            d3d_formats[i].formatTexture,
                                                            &i_formatSupport)) &&
-                    ( i_formatSupport & D3D11_FORMAT_SUPPORT_TEXTURE2D ))
+                    ( i_formatSupport & i_quadSupportFlags ))
             {
                 msg_Dbg(vd, "Using pixel format %s", d3d_formats[i].name );
                 sys->vlcFormat = d3d_formats[i].fourcc;
@@ -913,6 +917,26 @@ static int Direct3D11Open(vout_display_t *vd, video_format_t *fmt)
     {
        msg_Err(vd, "Could not get a suitable texture pixel format");
        return VLC_EGENERIC;
+    }
+
+    /* check the region pixel format */
+    i_quadSupportFlags |= D3D11_FORMAT_SUPPORT_BLENDABLE;
+    if( SUCCEEDED( ID3D11Device_CheckFormatSupport(sys->d3ddevice,
+                                                   DXGI_FORMAT_R8G8B8A8_UNORM,
+                                                   &i_formatSupport)) &&
+            ( i_formatSupport & i_quadSupportFlags )) {
+        sys->d3dregion_format = DXGI_FORMAT_R8G8B8A8_UNORM;
+        sys->pSubpictureChromas[0] = VLC_CODEC_RGBA;
+        sys->pSubpictureChromas[1] = 0;
+    } else if( SUCCEEDED( ID3D11Device_CheckFormatSupport(sys->d3ddevice,
+                                                          DXGI_FORMAT_B8G8R8A8_UNORM,
+                                                          &i_formatSupport)) &&
+                   ( i_formatSupport & i_quadSupportFlags )) {
+        sys->d3dregion_format = DXGI_FORMAT_B8G8R8A8_UNORM;
+        sys->pSubpictureChromas[0] = VLC_CODEC_BGRA;
+        sys->pSubpictureChromas[1] = 0;
+    } else {
+        sys->d3dregion_format = DXGI_FORMAT_UNKNOWN;
     }
 
     switch (sys->vlcFormat)
@@ -937,7 +961,10 @@ static int Direct3D11Open(vout_display_t *vd, video_format_t *fmt)
         sys->d3dPxShader = globPixelShaderDefault;
         break;
     }
-    sys->psz_rgbaPxShader = globPixelShaderDefault;
+    if (sys->d3dregion_format != DXGI_FORMAT_UNKNOWN)
+        sys->psz_rgbaPxShader = globPixelShaderDefault;
+    else
+        sys->psz_rgbaPxShader = NULL;
 
     UpdateRects(vd, NULL, NULL, true);
 
@@ -1148,24 +1175,28 @@ static int Direct3D11CreateResources(vout_display_t *vd, video_format_t *fmt)
       return VLC_EGENERIC;
     }
 
-    hr = D3DCompile(sys->psz_rgbaPxShader, strlen(sys->psz_rgbaPxShader),
-                    NULL, NULL, NULL, "PS", "ps_4_0_level_9_1", 0, 0, &pPSBlob, NULL);
-    if( FAILED(hr)) {
-      ID3D11PixelShader_Release(pPicQuadShader);
-      msg_Err(vd, "The RGBA Pixel Shader is invalid. (hr=0x%lX)", hr );
-      return VLC_EGENERIC;
+    if (sys->psz_rgbaPxShader != NULL)
+    {
+        hr = D3DCompile(sys->psz_rgbaPxShader, strlen(sys->psz_rgbaPxShader),
+                        NULL, NULL, NULL, "PS", "ps_4_0_level_9_1", 0, 0, &pPSBlob, NULL);
+        if( FAILED(hr)) {
+          ID3D11PixelShader_Release(pPicQuadShader);
+          msg_Err(vd, "The RGBA Pixel Shader is invalid. (hr=0x%lX)", hr );
+          return VLC_EGENERIC;
+        }
+
+        hr = ID3D11Device_CreatePixelShader(sys->d3ddevice, (void *)ID3D10Blob_GetBufferPointer(pPSBlob),
+                                            ID3D10Blob_GetBufferSize(pPSBlob), NULL, &sys->pSPUPixelShader);
+
+        ID3D10Blob_Release(pPSBlob);
+
+        if(FAILED(hr)) {
+          ID3D11PixelShader_Release(pPicQuadShader);
+          msg_Err(vd, "Failed to create the SPU pixel shader.");
+          return VLC_EGENERIC;
+        }
     }
 
-    hr = ID3D11Device_CreatePixelShader(sys->d3ddevice, (void *)ID3D10Blob_GetBufferPointer(pPSBlob),
-                                        ID3D10Blob_GetBufferSize(pPSBlob), NULL, &sys->pSPUPixelShader);
-
-    ID3D10Blob_Release(pPSBlob);
-
-    if(FAILED(hr)) {
-      ID3D11PixelShader_Release(pPicQuadShader);
-      msg_Err(vd, "Failed to create the pixel shader.");
-      return VLC_EGENERIC;
-    }
 #if 0
     float left   = -1.0f - (float) (fmt->i_x_offset)                                                / ((float)fmt->i_visible_width / 2.0f);
     float right  =  1.0f + (float) (fmt->i_width  - fmt->i_x_offset - (float)fmt->i_visible_width)  / ((float)fmt->i_visible_width / 2.0f);
@@ -1458,7 +1489,7 @@ static int Direct3D11MapSubpicture(vout_display_t *vd, int *subpicture_region_co
                             texDesc.Width, texDesc.Height);
 #endif
                     (*region)[i] = cache;
-                    memset(cache, 0, sizeof(*cache)); // do not reuse this cached value
+                    memset(&sys->d3dregions[j], 0, sizeof(cache)); // do not reuse this cached value
                     break;
                 }
             }
@@ -1471,8 +1502,8 @@ static int Direct3D11MapSubpicture(vout_display_t *vd, int *subpicture_region_co
                 continue;
             }
             d3d_quad_cfg_t rgbaCfg = {
-                .textureFormat      = DXGI_FORMAT_R8G8B8A8_UNORM,
-                .resourceFormatYRGB = DXGI_FORMAT_R8G8B8A8_UNORM,
+                .textureFormat      = sys->d3dregion_format,
+                .resourceFormatYRGB = sys->d3dregion_format,
             };
             err = AllocQuad(vd, &r->fmt, d3dquad, &rgbaCfg, sys->pSPUPixelShader, NULL);
             if (err != VLC_SUCCESS) {
@@ -1503,7 +1534,7 @@ static int Direct3D11MapSubpicture(vout_display_t *vd, int *subpicture_region_co
                     continue;
                 }
             } else {
-                msg_Err(vd, "Failed to lock the OSD texture (hr=0x%lX)", hr );
+                msg_Err(vd, "Failed to map the OSD texture (hr=0x%lX)", hr );
                 picture_Release(d3dr);
                 continue;
             }
