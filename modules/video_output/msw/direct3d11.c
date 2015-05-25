@@ -740,6 +740,7 @@ static int Direct3D11Open(vout_display_t *vd, video_format_t *fmt)
     scd.OutputWindow = sys->hvideownd;
 # endif
 
+    IDXGIAdapter *dxgiadapter;
 # if USE_DXGI
     static const D3D_FEATURE_LEVEL featureLevels[] =
     {
@@ -753,16 +754,17 @@ static int Direct3D11Open(vout_display_t *vd, video_format_t *fmt)
     };
 
     /* TODO : list adapters for the user to choose from */
-    hr = IDXGIFactory_EnumAdapters(sys->dxgifactory, 0, &sys->dxgiadapter);
+    hr = IDXGIFactory_EnumAdapters(sys->dxgifactory, 0, &dxgiadapter);
     if (FAILED(hr)) {
        msg_Err(vd, "Could not create find factory. (hr=0x%lX)", hr);
        return VLC_EGENERIC;
     }
 
     IDXGIOutput* output;
-    hr = IDXGIAdapter_EnumOutputs(sys->dxgiadapter, 0, &output);
+    hr = IDXGIAdapter_EnumOutputs(dxgiadapter, 0, &output);
     if (FAILED(hr)) {
        msg_Err(vd, "Could not Enumerate DXGI Outputs. (hr=0x%lX)", hr);
+       IDXGIAdapter_Release(dxgiadapter);
        return VLC_EGENERIC;
     }
 
@@ -776,6 +778,7 @@ static int Direct3D11Open(vout_display_t *vd, video_format_t *fmt)
     hr = IDXGIOutput_FindClosestMatchingMode(output, &md, &scd.BufferDesc, NULL);
     if (FAILED(hr)) {
        msg_Err(vd, "Failed to find a supported video mode. (hr=0x%lX)", hr);
+       IDXGIAdapter_Release(dxgiadapter);
        return VLC_EGENERIC;
     }
 
@@ -783,11 +786,12 @@ static int Direct3D11Open(vout_display_t *vd, video_format_t *fmt)
     scd.BufferDesc.Width = fmt->i_visible_width;
     scd.BufferDesc.Height = fmt->i_visible_height;
 
-    hr = D3D11CreateDeviceAndSwapChain(sys->dxgiadapter,
+    hr = D3D11CreateDeviceAndSwapChain(dxgiadapter,
                     D3D_DRIVER_TYPE_UNKNOWN, NULL, creationFlags,
                     featureLevels, ARRAYSIZE(featureLevels),
                     D3D11_SDK_VERSION, &scd, &sys->dxgiswapChain,
                     &sys->d3ddevice, NULL, &sys->d3dcontext);
+    IDXGIAdapter_Release(dxgiadapter);
     if (FAILED(hr)) {
        msg_Err(vd, "Could not Create the D3D11 device and SwapChain. (hr=0x%lX)", hr);
        return VLC_EGENERIC;
@@ -820,16 +824,15 @@ static int Direct3D11Open(vout_display_t *vd, video_format_t *fmt)
        return VLC_EGENERIC;
     }
 
-    hr = IDXGIDevice_GetAdapter(pDXGIDevice, &sys->dxgiadapter);
+    hr = IDXGIDevice_GetAdapter(pDXGIDevice, &dxgiadapter);
     IDXGIAdapter_Release(pDXGIDevice);
     if (FAILED(hr)) {
        msg_Err(vd, "Could not get the DXGI Adapter. (hr=0x%lX)", hr);
        return VLC_EGENERIC;
     }
 
-    hr = IDXGIAdapter_GetParent(sys->dxgiadapter, &IID_IDXGIFactory, (void **)&sys->dxgifactory);
-    IDXGIAdapter_Release(sys->dxgiadapter);
-    IDXGIAdapter_Release(sys->dxgiadapter);
+    hr = IDXGIAdapter_GetParent(dxgiadapter, &IID_IDXGIFactory, (void **)&sys->dxgifactory);
+    IDXGIAdapter_Release(dxgiadapter);
     if (FAILED(hr)) {
        msg_Err(vd, "Could not get the DXGI Factory. (hr=0x%lX)", hr);
        return VLC_EGENERIC;
@@ -982,22 +985,18 @@ static void Direct3D11Close(vout_display_t *vd)
     vout_display_sys_t *sys = vd->sys;
 
     Direct3D11DestroyResources(vd);
-    if ( sys->d3dcontext ) {
-        ID3D11DeviceContext_Release(sys->d3dcontext);
-        sys->d3dcontext = NULL;
-    }
     if (sys->dxgiswapChain) {
         IDXGISwapChain_Release(sys->dxgiswapChain);
         sys->dxgiswapChain = NULL;
     }
-    if (sys->dxgiadapter) {
-        IDXGIAdapter_Release(sys->dxgiadapter);
-        sys->dxgiadapter = NULL;
+    if ( sys->d3dcontext ) {
+        ID3D11DeviceContext_Release(sys->d3dcontext);
+        sys->d3dcontext = NULL;
     }
-    /*if ( sys->d3ddevice ) {
-        ID3D11Device_Release(sys->d3ddevice); // leaking
+    if ( sys->d3ddevice ) {
+        ID3D11Device_Release(sys->d3ddevice);
         sys->d3ddevice = NULL;
-    }*/
+    }
     msg_Dbg(vd, "Direct3D11 device adapter closed");
 }
 
@@ -1241,6 +1240,7 @@ static int Direct3D11CreateResources(vout_display_t *vd, video_format_t *fmt)
         msg_Err(vd, "Could not Create the D3d11 Sampler State. (hr=0x%lX)", hr);
         return VLC_EGENERIC;
     }
+
     ID3D11DeviceContext_PSSetSamplers(sys->d3dcontext, 0, 1, &d3dsampState);
     ID3D11SamplerState_Release(d3dsampState);
 

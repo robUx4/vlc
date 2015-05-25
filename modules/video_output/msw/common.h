@@ -168,7 +168,6 @@ struct vout_display_sys_t
     HINSTANCE                hdxgi_dll;        /* handle of the opened dxgi dll */
     HINSTANCE                hd3d11_dll;       /* handle of the opened d3d11 dll */
     HINSTANCE                hd3dcompiler_dll; /* handle of the opened d3dcompiler dll */
-    IDXGIAdapter             *dxgiadapter;     /* DXGI adapter */
     IDXGIFactory             *dxgifactory;     /* DXGI factory */
     IDXGISwapChain           *dxgiswapChain;   /* DXGI 1.0 swap chain */
     /* We should find a better way to store this or atleast a shorter name */
