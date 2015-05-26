@@ -36,6 +36,8 @@
 #include <d3d11.h>
 #include <d3dx9math.h>
 
+#include "../../src/win32/direct3d11_pool.h"
+
 /* avoided until we can pass ISwapchainPanel without c++/cx mode
 # include <windows.ui.xaml.media.dxinterop.h> */
 
@@ -107,7 +109,7 @@ static const d3d_format_t d3d_formats[] = {
 
 struct picture_sys_t
 {
-    ID3D11Texture2D     *texture;
+    d3d11_texture_t     texture;
     ID3D11DeviceContext *context;
 };
 
@@ -1262,7 +1264,7 @@ static int Direct3D11CreatePool(vout_display_t *vd, video_format_t *fmt)
         return VLC_ENOMEM;
     }
 
-    picsys->texture  = sys->picQuad.texture.pTexture;
+    picsys->texture  = sys->picQuad.texture;
     picsys->context  = sys->d3dcontext;
 
     picture_resource_t resource = { .p_sys = picsys };
@@ -1276,7 +1278,7 @@ static int Direct3D11CreatePool(vout_display_t *vd, video_format_t *fmt)
         free(picsys);
         return VLC_ENOMEM;
     }
-    ID3D11Texture2D_AddRef(picsys->texture);
+    ID3D11Texture2D_AddRef(picsys->texture.pTexture);
     ID3D11DeviceContext_AddRef(picsys->context);
     sys->picsys = picsys;
 
@@ -1301,7 +1303,7 @@ static void Direct3D11DestroyPool(vout_display_t *vd)
 
     if (sys->pool) {
         picture_sys_t *picsys = sys->picsys;
-        ID3D11Texture2D_Release(picsys->texture);
+        ID3D11Texture2D_Release(picsys->texture.pTexture);
         ID3D11DeviceContext_Release(picsys->context);
         picture_pool_Release(sys->pool);
     }
@@ -1423,12 +1425,12 @@ static int Direct3D11MapTexture(picture_t *picture)
     D3D11_MAPPED_SUBRESOURCE mappedResource;
     HRESULT hr;
     int res;
-    hr = ID3D11DeviceContext_Map(picture->p_sys->context, (ID3D11Resource *)picture->p_sys->texture, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource);
+    hr = ID3D11DeviceContext_Map(picture->p_sys->context, (ID3D11Resource *)picture->p_sys->texture.pTexture, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource);
     if( FAILED(hr) )
         return VLC_EGENERIC;
 
     res = CommonUpdatePicture(picture, NULL, mappedResource.pData, mappedResource.RowPitch);
-    ID3D11DeviceContext_Unmap(picture->p_sys->context,(ID3D11Resource *)picture->p_sys->texture, 0);
+    ID3D11DeviceContext_Unmap(picture->p_sys->context,(ID3D11Resource *)picture->p_sys->texture.pTexture, 0);
     return res;
 }
 

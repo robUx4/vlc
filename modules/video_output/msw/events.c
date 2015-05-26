@@ -40,6 +40,10 @@
 #include <windowsx.h>                                        /* GET_X_LPARAM */
 #include <shellapi.h>                                         /* ExtractIcon */
 
+#ifdef MODULE_NAME_IS_direct3d11
+#include "../../src/win32/direct3d11_pool.h"
+#endif
+
 #include "common.h"
 
 /*****************************************************************************
