@@ -109,7 +109,6 @@ struct picture_sys_t
 {
     ID3D11Texture2D     *texture;
     ID3D11DeviceContext *context;
-    vout_display_t      *vd;
 };
 
 /* matches the D3D11_INPUT_ELEMENT_DESC we setup */
@@ -1265,7 +1264,6 @@ static int Direct3D11CreatePool(vout_display_t *vd, video_format_t *fmt)
 
     picsys->texture  = sys->picQuad.pTexture;
     picsys->context  = sys->d3dcontext;
-    picsys->vd       = vd;
 
     picture_resource_t resource = { .p_sys = picsys };
     for (int i = 0; i < PICTURE_PLANE_MAX; i++) {
@@ -1427,10 +1425,8 @@ static int Direct3D11MapTexture(picture_t *picture)
     int res;
     hr = ID3D11DeviceContext_Map(picture->p_sys->context, (ID3D11Resource *)picture->p_sys->texture, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource);
     if( FAILED(hr) )
-    {
-        msg_Dbg( picture->p_sys->vd, "failed to map the texture (hr=0x%lX)", hr );
         return VLC_EGENERIC;
-    }
+
     res = CommonUpdatePicture(picture, NULL, mappedResource.pData, mappedResource.RowPitch);
     ID3D11DeviceContext_Unmap(picture->p_sys->context,(ID3D11Resource *)picture->p_sys->texture, 0);
     return res;
