@@ -137,6 +137,9 @@ static void Direct3D11Close(vout_display_t *);
 static int  Direct3D11CreateResources (vout_display_t *, video_format_t *);
 static void Direct3D11DestroyResources(vout_display_t *);
 
+static int  Direct3D11CreatePool (vout_display_t *, video_format_t *);
+static void Direct3D11DestroyPool(vout_display_t *);
+
 static int  Direct3D11MapTexture(picture_t *);
 static void Direct3D11DeleteRegions(int, picture_t **);
 static int Direct3D11MapSubpicture(vout_display_t *, int *, picture_t ***, subpicture_t *);
@@ -1241,6 +1244,20 @@ static int Direct3D11CreateResources(vout_display_t *vd, video_format_t *fmt)
     ID3D11DeviceContext_PSSetSamplers(sys->d3dcontext, 0, 1, &d3dsampState);
     ID3D11SamplerState_Release(d3dsampState);
 
+    if (Direct3D11CreatePool(vd, fmt))
+    {
+        msg_Err(vd, "Direct3D picture pool initialization failed");
+        return VLC_EGENERIC;
+    }
+
+    msg_Dbg(vd, "Direct3D11 resources created");
+    return VLC_SUCCESS;
+}
+
+static int Direct3D11CreatePool(vout_display_t *vd, video_format_t *fmt)
+{
+    vout_display_sys_t *sys = vd->sys;
+
     picture_sys_t *picsys = malloc(sizeof(*picsys));
     if (unlikely(picsys == NULL)) {
         return VLC_ENOMEM;
@@ -1277,8 +1294,20 @@ static int Direct3D11CreateResources(vout_display_t *vd, video_format_t *fmt)
         return VLC_ENOMEM;
     }
 
-    msg_Dbg(vd, "Direct3D11 resources created");
     return VLC_SUCCESS;
+}
+
+static void Direct3D11DestroyPool(vout_display_t *vd)
+{
+    vout_display_sys_t *sys = vd->sys;
+
+    if (sys->pool) {
+        picture_sys_t *picsys = sys->picsys;
+        ID3D11Texture2D_Release(picsys->texture);
+        ID3D11DeviceContext_Release(picsys->context);
+        picture_pool_Release(sys->pool);
+    }
+    sys->pool = NULL;
 }
 
 static int AllocQuad(vout_display_t *vd, const video_format_t *fmt, d3d_quad_t *quad,
@@ -1375,14 +1404,7 @@ static void Direct3D11DestroyResources(vout_display_t *vd)
 {
     vout_display_sys_t *sys = vd->sys;
 
-    /* TODO: Destroy Shaders? */
-    if (sys->pool) {
-        picture_sys_t *picsys = sys->picsys;
-        ID3D11Texture2D_Release(picsys->texture);
-        ID3D11DeviceContext_Release(picsys->context);
-        picture_pool_Release(sys->pool);
-    }
-    sys->pool = NULL;
+    Direct3D11DestroyPool(vd);
 
     ReleaseQuad(&sys->picQuad);
     Direct3D11DeleteRegions(sys->d3dregion_count, sys->d3dregions);
