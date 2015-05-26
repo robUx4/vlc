@@ -61,11 +61,16 @@ typedef struct
 
 typedef struct
 {
-    ID3D11Buffer              *pVertexBuffer;
     ID3D11Texture2D           *pTexture;
     ID3D11ShaderResourceView  *d3dresViewY;
     ID3D11ShaderResourceView  *d3dresViewUV;
+} d3d11_texture_t;
+
+typedef struct
+{
+    ID3D11Buffer              *pVertexBuffer;
     ID3D11PixelShader         *d3dpixelShader;
+    d3d11_texture_t           texture;
 } d3d_quad_t;
 #endif
 

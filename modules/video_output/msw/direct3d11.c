@@ -623,10 +623,10 @@ static void DisplayD3DPicture(vout_display_sys_t *sys, d3d_quad_t *quad)
 
     /* Render the quad */
     ID3D11DeviceContext_PSSetShader(sys->d3dcontext, quad->d3dpixelShader, NULL, 0);
-    ID3D11DeviceContext_PSSetShaderResources(sys->d3dcontext, 0, 1, &quad->d3dresViewY);
+    ID3D11DeviceContext_PSSetShaderResources(sys->d3dcontext, 0, 1, &quad->texture.d3dresViewY);
 
-    if( quad->d3dresViewUV )
-        ID3D11DeviceContext_PSSetShaderResources(sys->d3dcontext, 1, 1, &quad->d3dresViewUV);
+    if( quad->texture.d3dresViewUV )
+        ID3D11DeviceContext_PSSetShaderResources(sys->d3dcontext, 1, 1, &quad->texture.d3dresViewUV);
 
     ID3D11DeviceContext_IASetVertexBuffers(sys->d3dcontext, 0, 1, &quad->pVertexBuffer, &stride, &offset);
     ID3D11DeviceContext_DrawIndexed(sys->d3dcontext, 6, 0, 0);
@@ -1262,7 +1262,7 @@ static int Direct3D11CreatePool(vout_display_t *vd, video_format_t *fmt)
         return VLC_ENOMEM;
     }
 
-    picsys->texture  = sys->picQuad.pTexture;
+    picsys->texture  = sys->picQuad.texture.pTexture;
     picsys->context  = sys->d3dcontext;
 
     picture_resource_t resource = { .p_sys = picsys };
@@ -1346,7 +1346,7 @@ static int AllocQuad(vout_display_t *vd, const video_format_t *fmt, d3d_quad_t *
     texDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
     texDesc.MiscFlags = 0;
 
-    hr = ID3D11Device_CreateTexture2D(sys->d3ddevice, &texDesc, NULL, &quad->pTexture);
+    hr = ID3D11Device_CreateTexture2D(sys->d3ddevice, &texDesc, NULL, &quad->texture.pTexture);
     if (FAILED(hr)) {
         msg_Err(vd, "Could not Create the D3d11 Texture. (hr=0x%lX)", hr);
         goto error;
@@ -1358,7 +1358,7 @@ static int AllocQuad(vout_display_t *vd, const video_format_t *fmt, d3d_quad_t *
     resviewDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
     resviewDesc.Texture2D.MipLevels = texDesc.MipLevels;
 
-    hr = ID3D11Device_CreateShaderResourceView(sys->d3ddevice, (ID3D11Resource *)quad->pTexture, &resviewDesc, &quad->d3dresViewY);
+    hr = ID3D11Device_CreateShaderResourceView(sys->d3ddevice, (ID3D11Resource *)quad->texture.pTexture, &resviewDesc, &quad->texture.d3dresViewY);
     if (FAILED(hr)) {
         msg_Err(vd, "Could not Create the Y/RGB D3d11 Texture ResourceView. (hr=0x%lX)", hr);
         goto error;
@@ -1367,7 +1367,7 @@ static int AllocQuad(vout_display_t *vd, const video_format_t *fmt, d3d_quad_t *
     if( cfg->resourceFormatUV )
     {
         resviewDesc.Format = cfg->resourceFormatUV;
-        hr = ID3D11Device_CreateShaderResourceView(sys->d3ddevice, (ID3D11Resource *)quad->pTexture, &resviewDesc, &quad->d3dresViewUV);
+        hr = ID3D11Device_CreateShaderResourceView(sys->d3ddevice, (ID3D11Resource *)quad->texture.pTexture, &resviewDesc, &quad->texture.d3dresViewUV);
         if (FAILED(hr)) {
             msg_Err(vd, "Could not Create the UV D3d11 Texture ResourceView. (hr=0x%lX)", hr);
             goto error;
@@ -1388,12 +1388,12 @@ static void ReleaseQuad(d3d_quad_t *quad)
 {
     if (quad->pVertexBuffer)
         ID3D11Buffer_Release(quad->pVertexBuffer);
-    if (quad->pTexture)
-        ID3D11Texture2D_Release(quad->pTexture);
-    if (quad->d3dresViewY)
-        ID3D11ShaderResourceView_Release(quad->d3dresViewY);
-    if (quad->d3dresViewUV)
-        ID3D11ShaderResourceView_Release(quad->d3dresViewUV);
+    if (quad->texture.pTexture)
+        ID3D11Texture2D_Release(quad->texture.pTexture);
+    if (quad->texture.d3dresViewY)
+        ID3D11ShaderResourceView_Release(quad->texture.d3dresViewY);
+    if (quad->texture.d3dresViewUV)
+        ID3D11ShaderResourceView_Release(quad->texture.d3dresViewUV);
     if (quad->d3dpixelShader)
         ID3D11VertexShader_Release(quad->d3dpixelShader);
 }
@@ -1470,8 +1470,8 @@ static int Direct3D11MapSubpicture(vout_display_t *vd, int *subpicture_region_co
     for (subpicture_region_t *r = subpicture->p_region; r; r = r->p_next, i++) {
         for (int j = 0; j < sys->d3dregion_count; j++) {
             picture_t *cache = sys->d3dregions[j];
-            if (((d3d_quad_t *) cache->p_sys)->pTexture) {
-                ID3D11Texture2D_GetDesc( ((d3d_quad_t *) cache->p_sys)->pTexture, &texDesc );
+            if (((d3d_quad_t *) cache->p_sys)->texture.pTexture) {
+                ID3D11Texture2D_GetDesc( ((d3d_quad_t *) cache->p_sys)->texture.pTexture, &texDesc );
                 if (texDesc.Format == sys->d3dregion_format &&
                     texDesc.Width  == r->fmt.i_visible_width &&
                     texDesc.Height == r->fmt.i_visible_height) {
@@ -1515,10 +1515,10 @@ static int Direct3D11MapSubpicture(vout_display_t *vd, int *subpicture_region_co
                 continue;
             }
             quad_picture = (*region)[i];
-            hr = ID3D11DeviceContext_Map(sys->d3dcontext, (ID3D11Resource *)((d3d_quad_t *) quad_picture->p_sys)->pTexture, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource);
+            hr = ID3D11DeviceContext_Map(sys->d3dcontext, (ID3D11Resource *)((d3d_quad_t *) quad_picture->p_sys)->texture.pTexture, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource);
             if( SUCCEEDED(hr) ) {
                 err = CommonUpdatePicture(quad_picture, NULL, mappedResource.pData, mappedResource.RowPitch);
-                ID3D11DeviceContext_Unmap(sys->d3dcontext, (ID3D11Resource *)((d3d_quad_t *) quad_picture->p_sys)->pTexture, 0);
+                ID3D11DeviceContext_Unmap(sys->d3dcontext, (ID3D11Resource *)((d3d_quad_t *) quad_picture->p_sys)->texture.pTexture, 0);
                 if (err != VLC_SUCCESS) {
                     msg_Err(vd, "Failed to set the buffer on the OSD picture" );
                     picture_Release(quad_picture);
