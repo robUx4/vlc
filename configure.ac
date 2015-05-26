@@ -2406,6 +2406,7 @@ AS_IF([test "${enable_d3d11va}" != "no"], [
               [
                 AC_CHECK_HEADERS(libavcodec/d3d11va.h, [
                    AC_MSG_NOTICE([D3D11 acceleration activated])
+                   AC_DEFINE(HAVE_AVCODEC_D3D11VA, 1, [Define if the d3d11va module is built])
                    have_avcodec_d3d11va="yes"
                 ],[
                   AS_IF([test "${enable_d3d11va}" = "yes"],
