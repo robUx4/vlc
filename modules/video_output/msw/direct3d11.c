@@ -624,7 +624,18 @@ static void Manage(vout_display_t *vd)
 static void Prepare(vout_display_t *vd, picture_t *picture, subpicture_t *subpicture)
 {
     vout_display_sys_t *sys = vd->sys;
-    VLC_UNUSED(picture);
+
+    if (picture->format.i_chroma == VLC_CODEC_D3D11_OPAQUE) {
+        D3D11_BOX box;
+        box.left = 0;
+        box.right = picture->format.i_visible_width;
+        box.top = 0;
+        box.bottom = picture->format.i_visible_height;
+        box.back = 1;
+        box.front = 0;
+        ID3D11DeviceContext_CopySubresourceRegion(sys->d3dcontext, (ID3D11Resource*) sys->picQuad.texture.pTexture, 0, 0, 0, 0,
+                                                  (ID3D11Resource*) picture->p_sys->texture.pTexture, 0, &box);
+    }
 
     /* float ClearColor[4] = { 1.0f, 0.125f, 0.3f, 1.0f }; */
     /* ID3D11DeviceContext_ClearRenderTargetView(sys->d3dcontext,sys->d3drenderTargetView, ClearColor); */
