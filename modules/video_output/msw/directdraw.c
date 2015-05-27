@@ -51,6 +51,7 @@
 #include <commctrl.h>       /* ListView_(Get|Set)* */
 
 #include "common.h"
+#include "../../src/win32/picture.h"
 
 /* Unicode function "DirectDrawEnumerateExW" has been desactivated
    since in some cases this function fails and the callbacks are not

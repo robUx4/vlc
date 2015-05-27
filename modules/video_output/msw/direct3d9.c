@@ -51,6 +51,7 @@
 #include "common.h"
 #include "builtin_shaders.h"
 #include "../../src/win32/direct3d9_pool.h"
+#include "../../src/win32/picture.h"
 
 /*****************************************************************************
  * Module descriptor

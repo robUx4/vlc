@@ -37,6 +37,7 @@
 #include <d3dx9math.h>
 
 #include "../../src/win32/direct3d11_pool.h"
+#include "../../src/win32/picture.h"
 
 /* avoided until we can pass ISwapchainPanel without c++/cx mode
 # include <windows.ui.xaml.media.dxinterop.h> */

@@ -294,6 +294,8 @@ SOURCES_libvlc_win32 = \
 	win32/error.c \
 	win32/filesystem.c \
 	win32/netconf.c \
+	win32/picture.c \
+	win32/picture.h \
 	win32/plugin.c \
 	win32/thread.c \
 	win32/specific.c \
