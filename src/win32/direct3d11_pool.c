@@ -25,15 +25,39 @@
 # include "config.h"
 #endif
 
+#include "picture.h"
+
 #define COBJMACROS
 #include "direct3d11_pool.h"
 
-static void DestroyPicture(picture_t *picture);
+#include <initguid.h> /* must be last included to not redefine existing GUIDs */
+
+/* dxva2api.h GUIDs: http://msdn.microsoft.com/en-us/library/windows/desktop/ms697067(v=vs100).aspx
+ * assume that they are declared in dxva2api.h */
+#define MS_GUID(name, l, w1, w2, b1, b2, b3, b4, b5, b6, b7, b8)
+
+#ifdef __MINGW32__
+# include <_mingw.h>
+
+# if !defined(__MINGW64_VERSION_MAJOR)
+#  undef MS_GUID
+#  define MS_GUID DEFINE_GUID /* dxva2api.h fails to declare those, redefine as static */
+#  define DXVA2_E_NEW_VIDEO_DEVICE MAKE_HRESULT(1, 4, 4097)
+# else
+#  include <dxva.h>
+# endif
+
+#endif /* __MINGW32__ */
+
+DEFINE_GUID(IID_ID3D10Multithread,   0x9b7e4e00, 0x342c, 0x4106, 0xa1, 0x9f, 0x4f, 0x27, 0x04, 0xf6, 0x89, 0xf0);
+
+static void DestroyPicture(picture_t *e);
+static int Direct3D11MapTexture(picture_t *);
 
 struct picture_sys_t {
-    ID3D11VideoDecoderOutputView *surface;
-    ID3D11DeviceContext          *context;
-    HINSTANCE                    hd3d11_dll;
+    d3d11_texture_t     texture;
+    ID3D11DeviceContext *context;
+    HINSTANCE           hd3d11_dll;
 };
 
 typedef struct
@@ -92,14 +116,14 @@ picture_pool_t *AllocPoolD3D11( vlc_object_t *va, const video_format_t *fmt, uns
     }
 
     PFN_D3D11_CREATE_DEVICE pf_CreateDevice;
-    pf_CreateDevice = GetProcAddress(hd3d11_dll, "D3D11CreateDevice");
+    pf_CreateDevice = (PFN_D3D11_CREATE_DEVICE) GetProcAddress(hd3d11_dll, "D3D11CreateDevice");
     if (!pf_CreateDevice) {
         msg_Err(va, "Cannot locate reference to D3D11CreateDevice ABI in DLL");
         goto error;
     }
 
     /* Create the D3D object. */
-    UINT creationFlags = 0;
+    UINT creationFlags = D3D11_CREATE_DEVICE_VIDEO_SUPPORT; // used for direct rendering
 # if !defined(NDEBUG) && defined(_MSC_VER)
     creationFlags |= D3D11_CREATE_DEVICE_DEBUG;
 # endif
@@ -213,7 +237,9 @@ picture_pool_t *AllocPoolD3D11( vlc_object_t *va, const video_format_t *fmt, uns
     else
         i_src_chroma = fmt->i_chroma;
 
-    DXGI_FORMAT outputFormat = DXGI_FORMAT_UNKNOWN;
+    d3d11_texture_cfg_t outputFormat = {
+        .textureFormat =  DXGI_FORMAT_UNKNOWN,
+    };
 
     // look for the request pixel format first
     UINT i_quadSupportFlags = D3D11_FORMAT_SUPPORT_TEXTURE2D | D3D11_FORMAT_SUPPORT_SHADER_LOAD;
@@ -225,15 +251,14 @@ picture_pool_t *AllocPoolD3D11( vlc_object_t *va, const video_format_t *fmt, uns
             if( SUCCEEDED( ID3D11Device_CheckFormatSupport(d3ddev,
                                                            d3d_formats[i].formatTexture,
                                                            &i_formatSupport)) &&
-                    ( i_formatSupport & i_quadSupportFlags ))
+                    ( i_formatSupport & i_quadSupportFlags ) == i_quadSupportFlags)
             {
                 msg_Dbg(va, "Using pixel format %s", d3d_formats[i].name );
-                outputFormat = d3d_formats[i].formatTexture;
+                outputFormat.textureFormat      = d3d_formats[i].formatTexture;
+                outputFormat.resourceFormatYRGB = d3d_formats[i].formatY;
+                outputFormat.resourceFormatUV   = d3d_formats[i].formatUV;
 #if 0
                 sys->vlcFormat = d3d_formats[i].fourcc;
-                sys->picQuadConfig.textureFormat      = d3d_formats[i].formatTexture;
-                sys->picQuadConfig.resourceFormatYRGB = d3d_formats[i].formatY;
-                sys->picQuadConfig.resourceFormatUV   = d3d_formats[i].formatUV;
 #endif
                 break;
             }
@@ -241,17 +266,19 @@ picture_pool_t *AllocPoolD3D11( vlc_object_t *va, const video_format_t *fmt, uns
     }
 
     // look for any pixel format that we can handle
-    if ( outputFormat == DXGI_FORMAT_UNKNOWN )
+    if ( outputFormat.textureFormat == DXGI_FORMAT_UNKNOWN )
     {
         for (unsigned i = 0; d3d_formats[i].name != 0; i++)
         {
             if( SUCCEEDED( ID3D11Device_CheckFormatSupport(d3ddev,
                                                            d3d_formats[i].formatTexture,
                                                            &i_formatSupport)) &&
-                    ( i_formatSupport & i_quadSupportFlags ))
+                    ( i_formatSupport & i_quadSupportFlags ) == i_quadSupportFlags)
             {
                 msg_Dbg(va, "Using pixel format %s", d3d_formats[i].name );
-                outputFormat = d3d_formats[i].formatTexture;
+                outputFormat.textureFormat      = d3d_formats[i].formatTexture;
+                outputFormat.resourceFormatYRGB = d3d_formats[i].formatY;
+                outputFormat.resourceFormatUV   = d3d_formats[i].formatUV;
 #if 0
                 sys->vlcFormat = d3d_formats[i].fourcc;
                 sys->picQuadConfig.textureFormat      = d3d_formats[i].formatTexture;
@@ -262,13 +289,13 @@ picture_pool_t *AllocPoolD3D11( vlc_object_t *va, const video_format_t *fmt, uns
             }
         }
     }
-    if ( outputFormat == DXGI_FORMAT_UNKNOWN )
+    if ( outputFormat.textureFormat == DXGI_FORMAT_UNKNOWN )
     {
        msg_Err(va, "Could not get a suitable texture pixel format");
        goto error;
     }
 
-    picture_pool_t *result = AllocPoolD3D11Ex(va, d3ddev, fmt, outputFormat, pool_size);
+    picture_pool_t *result = AllocPoolD3D11Ex(va, d3ddev, d3dctx, fmt, &outputFormat, pool_size);
     if (!result)
         goto error;
 
@@ -283,13 +310,20 @@ error:
     return NULL;
 }
 
-picture_pool_t *AllocPoolD3D11Ex(vlc_object_t *va, ID3D11Device *d3ddev,
-                                 const video_format_t *fmt, DXGI_FORMAT output,
+picture_pool_t *AllocPoolD3D11Ex(vlc_object_t *va, ID3D11Device *d3ddev, ID3D11DeviceContext *d3dctx,
+                                 const video_format_t *fmt, const d3d11_texture_cfg_t *cfg,
                                  unsigned pool_size)
 {
     picture_t**       pictures = NULL;
     unsigned          picture_count = 0;
     HRESULT           hr;
+
+    ID3D10Multithread *pMultithread;
+    hr = ID3D11Device_QueryInterface( d3ddev, &IID_ID3D10Multithread, (void **)&pMultithread);
+    if (SUCCEEDED(hr)) {
+        ID3D10Multithread_SetMultithreadProtected(pMultithread, TRUE);
+        ID3D10Multithread_Release(pMultithread);
+    }
 
     pictures = calloc(pool_size, sizeof(*pictures));
     if (!pictures)
@@ -300,20 +334,92 @@ picture_pool_t *AllocPoolD3D11Ex(vlc_object_t *va, ID3D11Device *d3ddev,
     texDesc.Width = fmt->i_width;
     texDesc.Height = fmt->i_height;
     texDesc.MipLevels = 1;
-    texDesc.Format = output;
+    texDesc.Format = cfg->textureFormat;
     texDesc.SampleDesc.Count = 1;
-    texDesc.MiscFlags = 0; // D3D11_RESOURCE_MISC_SHARED
-    texDesc.ArraySize = pool_size;
-    texDesc.Usage = D3D11_USAGE_STAGING; //D3D11_USAGE_DYNAMIC; //D3D11_USAGE_STAGING; // D3D11_USAGE_DEFAULT
-    texDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_RENDER_TARGET;// | D3D11_BIND_UNORDERED_ACCESS;
-    texDesc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
+    texDesc.MiscFlags = 0; //D3D11_RESOURCE_MISC_SHARED;
+    texDesc.ArraySize = 1;
+    texDesc.Usage = D3D11_USAGE_DYNAMIC;
+    texDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+    texDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
 
-    ID3D11Texture2D *p_texture;
-    hr = ID3D11Device_CreateTexture2D( d3ddev, &texDesc, NULL, &p_texture );
-    if (FAILED(hr)) {
-        msg_Err(va, "CreateTexture2D %d failed. (hr=0x%0lx)", pool_size, hr);
-        goto error;
+    D3D11_SHADER_RESOURCE_VIEW_DESC resviewDesc;
+    memset(&resviewDesc, 0, sizeof(resviewDesc));
+    resviewDesc.Format = cfg->resourceFormatYRGB;
+    resviewDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
+    resviewDesc.Texture2D.MipLevels = texDesc.MipLevels;
+
+    unsigned surface_count;
+    for (surface_count = 0; surface_count < pool_size; surface_count++) {
+        // TODO ? resviewDesc.Texture2D.ArraySlice = surface_count;
+
+        picture_sys_t *picsys = malloc(sizeof(*picsys));
+        if (unlikely(picsys == NULL))
+            goto error;
+
+        hr = ID3D11Device_CreateTexture2D( d3ddev, &texDesc, NULL, &picsys->texture.pTexture );
+        if (FAILED(hr)) {
+            msg_Err(va, "CreateTexture2D %d failed. (hr=0x%0lx)", pool_size, hr);
+            goto error;
+        }
+
+        picsys->texture.d3dresViewY = NULL;
+        picsys->texture.d3dresViewUV = NULL;
+#if 0
+        hr = ID3D11Device_CreateShaderResourceView(d3ddev, (ID3D11Resource *)picsys->texture.pTexture, &resviewDesc, &picsys->texture.d3dresViewY);
+        if (FAILED(hr)) {
+            msg_Err(va, "Could not Create the Y/RGB D3d11 Texture ResourceView. (hr=0x%lX)", hr);
+            ID3D11Texture2D_Release(picsys->texture.pTexture);
+            free(picsys);
+            goto error;
+        }
+
+        if( cfg->resourceFormatUV )
+        {
+            resviewDesc.Format = cfg->resourceFormatUV;
+            hr = ID3D11Device_CreateShaderResourceView(d3ddev, (ID3D11Resource *)picsys->texture.pTexture, &resviewDesc, &picsys->texture.d3dresViewUV);
+            if (FAILED(hr)) {
+                msg_Err(va, "Could not Create the UV D3d11 Texture ResourceView. (hr=0x%lX)", hr);
+                ID3D11ShaderResourceView_Release(picsys->texture.d3dresViewY);
+                ID3D11Texture2D_Release(picsys->texture.pTexture);
+                free(picsys);
+                goto error;
+            }
+        }
+#endif
+#if 0
+        hr = ID3D11VideoDevice_CreateVideoDecoderOutputView( (ID3D11VideoDevice*) dx_sys->d3ddec,
+                                                             (ID3D11Resource*) p_texture,
+                                                             &viewDesc,
+                                                             (ID3D11VideoDecoderOutputView**) &dx_sys->hw_surface[pool_size] );
+        if (FAILED(hr)) {
+            msg_Err(va, "CreateVideoDecoderOutputView %d failed. (hr=0x%0lx)", pool_size, hr);
+            ID3D11Texture2D_Release(picsys->texture.pTexture);
+            free(picsys);
+            goto error;
+        }
+#endif
+
+        picsys->context = d3dctx;
+
+        picture_resource_t resource = {
+            .p_sys = picsys,
+            .pf_destroy = DestroyPicture,
+        };
+
+        picture_t *picture = picture_NewFromResource(fmt, &resource);
+        if (unlikely(picture == NULL)) {
+            free(picsys);
+            goto error;
+        }
+
+        pictures[surface_count] = picture;
+        /* each picture_t holds a ref to the device and release it on Destroy */
+        ULONG ref = ID3D11DeviceContext_AddRef(picsys->context);
+        /* each picture_t holds a ref to the DLL */
+        picsys->hd3d11_dll = LoadLibrary(TEXT("D3D11.DLL"));
     }
+    msg_Dbg(va, "ID3D11VideoDecoderOutputView succeed with %d surfaces (%dx%d)",
+            pool_size, fmt->i_width, fmt->i_height);
 
 #if 0 // TODO
     D3D11_VIDEO_DECODER_OUTPUT_VIEW_DESC viewDesc;
@@ -358,6 +464,7 @@ picture_pool_t *AllocPoolD3D11Ex(vlc_object_t *va, ID3D11Device *d3ddev,
     }
     msg_Dbg(va, "ID3D11VideoDecoderOutputView succeed with %d surfaces (%dx%d)",
             pool_size, dx_sys->surface_width, dx_sys->surface_height);
+#endif
 
     /* release the system resources, they will be free'd with the pool */
     ID3D11Device_Release(d3ddev); /* TODO check this */
@@ -366,9 +473,9 @@ picture_pool_t *AllocPoolD3D11Ex(vlc_object_t *va, ID3D11Device *d3ddev,
     memset(&pool_cfg, 0, sizeof(pool_cfg));
     pool_cfg.picture_count = pool_size;
     pool_cfg.picture       = pictures;
+    pool_cfg.lock          = Direct3D11MapTexture; /* TODO we only need to map once */
 
     return picture_pool_NewExtended( &pool_cfg );
-#endif
 
 error:
     if (pictures) {
@@ -379,17 +486,38 @@ error:
     return NULL;
 }
 
+static int Direct3D11MapTexture(picture_t *picture)
+{
+    D3D11_MAPPED_SUBRESOURCE mappedResource;
+    HRESULT hr;
+    int res;
+    hr = ID3D11DeviceContext_Map(picture->p_sys->context, (ID3D11Resource *)picture->p_sys->texture.pTexture, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource);
+    if( FAILED(hr) )
+        return VLC_EGENERIC;
+
+    res = CommonUpdatePicture(picture, NULL, mappedResource.pData, mappedResource.RowPitch);
+    ID3D11DeviceContext_Unmap(picture->p_sys->context,(ID3D11Resource *)picture->p_sys->texture.pTexture, 0);
+    return res;
+}
+
 static void DestroyPicture(picture_t *picture)
 {
-    ID3D11Device *d3ddev;
-    ID3D11DeviceChild_GetDevice(picture->p_sys->surface, &d3ddev);
-    ID3D11Device_Release(d3ddev);
-    ID3D11Device_Release(d3ddev);
+    ULONG ref = ID3D11DeviceContext_Release(picture->p_sys->context);
 
-    ID3D11VideoDecoderOutputView_Release(picture->p_sys->surface);
+    D3D11RextureRelease(&picture->p_sys->texture);
 
     FreeLibrary(picture->p_sys->hd3d11_dll);
 
     free(picture->p_sys);
     free(picture);
+}
+
+void D3D11RextureRelease(d3d11_texture_t *p_texture)
+{
+    if (p_texture->pTexture)
+        ID3D11Texture2D_Release(p_texture->pTexture);
+    if (p_texture->d3dresViewY)
+        ID3D11ShaderResourceView_Release(p_texture->d3dresViewY);
+    if (p_texture->d3dresViewUV)
+        ID3D11ShaderResourceView_Release(p_texture->d3dresViewUV);
 }

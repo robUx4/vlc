@@ -39,9 +39,17 @@ typedef struct
     ID3D11ShaderResourceView  *d3dresViewUV;
 } d3d11_texture_t;
 
-picture_pool_t *AllocPoolD3D11( vlc_object_t *obj, const video_format_t *p_fmt, unsigned pool_size );
-picture_pool_t *AllocPoolD3D11Ex(vlc_object_t *obj, ID3D11Device *d3ddev,
-                                 const video_format_t *fmt, DXGI_FORMAT output,
-                                 unsigned pool_size);
+typedef struct
+{
+    DXGI_FORMAT   textureFormat;
+    DXGI_FORMAT   resourceFormatYRGB;
+    DXGI_FORMAT   resourceFormatUV;
+} d3d11_texture_cfg_t;
+
+picture_pool_t *AllocPoolD3D11( vlc_object_t *obj, const video_format_t *, unsigned pool_size );
+picture_pool_t *AllocPoolD3D11Ex(vlc_object_t *, ID3D11Device *, ID3D11DeviceContext *,
+                                 const video_format_t *,
+                                 const d3d11_texture_cfg_t *, unsigned pool_size);
+void D3D11RextureRelease(d3d11_texture_t *);
 
 #endif /* WIN32_DIRECT3D11_POOL_H_ */

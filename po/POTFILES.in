@@ -158,6 +158,8 @@ src/video_output/vout_control.h
 src/video_output/vout_internal.h
 src/video_output/vout_intf.c
 src/video_output/vout_subpictures.c
+src/win32/direct3d11_pool.c
+src/win32/direct3d11_pool.h
 src/win32/direct3d9_pool.c
 src/win32/direct3d9_pool.h
 src/win32/picture.c

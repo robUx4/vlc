@@ -54,13 +54,6 @@
 #ifdef MODULE_NAME_IS_direct3d11
 typedef struct
 {
-    DXGI_FORMAT   textureFormat;
-    DXGI_FORMAT   resourceFormatYRGB;
-    DXGI_FORMAT   resourceFormatUV;
-} d3d_quad_cfg_t;
-
-typedef struct
-{
     d3d11_texture_t           texture;
     ID3D11Buffer              *pVertexBuffer;
     ID3D11PixelShader         *d3dpixelShader;
@@ -178,10 +171,10 @@ struct vout_display_sys_t
     ID3D11Device             *d3ddevice;       /* D3D device */
     ID3D11DeviceContext      *d3dcontext;      /* D3D context */
     d3d_quad_t               picQuad;
-    d3d_quad_cfg_t           picQuadConfig;
+    d3d11_texture_cfg_t      picQuadConfig;
     ID3D11RenderTargetView   *d3drenderTargetView;
     ID3D11DepthStencilView   *d3ddepthStencilView;
-    picture_sys_t            *picsys;
+    //picture_sys_t            *picsys;
     vlc_fourcc_t             vlcFormat;
     const char               *d3dPxShader;
 

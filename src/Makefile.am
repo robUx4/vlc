@@ -312,6 +312,13 @@ SOURCES_libvlc_win32 += \
 endif
 endif
 
+if HAVE_AVCODEC_D3D11VA
+SOURCES_libvlc_win32 += \
+	win32/direct3d11_pool.c \
+	win32/direct3d11_pool.h \
+	$(NULL)
+endif
+
 SOURCES_libvlc_symbian = \
 	symbian/path.cpp \
 	symbian/dirs.c \

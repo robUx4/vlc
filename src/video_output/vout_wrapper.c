@@ -35,8 +35,11 @@
 #include <assert.h>
 #include "vout_internal.h"
 #include "display.h"
-#if defined(_WIN32) && defined(HAVE_D3D9_H)
+#if defined(HAVE_AVCODEC_DXVA2)
 #include "../win32/direct3d9_pool.h"
+#endif
+#if defined(HAVE_AVCODEC_D3D11VA)
+#include "../win32/direct3d11_pool.h"
 #endif
 
 /*****************************************************************************
@@ -153,6 +156,11 @@ int vout_InitWrapper(vout_thread_t *vout)
 #if defined(HAVE_AVCODEC_DXVA2)
         if (source.i_chroma == VLC_CODEC_D3D9_OPAQUE)
             sys->decoder_pool = AllocPoolD3D9( VLC_OBJECT(vout), &source, decoder_pool_size );
+        else
+#endif
+#if defined(HAVE_AVCODEC_D3D11VA)
+        if (source.i_chroma == VLC_CODEC_D3D11_OPAQUE)
+            sys->decoder_pool = AllocPoolD3D11( VLC_OBJECT(vout), &source, decoder_pool_size );
         else
 #endif
             sys->decoder_pool = picture_pool_NewFromFormat( &source, decoder_pool_size );
