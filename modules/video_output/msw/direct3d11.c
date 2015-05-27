@@ -982,6 +982,7 @@ static int Direct3D11Open(vout_display_t *vd, video_format_t *fmt)
     switch (sys->vlcFormat)
     {
     case VLC_CODEC_NV12:
+    case VLC_CODEC_D3D11_OPAQUE:
         if( fmt->i_height > 576 )
             sys->d3dPxShader = globPixelShaderBiplanarYUV_BT709_2RGB;
         else
