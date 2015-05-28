@@ -507,8 +507,9 @@ static void Close(vlc_object_t *object)
 static picture_pool_t *Pool(vout_display_t *vd, unsigned count)
 {
     if ( vd->sys->pool == NULL )
-        vd->sys->pool = AllocPoolD3D11Ex( VLC_OBJECT(vd), vd->sys->d3ddevice, vd->sys->d3dcontext, &vd->fmt,
-                                          &vd->sys->picQuadConfig, count );
+        vd->sys->pool = AllocPoolD3D11Ex( VLC_OBJECT(vd), vd->sys->d3ddevice,
+                                          vd->sys->d3dcontext, &vd->fmt,
+                                          vd->sys->picQuadConfig.textureFormat, count );
     return vd->sys->pool;
 }
 

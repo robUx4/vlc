@@ -235,9 +235,7 @@ picture_pool_t *AllocPoolD3D11( vlc_object_t *va, const video_format_t *fmt, uns
     else
         i_src_chroma = fmt->i_chroma;
 
-    d3d11_texture_cfg_t outputFormat = {
-        .textureFormat =  DXGI_FORMAT_UNKNOWN,
-    };
+    DXGI_FORMAT outputFormat =  DXGI_FORMAT_UNKNOWN;
 
     // look for the request pixel format first
     UINT i_quadSupportFlags = D3D11_FORMAT_SUPPORT_TEXTURE2D | D3D11_FORMAT_SUPPORT_SHADER_LOAD;
@@ -252,16 +250,14 @@ picture_pool_t *AllocPoolD3D11( vlc_object_t *va, const video_format_t *fmt, uns
                     ( i_formatSupport & i_quadSupportFlags ) == i_quadSupportFlags)
             {
                 msg_Dbg(va, "Using pixel format %s", d3d_formats[i].name );
-                outputFormat.textureFormat      = d3d_formats[i].formatTexture;
-                outputFormat.resourceFormatYRGB = d3d_formats[i].formatY;
-                outputFormat.resourceFormatUV   = d3d_formats[i].formatUV;
+                outputFormat = d3d_formats[i].formatTexture;
                 break;
             }
         }
     }
 
     // look for any pixel format that we can handle
-    if ( outputFormat.textureFormat == DXGI_FORMAT_UNKNOWN )
+    if ( outputFormat == DXGI_FORMAT_UNKNOWN )
     {
         for (unsigned i = 0; d3d_formats[i].name != 0; i++)
         {
@@ -271,20 +267,18 @@ picture_pool_t *AllocPoolD3D11( vlc_object_t *va, const video_format_t *fmt, uns
                     ( i_formatSupport & i_quadSupportFlags ) == i_quadSupportFlags)
             {
                 msg_Dbg(va, "Using pixel format %s", d3d_formats[i].name );
-                outputFormat.textureFormat      = d3d_formats[i].formatTexture;
-                outputFormat.resourceFormatYRGB = d3d_formats[i].formatY;
-                outputFormat.resourceFormatUV   = d3d_formats[i].formatUV;
+                outputFormat = d3d_formats[i].formatTexture;
                 break;
             }
         }
     }
-    if ( outputFormat.textureFormat == DXGI_FORMAT_UNKNOWN )
+    if ( outputFormat == DXGI_FORMAT_UNKNOWN )
     {
        msg_Err(va, "Could not get a suitable texture pixel format");
        goto error;
     }
 
-    picture_pool_t *result = AllocPoolD3D11Ex(va, d3ddev, d3dctx, fmt, &outputFormat, pool_size);
+    picture_pool_t *result = AllocPoolD3D11Ex(va, d3ddev, d3dctx, fmt, outputFormat, pool_size);
     if (!result)
         goto error;
 
@@ -300,7 +294,7 @@ error:
 }
 
 picture_pool_t *AllocPoolD3D11Ex(vlc_object_t *va, ID3D11Device *d3ddev, ID3D11DeviceContext *d3dctx,
-                                 const video_format_t *fmt, const d3d11_texture_cfg_t *cfg,
+                                 const video_format_t *fmt, DXGI_FORMAT output_format,
                                  unsigned pool_size)
 {
     picture_t**       pictures = NULL;
@@ -323,7 +317,7 @@ picture_pool_t *AllocPoolD3D11Ex(vlc_object_t *va, ID3D11Device *d3ddev, ID3D11D
     texDesc.Width = fmt->i_width;
     texDesc.Height = fmt->i_height;
     texDesc.MipLevels = 1;
-    texDesc.Format = cfg->textureFormat;
+    texDesc.Format = output_format;
     texDesc.SampleDesc.Count = 1;
     texDesc.MiscFlags = 0; //D3D11_RESOURCE_MISC_SHARED;
     texDesc.ArraySize = 1;
