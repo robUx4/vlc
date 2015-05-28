@@ -346,17 +346,9 @@ picture_pool_t *AllocPoolD3D11Ex(vlc_object_t *va, ID3D11Device *d3ddev, ID3D11D
     texDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
     texDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
 
-    D3D11_SHADER_RESOURCE_VIEW_DESC resviewDesc;
-    memset(&resviewDesc, 0, sizeof(resviewDesc));
-    resviewDesc.Format = cfg->resourceFormatYRGB;
-    resviewDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
-    resviewDesc.Texture2D.MipLevels = texDesc.MipLevels;
-
     unsigned surface_count;
     for (surface_count = 0; surface_count < pool_size; surface_count++) {
-        // TODO ? resviewDesc.Texture2D.ArraySlice = surface_count;
-
-        picture_sys_t *picsys = malloc(sizeof(*picsys));
+        picture_sys_t *picsys = calloc(1, sizeof(*picsys));
         if (unlikely(picsys == NULL))
             goto error;
 
@@ -365,9 +357,6 @@ picture_pool_t *AllocPoolD3D11Ex(vlc_object_t *va, ID3D11Device *d3ddev, ID3D11D
             msg_Err(va, "CreateTexture2D %d failed. (hr=0x%0lx)", pool_size, hr);
             goto error;
         }
-
-        picsys->texture.d3dresViewY = NULL;
-        picsys->texture.d3dresViewUV = NULL;
 
         picsys->context = d3dctx;
         picsys->device = d3ddev;
@@ -384,8 +373,8 @@ picture_pool_t *AllocPoolD3D11Ex(vlc_object_t *va, ID3D11Device *d3ddev, ID3D11D
         }
 
         pictures[surface_count] = picture;
-        /* each picture_t holds a ref to the device and release it on Destroy */
-        ULONG ref = ID3D11DeviceContext_AddRef(picsys->context);
+        /* each picture_t holds a ref to the context and release it on Destroy */
+        ID3D11DeviceContext_AddRef(picsys->context);
         /* each picture_t holds a ref to the DLL */
         picsys->hd3d11_dll = LoadLibrary(TEXT("D3D11.DLL"));
     }
