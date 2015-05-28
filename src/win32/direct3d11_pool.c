@@ -44,7 +44,6 @@
 DEFINE_GUID(IID_ID3D10Multithread,   0x9b7e4e00, 0x342c, 0x4106, 0xa1, 0x9f, 0x4f, 0x27, 0x04, 0xf6, 0x89, 0xf0);
 
 static int Direct3D11MapTexture(picture_t *);
-static void DestroyPicture(picture_t *);
 
 typedef struct
 {
@@ -251,7 +250,7 @@ picture_pool_t *AllocPoolD3D11Ex(vlc_object_t *va, ID3D11Device *d3ddev, ID3D11D
 
         picture_resource_t resource = {
             .p_sys = picsys,
-            .pf_destroy = DestroyPicture,
+            .pf_destroy = DestroyD3D11Picture,
         };
 
         picture_t *picture = picture_NewFromResource(fmt, &resource);
@@ -283,7 +282,7 @@ picture_pool_t *AllocPoolD3D11Ex(vlc_object_t *va, ID3D11Device *d3ddev, ID3D11D
 error:
     if (pictures) {
         for (unsigned i=0;i<picture_count; ++i)
-            DestroyPicture(pictures[i]);
+            DestroyD3D11Picture(pictures[i]);
         free(pictures);
     }
     return NULL;
@@ -294,16 +293,17 @@ static int Direct3D11MapTexture(picture_t *picture)
     D3D11_MAPPED_SUBRESOURCE mappedResource;
     HRESULT hr;
     int res;
-    hr = ID3D11DeviceContext_Map(picture->p_sys->context, (ID3D11Resource *)picture->p_sys->texture, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource);
+    picture_sys_t *p_sys = picture->p_sys;
+    hr = ID3D11DeviceContext_Map(picture->p_sys->context, (ID3D11Resource *)p_sys->texture, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource);
     if( FAILED(hr) )
         return VLC_EGENERIC;
 
     res = CommonUpdatePicture(picture, NULL, mappedResource.pData, mappedResource.RowPitch);
-    ID3D11DeviceContext_Unmap(picture->p_sys->context,(ID3D11Resource *)picture->p_sys->texture, 0);
+    ID3D11DeviceContext_Unmap(picture->p_sys->context,(ID3D11Resource *)p_sys->texture, 0);
     return res;
 }
 
-static void DestroyPicture(picture_t *picture)
+void DestroyD3D11Picture(picture_t *picture)
 {
     picture_sys_t *p_sys = picture->p_sys;
     ID3D11DeviceContext_Release(p_sys->context);

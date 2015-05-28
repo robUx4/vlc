@@ -40,5 +40,6 @@ struct picture_sys_t {
 picture_pool_t *AllocPoolD3D11( vlc_object_t *obj, const video_format_t *, unsigned pool_size );
 picture_pool_t *AllocPoolD3D11Ex(vlc_object_t *, ID3D11Device *, ID3D11DeviceContext *,
                                  const video_format_t *, DXGI_FORMAT, unsigned pool_size);
+void DestroyD3D11Picture(picture_t *);
 
 #endif /* WIN32_DIRECT3D11_POOL_H_ */

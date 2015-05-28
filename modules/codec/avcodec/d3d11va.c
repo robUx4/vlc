@@ -161,6 +161,7 @@ static int Extract(vlc_va_t *va, picture_t *picture, uint8_t *data)
     ID3D11VideoDecoderOutputView *d3d = (ID3D11VideoDecoderOutputView*)(uintptr_t)data;
     ID3D11Resource *p_texture = NULL;
     D3D11_VIDEO_DECODER_OUTPUT_VIEW_DESC viewDesc;
+    picture_sys_t *p_sys = picture->p_sys;
 
     assert( picture->format.i_chroma == VLC_CODEC_D3D11_OPAQUE);
 
@@ -173,8 +174,10 @@ static int Extract(vlc_va_t *va, picture_t *picture, uint8_t *data)
     }
 
     /* copy decoder slice to surface */
-    ID3D11DeviceContext_CopySubresourceRegion(sys->d3dctx, (ID3D11Resource*) picture->p_sys->texture, 0, 0, 0, 0,
-                                              p_texture, viewDesc.Texture2D.ArraySlice, NULL);
+    ID3D11DeviceContext_CopySubresourceRegion(sys->d3dctx, (ID3D11Resource*) p_sys->texture,
+                                              0, 0, 0, 0,
+                                              p_texture, viewDesc.Texture2D.ArraySlice,
+                                              NULL);
 
     if (p_texture!=NULL)
         ID3D11Resource_Release(p_texture);
