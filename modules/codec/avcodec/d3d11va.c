@@ -189,14 +189,9 @@ static int Extract(vlc_va_t *va, picture_t *picture, uint8_t *data)
     vlc_va_sys_t *sys = va->sys;
     ID3D11VideoDecoderOutputView *d3d = (ID3D11VideoDecoderOutputView*)(uintptr_t)data;
     ID3D11Resource *p_texture = NULL;
-    D3D11_TEXTURE2D_DESC texDesc, dstDesc;
     D3D11_VIDEO_DECODER_OUTPUT_VIEW_DESC viewDesc;
-    //D3D11_MAPPED_SUBRESOURCE mappedResource;
-    //HRESULT hr;
 
     assert( picture->format.i_chroma == VLC_CODEC_D3D11_OPAQUE);
-
-    ID3D11VideoDecoderOutputView_GetDesc( d3d, &viewDesc );
 
     ID3D11VideoDecoderOutputView_GetResource( d3d, &p_texture );
     if (!p_texture) {
@@ -204,32 +199,11 @@ static int Extract(vlc_va_t *va, picture_t *picture, uint8_t *data)
         goto error;
     }
 
-    ID3D11Texture2D_GetDesc( (ID3D11Texture2D*) p_texture, &texDesc);
-    ID3D11Texture2D_GetDesc( picture->p_sys->texture.pTexture, &dstDesc);
+    ID3D11VideoDecoderOutputView_GetDesc( d3d, &viewDesc );
 
     /* extract to NV12 planes */
     ID3D11DeviceContext_CopySubresourceRegion(sys->d3dctx, (ID3D11Resource*) picture->p_sys->texture.pTexture, 0, 0, 0, 0,
                                               p_texture, viewDesc.Texture2D.ArraySlice, NULL);
-
-#if 0
-    hr = ID3D11DeviceContext_Map(sys->d3dctx, sys->staging, 0, D3D11_MAP_READ, 0, &mappedResource);
-    if (FAILED(hr)) {
-        msg_Err(va, "Failed to map the texture surface pixels (hr=0x%0lx)", hr );
-        goto error;
-    }
-
-    uint8_t *plane[2] = {
-        mappedResource.pData,
-        (uint8_t*)mappedResource.pData + mappedResource.RowPitch * texDesc.Height,
-    };
-    size_t  pitch[2] = {
-        mappedResource.RowPitch,
-        mappedResource.RowPitch,
-    };
-    CopyFromNv12ToNv12(picture, plane, pitch, texDesc.Width, texDesc.Height, sys->p_copy_cache );
-
-    ID3D11DeviceContext_Unmap(sys->d3dctx, sys->staging, 0);
-#endif
 
     if (p_texture!=NULL)
         ID3D11Resource_Release(p_texture);
