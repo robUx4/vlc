@@ -46,13 +46,6 @@ DEFINE_GUID(IID_ID3D10Multithread,   0x9b7e4e00, 0x342c, 0x4106, 0xa1, 0x9f, 0x4
 static int Direct3D11MapTexture(picture_t *);
 static void DestroyPicture(picture_t *);
 
-struct picture_sys_t {
-    ID3D11Texture2D     *texture;
-    ID3D11Device        *device;
-    ID3D11DeviceContext *context;
-    HINSTANCE           hd3d11_dll;
-};
-
 typedef struct
 {
     const char   *name;

@@ -53,14 +53,6 @@ vlc_module_end ()
 
 #include "../../src/win32/direct3d11_pool.h"
 
-/* must match the one in direct3d11_pool */
-struct picture_sys_t {
-    ID3D11Texture2D     *texture;
-    ID3D11Device        *device;
-    ID3D11DeviceContext *context;
-    HINSTANCE           hd3d11_dll;
-};
-
 struct filter_sys_t {
     copy_cache_t     cache;
     ID3D11Texture2D  *staging;

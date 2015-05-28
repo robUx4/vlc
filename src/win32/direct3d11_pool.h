@@ -30,6 +30,13 @@
 #include <vlc_common.h>
 #include <vlc_picture_pool.h>
 
+struct picture_sys_t {
+    ID3D11Texture2D     *texture;
+    ID3D11Device        *device;
+    ID3D11DeviceContext *context;
+    HINSTANCE           hd3d11_dll;
+};
+
 picture_pool_t *AllocPoolD3D11( vlc_object_t *obj, const video_format_t *, unsigned pool_size );
 picture_pool_t *AllocPoolD3D11Ex(vlc_object_t *, ID3D11Device *, ID3D11DeviceContext *,
                                  const video_format_t *, DXGI_FORMAT, unsigned pool_size);

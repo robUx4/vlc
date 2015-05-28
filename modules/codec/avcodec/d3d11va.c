@@ -110,14 +110,6 @@ struct vlc_va_sys_t
     struct AVD3D11VAContext      hw;
 };
 
-/* must match the one in direct3d11_pool */
-struct picture_sys_t {
-    ID3D11Texture2D     *texture;
-    ID3D11Device        *device;
-    ID3D11DeviceContext *context;
-    HINSTANCE           hd3d11_dll;
-};
-
 /* */
 static int D3dCreateDevice(vlc_va_t *);
 static void D3dDestroyDevice(vlc_va_t *);

@@ -109,12 +109,6 @@ static const d3d_format_t d3d_formats[] = {
     { NULL, 0, 0, 0, 0}
 };
 
-struct picture_sys_t
-{
-    ID3D11Texture2D     *texture;
-    ID3D11DeviceContext *context;
-};
-
 /* matches the D3D11_INPUT_ELEMENT_DESC we setup */
 typedef struct d3d_vertex_t {
     D3DXVECTOR3 position;
