@@ -261,9 +261,6 @@ picture_pool_t *AllocPoolD3D11( vlc_object_t *va, const video_format_t *fmt, uns
                 outputFormat.textureFormat      = d3d_formats[i].formatTexture;
                 outputFormat.resourceFormatYRGB = d3d_formats[i].formatY;
                 outputFormat.resourceFormatUV   = d3d_formats[i].formatUV;
-#if 0
-                sys->vlcFormat = d3d_formats[i].fourcc;
-#endif
                 break;
             }
         }
@@ -283,12 +280,6 @@ picture_pool_t *AllocPoolD3D11( vlc_object_t *va, const video_format_t *fmt, uns
                 outputFormat.textureFormat      = d3d_formats[i].formatTexture;
                 outputFormat.resourceFormatYRGB = d3d_formats[i].formatY;
                 outputFormat.resourceFormatUV   = d3d_formats[i].formatUV;
-#if 0
-                sys->vlcFormat = d3d_formats[i].fourcc;
-                sys->picQuadConfig.textureFormat      = d3d_formats[i].formatTexture;
-                sys->picQuadConfig.resourceFormatYRGB = d3d_formats[i].formatY;
-                sys->picQuadConfig.resourceFormatUV   = d3d_formats[i].formatUV;
-#endif
                 break;
             }
         }
@@ -417,7 +408,7 @@ static int Direct3D11MapTexture(picture_t *picture)
 
 static void DestroyPicture(picture_t *picture)
 {
-    ULONG ref = ID3D11DeviceContext_Release(picture->p_sys->context);
+    ID3D11DeviceContext_Release(picture->p_sys->context);
 
     D3D11TextureRelease(&picture->p_sys->texture);
 

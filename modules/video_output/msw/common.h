@@ -174,8 +174,6 @@ struct vout_display_sys_t
     d3d11_texture_cfg_t      picQuadConfig;
     ID3D11RenderTargetView   *d3drenderTargetView;
     ID3D11DepthStencilView   *d3ddepthStencilView;
-    //picture_sys_t            *picsys;
-    vlc_fourcc_t             vlcFormat;
     const char               *d3dPxShader;
 
     // SPU
