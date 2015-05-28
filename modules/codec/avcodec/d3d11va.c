@@ -112,7 +112,7 @@ struct vlc_va_sys_t
 
 /* must match the one in direct3d11_pool */
 struct picture_sys_t {
-    d3d11_texture_t     texture;
+    ID3D11Texture2D     *texture;
     ID3D11Device        *device;
     ID3D11DeviceContext *context;
     HINSTANCE           hd3d11_dll;
@@ -181,7 +181,7 @@ static int Extract(vlc_va_t *va, picture_t *picture, uint8_t *data)
     }
 
     /* copy decoder slice to surface */
-    ID3D11DeviceContext_CopySubresourceRegion(sys->d3dctx, (ID3D11Resource*) picture->p_sys->texture.pTexture, 0, 0, 0, 0,
+    ID3D11DeviceContext_CopySubresourceRegion(sys->d3dctx, (ID3D11Resource*) picture->p_sys->texture, 0, 0, 0, 0,
                                               p_texture, viewDesc.Texture2D.ArraySlice, NULL);
 
     if (p_texture!=NULL)
@@ -283,7 +283,7 @@ static int Open(vlc_va_t *va, AVCodecContext *ctx, enum PixelFormat pix_fmt,
             sys->d3dvidctx = d3dvidctx;
 
             D3D11_TEXTURE2D_DESC dstDesc;
-            ID3D11Texture2D_GetDesc( p_sys->texture.pTexture, &dstDesc);
+            ID3D11Texture2D_GetDesc( p_sys->texture, &dstDesc);
             sys->render = dstDesc.Format;
         }
     }

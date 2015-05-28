@@ -111,7 +111,7 @@ static const d3d_format_t d3d_formats[] = {
 
 struct picture_sys_t
 {
-    d3d11_texture_t     texture;
+    ID3D11Texture2D     *texture;
     ID3D11DeviceContext *context;
 };
 
@@ -626,7 +626,7 @@ static void Prepare(vout_display_t *vd, picture_t *picture, subpicture_t *subpic
         box.back = 1;
         box.front = 0;
         ID3D11DeviceContext_CopySubresourceRegion(sys->d3dcontext, (ID3D11Resource*) sys->picQuad.pTexture, 0, 0, 0, 0,
-                                                  (ID3D11Resource*) picture->p_sys->texture.pTexture, 0, &box);
+                                                  (ID3D11Resource*) picture->p_sys->texture, 0, &box);
     }
 
     /* float ClearColor[4] = { 1.0f, 0.125f, 0.3f, 1.0f }; */
@@ -1285,7 +1285,7 @@ static int Direct3D11CreateResources(vout_display_t *vd, video_format_t *fmt)
 
 static void DestroyPicture(picture_t *picture)
 {
-    ID3D11Texture2D_Release(picture->p_sys->texture.pTexture);
+    ID3D11Texture2D_Release(picture->p_sys->texture);
     ID3D11DeviceContext_Release(picture->p_sys->context);
 }
 
@@ -1302,8 +1302,8 @@ static int Direct3D11CreatePool(vout_display_t *vd, video_format_t *fmt)
         return VLC_ENOMEM;
     }
 
-    picsys->texture.pTexture  = sys->picQuad.pTexture;
-    picsys->context           = sys->d3dcontext;
+    picsys->texture = sys->picQuad.pTexture;
+    picsys->context = sys->d3dcontext;
 
     picture_resource_t resource = {
         .p_sys = picsys,
@@ -1319,7 +1319,7 @@ static int Direct3D11CreatePool(vout_display_t *vd, video_format_t *fmt)
         free(picsys);
         return VLC_ENOMEM;
     }
-    ID3D11Texture2D_AddRef(picsys->texture.pTexture);
+    ID3D11Texture2D_AddRef(picsys->texture);
     ID3D11DeviceContext_AddRef(picsys->context);
 
     picture_pool_configuration_t pool_cfg;
@@ -1461,12 +1461,12 @@ static int Direct3D11MapTexture(picture_t *picture)
     D3D11_MAPPED_SUBRESOURCE mappedResource;
     HRESULT hr;
     int res;
-    hr = ID3D11DeviceContext_Map(picture->p_sys->context, (ID3D11Resource *)picture->p_sys->texture.pTexture, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource);
+    hr = ID3D11DeviceContext_Map(picture->p_sys->context, (ID3D11Resource *)picture->p_sys->texture, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource);
     if( FAILED(hr) )
         return VLC_EGENERIC;
 
     res = CommonUpdatePicture(picture, NULL, mappedResource.pData, mappedResource.RowPitch);
-    ID3D11DeviceContext_Unmap(picture->p_sys->context,(ID3D11Resource *)picture->p_sys->texture.pTexture, 0);
+    ID3D11DeviceContext_Unmap(picture->p_sys->context,(ID3D11Resource *)picture->p_sys->texture, 0);
     return res;
 }
 

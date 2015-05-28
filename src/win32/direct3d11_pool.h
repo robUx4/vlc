@@ -30,18 +30,8 @@
 #include <vlc_common.h>
 #include <vlc_picture_pool.h>
 
-#define VA_DXVA2_MAX_SURFACE_COUNT (64)
-
-typedef struct
-{
-    ID3D11Texture2D           *pTexture;
-    ID3D11ShaderResourceView  *d3dresViewY;
-    ID3D11ShaderResourceView  *d3dresViewUV;
-} d3d11_texture_t;
-
 picture_pool_t *AllocPoolD3D11( vlc_object_t *obj, const video_format_t *, unsigned pool_size );
 picture_pool_t *AllocPoolD3D11Ex(vlc_object_t *, ID3D11Device *, ID3D11DeviceContext *,
                                  const video_format_t *, DXGI_FORMAT, unsigned pool_size);
-void D3D11TextureRelease(d3d11_texture_t *);
 
 #endif /* WIN32_DIRECT3D11_POOL_H_ */

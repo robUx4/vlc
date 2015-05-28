@@ -47,7 +47,7 @@ static int Direct3D11MapTexture(picture_t *);
 static void DestroyPicture(picture_t *);
 
 struct picture_sys_t {
-    d3d11_texture_t     texture;
+    ID3D11Texture2D     *texture;
     ID3D11Device        *device;
     ID3D11DeviceContext *context;
     HINSTANCE           hd3d11_dll;
@@ -247,7 +247,7 @@ picture_pool_t *AllocPoolD3D11Ex(vlc_object_t *va, ID3D11Device *d3ddev, ID3D11D
         if (unlikely(picsys == NULL))
             goto error;
 
-        hr = ID3D11Device_CreateTexture2D( d3ddev, &texDesc, NULL, &picsys->texture.pTexture );
+        hr = ID3D11Device_CreateTexture2D( d3ddev, &texDesc, NULL, &picsys->texture );
         if (FAILED(hr)) {
             msg_Err(va, "CreateTexture2D %d failed. (hr=0x%0lx)", pool_size, hr);
             goto error;
@@ -301,33 +301,25 @@ static int Direct3D11MapTexture(picture_t *picture)
     D3D11_MAPPED_SUBRESOURCE mappedResource;
     HRESULT hr;
     int res;
-    hr = ID3D11DeviceContext_Map(picture->p_sys->context, (ID3D11Resource *)picture->p_sys->texture.pTexture, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource);
+    hr = ID3D11DeviceContext_Map(picture->p_sys->context, (ID3D11Resource *)picture->p_sys->texture, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource);
     if( FAILED(hr) )
         return VLC_EGENERIC;
 
     res = CommonUpdatePicture(picture, NULL, mappedResource.pData, mappedResource.RowPitch);
-    ID3D11DeviceContext_Unmap(picture->p_sys->context,(ID3D11Resource *)picture->p_sys->texture.pTexture, 0);
+    ID3D11DeviceContext_Unmap(picture->p_sys->context,(ID3D11Resource *)picture->p_sys->texture, 0);
     return res;
 }
 
 static void DestroyPicture(picture_t *picture)
 {
-    ID3D11DeviceContext_Release(picture->p_sys->context);
+    picture_sys_t *p_sys = picture->p_sys;
+    ID3D11DeviceContext_Release(p_sys->context);
 
-    D3D11TextureRelease(&picture->p_sys->texture);
+    if (p_sys->texture)
+        ID3D11Texture2D_Release(p_sys->texture);
 
-    FreeLibrary(picture->p_sys->hd3d11_dll);
+    FreeLibrary(p_sys->hd3d11_dll);
 
-    free(picture->p_sys);
+    free(p_sys);
     free(picture);
-}
-
-void D3D11TextureRelease(d3d11_texture_t *p_texture)
-{
-    if (p_texture->pTexture)
-        ID3D11Texture2D_Release(p_texture->pTexture);
-    if (p_texture->d3dresViewY)
-        ID3D11ShaderResourceView_Release(p_texture->d3dresViewY);
-    if (p_texture->d3dresViewUV)
-        ID3D11ShaderResourceView_Release(p_texture->d3dresViewUV);
 }

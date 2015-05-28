@@ -55,7 +55,7 @@ vlc_module_end ()
 
 /* must match the one in direct3d11_pool */
 struct picture_sys_t {
-    d3d11_texture_t     texture;
+    ID3D11Texture2D     *texture;
     ID3D11Device        *device;
     ID3D11DeviceContext *context;
     HINSTANCE           hd3d11_dll;
@@ -75,7 +75,7 @@ static int assert_staging(filter_t *p_filter, picture_sys_t *p_sys)
         goto ok;
 
     D3D11_TEXTURE2D_DESC texDesc;
-    ID3D11Texture2D_GetDesc(p_sys->texture.pTexture, &texDesc);
+    ID3D11Texture2D_GetDesc(p_sys->texture, &texDesc);
 
     texDesc.MipLevels = 1;
     //texDesc.SampleDesc.Count = 1;
@@ -107,7 +107,7 @@ static void D3D11_YUY2(filter_t *p_filter, picture_t *src, picture_t *dst)
         return;
 
     ID3D11DeviceContext_CopyResource(p_sys->context, (ID3D11Resource*) sys->staging,
-                                     (ID3D11Resource*) p_sys->texture.pTexture);
+                                     (ID3D11Resource*) p_sys->texture);
 
     HRESULT hr = ID3D11DeviceContext_Map(p_sys->context, (ID3D11Resource*) sys->staging,
                                          0, D3D11_MAP_READ, 0, &lock);
@@ -179,7 +179,7 @@ static void D3D11_NV12(filter_t *p_filter, picture_t *src, picture_t *dst)
         return;
 
     ID3D11DeviceContext_CopyResource(p_sys->context, (ID3D11Resource*) sys->staging,
-                                     (ID3D11Resource*) p_sys->texture.pTexture);
+                                     (ID3D11Resource*) p_sys->texture);
 
     HRESULT hr = ID3D11DeviceContext_Map(p_sys->context, (ID3D11Resource*) sys->staging,
                                          0, D3D11_MAP_READ, 0, &lock);
