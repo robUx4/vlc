@@ -169,7 +169,7 @@ VIDEO_FILTER_WRAPPER (DXA9_NV12)
 static int OpenConverter( vlc_object_t *obj )
 {
     filter_t *p_filter = (filter_t *)obj;
-    if ( p_filter->fmt_in.video.i_chroma != VLC_CODEC_D3D9_OPAQUE )
+    if ( 1 || p_filter->fmt_in.video.i_chroma != VLC_CODEC_D3D9_OPAQUE )
         return VLC_EGENERIC;
 
     if ( p_filter->fmt_in.video.i_height != p_filter->fmt_out.video.i_height
