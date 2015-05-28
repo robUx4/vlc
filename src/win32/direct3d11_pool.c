@@ -56,6 +56,7 @@ static int Direct3D11MapTexture(picture_t *);
 
 struct picture_sys_t {
     d3d11_texture_t     texture;
+    ID3D11Device        *device;
     ID3D11DeviceContext *context;
     HINSTANCE           hd3d11_dll;
 };
@@ -124,7 +125,7 @@ picture_pool_t *AllocPoolD3D11( vlc_object_t *va, const video_format_t *fmt, uns
 
     /* Create the D3D object. */
     UINT creationFlags = D3D11_CREATE_DEVICE_VIDEO_SUPPORT; // used for direct rendering
-# if !defined(NDEBUG) && defined(_MSC_VER)
+# if !defined(NDEBUG) //&& defined(_MSC_VER)
     creationFlags |= D3D11_CREATE_DEVICE_DEBUG;
 # endif
 
@@ -140,7 +141,10 @@ picture_pool_t *AllocPoolD3D11( vlc_object_t *va, const video_format_t *fmt, uns
         hr = pf_CreateDevice(NULL, driverAttempts[driver], NULL,
                                  creationFlags, NULL, 0,
                                  D3D11_SDK_VERSION, &d3ddev, NULL, &d3dctx);
-        if (SUCCEEDED(hr)) break;
+        if (SUCCEEDED(hr)) {
+            msg_Dbg(va, "Created the D3D11 pool device 0x%p ctx 0x%p type %d.", d3ddev, d3dctx, driverAttempts[driver]);
+            break;
+        }
     }
     if (FAILED(hr)) {
         msg_Err(va, "D3D11CreateDevice failed. (hr=0x%lX)", hr);
@@ -400,6 +404,7 @@ picture_pool_t *AllocPoolD3D11Ex(vlc_object_t *va, ID3D11Device *d3ddev, ID3D11D
 #endif
 
         picsys->context = d3dctx;
+        picsys->device = d3ddev;
 
         picture_resource_t resource = {
             .p_sys = picsys,

@@ -45,11 +45,11 @@
 #include <libavcodec/d3d11va.h>
 
 #include "../../video_chroma/copy.h"
+#include "../../src/win32/direct3d11_pool.h"
 
 static int Open(vlc_va_t *, AVCodecContext *, enum PixelFormat,
                 const es_format_t *, picture_sys_t *p_sys);
 static void Close(vlc_va_t *, AVCodecContext *);
-static ID3D11Device *GetOutputViewDevice(ID3D11Texture2D *);
 
 vlc_module_begin()
     set_description(N_("Direct3D11 Video Acceleration"))
@@ -131,10 +131,12 @@ struct vlc_va_sys_t
     copy_cache_t                 *p_copy_cache;
 };
 
-/* should match the one in direct3d11_pool */
-struct picture_sys_t
-{
-    ID3D11Texture2D              *pTexture;
+/* must match the one in direct3d11_pool */
+struct picture_sys_t {
+    d3d11_texture_t     texture;
+    ID3D11Device        *device;
+    ID3D11DeviceContext *context;
+    HINSTANCE           hd3d11_dll;
 };
 
 /* */
@@ -203,10 +205,10 @@ static int Extract(vlc_va_t *va, picture_t *picture, uint8_t *data)
     }
 
     ID3D11Texture2D_GetDesc( (ID3D11Texture2D*) p_texture, &texDesc);
-    ID3D11Texture2D_GetDesc( picture->p_sys->pTexture, &dstDesc);
+    ID3D11Texture2D_GetDesc( picture->p_sys->texture.pTexture, &dstDesc);
 
     /* extract to NV12 planes */
-    ID3D11DeviceContext_CopySubresourceRegion(sys->d3dctx, (ID3D11Resource*) picture->p_sys->pTexture, 0, 0, 0, 0,
+    ID3D11DeviceContext_CopySubresourceRegion(sys->d3dctx, (ID3D11Resource*) picture->p_sys->texture.pTexture, 0, 0, 0, 0,
                                               p_texture, viewDesc.Texture2D.ArraySlice, NULL);
 
 #if 0
@@ -260,15 +262,6 @@ static int CheckDevice(vlc_va_t *va)
 static int Get(vlc_va_t *va, picture_t *pic, uint8_t **data)
 {
     return directx_va_Get(va, &va->sys->dx_sys, pic, data);
-}
-
-static ID3D11Device *GetOutputViewDevice(ID3D11Texture2D *pTexture)
-{
-    ID3D11Device *result = NULL;
-    ID3D11Texture2D_GetDevice( pTexture, &result );
-    if (result)
-        ID3D11Device_Release(result);
-    return result;
 }
 
 static void Close(vlc_va_t *va, AVCodecContext *ctx)
