@@ -368,40 +368,6 @@ picture_pool_t *AllocPoolD3D11Ex(vlc_object_t *va, ID3D11Device *d3ddev, ID3D11D
 
         picsys->texture.d3dresViewY = NULL;
         picsys->texture.d3dresViewUV = NULL;
-#if 0
-        hr = ID3D11Device_CreateShaderResourceView(d3ddev, (ID3D11Resource *)picsys->texture.pTexture, &resviewDesc, &picsys->texture.d3dresViewY);
-        if (FAILED(hr)) {
-            msg_Err(va, "Could not Create the Y/RGB D3d11 Texture ResourceView. (hr=0x%lX)", hr);
-            ID3D11Texture2D_Release(picsys->texture.pTexture);
-            free(picsys);
-            goto error;
-        }
-
-        if( cfg->resourceFormatUV )
-        {
-            resviewDesc.Format = cfg->resourceFormatUV;
-            hr = ID3D11Device_CreateShaderResourceView(d3ddev, (ID3D11Resource *)picsys->texture.pTexture, &resviewDesc, &picsys->texture.d3dresViewUV);
-            if (FAILED(hr)) {
-                msg_Err(va, "Could not Create the UV D3d11 Texture ResourceView. (hr=0x%lX)", hr);
-                ID3D11ShaderResourceView_Release(picsys->texture.d3dresViewY);
-                ID3D11Texture2D_Release(picsys->texture.pTexture);
-                free(picsys);
-                goto error;
-            }
-        }
-#endif
-#if 0
-        hr = ID3D11VideoDevice_CreateVideoDecoderOutputView( (ID3D11VideoDevice*) dx_sys->d3ddec,
-                                                             (ID3D11Resource*) p_texture,
-                                                             &viewDesc,
-                                                             (ID3D11VideoDecoderOutputView**) &dx_sys->hw_surface[pool_size] );
-        if (FAILED(hr)) {
-            msg_Err(va, "CreateVideoDecoderOutputView %d failed. (hr=0x%0lx)", pool_size, hr);
-            ID3D11Texture2D_Release(picsys->texture.pTexture);
-            free(picsys);
-            goto error;
-        }
-#endif
 
         picsys->context = d3dctx;
         picsys->device = d3ddev;
@@ -426,53 +392,8 @@ picture_pool_t *AllocPoolD3D11Ex(vlc_object_t *va, ID3D11Device *d3ddev, ID3D11D
     msg_Dbg(va, "ID3D11VideoDecoderOutputView succeed with %d surfaces (%dx%d)",
             pool_size, fmt->i_width, fmt->i_height);
 
-#if 0 // TODO
-    D3D11_VIDEO_DECODER_OUTPUT_VIEW_DESC viewDesc;
-    ZeroMemory(&viewDesc, sizeof(viewDesc));
-    viewDesc.DecodeProfile = dx_sys->input;
-    viewDesc.ViewDimension = D3D11_VDOV_DIMENSION_TEXTURE2D;
-
-    int surface_count = pool_size;
-    for (surface_count = 0; surface_count < pool_size; surface_count++) {
-        viewDesc.Texture2D.ArraySlice = surface_count;
-
-        picture_sys_t *picsys = malloc(sizeof(*picsys));
-        if (unlikely(picsys == NULL))
-            goto error;
-
-        hr = ID3D11VideoDevice_CreateVideoDecoderOutputView( (ID3D11VideoDevice*) dx_sys->d3ddec,
-                                                             (ID3D11Resource*) p_texture,
-                                                             &viewDesc,
-                                                             (ID3D11VideoDecoderOutputView**) &dx_sys->hw_surface[pool_size] );
-        if (FAILED(hr)) {
-            msg_Err(va, "CreateVideoDecoderOutputView %d failed. (hr=0x%0lx)", pool_size, hr);
-            ID3D11Texture2D_Release(p_texture);
-            goto error;
-        }
-
-        picture_resource_t resource = {
-            .p_sys = picsys,
-            .pf_destroy = DestroyPicture,
-        };
-
-        picture_t *picture = picture_NewFromResource(fmt, &resource);
-        if (unlikely(picture == NULL)) {
-            free(picsys);
-            goto error;
-        }
-
-        pictures[picture_count] = picture;
-        /* each picture_t holds a ref to the device and release it on Destroy */
-        ID3D11Device_AddRef(d3ddev);
-        /* each picture_t holds a ref to the DLL */
-        picsys->hd3d11_dll = LoadLibrary(TEXT("D3D11.DLL"));
-    }
-    msg_Dbg(va, "ID3D11VideoDecoderOutputView succeed with %d surfaces (%dx%d)",
-            pool_size, dx_sys->surface_width, dx_sys->surface_height);
-#endif
-
     /* release the system resources, they will be free'd with the pool */
-    ID3D11Device_Release(d3ddev); /* TODO check this */
+    //ID3D11Device_Release(d3ddev); /* TODO check this */
 
     picture_pool_configuration_t pool_cfg;
     memset(&pool_cfg, 0, sizeof(pool_cfg));
