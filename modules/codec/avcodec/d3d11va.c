@@ -330,7 +330,7 @@ static int D3dCreateDevice(vlc_va_t *va)
     }
 
     UINT creationFlags = D3D11_CREATE_DEVICE_VIDEO_SUPPORT;
-# if !defined(NDEBUG) //&& defined(_MSC_VER)
+# if !defined(NDEBUG) && defined(_MSC_VER)
     creationFlags |= D3D11_CREATE_DEVICE_DEBUG;
 # endif
 

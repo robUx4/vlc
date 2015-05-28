@@ -32,18 +32,10 @@
 
 #include <initguid.h> /* must be last included to not redefine existing GUIDs */
 
-/* dxva2api.h GUIDs: http://msdn.microsoft.com/en-us/library/windows/desktop/ms697067(v=vs100).aspx
- * assume that they are declared in dxva2api.h */
-#define MS_GUID(name, l, w1, w2, b1, b2, b3, b4, b5, b6, b7, b8)
-
 #ifdef __MINGW32__
 # include <_mingw.h>
 
-# if !defined(__MINGW64_VERSION_MAJOR)
-#  undef MS_GUID
-#  define MS_GUID DEFINE_GUID /* dxva2api.h fails to declare those, redefine as static */
-#  define DXVA2_E_NEW_VIDEO_DEVICE MAKE_HRESULT(1, 4, 4097)
-# else
+# if defined(__MINGW64_VERSION_MAJOR)
 #  include <dxva.h>
 # endif
 
@@ -51,8 +43,8 @@
 
 DEFINE_GUID(IID_ID3D10Multithread,   0x9b7e4e00, 0x342c, 0x4106, 0xa1, 0x9f, 0x4f, 0x27, 0x04, 0xf6, 0x89, 0xf0);
 
-static void DestroyPicture(picture_t *e);
 static int Direct3D11MapTexture(picture_t *);
+static void DestroyPicture(picture_t *);
 
 struct picture_sys_t {
     d3d11_texture_t     texture;
@@ -124,8 +116,8 @@ picture_pool_t *AllocPoolD3D11( vlc_object_t *va, const video_format_t *fmt, uns
     }
 
     /* Create the D3D object. */
-    UINT creationFlags = D3D11_CREATE_DEVICE_VIDEO_SUPPORT; // used for direct rendering
-# if !defined(NDEBUG) //&& defined(_MSC_VER)
+    UINT creationFlags = D3D11_CREATE_DEVICE_VIDEO_SUPPORT;
+# if !defined(NDEBUG) && defined(_MSC_VER)
     creationFlags |= D3D11_CREATE_DEVICE_DEBUG;
 # endif
 

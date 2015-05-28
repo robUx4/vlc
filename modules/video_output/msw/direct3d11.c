@@ -741,7 +741,7 @@ static int Direct3D11Open(vout_display_t *vd, video_format_t *fmt)
     UINT creationFlags = 0;
     HRESULT hr = S_OK;
 
-# if !defined(NDEBUG) // && defined(_MSC_VER)
+# if !defined(NDEBUG) && defined(_MSC_VER)
     creationFlags |= D3D11_CREATE_DEVICE_DEBUG;
 # endif
 
