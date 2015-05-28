@@ -39,13 +39,6 @@ typedef struct
     ID3D11ShaderResourceView  *d3dresViewUV;
 } d3d11_texture_t;
 
-typedef struct
-{
-    DXGI_FORMAT   textureFormat;
-    DXGI_FORMAT   resourceFormatYRGB;
-    DXGI_FORMAT   resourceFormatUV;
-} d3d11_texture_cfg_t;
-
 picture_pool_t *AllocPoolD3D11( vlc_object_t *obj, const video_format_t *, unsigned pool_size );
 picture_pool_t *AllocPoolD3D11Ex(vlc_object_t *, ID3D11Device *, ID3D11DeviceContext *,
                                  const video_format_t *, DXGI_FORMAT, unsigned pool_size);

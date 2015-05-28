@@ -150,7 +150,7 @@ static void Direct3D11DeleteRegions(int, picture_t **);
 static int Direct3D11MapSubpicture(vout_display_t *, int *, picture_t ***, subpicture_t *);
 
 static int AllocQuad(vout_display_t *, const video_format_t *, d3d_quad_t *,
-                     d3d11_texture_cfg_t *, ID3D11PixelShader *,
+                     d3d_quad_cfg_t *, ID3D11PixelShader *,
                      const float vertices[4 * sizeof(d3d_vertex_t)]);
 static void ReleaseQuad(d3d_quad_t *);
 
@@ -1347,7 +1347,7 @@ static void Direct3D11DestroyPool(vout_display_t *vd)
 }
 
 static int AllocQuad(vout_display_t *vd, const video_format_t *fmt, d3d_quad_t *quad,
-                     d3d11_texture_cfg_t *cfg, ID3D11PixelShader *d3dpixelShader,
+                     d3d_quad_cfg_t *cfg, ID3D11PixelShader *d3dpixelShader,
                      const float vertices[4 * sizeof(d3d_vertex_t)])
 {
     vout_display_sys_t *sys = vd->sys;
@@ -1525,7 +1525,7 @@ static int Direct3D11MapSubpicture(vout_display_t *vd, int *subpicture_region_co
             if (unlikely(d3dquad==NULL)) {
                 continue;
             }
-            d3d11_texture_cfg_t rgbaCfg = {
+            d3d_quad_cfg_t rgbaCfg = {
                 .textureFormat      = sys->d3dregion_format,
                 .resourceFormatYRGB = sys->d3dregion_format,
             };
