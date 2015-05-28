@@ -185,14 +185,15 @@ EXTRA_LTLIBRARIES += libdirect3d9_plugin.la
 
 libdirect3d11_plugin_la_SOURCES = video_output/msw/direct3d11.c \
 	video_output/msw/common.c video_output/msw/common.h \
-	video_output/msw/events.c video_output/msw/events.h \
-	video_output/msw/builtin_shaders.h \
-	video_output/msw/win32touch.c video_output/msw/win32touch.h \
 	../src/win32/direct3d11_pool.c ../src/win32/direct3d11_pool.h \
 	../src/win32/picture.c ../src/win32/picture.h
+
 libdirect3d11_plugin_la_CPPFLAGS = $(AM_CPPFLAGS) \
  -DMODULE_NAME_IS_direct3d11
 if !HAVE_WINSTORE
+libdirect3d11_plugin_la_SOURCES += video_output/msw/events.c \
+ video_output/msw/events.h video_output/msw/builtin_shaders.h \
+ video_output/msw/win32touch.c video_output/msw/win32touch.h
 libdirect3d11_plugin_la_LIBADD = -lgdi32 -lole32 -luuid
 else
 libdirect3d11_plugin_la_LIBADD = -ld3dcompiler -lole32 -luuid
