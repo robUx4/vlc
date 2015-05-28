@@ -142,7 +142,9 @@ picture_pool_t *AllocPoolD3D11( vlc_object_t *va, const video_format_t *fmt, uns
                                  creationFlags, NULL, 0,
                                  D3D11_SDK_VERSION, &d3ddev, NULL, &d3dctx);
         if (SUCCEEDED(hr)) {
+#ifndef NDEBUG
             msg_Dbg(va, "Created the D3D11 pool device 0x%p ctx 0x%p type %d.", d3ddev, d3dctx, driverAttempts[driver]);
+#endif
             break;
         }
     }
