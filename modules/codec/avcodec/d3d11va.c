@@ -337,23 +337,19 @@ static int Open(vlc_va_t *va, AVCodecContext *ctx, enum PixelFormat pix_fmt,
 
     dx_sys->d3ddev = NULL;
     va->sys->render = DXGI_FORMAT_UNKNOWN;
-    if ( p_sys != NULL && p_sys->pTexture != NULL ) {
-        ID3D11Device *d3ddev = GetOutputViewDevice( p_sys->pTexture );
-        if (d3ddev != NULL) {
-            ID3D11Device_GetImmediateContext(d3ddev, &sys->d3dctx);
-            if (sys->d3dctx) {
-                ID3D11VideoContext *d3dvidctx = NULL;
-                HRESULT hr = ID3D11DeviceContext_QueryInterface(sys->d3dctx, &IID_ID3D11VideoContext, (void **)&d3dvidctx);
-                if (FAILED(hr)) {
-                   msg_Err(va, "Could not Query ID3D11VideoDevice Interface from the picture. (hr=0x%lX)", hr);
-                } else {
-                    D3D11_TEXTURE2D_DESC dstDesc;
-                    ID3D11Texture2D_GetDesc( p_sys->pTexture, &dstDesc);
-                    sys->render = dstDesc.Format;
-                    sys->d3dvidctx = d3dvidctx;
-                    dx_sys->d3ddev = (IUnknown *) d3ddev;
-                }
-            }
+    if ( p_sys != NULL && p_sys->device != NULL && p_sys->context != NULL ) {
+        ID3D11VideoContext *d3dvidctx = NULL;
+        HRESULT hr = ID3D11DeviceContext_QueryInterface(p_sys->context, &IID_ID3D11VideoContext, (void **)&d3dvidctx);
+        if (FAILED(hr)) {
+           msg_Err(va, "Could not Query ID3D11VideoDevice Interface from the picture. (hr=0x%lX)", hr);
+        } else {
+            dx_sys->d3ddev = (IUnknown*) p_sys->device;
+            sys->d3dctx = p_sys->context;
+            sys->d3dvidctx = d3dvidctx;
+
+            D3D11_TEXTURE2D_DESC dstDesc;
+            ID3D11Texture2D_GetDesc( p_sys->texture.pTexture, &dstDesc);
+            sys->render = dstDesc.Format;
         }
     }
 
@@ -384,6 +380,13 @@ static int D3dCreateDevice(vlc_va_t *va)
 {
     directx_sys_t *dx_sys = &va->sys->dx_sys;
     HRESULT hr;
+
+    if (dx_sys->d3ddev && va->sys->d3dctx) {
+        msg_Dbg(va, "Reusing Direct3D11 device");
+        ID3D11DeviceContext_AddRef(va->sys->d3dctx);
+        ID3D11Device_AddRef(dx_sys->d3ddev);
+        return VLC_SUCCESS;
+    }
 
     /* */
     PFN_D3D11_CREATE_DEVICE pf_CreateDevice;
