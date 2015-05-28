@@ -172,13 +172,13 @@ static int Extract(vlc_va_t *va, picture_t *picture, uint8_t *data)
 
     assert( picture->format.i_chroma == VLC_CODEC_D3D11_OPAQUE);
 
+    ID3D11VideoDecoderOutputView_GetDesc( d3d, &viewDesc );
+
     ID3D11VideoDecoderOutputView_GetResource( d3d, &p_texture );
     if (!p_texture) {
         msg_Err(va, "Failed to get the texture of the outputview." );
         goto error;
     }
-
-    ID3D11VideoDecoderOutputView_GetDesc( d3d, &viewDesc );
 
     /* copy decoder slice to surface */
     ID3D11DeviceContext_CopySubresourceRegion(sys->d3dctx, (ID3D11Resource*) picture->p_sys->texture.pTexture, 0, 0, 0, 0,
@@ -602,31 +602,18 @@ static int DxCreateDecoderSurfaces(vlc_va_t *va, int codec_id, const video_forma
         ID3D10Multithread_Release(pMultithread);
     }
 
-    D3D11_TEXTURE2D_DESC texDesc; // TODO remove with direct rendering
+    D3D11_TEXTURE2D_DESC texDesc;
     ZeroMemory(&texDesc, sizeof(texDesc));
     texDesc.Width = dx_sys->surface_width;
     texDesc.Height = dx_sys->surface_height;
     texDesc.MipLevels = 1;
     texDesc.Format = sys->render;
     texDesc.SampleDesc.Count = 1;
-    texDesc.MiscFlags = 0; // D3D11_RESOURCE_MISC_SHARED
-    texDesc.ArraySize = 1;
-    texDesc.Usage = D3D11_USAGE_STAGING;
-    texDesc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
-    texDesc.BindFlags = 0;
-#if 0
-    sys->staging = NULL;
-    hr = ID3D11Device_CreateTexture2D( (ID3D11Device*) dx_sys->d3ddev, &texDesc, NULL,
-                                       (ID3D11Texture2D**) &sys->staging);
-    if (FAILED(hr)) {
-        msg_Err(va, "Failed to create a staging texture to extract surface pixels (hr=0x%0lx)", hr );
-        return VLC_EGENERIC;
-    }
-#endif
+    texDesc.MiscFlags = 0;
     texDesc.ArraySize = dx_sys->surface_count;
-    texDesc.Usage = D3D11_USAGE_DEFAULT; //D3D11_USAGE_DYNAMIC; //D3D11_USAGE_STAGING; // D3D11_USAGE_DEFAULT
-    texDesc.BindFlags = D3D11_BIND_DECODER;// | D3D11_BIND_UNORDERED_ACCESS;
-    texDesc.CPUAccessFlags = 0; //D3D11_CPU_ACCESS_READ;
+    texDesc.Usage = D3D11_USAGE_DEFAULT;
+    texDesc.BindFlags = D3D11_BIND_DECODER;
+    texDesc.CPUAccessFlags = 0;
 
     ID3D11Texture2D *p_texture;
     hr = ID3D11Device_CreateTexture2D( (ID3D11Device*) dx_sys->d3ddev, &texDesc, NULL, &p_texture );
@@ -736,8 +723,4 @@ static void DxDestroySurfaces(vlc_va_t *va)
         ID3D11Resource_Release(p_texture);
         ID3D11Resource_Release(p_texture);
     }
-#if 0
-    if (va->sys->staging)
-        ID3D11Resource_Release(va->sys->staging);
-#endif
 }
