@@ -89,23 +89,6 @@ DEFINE_GUID(IID_ID3D10Multithread,   0x9b7e4e00, 0x342c, 0x4106, 0xa1, 0x9f, 0x4
 
 DEFINE_GUID(DXVA_Intel_H264_NoFGT_ClearVideo,       0x604F8E68, 0x4951, 0x4c54, 0x88, 0xFE, 0xAB, 0xD2, 0x5C, 0x15, 0xB3, 0xD6);
 
-/* */
-typedef struct {
-    const char   *name;
-    DXGI_FORMAT  format;
-    vlc_fourcc_t codec;
-} d3d_format_t;
-/* XXX Prefered format must come first */
-static const d3d_format_t d3d_formats[] = {
-    { "NV12",     DXGI_FORMAT_NV12,           VLC_CODEC_NV12 },
-//    { "I420L",    DXGI_FORMAT_P010,           VLC_CODEC_I420_10L },
-//    { "YUY2",     DXGI_FORMAT_YUY2,           VLC_CODEC_I422 },
-//    { "R8G8B8A8", DXGI_FORMAT_R8G8B8A8_UNORM, VLC_CODEC_RGBA },
-//    { "B8G8R8A8", DXGI_FORMAT_B8G8R8A8_UNORM, VLC_CODEC_BGRA },
-
-    { NULL, 0, 0 }
-};
-
 struct vlc_va_sys_t
 {
     directx_sys_t                dx_sys;
@@ -125,10 +108,6 @@ struct vlc_va_sys_t
 
     /* avcodec internals */
     struct AVD3D11VAContext      hw;
-
-    /* Extraction */
-    //ID3D11Resource               *staging;
-    copy_cache_t                 *p_copy_cache;
 };
 
 /* must match the one in direct3d11_pool */
@@ -201,7 +180,7 @@ static int Extract(vlc_va_t *va, picture_t *picture, uint8_t *data)
 
     ID3D11VideoDecoderOutputView_GetDesc( d3d, &viewDesc );
 
-    /* extract to NV12 planes */
+    /* copy decoder slice to surface */
     ID3D11DeviceContext_CopySubresourceRegion(sys->d3dctx, (ID3D11Resource*) picture->p_sys->texture.pTexture, 0, 0, 0, 0,
                                               p_texture, viewDesc.Texture2D.ArraySlice, NULL);
 
@@ -246,11 +225,6 @@ static void Close(vlc_va_t *va, AVCodecContext *ctx)
 
     directx_va_Close(va, &sys->dx_sys);
 
-    if (sys->p_copy_cache!=NULL) {
-        CopyCleanCache(sys->p_copy_cache);
-        free( sys->p_copy_cache );
-    }
-
 #if defined(NDEBUG) && defined(HAVE_DXGIDEBUG_H)
     if (sys->dxgidebug_dll)
         FreeLibrary(sys->dxgidebug_dll);
@@ -273,12 +247,6 @@ static int Open(vlc_va_t *va, AVCodecContext *ctx, enum PixelFormat pix_fmt,
     vlc_va_sys_t *sys = calloc(1, sizeof (*sys));
     if (unlikely(sys == NULL))
         return VLC_ENOMEM;
-
-    sys->p_copy_cache = calloc(1, sizeof(*sys->p_copy_cache));
-    if (unlikely(sys->p_copy_cache == NULL)) {
-         err = VLC_ENOMEM;
-         goto error;
-    }
 
 #if defined(NDEBUG) && defined(HAVE_DXGIDEBUG_H)
     sys->dxgidebug_dll = LoadLibrary(TEXT("DXGIDEBUG.DLL"));
@@ -323,8 +291,6 @@ static int Open(vlc_va_t *va, AVCodecContext *ctx, enum PixelFormat pix_fmt,
     err = directx_va_Open(va, &sys->dx_sys, ctx, fmt);
     if (err!=VLC_SUCCESS)
         goto error;
-
-    CopyInitCache( sys->p_copy_cache, fmt->video.i_width );
 
     /* TODO print the hardware name/vendor for debugging purposes */
     va->description = DxDescribe(dx_sys);
@@ -411,11 +377,10 @@ static int D3dCreateDevice(vlc_va_t *va)
  */
 static void D3dDestroyDevice(vlc_va_t *va)
 {
-    ULONG ref;
     if (va->sys->d3dvidctx)
-        ref = ID3D11VideoContext_Release(va->sys->d3dvidctx);
+        ID3D11VideoContext_Release(va->sys->d3dvidctx);
     if (va->sys->d3dctx)
-        ref = ID3D11DeviceContext_Release(va->sys->d3dctx);
+        ID3D11DeviceContext_Release(va->sys->d3dctx);
 }
 /**
  * It describes our Direct3D object
@@ -587,44 +552,34 @@ static int DxSetupOutput(vlc_va_t *va, const GUID *input)
     HRESULT hr;
 
     /* */
-    for (unsigned j = 0; d3d_formats[j].name; j++) {
-        const d3d_format_t *format = &d3d_formats[j];
-
-        BOOL is_supported = false;
-        hr = ID3D11VideoDevice_CheckVideoDecoderFormat((ID3D11VideoDevice*) dx_sys->d3ddec, input, format->format, &is_supported);
-        if (FAILED(hr) || !is_supported)
-            continue;
-        msg_Dbg(va, "%s is supported for output", format->name);
-    }
+    BOOL is_supported = false;
+    hr = ID3D11VideoDevice_CheckVideoDecoderFormat((ID3D11VideoDevice*) dx_sys->d3ddec, input, DXGI_FORMAT_NV12, &is_supported);
+    if (SUCCEEDED(hr) && is_supported)
+        msg_Dbg(va, "NV12 is supported for output");
 
     if ( va->sys->render != DXGI_FORMAT_UNKNOWN )
     {
-        BOOL is_supported = false;
+        is_supported = false;
         hr = ID3D11VideoDevice_CheckVideoDecoderFormat((ID3D11VideoDevice*) dx_sys->d3ddec, input, va->sys->render, &is_supported);
-        if (FAILED(hr) || !is_supported)
+        if (SUCCEEDED(hr) && is_supported)
         {
-            msg_Dbg(va, "Output format from picture source not supported.");
-            return VLC_EGENERIC;
+            /* We have our solution */
+            msg_Dbg(va, "Using decoder output from picture source.");
+            return VLC_SUCCESS;
         }
-
-        /* We have our solution */
-        msg_Dbg(va, "Using decoder output from picture source.");
-        return VLC_SUCCESS;
+        msg_Dbg(va, "Output format from picture source not supported.");
+        return VLC_EGENERIC;
     }
     else
     {
-        for (unsigned j = 0; d3d_formats[j].name; j++) {
-            const d3d_format_t *format = &d3d_formats[j];
-
-            /* */
-            BOOL is_supported = false;
-            hr = ID3D11VideoDevice_CheckVideoDecoderFormat((ID3D11VideoDevice*) dx_sys->d3ddec, input, format->format, &is_supported);
-            if (FAILED(hr) || !is_supported)
-                continue;
-
+        /* */
+        is_supported = false;
+        hr = ID3D11VideoDevice_CheckVideoDecoderFormat((ID3D11VideoDevice*) dx_sys->d3ddec, input, DXGI_FORMAT_NV12, &is_supported);
+        if (SUCCEEDED(hr) && is_supported)
+        {
             /* We have our solution */
-            msg_Dbg(va, "Using decoder output '%s'", format->name);
-            va->sys->render = format->format;
+            msg_Dbg(va, "Using decoder output NV12");
+            va->sys->render = DXGI_FORMAT_NV12;
             return VLC_SUCCESS;
         }
     }
