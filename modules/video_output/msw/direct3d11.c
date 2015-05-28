@@ -88,7 +88,7 @@ typedef struct
 static const d3d_format_t d3d_formats[] = {
 //    { "D3D11VA",  DXGI_FORMAT_NV12,           VLC_CODEC_D3D11_OPAQUE, DXGI_FORMAT_R8_UNORM,       DXGI_FORMAT_R8G8_UNORM },
 //    { "D3D11VA",  DXGI_FORMAT_R8G8B8A8_UNORM, VLC_CODEC_D3D11_OPAQUE, DXGI_FORMAT_R8G8B8A8_UNORM, 0 }, // TODO remove
-//    { "VA_NV12",  DXGI_FORMAT_NV12,           VLC_CODEC_D3D11_OPAQUE, DXGI_FORMAT_R8_UNORM,       DXGI_FORMAT_R8G8_UNORM },
+    { "VA_NV12",  DXGI_FORMAT_NV12,           VLC_CODEC_D3D11_OPAQUE, DXGI_FORMAT_R8_UNORM,       DXGI_FORMAT_R8G8_UNORM },
     { "I420",     DXGI_FORMAT_NV12,           VLC_CODEC_I420,     DXGI_FORMAT_R8_UNORM,           DXGI_FORMAT_R8G8_UNORM },
     { "YV12",     DXGI_FORMAT_NV12,           VLC_CODEC_YV12,     DXGI_FORMAT_R8_UNORM,           DXGI_FORMAT_R8G8_UNORM },
     { "NV12",     DXGI_FORMAT_NV12,           VLC_CODEC_NV12,     DXGI_FORMAT_R8_UNORM,           DXGI_FORMAT_R8G8_UNORM },
@@ -909,8 +909,8 @@ static int Direct3D11Open(vout_display_t *vd, video_format_t *fmt)
     vlc_fourcc_t i_src_chroma = fmt->i_chroma;
     if (fmt->i_chroma == VLC_CODEC_D3D9_OPAQUE)
         i_src_chroma = VLC_CODEC_NV12; // favor NV12
-    else if (fmt->i_chroma == VLC_CODEC_D3D11_OPAQUE)
-        output_fmt = d3d_formats_dr;
+    /*else if (fmt->i_chroma == VLC_CODEC_D3D11_OPAQUE)
+        output_fmt = d3d_formats_dr;*/
 
     // look for the request pixel format first
     UINT i_quadSupportFlags = D3D11_FORMAT_SUPPORT_TEXTURE2D | D3D11_FORMAT_SUPPORT_SHADER_LOAD;
