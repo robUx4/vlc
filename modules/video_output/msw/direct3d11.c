@@ -1447,7 +1447,7 @@ static void ReleaseShaderQuad(d3d_quad_t *quad)
         ID3D11Buffer_Release(quad->pVertexBuffer);
     if (quad->d3dpixelShader)
         ID3D11VertexShader_Release(quad->d3dpixelShader);
-    D3D11RextureRelease(&quad->texture);
+    D3D11TextureRelease(&quad->texture);
 }
 
 static void Direct3D11DestroyResources(vout_display_t *vd)

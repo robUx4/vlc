@@ -50,6 +50,6 @@ picture_pool_t *AllocPoolD3D11( vlc_object_t *obj, const video_format_t *, unsig
 picture_pool_t *AllocPoolD3D11Ex(vlc_object_t *, ID3D11Device *, ID3D11DeviceContext *,
                                  const video_format_t *,
                                  const d3d11_texture_cfg_t *, unsigned pool_size);
-void D3D11RextureRelease(d3d11_texture_t *);
+void D3D11TextureRelease(d3d11_texture_t *);
 
 #endif /* WIN32_DIRECT3D11_POOL_H_ */

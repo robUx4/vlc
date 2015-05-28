@@ -504,7 +504,7 @@ static void DestroyPicture(picture_t *picture)
 {
     ULONG ref = ID3D11DeviceContext_Release(picture->p_sys->context);
 
-    D3D11RextureRelease(&picture->p_sys->texture);
+    D3D11TextureRelease(&picture->p_sys->texture);
 
     FreeLibrary(picture->p_sys->hd3d11_dll);
 
@@ -512,7 +512,7 @@ static void DestroyPicture(picture_t *picture)
     free(picture);
 }
 
-void D3D11RextureRelease(d3d11_texture_t *p_texture)
+void D3D11TextureRelease(d3d11_texture_t *p_texture)
 {
     if (p_texture->pTexture)
         ID3D11Texture2D_Release(p_texture->pTexture);
