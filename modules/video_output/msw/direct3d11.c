@@ -738,7 +738,7 @@ static int Direct3D11Open(vout_display_t *vd, video_format_t *fmt)
 
 #if !VLC_WINSTORE_APP
 
-    UINT creationFlags = D3D11_CREATE_DEVICE_VIDEO_SUPPORT; // used for direct rendering
+    UINT creationFlags = 0;//D3D11_CREATE_DEVICE_VIDEO_SUPPORT; // used for direct rendering
     HRESULT hr = S_OK;
 
 # if !defined(NDEBUG) // && defined(_MSC_VER)
