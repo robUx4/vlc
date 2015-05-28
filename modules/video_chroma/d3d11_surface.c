@@ -78,7 +78,7 @@ static int assert_staging(filter_t *p_filter, picture_sys_t *p_sys)
     ID3D11Texture2D_GetDesc(p_sys->texture.pTexture, &texDesc);
 
     texDesc.MipLevels = 1;
-    texDesc.SampleDesc.Count = 1;
+    //texDesc.SampleDesc.Count = 1;
     texDesc.MiscFlags = 0;
     texDesc.ArraySize = 1;
     texDesc.Usage = D3D11_USAGE_STAGING;
@@ -103,10 +103,13 @@ static void D3D11_YUY2(filter_t *p_filter, picture_t *src, picture_t *dst)
     D3D11_TEXTURE2D_DESC desc;
     D3D11_MAPPED_SUBRESOURCE lock;
 
-    if (!assert_staging(p_filter, p_sys))
+    if (assert_staging(p_filter, p_sys) != VLC_SUCCESS)
         return;
 
-    HRESULT hr = ID3D11DeviceContext_Map(p_sys->context, (ID3D11Resource*) p_sys->texture.pTexture,
+    ID3D11DeviceContext_CopyResource(p_sys->context, (ID3D11Resource*) sys->staging,
+                                     (ID3D11Resource*) p_sys->texture.pTexture);
+
+    HRESULT hr = ID3D11DeviceContext_Map(p_sys->context, (ID3D11Resource*) sys->staging,
                                          0, D3D11_MAP_READ, 0, &lock);
     if (FAILED(hr)) {
         msg_Err(p_filter, "Failed to map source surface. (hr=0x%0lx)", hr);
@@ -118,6 +121,8 @@ static void D3D11_YUY2(filter_t *p_filter, picture_t *src, picture_t *dst)
         dst->p[1].p_pixels = dst->p[2].p_pixels;
         dst->p[2].p_pixels = tmp;
     }
+
+    ID3D11Texture2D_GetDesc(sys->staging, &desc);
 
     if (desc.Format == DXGI_FORMAT_YUY2) {
         size_t chroma_pitch = (lock.RowPitch / 2);
@@ -136,18 +141,18 @@ static void D3D11_YUY2(filter_t *p_filter, picture_t *src, picture_t *dst)
         };
 
         CopyFromYv12(dst, plane, pitch, src->format.i_width,
-                     src->format.i_visible_height, &sys->cache);
+                     src->format.i_height, &sys->cache);
     } else if (desc.Format == DXGI_FORMAT_NV12) {
         uint8_t *plane[2] = {
             lock.pData,
-            (uint8_t*)lock.pData + lock.RowPitch * src->format.i_visible_height
+            (uint8_t*)lock.pData + lock.RowPitch * src->format.i_height
         };
         size_t  pitch[2] = {
             lock.RowPitch,
             lock.RowPitch,
         };
         CopyFromNv12(dst, plane, pitch, src->format.i_width,
-                     src->format.i_visible_height, &sys->cache);
+                     src->format.i_height, &sys->cache);
     } else {
         msg_Err(p_filter, "Unsupported D3D11VA conversion from 0x%08X to YV12", desc.Format);
     }
@@ -159,7 +164,7 @@ static void D3D11_YUY2(filter_t *p_filter, picture_t *src, picture_t *dst)
     }
 
     /* */
-    ID3D11DeviceContext_Unmap(p_sys->context, (ID3D11Resource*)p_sys->texture.pTexture, 0);
+    ID3D11DeviceContext_Unmap(p_sys->context, (ID3D11Resource*)sys->staging, 0);
 }
 
 static void D3D11_NV12(filter_t *p_filter, picture_t *src, picture_t *dst)
@@ -170,35 +175,38 @@ static void D3D11_NV12(filter_t *p_filter, picture_t *src, picture_t *dst)
     D3D11_TEXTURE2D_DESC desc;
     D3D11_MAPPED_SUBRESOURCE lock;
 
-    if (!assert_staging(p_filter, p_sys))
+    if (assert_staging(p_filter, p_sys) != VLC_SUCCESS)
         return;
 
-    HRESULT hr = ID3D11DeviceContext_Map(p_sys->context, (ID3D11Resource*) p_sys->texture.pTexture,
+    ID3D11DeviceContext_CopyResource(p_sys->context, (ID3D11Resource*) sys->staging,
+                                     (ID3D11Resource*) p_sys->texture.pTexture);
+
+    HRESULT hr = ID3D11DeviceContext_Map(p_sys->context, (ID3D11Resource*) sys->staging,
                                          0, D3D11_MAP_READ, 0, &lock);
     if (FAILED(hr)) {
         msg_Err(p_filter, "Failed to map source surface. (hr=0x%0lx)", hr);
         return;
     }
 
-    ID3D11Texture2D_GetDesc(p_sys->texture.pTexture, &desc);
+    ID3D11Texture2D_GetDesc(sys->staging, &desc);
 
     if (desc.Format == DXGI_FORMAT_NV12) {
         uint8_t *plane[2] = {
             lock.pData,
-            (uint8_t*)lock.pData + lock.RowPitch * src->format.i_visible_height
+            (uint8_t*)lock.pData + lock.RowPitch * src->format.i_height
         };
         size_t  pitch[2] = {
             lock.RowPitch,
             lock.RowPitch,
         };
         CopyFromNv12ToNv12(dst, plane, pitch, src->format.i_width,
-                           src->format.i_visible_height, &sys->cache);
+                           src->format.i_height, &sys->cache);
     } else {
         msg_Err(p_filter, "Unsupported D3D11VA conversion from 0x%08X to NV12", desc.Format);
     }
 
     /* */
-    ID3D11DeviceContext_Unmap(p_sys->context, (ID3D11Resource*)p_sys->texture.pTexture, 0);
+    ID3D11DeviceContext_Unmap(p_sys->context, (ID3D11Resource*)sys->staging, 0);
 }
 
 VIDEO_FILTER_WRAPPER (D3D11_NV12)
