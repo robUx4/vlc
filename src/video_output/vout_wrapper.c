@@ -154,12 +154,12 @@ int vout_InitWrapper(vout_thread_t *vout)
         const unsigned decoder_pool_size = __MAX(VOUT_MAX_PICTURES,
                                                  reserved_picture + decoder_picture - DISPLAY_PICTURE_COUNT);
 #if defined(HAVE_AVCODEC_DXVA2)
-        if (source.i_chroma == VLC_CODEC_D3D9_OPAQUE)
+        if (0 && source.i_chroma == VLC_CODEC_D3D9_OPAQUE)
             sys->decoder_pool = AllocPoolD3D9( VLC_OBJECT(vout), &source, decoder_pool_size );
         else
 #endif
 #if defined(HAVE_AVCODEC_D3D11VA)
-        if (source.i_chroma == VLC_CODEC_D3D11_OPAQUE)
+        if (0 && source.i_chroma == VLC_CODEC_D3D11_OPAQUE)
             sys->decoder_pool = AllocPoolD3D11( VLC_OBJECT(vout), &source, decoder_pool_size );
         else
 #endif

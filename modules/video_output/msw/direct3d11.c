@@ -895,8 +895,8 @@ static int Direct3D11Open(vout_display_t *vd, video_format_t *fmt)
 #endif
 
     vlc_fourcc_t i_src_chroma = fmt->i_chroma;
-    if (fmt->i_chroma == VLC_CODEC_D3D9_OPAQUE)
-        i_src_chroma = VLC_CODEC_NV12; // favor NV12
+    //if (fmt->i_chroma == VLC_CODEC_D3D9_OPAQUE)
+    //    i_src_chroma = VLC_CODEC_NV12; // favor NV12
     fmt->i_chroma = 0;
 
     // look for the request pixel format first

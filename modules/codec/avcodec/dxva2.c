@@ -38,6 +38,7 @@
 #define DXVA2API_USE_BITFIELDS
 #define COBJMACROS
 #include <libavcodec/dxva2.h>
+#include "../../video_chroma/copy.h"
 
 static int Open(vlc_va_t *, AVCodecContext *, enum PixelFormat,
                 const es_format_t *, picture_sys_t *p_sys);
@@ -124,6 +125,9 @@ struct vlc_va_sys_t
     /* Video decoder */
     DXVA2_ConfigPictureDecode    cfg;
 
+    /* Option conversion */
+    copy_cache_t                 surface_cache;
+
     /* avcodec internals */
     struct dxva_context hw;
 };
@@ -153,14 +157,17 @@ static int DxResetVideoDecoder(vlc_va_t *);
 static void SetupAVCodecContext(vlc_va_t *);
 
 /* */
-static int Setup(vlc_va_t *va, AVCodecContext *avctx, vlc_fourcc_t *chroma)
+static int Setup(vlc_va_t *va, AVCodecContext *avctx, vlc_fourcc_t *chroma, bool b_opaque)
 {
     vlc_va_sys_t *sys = va->sys;
     if (directx_va_Setup(va, &sys->dx_sys, avctx, chroma)!=VLC_SUCCESS)
         return VLC_EGENERIC;
 
     avctx->hwaccel_context = &sys->hw;
-    *chroma = VLC_CODEC_D3D9_OPAQUE;
+    if (b_opaque)
+        *chroma = VLC_CODEC_D3D9_OPAQUE;
+    else
+        *chroma = VLC_CODEC_YV12;
 
     return VLC_SUCCESS;
 }
@@ -183,26 +190,86 @@ static int Extract(vlc_va_t *va, picture_t *picture, uint8_t *data)
 {
     directx_sys_t *dx_sys = &va->sys->dx_sys;
     LPDIRECT3DSURFACE9 d3d = (LPDIRECT3DSURFACE9)(uintptr_t)data;
-    picture_sys_t *p_sys = picture->p_sys;
-    LPDIRECT3DSURFACE9 output = p_sys->surface;
+    if (picture->format.i_chroma == VLC_CODEC_D3D9_OPAQUE)
+    {
+        picture_sys_t *p_sys = picture->p_sys;
+        LPDIRECT3DSURFACE9 output = p_sys->surface;
 
-    assert(d3d != output);
+        assert(d3d != output);
 #ifndef NDEBUG
-    LPDIRECT3DDEVICE9 srcDevice, dstDevice;
-    IDirect3DSurface9_GetDevice(d3d, &srcDevice);
-    IDirect3DSurface9_GetDevice(output, &dstDevice);
-    assert(srcDevice == dstDevice);
+        LPDIRECT3DDEVICE9 srcDevice, dstDevice;
+        IDirect3DSurface9_GetDevice(d3d, &srcDevice);
+        IDirect3DSurface9_GetDevice(output, &dstDevice);
+        assert(srcDevice == dstDevice);
 #endif
 
-    HRESULT hr;
-    RECT visibleSource;
-    visibleSource.left = 0;
-    visibleSource.top = 0;
-    visibleSource.right = picture->format.i_visible_width;
-    visibleSource.bottom = picture->format.i_visible_height;
-    hr = IDirect3DDevice9_StretchRect( (IDirect3DDevice9*) dx_sys->d3ddev, d3d, &visibleSource, output, &visibleSource, D3DTEXF_NONE);
-    if (FAILED(hr)) {
-        msg_Err(va, "Failed to copy the hw surface to the decoder surface (hr=0x%0lx)", hr );
+        HRESULT hr;
+        RECT visibleSource;
+        visibleSource.left = 0;
+        visibleSource.top = 0;
+        visibleSource.right = picture->format.i_visible_width;
+        visibleSource.bottom = picture->format.i_visible_height;
+        hr = IDirect3DDevice9_StretchRect( (IDirect3DDevice9*) dx_sys->d3ddev, d3d, &visibleSource, output, &visibleSource, D3DTEXF_NONE);
+        if (FAILED(hr)) {
+            msg_Err(va, "Failed to copy the hw surface to the decoder surface (hr=0x%0lx)", hr );
+            return VLC_EGENERIC;
+        }
+    }
+    else if (picture->format.i_chroma == VLC_CODEC_YV12) {
+        D3DSURFACE_DESC desc;
+        D3DLOCKED_RECT lock;
+        if (FAILED( IDirect3DSurface9_GetDesc(d3d, &desc)))
+            return VLC_EGENERIC;
+
+        /* */
+        if (FAILED(IDirect3DSurface9_LockRect(d3d, &lock, NULL, D3DLOCK_READONLY))) {
+            msg_Err(va, "Failed to lock surface");
+            return VLC_EGENERIC;
+        }
+
+        if (desc.Format == MAKEFOURCC('Y','V','1','2') ||
+            desc.Format == MAKEFOURCC('I','M','C','3')) {
+            bool imc3 = desc.Format == MAKEFOURCC('I','M','C','3');
+            size_t chroma_pitch = imc3 ? lock.Pitch : (lock.Pitch / 2);
+
+            size_t pitch[3] = {
+                lock.Pitch,
+                chroma_pitch,
+                chroma_pitch,
+            };
+
+            uint8_t *plane[3] = {
+                (uint8_t*)lock.pBits,
+                (uint8_t*)lock.pBits + pitch[0] * dx_sys->surface_height,
+                (uint8_t*)lock.pBits + pitch[0] * dx_sys->surface_height
+                                     + pitch[1] * dx_sys->surface_height / 2,
+            };
+
+            if (imc3) {
+                uint8_t *V = plane[1];
+                plane[1] = plane[2];
+                plane[2] = V;
+            }
+            CopyFromYv12(picture, plane, pitch, dx_sys->width, dx_sys->height,
+                         &va->sys->surface_cache);
+        } else {
+            assert(desc.Format == MAKEFOURCC('N','V','1','2'));
+            uint8_t *plane[2] = {
+                lock.pBits,
+                (uint8_t*)lock.pBits + lock.Pitch * dx_sys->surface_height
+            };
+            size_t  pitch[2] = {
+                lock.Pitch,
+                lock.Pitch,
+            };
+            CopyFromNv12(picture, plane, pitch, dx_sys->width, dx_sys->height,
+                         &va->sys->surface_cache);
+        }
+
+        /* */
+        IDirect3DSurface9_UnlockRect(d3d);
+    } else {
+        msg_Err(va, "Unsupported output picture format %08X", picture->format.i_chroma );
         return VLC_EGENERIC;
     }
 
@@ -236,6 +303,8 @@ static void Close(vlc_va_t *va, AVCodecContext *ctx)
 
     (void) ctx;
 
+    CopyCleanCache(&sys->surface_cache);
+
     directx_va_Close(va, &sys->dx_sys);
 
     if (sys->hd3d9_dll)
@@ -259,6 +328,8 @@ static int Open(vlc_va_t *va, AVCodecContext *ctx, enum PixelFormat pix_fmt,
     vlc_va_sys_t *sys = calloc(1, sizeof (*sys));
     if (unlikely(sys == NULL))
         return VLC_ENOMEM;
+
+    CopyInitCache( &sys->surface_cache, fmt->video.i_width );
 
     /* Load dll*/
     sys->hd3d9_dll = LoadLibrary(TEXT("D3D9.DLL"));

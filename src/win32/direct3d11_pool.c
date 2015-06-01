@@ -137,11 +137,7 @@ picture_pool_t *AllocPoolD3D11( vlc_object_t *va, const video_format_t *fmt, uns
         goto error;
     }
 
-    vlc_fourcc_t i_src_chroma;
-    if (fmt->i_chroma == VLC_CODEC_D3D9_OPAQUE)
-        i_src_chroma = VLC_CODEC_NV12; // favor NV12
-    else
-        i_src_chroma = fmt->i_chroma;
+    vlc_fourcc_t i_src_chroma = fmt->i_chroma;
 
     DXGI_FORMAT outputFormat =  DXGI_FORMAT_UNKNOWN;
 

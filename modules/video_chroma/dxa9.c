@@ -43,7 +43,7 @@ static void CloseConverter( vlc_object_t * );
  *****************************************************************************/
 vlc_module_begin ()
     set_description( N_("Conversions from DXA9 to I420,YV12,NV12") )
-    set_capability( "video filter2", 10 )
+    set_capability( "video filter2", 0 )
     set_callbacks( OpenConverter, CloseConverter )
 vlc_module_end ()
 
@@ -169,7 +169,7 @@ VIDEO_FILTER_WRAPPER (DXA9_NV12)
 static int OpenConverter( vlc_object_t *obj )
 {
     filter_t *p_filter = (filter_t *)obj;
-    if ( 1 || p_filter->fmt_in.video.i_chroma != VLC_CODEC_D3D9_OPAQUE )
+    if ( p_filter->fmt_in.video.i_chroma != VLC_CODEC_D3D9_OPAQUE )
         return VLC_EGENERIC;
 
     if ( p_filter->fmt_in.video.i_height != p_filter->fmt_out.video.i_height

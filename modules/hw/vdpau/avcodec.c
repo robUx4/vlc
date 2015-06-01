@@ -140,8 +140,9 @@ static int Copy(vlc_va_t *va, picture_t *pic, uint8_t *data)
     return VLC_SUCCESS;
 }
 
-static int Setup(vlc_va_t *va, AVCodecContext *avctx, vlc_fourcc_t *chromap)
+static int Setup(vlc_va_t *va, AVCodecContext *avctx, vlc_fourcc_t *chromap, bool b_opaque)
 {
+    VLC_UNUSED(b_opaque);
     vlc_va_sys_t *sys = va->sys;
     VdpChromaType type;
     uint32_t width, height;
