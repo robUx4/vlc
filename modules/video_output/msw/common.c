@@ -38,10 +38,6 @@
 #include <windows.h>
 #include <assert.h>
 
-#ifdef MODULE_NAME_IS_direct3d11
-#include "../../src/win32/direct3d11_pool.h"
-#endif
-
 #include "common.h"
 
 #include <vlc_windows_interfaces.h>

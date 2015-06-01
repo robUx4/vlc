@@ -626,8 +626,10 @@ static void Prepare(vout_display_t *vd, picture_t *picture, subpicture_t *subpic
                                                   0, &box);
     }
 
-    /* float ClearColor[4] = { 1.0f, 0.125f, 0.3f, 1.0f }; */
-    /* ID3D11DeviceContext_ClearRenderTargetView(sys->d3dcontext,sys->d3drenderTargetView, ClearColor); */
+#if VLC_WINSTORE_APP /* TODO: Choose the WinRT app background clear color */
+    float ClearColor[4] = { 1.0f, 0.125f, 0.3f, 1.0f };
+    ID3D11DeviceContext_ClearRenderTargetView(sys->d3dcontext,sys->d3drenderTargetView, ClearColor);
+#endif
     ID3D11DeviceContext_ClearDepthStencilView(sys->d3dcontext,sys->d3ddepthStencilView, D3D11_CLEAR_DEPTH, 1.0f, 0);
 
     if (subpicture) {
@@ -1307,10 +1309,8 @@ static int Direct3D11CreatePool(vout_display_t *vd, video_format_t *fmt)
         .p_sys = picsys,
         .pf_destroy = DestroyD3D11Picture,
     };
-    for (int i = 0; i < PICTURE_PLANE_MAX; i++) {
+    for (int i = 0; i < PICTURE_PLANE_MAX; i++)
         resource.p[i].i_lines = fmt->i_height / (i > 0 ? 2 : 1);
-        //resource.p[i].i_pitch = fmt->i_width;
-    }
 
     picture_t *picture = picture_NewFromResource(fmt, &resource);
     if (!picture) {
