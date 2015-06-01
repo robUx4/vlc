@@ -36,8 +36,6 @@
 #include <d3d11.h>
 #include <d3dx9math.h>
 
-#include "../../src/win32/picture.h"
-
 /* avoided until we can pass ISwapchainPanel without c++/cx mode
 # include <windows.ui.xaml.media.dxinterop.h> */
 
@@ -583,10 +581,9 @@ static picture_pool_t *Pool(vout_display_t *vd, unsigned pool_size)
     pool_cfg.lock          = Direct3D11MapTexture; /* TODO we only need to map once */
 
     vd->sys->pool = picture_pool_NewExtended( &pool_cfg );
-    return vd->sys->pool;
 
 error:
-    if (pictures) {
+    if (vd->sys->pool ==NULL && pictures) {
         for (unsigned i=0;i<picture_count; ++i)
             DestroyD3D11Picture(pictures[i]);
         free(pictures);

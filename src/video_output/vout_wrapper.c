@@ -35,12 +35,6 @@
 #include <assert.h>
 #include "vout_internal.h"
 #include "display.h"
-#if defined(HAVE_AVCODEC_DXVA2)
-#include "../win32/direct3d9_pool.h"
-#endif
-#if defined(HAVE_AVCODEC_D3D11VA)
-#include "../win32/direct3d11_pool.h"
-#endif
 
 /*****************************************************************************
  * Local prototypes
@@ -153,17 +147,7 @@ int vout_InitWrapper(vout_thread_t *vout)
     } else if (!sys->decoder_pool) {
         const unsigned decoder_pool_size = __MAX(VOUT_MAX_PICTURES,
                                                  reserved_picture + decoder_picture - DISPLAY_PICTURE_COUNT);
-#if defined(HAVE_AVCODEC_DXVA2)
-        if (0 && source.i_chroma == VLC_CODEC_D3D9_OPAQUE)
-            sys->decoder_pool = AllocPoolD3D9( VLC_OBJECT(vout), &source, decoder_pool_size );
-        else
-#endif
-#if defined(HAVE_AVCODEC_D3D11VA)
-        if (0 && source.i_chroma == VLC_CODEC_D3D11_OPAQUE)
-            sys->decoder_pool = AllocPoolD3D11( VLC_OBJECT(vout), &source, decoder_pool_size );
-        else
-#endif
-            sys->decoder_pool = picture_pool_NewFromFormat( &source, decoder_pool_size );
+        sys->decoder_pool = picture_pool_NewFromFormat( &source, decoder_pool_size );
         if (!sys->decoder_pool)
             return VLC_EGENERIC;
         if (allow_dr) {

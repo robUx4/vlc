@@ -301,22 +301,6 @@ SOURCES_libvlc_win32 = \
 	win32/rand.c \
 	$(NULL)
 
-if HAVE_AVCODEC_DXVA2
-if !HAVE_WINSTORE
-SOURCES_libvlc_win32 += \
-	win32/direct3d9_pool.c \
-	win32/direct3d9_pool.h \
-	$(NULL)
-endif
-endif
-
-if HAVE_AVCODEC_D3D11VA
-SOURCES_libvlc_win32 += \
-	win32/picture.c \
-	win32/picture.h \
-	$(NULL)
-endif
-
 SOURCES_libvlc_symbian = \
 	symbian/path.cpp \
 	symbian/dirs.c \

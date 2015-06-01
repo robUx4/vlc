@@ -50,8 +50,6 @@
 
 #include "common.h"
 #include "builtin_shaders.h"
-#include "../../src/win32/direct3d9_pool.h"
-#include "../../src/win32/picture.h"
 
 /*****************************************************************************
  * Module descriptor
@@ -273,11 +271,80 @@ static void Close(vlc_object_t *object)
     free(vd->sys);
 }
 
-/* */
-static picture_pool_t *Pool(vout_display_t *vd, unsigned count)
+static void DestroyPicture(picture_t *picture)
 {
-    if ( vd->sys->pool == NULL )
-        vd->sys->pool = AllocPoolD3D9Ex( VLC_OBJECT(vd), vd->sys->d3ddev, &vd->fmt, count );
+    LPDIRECT3DDEVICE9 d3ddev;
+    if (!FAILED(IDirect3DSurface9_GetDevice(picture->p_sys->surface, &d3ddev)))
+        IDirect3DDevice9_Release(d3ddev);
+
+    IDirect3DSurface9_Release(picture->p_sys->surface);
+
+    free(picture->p_sys);
+    free(picture);
+}
+
+/* */
+static picture_pool_t *Pool(vout_display_t *vd, unsigned pool_size)
+{
+    if ( vd->sys->pool != NULL )
+        return vd->sys->pool;
+
+    picture_t**       pictures = NULL;
+    unsigned          picture_count = 0;
+
+    pictures = calloc(pool_size, sizeof(*pictures));
+    if (!pictures)
+        goto error;
+    for (picture_count = 0; picture_count < pool_size; ++picture_count)
+    {
+        picture_sys_t *picsys = malloc(sizeof(*picsys));
+        if (unlikely(picsys == NULL))
+            goto error;
+
+        HRESULT hr = IDirect3DDevice9_CreateOffscreenPlainSurface(vd->sys->d3ddev,
+                                                          vd->fmt.i_visible_width,
+                                                          vd->fmt.i_visible_height,
+                                                          MAKEFOURCC('N','V','1','2'), /* FIXME d3ddm.Format, */
+                                                          D3DPOOL_DEFAULT,
+                                                          &picsys->surface,
+                                                          NULL);
+        if (FAILED(hr)) {
+           msg_Err(vd, "Failed to allocate surface %d (hr=0x%0lx)", picture_count, hr);
+           goto error;
+        }
+
+        picture_resource_t resource = {
+            .p_sys = picsys,
+            .pf_destroy = DestroyPicture,
+        };
+
+        picture_t *picture = picture_NewFromResource(&vd->fmt, &resource);
+        if (unlikely(picture == NULL)) {
+            free(picsys);
+            goto error;
+        }
+
+        pictures[picture_count] = picture;
+        /* each picture_t holds a ref to the device and release it on Destroy */
+        IDirect3DDevice9_AddRef(vd->sys->d3ddev);
+    }
+
+    /* release the system resources, they will be free'd with the pool */
+    IDirect3DDevice9_Release(vd->sys->d3ddev);
+
+    picture_pool_configuration_t pool_cfg;
+    memset(&pool_cfg, 0, sizeof(pool_cfg));
+    pool_cfg.picture_count = pool_size;
+    pool_cfg.picture       = pictures;
+
+    vd->sys->pool = picture_pool_NewExtended( &pool_cfg );
+
+error:
+    if (vd->sys->pool == NULL && pictures) {
+        for (unsigned i=0;i<picture_count; ++i)
+            DestroyPicture(pictures[i]);
+        free(pictures);
+    }
     return vd->sys->pool;
 }
 

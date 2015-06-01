@@ -268,6 +268,7 @@ void UpdateRects (vout_display_t *,
 void AlignRect(RECT *, int align_boundary, int align_size);
 
 picture_pool_t *CommonPool(vout_display_t *, unsigned);
+int  CommonUpdatePicture(picture_t *pic, picture_t **fallback, uint8_t *data, unsigned pitch);
 
 /*****************************************************************************
  * Constants

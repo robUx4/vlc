@@ -45,7 +45,13 @@
 #include <libavcodec/d3d11va.h>
 
 #include "../../video_chroma/copy.h"
-#include "../../src/win32/direct3d11_pool.h"
+
+struct picture_sys_t {
+    ID3D11Texture2D     *texture;
+    ID3D11Device        *device;
+    ID3D11DeviceContext *context;
+    HINSTANCE           hd3d11_dll;
+};
 
 static int Open(vlc_va_t *, AVCodecContext *, enum PixelFormat,
                 const es_format_t *, picture_sys_t *p_sys);
