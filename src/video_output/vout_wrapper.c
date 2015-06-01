@@ -145,9 +145,10 @@ int vout_InitWrapper(vout_thread_t *vout)
         sys->decoder_pool = display_pool;
         sys->display_pool = display_pool;
     } else if (!sys->decoder_pool) {
-        const unsigned decoder_pool_size = __MAX(VOUT_MAX_PICTURES,
-                                                 reserved_picture + decoder_picture - DISPLAY_PICTURE_COUNT);
-        sys->decoder_pool = picture_pool_NewFromFormat( &source, decoder_pool_size );
+        sys->decoder_pool =
+            picture_pool_NewFromFormat(&source,
+                                       __MAX(VOUT_MAX_PICTURES,
+                                             reserved_picture + decoder_picture - DISPLAY_PICTURE_COUNT));
         if (!sys->decoder_pool)
             return VLC_EGENERIC;
         if (allow_dr) {

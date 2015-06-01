@@ -99,4 +99,6 @@ SOURCES_macosx = \
 	PLItem.m \
 	PLModel.h \
 	PLModel.m \
+	KeyboardBacklight.h \
+	KeyboardBacklight.m
 	$(NULL)
