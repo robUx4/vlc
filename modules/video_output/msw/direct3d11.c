@@ -36,7 +36,6 @@
 #include <d3d11.h>
 #include <d3dx9math.h>
 
-#include "../../src/win32/direct3d11_pool.h"
 #include "../../src/win32/picture.h"
 
 /* avoided until we can pass ISwapchainPanel without c++/cx mode
@@ -116,6 +115,13 @@ typedef struct d3d_vertex_t {
     FLOAT       opacity;
 } d3d_vertex_t;
 
+struct picture_sys_t {
+    ID3D11Texture2D     *texture;
+    ID3D11Device        *device;
+    ID3D11DeviceContext *context;
+    HINSTANCE           hd3d11_dll;
+};
+
 #define RECTWidth(r)   (int)(r.right - r.left)
 #define RECTHeight(r)  (int)(r.bottom - r.top)
 
@@ -139,6 +145,7 @@ static void Direct3D11DestroyResources(vout_display_t *);
 static int  Direct3D11CreatePool (vout_display_t *, video_format_t *);
 static void Direct3D11DestroyPool(vout_display_t *);
 
+static void DestroyD3D11Picture(picture_t *);
 static int  Direct3D11MapTexture(picture_t *);
 static void Direct3D11DeleteRegions(int, picture_t **);
 static int Direct3D11MapSubpicture(vout_display_t *, int *, picture_t ***, subpicture_t *);
@@ -498,13 +505,107 @@ static void Close(vlc_object_t *object)
     free(vd->sys);
 }
 
-static picture_pool_t *Pool(vout_display_t *vd, unsigned count)
+static picture_pool_t *Pool(vout_display_t *vd, unsigned pool_size)
 {
-    if ( vd->sys->pool == NULL )
-        vd->sys->pool = AllocPoolD3D11Ex( VLC_OBJECT(vd), vd->sys->d3ddevice,
-                                          vd->sys->d3dcontext, &vd->fmt,
-                                          vd->sys->picQuadConfig.textureFormat, count );
+    if ( vd->sys->pool != NULL )
+        return vd->sys->pool;
+
+    picture_t**       pictures = NULL;
+    unsigned          picture_count = 0;
+    HRESULT           hr;
+
+    ID3D10Multithread *pMultithread;
+    hr = ID3D11Device_QueryInterface( vd->sys->d3ddevice, &IID_ID3D10Multithread, (void **)&pMultithread);
+    if (SUCCEEDED(hr)) {
+        ID3D10Multithread_SetMultithreadProtected(pMultithread, TRUE);
+        ID3D10Multithread_Release(pMultithread);
+    }
+
+    pictures = calloc(pool_size, sizeof(*pictures));
+    if (!pictures)
+        goto error;
+
+    D3D11_TEXTURE2D_DESC texDesc;
+    ZeroMemory(&texDesc, sizeof(texDesc));
+    texDesc.Width = vd->fmt.i_width;
+    texDesc.Height = vd->fmt.i_height;
+    texDesc.MipLevels = 1;
+    texDesc.Format = vd->sys->picQuadConfig.textureFormat;
+    texDesc.SampleDesc.Count = 1;
+    texDesc.MiscFlags = 0; //D3D11_RESOURCE_MISC_SHARED;
+    texDesc.ArraySize = 1;
+    texDesc.Usage = D3D11_USAGE_DYNAMIC;
+    texDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+    texDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+
+    unsigned surface_count;
+    for (surface_count = 0; surface_count < pool_size; surface_count++) {
+        picture_sys_t *picsys = calloc(1, sizeof(*picsys));
+        if (unlikely(picsys == NULL))
+            goto error;
+
+        hr = ID3D11Device_CreateTexture2D( vd->sys->d3ddevice, &texDesc, NULL, &picsys->texture );
+        if (FAILED(hr)) {
+            msg_Err(vd, "CreateTexture2D %d failed. (hr=0x%0lx)", pool_size, hr);
+            goto error;
+        }
+
+        picsys->context = vd->sys->d3dcontext;
+        picsys->device = vd->sys->d3ddevice;
+
+        picture_resource_t resource = {
+            .p_sys = picsys,
+            .pf_destroy = DestroyD3D11Picture,
+        };
+
+        picture_t *picture = picture_NewFromResource(&vd->fmt, &resource);
+        if (unlikely(picture == NULL)) {
+            free(picsys);
+            goto error;
+        }
+
+        pictures[surface_count] = picture;
+        /* each picture_t holds a ref to the context and release it on Destroy */
+        ID3D11DeviceContext_AddRef(picsys->context);
+        /* each picture_t holds a ref to the DLL */
+        picsys->hd3d11_dll = LoadLibrary(TEXT("D3D11.DLL"));
+    }
+    msg_Dbg(vd, "ID3D11VideoDecoderOutputView succeed with %d surfaces (%dx%d)",
+            pool_size, vd->fmt.i_width, vd->fmt.i_height);
+
+    /* release the system resources, they will be free'd with the pool */
+    //ID3D11Device_Release(vd->sys->d3ddevice); /* TODO check this */
+
+    picture_pool_configuration_t pool_cfg;
+    memset(&pool_cfg, 0, sizeof(pool_cfg));
+    pool_cfg.picture_count = pool_size;
+    pool_cfg.picture       = pictures;
+    pool_cfg.lock          = Direct3D11MapTexture; /* TODO we only need to map once */
+
+    vd->sys->pool = picture_pool_NewExtended( &pool_cfg );
     return vd->sys->pool;
+
+error:
+    if (pictures) {
+        for (unsigned i=0;i<picture_count; ++i)
+            DestroyD3D11Picture(pictures[i]);
+        free(pictures);
+    }
+    return vd->sys->pool;
+}
+
+static void DestroyD3D11Picture(picture_t *picture)
+{
+    picture_sys_t *p_sys = picture->p_sys;
+    ID3D11DeviceContext_Release(p_sys->context);
+
+    if (p_sys->texture)
+        ID3D11Texture2D_Release(p_sys->texture);
+
+    FreeLibrary(p_sys->hd3d11_dll);
+
+    free(p_sys);
+    free(picture);
 }
 
 static HRESULT UpdateBackBuffer(vout_display_t *vd)
