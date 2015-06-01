@@ -43,7 +43,7 @@ static void CloseConverter( vlc_object_t * );
  *****************************************************************************/
 vlc_module_begin ()
     set_description( N_("Conversions from D3D11VA to NV12,YV12,NV12") )
-    set_capability( "video filter2", 10 )
+    set_capability( "video filter2", 0 )
     set_callbacks( OpenConverter, CloseConverter )
 vlc_module_end ()
 

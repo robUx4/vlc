@@ -106,6 +106,10 @@ struct vlc_va_sys_t
     /* Video decoder */
     D3D11_VIDEO_DECODER_CONFIG   cfg;
 
+    /* Option conversion */
+    copy_cache_t                 surface_cache;
+    ID3D11Texture2D              *staging;
+
     /* avcodec internals */
     struct AVD3D11VAContext      hw;
 };
@@ -158,15 +162,43 @@ void SetupAVCodecContext(vlc_va_t *va)
         sys->hw.workaround |= FF_DXVA2_WORKAROUND_INTEL_CLEARVIDEO;
 }
 
+static int assert_staging(vlc_va_t *va, ID3D11Texture2D *texture)
+{
+    vlc_va_sys_t *sys = va->sys;
+    HRESULT hr;
+
+    if (sys->staging)
+        goto ok;
+
+    D3D11_TEXTURE2D_DESC texDesc;
+    ID3D11Texture2D_GetDesc(texture, &texDesc);
+
+    texDesc.MipLevels = 1;
+    //texDesc.SampleDesc.Count = 1;
+    texDesc.MiscFlags = 0;
+    texDesc.ArraySize = 1;
+    texDesc.Usage = D3D11_USAGE_STAGING;
+    texDesc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
+    texDesc.BindFlags = 0;
+
+    sys->staging = NULL;
+    hr = ID3D11Device_CreateTexture2D( (ID3D11Device*) sys->dx_sys.d3ddev, &texDesc, NULL, &sys->staging);
+    if (FAILED(hr)) {
+        msg_Err(va, "Failed to create a staging texture to extract surface pixels (hr=0x%0lx)", hr );
+        return VLC_EGENERIC;
+    }
+ok:
+    return VLC_SUCCESS;
+}
+
 static int Extract(vlc_va_t *va, picture_t *picture, uint8_t *data)
 {
     vlc_va_sys_t *sys = va->sys;
+    directx_sys_t *dx_sys = &va->sys->dx_sys;
     ID3D11VideoDecoderOutputView *d3d = (ID3D11VideoDecoderOutputView*)(uintptr_t)data;
     ID3D11Resource *p_texture = NULL;
     D3D11_VIDEO_DECODER_OUTPUT_VIEW_DESC viewDesc;
     picture_sys_t *p_sys = picture->p_sys;
-
-    assert( picture->format.i_chroma == VLC_CODEC_D3D11_OPAQUE);
 
     ID3D11VideoDecoderOutputView_GetDesc( d3d, &viewDesc );
 
@@ -176,11 +208,75 @@ static int Extract(vlc_va_t *va, picture_t *picture, uint8_t *data)
         goto error;
     }
 
-    /* copy decoder slice to surface */
-    ID3D11DeviceContext_CopySubresourceRegion(sys->d3dctx, (ID3D11Resource*) p_sys->texture,
-                                              0, 0, 0, 0,
-                                              p_texture, viewDesc.Texture2D.ArraySlice,
-                                              NULL);
+    if (picture->format.i_chroma == VLC_CODEC_D3D11_OPAQUE)
+    {
+        /* copy decoder slice to surface */
+        ID3D11DeviceContext_CopySubresourceRegion(sys->d3dctx, (ID3D11Resource*) p_sys->texture,
+                                                  0, 0, 0, 0,
+                                                  p_texture, viewDesc.Texture2D.ArraySlice,
+                                                  NULL);
+    }
+    else if (picture->format.i_chroma == VLC_CODEC_YV12) {
+        D3D11_TEXTURE2D_DESC desc;
+        D3D11_MAPPED_SUBRESOURCE lock;
+
+        if (assert_staging(va, (ID3D11Texture2D*) p_texture) != VLC_SUCCESS)
+            goto error;
+
+        /* copy decoder slice to surface */
+        ID3D11DeviceContext_CopySubresourceRegion(sys->d3dctx, (ID3D11Resource*) sys->staging,
+                                                  0, 0, 0, 0,
+                                                  p_texture, viewDesc.Texture2D.ArraySlice,
+                                                  NULL);
+
+        HRESULT hr = ID3D11DeviceContext_Map(sys->d3dctx, (ID3D11Resource*) sys->staging,
+                                             0, D3D11_MAP_READ, 0, &lock);
+        if (FAILED(hr)) {
+            msg_Err(va, "Failed to map source surface. (hr=0x%0lx)", hr);
+            goto error;
+        }
+
+        ID3D11Texture2D_GetDesc(sys->staging, &desc);
+
+        if (desc.Format == DXGI_FORMAT_YUY2) {
+            size_t chroma_pitch = (lock.RowPitch / 2);
+
+            size_t pitch[3] = {
+                lock.RowPitch,
+                chroma_pitch,
+                chroma_pitch,
+            };
+
+            uint8_t *plane[3] = {
+                (uint8_t*)lock.pData,
+                (uint8_t*)lock.pData + pitch[0] * dx_sys->surface_height,
+                (uint8_t*)lock.pData + pitch[0] * dx_sys->surface_height
+                                     + pitch[1] * dx_sys->surface_height / 2,
+            };
+
+            CopyFromYv12(picture, plane, pitch, dx_sys->surface_width,
+                         dx_sys->surface_height, &sys->surface_cache);
+        } else if (desc.Format == DXGI_FORMAT_NV12) {
+            uint8_t *plane[2] = {
+                lock.pData,
+                (uint8_t*)lock.pData + lock.RowPitch * dx_sys->surface_height
+            };
+            size_t  pitch[2] = {
+                lock.RowPitch,
+                lock.RowPitch,
+            };
+            CopyFromNv12(picture, plane, pitch, dx_sys->surface_width,
+                         dx_sys->surface_height, &sys->surface_cache);
+        } else {
+            msg_Err(va, "Unsupported D3D11VA conversion from 0x%08X to YV12", desc.Format);
+        }
+
+        /* */
+        ID3D11DeviceContext_Unmap(sys->d3dctx, (ID3D11Resource*)sys->staging, 0);
+    } else {
+        msg_Err(va, "Unsupported output picture format %08X", picture->format.i_chroma );
+        goto error;
+    }
 
     if (p_texture!=NULL)
         ID3D11Resource_Release(p_texture);
@@ -220,6 +316,10 @@ static void Close(vlc_va_t *va, AVCodecContext *ctx)
     vlc_va_sys_t *sys = va->sys;
 
     (void) ctx;
+
+    CopyCleanCache(&sys->surface_cache);
+    if (sys->staging)
+        ID3D11Texture2D_Release(sys->staging);
 
     directx_va_Close(va, &sys->dx_sys);
 
@@ -267,6 +367,8 @@ static int Open(vlc_va_t *va, AVCodecContext *ctx, enum PixelFormat pix_fmt,
     dx_sys->psz_decoder_dll            = TEXT("D3D11.DLL");
 
     va->sys = sys;
+
+    CopyInitCache( &sys->surface_cache, fmt->video.i_width );
 
     dx_sys->d3ddev = NULL;
     va->sys->render = DXGI_FORMAT_UNKNOWN;
