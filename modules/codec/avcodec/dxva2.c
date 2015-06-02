@@ -107,10 +107,11 @@ static const d3d_format_t *D3dFindFormat(D3DFORMAT format)
 
 typedef struct
 {
-    filter_t   filter;
-    picture_t  *pic_in;
-    picture_t  *pic_out;
-} plane_filter;
+    filter_t     filter;
+    picture_t    *pic_in;
+    picture_t    *pic_out;
+    vlc_mutex_t  lock;
+} plane_filter_t;
 
 struct vlc_va_sys_t
 {
@@ -135,7 +136,7 @@ struct vlc_va_sys_t
     DXVA2_ConfigPictureDecode    cfg;
 
     /* Option conversion */
-    plane_filter             *filter;
+    plane_filter_t             *filter;
 
     /* avcodec internals */
     struct dxva_context hw;
@@ -166,7 +167,7 @@ static int DxResetVideoDecoder(vlc_va_t *);
 static void SetupAVCodecContext(vlc_va_t *);
 
 
-static void DeleteFilter( plane_filter * plane_filter )
+static void DeleteFilter( plane_filter_t * plane_filter )
 {
     filter_t *p_filter = &plane_filter->filter;
 
@@ -179,20 +180,28 @@ static void DeleteFilter( plane_filter * plane_filter )
     if (plane_filter->pic_in)
         picture_Release( plane_filter->pic_in );
 
+    vlc_mutex_destroy( &plane_filter->lock );
+
     vlc_object_release( p_filter );
 }
 
-static picture_t *video_new_buffer(plane_filter *p_filter)
+static picture_t *video_new_buffer(plane_filter_t *p_filter)
 {
     return p_filter->pic_out;
 }
 
-static plane_filter *CreateFilter( vlc_object_t *p_this, const es_format_t *p_fmt_in,
+static plane_filter_t *CreateFilter( vlc_object_t *p_this, const es_format_t *p_fmt_in,
                                vlc_fourcc_t fmt_out )
 {
     filter_t *p_filter;
 
-    p_filter = vlc_object_create( p_this, sizeof(plane_filter) );
+    p_filter = vlc_object_create( p_this, sizeof(plane_filter_t) );
+    if (unlikely(p_filter == NULL))
+        return NULL;
+
+    plane_filter_t *plane_filter = (plane_filter_t*) p_filter;
+    vlc_mutex_init( &plane_filter->lock );
+
     p_filter->owner.video.buffer_new = (picture_t *(*)(filter_t *))video_new_buffer;
 
     es_format_InitFromVideo( &p_filter->fmt_in,  &p_fmt_in->video );
@@ -204,11 +213,11 @@ static plane_filter *CreateFilter( vlc_object_t *p_this, const es_format_t *p_fm
     if( !p_filter->p_module )
     {
         msg_Dbg( p_filter, "no video filter found" );
-        DeleteFilter( (plane_filter*) p_filter );
+        DeleteFilter( (plane_filter_t*) p_filter );
         return NULL;
     }
 
-    return (plane_filter*) p_filter;
+    return (plane_filter_t*) p_filter;
 }
 
 /* */
@@ -219,7 +228,7 @@ static int Setup(vlc_va_t *va, AVCodecContext *avctx, vlc_fourcc_t *chroma)
         return VLC_EGENERIC;
 
     avctx->hwaccel_context = &sys->hw;
-    *chroma = sys->b_opaque ? VLC_CODEC_D3D9_OPAQUE : VLC_CODEC_YV12;
+    *chroma = sys->filter == NULL ? VLC_CODEC_D3D9_OPAQUE : VLC_CODEC_YV12;
 
     return VLC_SUCCESS;
 }
@@ -268,10 +277,13 @@ static int Extract(vlc_va_t *va, picture_t *picture, uint8_t *data)
         }
     }
     else if (va->sys->filter != NULL) {
-        va->sys->filter->pic_in->p_sys->surface = d3d;
-        va->sys->filter->pic_out = picture;
-        picture_Hold(va->sys->filter->pic_in);
-        va->sys->filter->filter.pf_video_filter( &va->sys->filter->filter, va->sys->filter->pic_in );
+        plane_filter_t *p_f = va->sys->filter;
+        vlc_mutex_lock( &p_f->lock );
+        p_f->pic_in->p_sys->surface = d3d;
+        p_f->pic_out = picture;
+        picture_Hold( p_f->pic_in );
+        p_f->filter.pf_video_filter( &p_f->filter, p_f->pic_in );
+        vlc_mutex_unlock( &p_f->lock );
     } else {
         msg_Err(va, "Unsupported output picture format %08X", picture->format.i_chroma );
         return VLC_EGENERIC;
