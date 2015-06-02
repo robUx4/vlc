@@ -329,6 +329,9 @@ int directx_va_Setup(vlc_va_t *va, directx_sys_t *dx_sys, AVCodecContext *avctx,
         surface->refcount = 0;
         surface->order = 0;
         surface->p_lock = &dx_sys->surface_lock;
+        surface->p_pic = dx_sys->pf_alloc_surface_pic(va, &fmt, i);
+        if (unlikely(surface->p_pic == NULL))
+            return VLC_EGENERIC;
     }
 
     dx_sys->pf_setup_avcodec_ctx(va);

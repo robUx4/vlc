@@ -108,9 +108,7 @@ static const d3d_format_t *D3dFindFormat(D3DFORMAT format)
 typedef struct
 {
     filter_t     filter;
-    picture_t    *pic_in;
     picture_t    *pic_out;
-    vlc_mutex_t  lock;
 } plane_filter_t;
 
 struct vlc_va_sys_t
@@ -136,7 +134,7 @@ struct vlc_va_sys_t
     DXVA2_ConfigPictureDecode    cfg;
 
     /* Option conversion */
-    plane_filter_t             *filter;
+    filter_t                 *filter;
 
     /* avcodec internals */
     struct dxva_context hw;
@@ -167,20 +165,13 @@ static int DxResetVideoDecoder(vlc_va_t *);
 static void SetupAVCodecContext(vlc_va_t *);
 
 
-static void DeleteFilter( plane_filter_t * plane_filter )
+static void DeleteFilter( filter_t * p_filter )
 {
-    filter_t *p_filter = &plane_filter->filter;
-
     if( p_filter->p_module )
         module_unneed( p_filter, p_filter->p_module );
 
     es_format_Clean( &p_filter->fmt_in );
     es_format_Clean( &p_filter->fmt_out );
-
-    if (plane_filter->pic_in)
-        picture_Release( plane_filter->pic_in );
-
-    vlc_mutex_destroy( &plane_filter->lock );
 
     vlc_object_release( p_filter );
 }
@@ -190,17 +181,14 @@ static picture_t *video_new_buffer(plane_filter_t *p_filter)
     return p_filter->pic_out;
 }
 
-static plane_filter_t *CreateFilter( vlc_object_t *p_this, const es_format_t *p_fmt_in,
+static filter_t *CreateFilter( vlc_object_t *p_this, const es_format_t *p_fmt_in,
                                vlc_fourcc_t fmt_out )
 {
     filter_t *p_filter;
 
-    p_filter = vlc_object_create( p_this, sizeof(plane_filter_t) );
+    p_filter = vlc_object_create( p_this, sizeof(filter_t) );
     if (unlikely(p_filter == NULL))
         return NULL;
-
-    plane_filter_t *plane_filter = (plane_filter_t*) p_filter;
-    vlc_mutex_init( &plane_filter->lock );
 
     p_filter->owner.video.buffer_new = (picture_t *(*)(filter_t *))video_new_buffer;
 
@@ -213,11 +201,11 @@ static plane_filter_t *CreateFilter( vlc_object_t *p_this, const es_format_t *p_
     if( !p_filter->p_module )
     {
         msg_Dbg( p_filter, "no video filter found" );
-        DeleteFilter( (plane_filter_t*) p_filter );
+        DeleteFilter( p_filter );
         return NULL;
     }
 
-    return (plane_filter_t*) p_filter;
+    return p_filter;
 }
 
 /* */
@@ -277,13 +265,13 @@ static int Extract(vlc_va_t *va, picture_t *picture, uint8_t *data)
         }
     }
     else if (va->sys->filter != NULL) {
-        plane_filter_t *p_f = va->sys->filter;
-        vlc_mutex_lock( &p_f->lock );
-        p_f->pic_in->p_sys->surface = d3d;
-        p_f->pic_out = picture;
-        picture_Hold( p_f->pic_in );
-        p_f->filter.pf_video_filter( &p_f->filter, p_f->pic_in );
-        vlc_mutex_unlock( &p_f->lock );
+        plane_filter_t filter = {
+            .filter  = *va->sys->filter,
+            .pic_out = picture,
+        };
+        vlc_va_surface_t *surface = picture->context;
+        picture_Hold( surface->p_pic );
+        va->sys->filter->pf_video_filter( &filter.filter, surface->p_pic );
     } else {
         msg_Err(va, "Unsupported output picture format %08X", picture->format.i_chroma );
         return VLC_EGENERIC;
@@ -311,6 +299,27 @@ static int CheckDevice(vlc_va_t *va)
 static int Get(vlc_va_t *va, picture_t *pic, uint8_t **data)
 {
     return directx_va_Get(va, &va->sys->dx_sys, pic, data);
+}
+
+static picture_t *DxAllocPicture(vlc_va_t *va, const video_format_t *fmt, unsigned index)
+{
+    video_format_t src_fmt = *fmt;
+    src_fmt.i_chroma = VLC_CODEC_D3D9_OPAQUE;
+    picture_sys_t *pic_sys = calloc(1, sizeof(*pic_sys));
+    if (unlikely(pic_sys == NULL))
+        return NULL;
+    pic_sys->surface = (LPDIRECT3DSURFACE9) va->sys->dx_sys.hw_surface[index];
+
+    picture_resource_t res = {
+        .p_sys = pic_sys,
+    };
+    picture_t *pic = picture_NewFromResource(&src_fmt, &res);
+    if (unlikely(pic == NULL))
+    {
+        free(pic_sys);
+        return NULL;
+    }
+    return pic;
 }
 
 static void Close(vlc_va_t *va, AVCodecContext *ctx)
@@ -368,6 +377,7 @@ static int Open(vlc_va_t *va, AVCodecContext *ctx, enum PixelFormat pix_fmt,
     dx_sys->pf_setup_avcodec_ctx       = SetupAVCodecContext;
     dx_sys->pf_get_input_list          = DxGetInputList;
     dx_sys->pf_setup_output            = DxSetupOutput;
+    dx_sys->pf_alloc_surface_pic       = DxAllocPicture;
     dx_sys->psz_decoder_dll            = TEXT("DXVA2.DLL");
 
     va->sys = sys;
@@ -687,25 +697,6 @@ static int DxCreateVideoDecoder(vlc_va_t *va, int codec_id, const video_format_t
 
     vlc_va_sys_t *p_sys = va->sys;
     directx_sys_t *sys = &va->sys->dx_sys;
-
-    if (p_sys->filter != NULL)
-    {
-        video_format_t src_fmt = *fmt;
-        src_fmt.i_chroma = VLC_CODEC_D3D9_OPAQUE;
-        picture_sys_t *pic_sys = calloc(1, sizeof(*p_sys));
-        if (unlikely(pic_sys == NULL))
-            return VLC_EGENERIC;
-
-        picture_resource_t res = {
-            .p_sys = pic_sys,
-        };
-        p_sys->filter->pic_in = picture_NewFromResource(&src_fmt, &res);
-        if (unlikely(p_sys->filter->pic_in == NULL))
-        {
-            free(p_sys);
-            return VLC_EGENERIC;
-        }
-    }
 
     if (FAILED(IDirectXVideoDecoderService_CreateSurface((IDirectXVideoDecoderService*) sys->d3ddec,
                                                          sys->surface_width,
