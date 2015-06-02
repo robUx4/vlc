@@ -1124,29 +1124,28 @@ static enum PixelFormat ffmpeg_GetFormat( AVCodecContext *p_context,
     for( size_t i = 0; pi_fmt[i] != PIX_FMT_NONE; i++ )
     {
         enum PixelFormat hwfmt = pi_fmt[i];
-        bool b_found = false;
 
         /* first try full hardware */
         p_sys->b_opaque = true;
         p_dec->fmt_out.video.i_chroma = vlc_va_GetChroma(hwfmt, hwfmt);
         if (p_dec->fmt_out.video.i_chroma != 0)
         {
-            if (!lavc_UpdateVideoFormat(p_dec, p_context, true))
-                b_found = true;
+            if (lavc_UpdateVideoFormat(p_dec, p_context, true))
+                p_dec->fmt_out.video.i_chroma = 0;
         }
 
-        if (!b_found)
+        if (p_dec->fmt_out.video.i_chroma == 0)
         {
             p_sys->b_opaque = false;
             p_dec->fmt_out.video.i_chroma = vlc_va_GetChroma(hwfmt, swfmt);
             if (p_dec->fmt_out.video.i_chroma != 0)
             {
-                if (!lavc_UpdateVideoFormat(p_dec, p_context, true))
-                    b_found = true;
+                if (lavc_UpdateVideoFormat(p_dec, p_context, true))
+                    p_dec->fmt_out.video.i_chroma = 0;
             }
         }
 
-        if (!b_found)
+        if (p_dec->fmt_out.video.i_chroma == 0)
             continue; /* Unsupported brand of hardware acceleration */
 
         picture_t *test_pic = decoder_NewPicture(p_dec);
