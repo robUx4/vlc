@@ -164,6 +164,8 @@ static void DxDestroyVideoDecoder(vlc_va_t *);
 static int DxResetVideoDecoder(vlc_va_t *);
 static void SetupAVCodecContext(vlc_va_t *);
 
+static picture_t *DxAllocPicture(vlc_va_t *, const video_format_t *, unsigned index);
+
 
 static void DeleteFilter( filter_t * p_filter )
 {
@@ -299,27 +301,6 @@ static int CheckDevice(vlc_va_t *va)
 static int Get(vlc_va_t *va, picture_t *pic, uint8_t **data)
 {
     return directx_va_Get(va, &va->sys->dx_sys, pic, data);
-}
-
-static picture_t *DxAllocPicture(vlc_va_t *va, const video_format_t *fmt, unsigned index)
-{
-    video_format_t src_fmt = *fmt;
-    src_fmt.i_chroma = VLC_CODEC_D3D9_OPAQUE;
-    picture_sys_t *pic_sys = calloc(1, sizeof(*pic_sys));
-    if (unlikely(pic_sys == NULL))
-        return NULL;
-    pic_sys->surface = (LPDIRECT3DSURFACE9) va->sys->dx_sys.hw_surface[index];
-
-    picture_resource_t res = {
-        .p_sys = pic_sys,
-    };
-    picture_t *pic = picture_NewFromResource(&src_fmt, &res);
-    if (unlikely(pic == NULL))
-    {
-        free(pic_sys);
-        return NULL;
-    }
-    return pic;
 }
 
 static void Close(vlc_va_t *va, AVCodecContext *ctx)
@@ -816,3 +797,23 @@ static int DxResetVideoDecoder(vlc_va_t *va)
     return VLC_EGENERIC;
 }
 
+static picture_t *DxAllocPicture(vlc_va_t *va, const video_format_t *fmt, unsigned index)
+{
+    video_format_t src_fmt = *fmt;
+    src_fmt.i_chroma = VLC_CODEC_D3D9_OPAQUE;
+    picture_sys_t *pic_sys = calloc(1, sizeof(*pic_sys));
+    if (unlikely(pic_sys == NULL))
+        return NULL;
+    pic_sys->surface = (LPDIRECT3DSURFACE9) va->sys->dx_sys.hw_surface[index];
+
+    picture_resource_t res = {
+        .p_sys = pic_sys,
+    };
+    picture_t *pic = picture_NewFromResource(&src_fmt, &res);
+    if (unlikely(pic == NULL))
+    {
+        free(pic_sys);
+        return NULL;
+    }
+    return pic;
+}

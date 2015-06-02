@@ -105,12 +105,14 @@ static const d3d_format_t d3d_formats[] = {
     { NULL, 0, 0, 0, 0}
 };
 
+/* VLC_CODEC_D3D11_OPAQUE */
 struct picture_sys_t
 {
-    ID3D11Texture2D     *texture;
-    ID3D11Device        *device;
-    ID3D11DeviceContext *context;
-    HINSTANCE           hd3d11_dll;
+    ID3D11VideoDecoderOutputView  *decoder; /* we do not get access from here */
+    ID3D11Texture2D               *texture;
+    ID3D11Device                  *device;
+    ID3D11DeviceContext           *context;
+    HINSTANCE                     hd3d11_dll;
 };
 
 /* matches the D3D11_INPUT_ELEMENT_DESC we setup */
