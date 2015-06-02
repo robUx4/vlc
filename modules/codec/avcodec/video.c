@@ -77,8 +77,6 @@ struct decoder_sys_t
 
     /* VA API */
     vlc_va_t *p_va;
-    /* using an opaque output */
-    bool     b_opaque;
 
     vlc_sem_t sem_mt;
 };
@@ -1057,7 +1055,7 @@ static int lavc_GetFrame(struct AVCodecContext *ctx, AVFrame *frame, int flags)
     wait_mt(sys);
     if (sys->p_va != NULL)
     {   /* TODO: Move this to get_format(). We are screwed if it fails here. */
-        if (vlc_va_Setup(sys->p_va, ctx, &dec->fmt_out.video.i_chroma, sys->b_opaque))
+        if (vlc_va_Setup(sys->p_va, ctx, &dec->fmt_out.video.i_chroma))
         {
             post_mt(sys);
             msg_Err(dec, "hardware acceleration setup failed");
@@ -1125,8 +1123,7 @@ static enum PixelFormat ffmpeg_GetFormat( AVCodecContext *p_context,
     {
         enum PixelFormat hwfmt = pi_fmt[i];
 
-        /* first try full hardware */
-        p_sys->b_opaque = true;
+        /* first try a direct rendering friendly format */
         p_dec->fmt_out.video.i_chroma = vlc_va_GetChroma(hwfmt, hwfmt);
         if (p_dec->fmt_out.video.i_chroma != 0)
         {
@@ -1136,7 +1133,6 @@ static enum PixelFormat ffmpeg_GetFormat( AVCodecContext *p_context,
 
         if (p_dec->fmt_out.video.i_chroma == 0)
         {
-            p_sys->b_opaque = false;
             p_dec->fmt_out.video.i_chroma = vlc_va_GetChroma(hwfmt, swfmt);
             if (p_dec->fmt_out.video.i_chroma != 0)
             {
@@ -1161,7 +1157,7 @@ static enum PixelFormat ffmpeg_GetFormat( AVCodecContext *p_context,
         /* We try to call vlc_va_Setup when possible to detect errors when
          * possible (later is too late) */
         if( p_context->width > 0 && p_context->height > 0
-         && vlc_va_Setup(va, p_context, &p_dec->fmt_out.video.i_chroma, p_sys->b_opaque))
+         && vlc_va_Setup(va, p_context, &p_dec->fmt_out.video.i_chroma))
         {
             msg_Err( p_dec, "acceleration setup failure" );
             vlc_va_Delete(va, p_context);

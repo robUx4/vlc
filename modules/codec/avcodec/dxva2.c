@@ -106,6 +106,7 @@ static const d3d_format_t *D3dFindFormat(D3DFORMAT format)
 struct vlc_va_sys_t
 {
     directx_sys_t         dx_sys;
+    bool                  b_opaque;
 
     /* DLL */
     HINSTANCE             hd3d9_dll;
@@ -157,17 +158,14 @@ static int DxResetVideoDecoder(vlc_va_t *);
 static void SetupAVCodecContext(vlc_va_t *);
 
 /* */
-static int Setup(vlc_va_t *va, AVCodecContext *avctx, vlc_fourcc_t *chroma, bool b_opaque)
+static int Setup(vlc_va_t *va, AVCodecContext *avctx, vlc_fourcc_t *chroma)
 {
     vlc_va_sys_t *sys = va->sys;
     if (directx_va_Setup(va, &sys->dx_sys, avctx, chroma)!=VLC_SUCCESS)
         return VLC_EGENERIC;
 
     avctx->hwaccel_context = &sys->hw;
-    if (b_opaque)
-        *chroma = VLC_CODEC_D3D9_OPAQUE;
-    else
-        *chroma = VLC_CODEC_YV12;
+    *chroma = sys->b_opaque ? VLC_CODEC_D3D9_OPAQUE : VLC_CODEC_YV12;
 
     return VLC_SUCCESS;
 }
@@ -323,11 +321,11 @@ static int Open(vlc_va_t *va, AVCodecContext *ctx, enum PixelFormat pix_fmt,
     if (pix_fmt != AV_PIX_FMT_DXVA2_VLD)
         return VLC_EGENERIC;
 
-    (void) p_sys;
-
     vlc_va_sys_t *sys = calloc(1, sizeof (*sys));
     if (unlikely(sys == NULL))
         return VLC_ENOMEM;
+
+    sys->b_opaque = p_sys != NULL;
 
     CopyInitCache( &sys->surface_cache, fmt->video.i_width );
 

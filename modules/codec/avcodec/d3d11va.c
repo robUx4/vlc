@@ -98,6 +98,7 @@ DEFINE_GUID(DXVA_Intel_H264_NoFGT_ClearVideo,       0x604F8E68, 0x4951, 0x4c54, 
 struct vlc_va_sys_t
 {
     directx_sys_t                dx_sys;
+    bool                         b_opaque;
 
 #if defined(NDEBUG) && defined(HAVE_DXGIDEBUG_H)
     HINSTANCE                    dxgidebug_dll;
@@ -138,17 +139,14 @@ static void DxDestroySurfaces(vlc_va_t *);
 static void SetupAVCodecContext(vlc_va_t *);
 
 /* */
-static int Setup(vlc_va_t *va, AVCodecContext *avctx, vlc_fourcc_t *chroma, bool b_opaque)
+static int Setup(vlc_va_t *va, AVCodecContext *avctx, vlc_fourcc_t *chroma)
 {
     vlc_va_sys_t *sys = va->sys;
     if (directx_va_Setup(va, &sys->dx_sys, avctx, chroma)!=VLC_SUCCESS)
         return VLC_EGENERIC;
 
     avctx->hwaccel_context = &sys->hw;
-    if (b_opaque)
-        *chroma = VLC_CODEC_D3D11_OPAQUE;
-    else
-        *chroma = VLC_CODEC_YV12;
+    *chroma = sys->b_opaque ? VLC_CODEC_D3D11_OPAQUE : VLC_CODEC_YV12;
 
     return VLC_SUCCESS;
 }
@@ -341,7 +339,6 @@ static void Close(vlc_va_t *va, AVCodecContext *ctx)
 static int Open(vlc_va_t *va, AVCodecContext *ctx, enum PixelFormat pix_fmt,
                 const es_format_t *fmt, picture_sys_t *p_sys)
 {
-    VLC_UNUSED(p_sys);
     int err = VLC_EGENERIC;
     directx_sys_t *dx_sys;
 
@@ -351,6 +348,8 @@ static int Open(vlc_va_t *va, AVCodecContext *ctx, enum PixelFormat pix_fmt,
     vlc_va_sys_t *sys = calloc(1, sizeof (*sys));
     if (unlikely(sys == NULL))
         return VLC_ENOMEM;
+
+    sys->b_opaque = p_sys != NULL;
 
 #if defined(NDEBUG) && defined(HAVE_DXGIDEBUG_H)
     sys->dxgidebug_dll = LoadLibrary(TEXT("DXGIDEBUG.DLL"));

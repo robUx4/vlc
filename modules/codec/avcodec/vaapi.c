@@ -187,7 +187,7 @@ static void Release( void *opaque, uint8_t *data )
     (void) data;
 }
 
-static int Setup( vlc_va_t *va, AVCodecContext *avctx, vlc_fourcc_t *pi_chroma, bool b_opaque )
+static int Setup( vlc_va_t *va, AVCodecContext *avctx, vlc_fourcc_t *pi_chroma )
 {
     VLC_UNUSED(b_opaque);
     vlc_va_sys_t *sys = va->sys;

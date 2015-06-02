@@ -36,7 +36,7 @@ struct vlc_va_t {
     module_t *module;
     const char *description;
 
-    int  (*setup)(vlc_va_t *, AVCodecContext *, vlc_fourcc_t *output, bool b_opaque);
+    int  (*setup)(vlc_va_t *, AVCodecContext *, vlc_fourcc_t *output);
     int  (*get)(vlc_va_t *, picture_t *pic, uint8_t **data);
     void (*release)(void *pic, uint8_t *surface);
     int  (*extract)(vlc_va_t *, picture_t *pic, uint8_t *data);
@@ -55,6 +55,7 @@ vlc_fourcc_t vlc_va_GetChroma(enum PixelFormat hwfmt, enum PixelFormat swfmt);
  * Creates an accelerated video decoding back-end for libavcodec.
  * @param obj parent VLC object
  * @param fmt VLC format of the content to decode
+ * @param p_sys picture_sys_t type that will be used with Extract()
  * @return a new VLC object on success, NULL on error.
  */
 vlc_va_t *vlc_va_New(vlc_object_t *obj, AVCodecContext *,
@@ -65,13 +66,12 @@ vlc_va_t *vlc_va_New(vlc_object_t *obj, AVCodecContext *,
  * Initializes the acceleration video decoding back-end for libavcodec.
  * @param avctx libavcodec codec context
  * @param output pointer to video chroma output by the back-end [OUT]
- * @param b_opaque whether an opaque chroma output is allowed or not[IN]
  * @return VLC_SUCCESS on success, otherwise an error code.
  */
 static inline int vlc_va_Setup(vlc_va_t *va, AVCodecContext *avctx,
-                               vlc_fourcc_t *output, bool b_opaque)
+                               vlc_fourcc_t *output)
 {
-    return va->setup(va, avctx, output, b_opaque);
+    return va->setup(va, avctx, output);
 }
 
 /**
