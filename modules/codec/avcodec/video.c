@@ -1154,7 +1154,7 @@ static enum PixelFormat ffmpeg_GetFormat( AVCodecContext *p_context,
             vlc_va_Delete(va, p_context);
             continue;
         }
-
+#if 0
         if (i_expected_chroma != p_dec->fmt_out.video.i_chroma)
         {
             msg_Dbg( va, "cannot output %08x trying %08x", i_expected_chroma,
@@ -1201,6 +1201,7 @@ static enum PixelFormat ffmpeg_GetFormat( AVCodecContext *p_context,
             vlc_va_Delete(va, p_context);
             continue;
         }
+#endif
 
         post_mt(p_sys);
 
