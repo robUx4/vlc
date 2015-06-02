@@ -284,7 +284,7 @@ static void DestroyPicture(picture_t *picture)
 }
 
 /* */
-static picture_pool_t *Pool(vout_display_t *vd, unsigned pool_size)
+static picture_pool_t *Pool(vout_display_t *vd, unsigned count)
 {
     if ( vd->sys->pool != NULL )
         return vd->sys->pool;
@@ -292,10 +292,10 @@ static picture_pool_t *Pool(vout_display_t *vd, unsigned pool_size)
     picture_t**       pictures = NULL;
     unsigned          picture_count = 0;
 
-    pictures = calloc(pool_size, sizeof(*pictures));
+    pictures = calloc(count, sizeof(*pictures));
     if (!pictures)
         goto error;
-    for (picture_count = 0; picture_count < pool_size; ++picture_count)
+    for (picture_count = 0; picture_count < count; ++picture_count)
     {
         picture_sys_t *picsys = malloc(sizeof(*picsys));
         if (unlikely(picsys == NULL))
@@ -304,7 +304,7 @@ static picture_pool_t *Pool(vout_display_t *vd, unsigned pool_size)
         HRESULT hr = IDirect3DDevice9_CreateOffscreenPlainSurface(vd->sys->d3ddev,
                                                           vd->fmt.i_visible_width,
                                                           vd->fmt.i_visible_height,
-                                                          MAKEFOURCC('N','V','1','2'), /* FIXME d3ddm.Format, */
+                                                          MAKEFOURCC('N','V','1','2'),
                                                           D3DPOOL_DEFAULT,
                                                           &picsys->surface,
                                                           NULL);
@@ -329,12 +329,9 @@ static picture_pool_t *Pool(vout_display_t *vd, unsigned pool_size)
         IDirect3DDevice9_AddRef(vd->sys->d3ddev);
     }
 
-    /* release the system resources, they will be free'd with the pool */
-    IDirect3DDevice9_Release(vd->sys->d3ddev);
-
     picture_pool_configuration_t pool_cfg;
     memset(&pool_cfg, 0, sizeof(pool_cfg));
-    pool_cfg.picture_count = pool_size;
+    pool_cfg.picture_count = count;
     pool_cfg.picture       = pictures;
 
     vd->sys->pool = picture_pool_NewExtended( &pool_cfg );
@@ -1552,7 +1549,12 @@ static int Direct3D9ImportPicture(vout_display_t *vd,
 
     /* Copy picture surface into texture surface
      * color space conversion happen here */
-    hr = IDirect3DDevice9_StretchRect(sys->d3ddev, source, NULL, destination, NULL, D3DTEXF_LINEAR);
+    RECT cropSource;
+    cropSource.left = 0;
+    cropSource.top = 0;
+    cropSource.right = vd->fmt.i_visible_width;
+    cropSource.bottom = vd->fmt.i_visible_height;
+    hr = IDirect3DDevice9_StretchRect(sys->d3ddev, source, &cropSource, destination, NULL, D3DTEXF_LINEAR);
     IDirect3DSurface9_Release(destination);
     if (FAILED(hr)) {
         msg_Dbg(vd, "Failed IDirect3DDevice9_StretchRect: source 0x%p 0x%0lx", source, hr);
@@ -1606,7 +1608,7 @@ static void Direct3D9ImportSubpicture(vout_display_t *vd,
                 cache->format == sys->d3dregion_format &&
                 cache->width  == r->fmt.i_visible_width &&
                 cache->height == r->fmt.i_visible_height) {
-#if 0 //ndef NDEBUG
+#ifndef NDEBUG
                 msg_Dbg(vd, "Reusing %dx%d texture for OSD",
                         cache->width, cache->height);
 #endif
@@ -1690,7 +1692,7 @@ static void Direct3D9ImportSubpicture(vout_display_t *vd,
         dst.left   = video.left + scale_w * r->i_x,
         dst.right  = dst.left + scale_w * r->fmt.i_visible_width,
         dst.top    = video.top  + scale_h * r->i_y,
-        dst.bottom = dst.top  + scale_h * r->fmt.i_visible_height;
+        dst.bottom = dst.top  + scale_h * r->fmt.i_visible_height,
         Direct3D9SetupVertices(d3dr->vertex,
                               src, src, dst,
                               subpicture->i_alpha * r->i_alpha / 255, ORIENT_NORMAL);

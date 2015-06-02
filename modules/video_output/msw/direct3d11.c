@@ -46,7 +46,6 @@
 # define D3D11CreateDevice(args...)             sys->OurD3D11CreateDevice(args)
 # define D3DCompile(args...)                    sys->OurD3DCompile(args)
 #else
-# define IDXGISwapChain_Present(args...)        IDXGISwapChain_Present1(args)
 # define IDXGIFactory_CreateSwapChain(a,b,c,d)  IDXGIFactory2_CreateSwapChainForComposition(a,b,c,NULL,d)
 # define DXGI_SWAP_CHAIN_DESC                   DXGI_SWAP_CHAIN_DESC1
 #endif
@@ -83,10 +82,10 @@ typedef struct
 } d3d_format_t;
 
 static const d3d_format_t d3d_formats[] = {
-    { "VA_NV12",  DXGI_FORMAT_NV12,           VLC_CODEC_D3D11_OPAQUE, DXGI_FORMAT_R8_UNORM,       DXGI_FORMAT_R8G8_UNORM },
     { "I420",     DXGI_FORMAT_NV12,           VLC_CODEC_I420,     DXGI_FORMAT_R8_UNORM,           DXGI_FORMAT_R8G8_UNORM },
     { "YV12",     DXGI_FORMAT_NV12,           VLC_CODEC_YV12,     DXGI_FORMAT_R8_UNORM,           DXGI_FORMAT_R8G8_UNORM },
     { "NV12",     DXGI_FORMAT_NV12,           VLC_CODEC_NV12,     DXGI_FORMAT_R8_UNORM,           DXGI_FORMAT_R8G8_UNORM },
+    { "VA_NV12",  DXGI_FORMAT_NV12,           VLC_CODEC_D3D11_OPAQUE, DXGI_FORMAT_R8_UNORM,       DXGI_FORMAT_R8G8_UNORM },
 #ifdef BROKEN_PIXEL
     { "YUY2",     DXGI_FORMAT_YUY2,           VLC_CODEC_I422,     DXGI_FORMAT_R8G8B8A8_UNORM,     0 },
     { "AYUV",     DXGI_FORMAT_AYUV,           VLC_CODEC_YUVA,     DXGI_FORMAT_R8G8B8A8_UNORM,     0 },
@@ -106,19 +105,20 @@ static const d3d_format_t d3d_formats[] = {
     { NULL, 0, 0, 0, 0}
 };
 
+struct picture_sys_t
+{
+    ID3D11Texture2D     *texture;
+    ID3D11Device        *device;
+    ID3D11DeviceContext *context;
+    HINSTANCE           hd3d11_dll;
+};
+
 /* matches the D3D11_INPUT_ELEMENT_DESC we setup */
 typedef struct d3d_vertex_t {
     D3DXVECTOR3 position;
     D3DXVECTOR2 texture;
     FLOAT       opacity;
 } d3d_vertex_t;
-
-struct picture_sys_t {
-    ID3D11Texture2D     *texture;
-    ID3D11Device        *device;
-    ID3D11DeviceContext *context;
-    HINSTANCE           hd3d11_dll;
-};
 
 #define RECTWidth(r)   (int)(r.right - r.left)
 #define RECTHeight(r)  (int)(r.bottom - r.top)
@@ -571,9 +571,6 @@ static picture_pool_t *Pool(vout_display_t *vd, unsigned pool_size)
     msg_Dbg(vd, "ID3D11VideoDecoderOutputView succeed with %d surfaces (%dx%d)",
             pool_size, vd->fmt.i_width, vd->fmt.i_height);
 
-    /* release the system resources, they will be free'd with the pool */
-    //ID3D11Device_Release(vd->sys->d3ddevice); /* TODO check this */
-
     picture_pool_configuration_t pool_cfg;
     memset(&pool_cfg, 0, sizeof(pool_cfg));
     pool_cfg.picture_count = pool_size;
@@ -993,8 +990,6 @@ static int Direct3D11Open(vout_display_t *vd, video_format_t *fmt)
 #endif
 
     vlc_fourcc_t i_src_chroma = fmt->i_chroma;
-    //if (fmt->i_chroma == VLC_CODEC_D3D9_OPAQUE)
-    //    i_src_chroma = VLC_CODEC_NV12; // favor NV12
     fmt->i_chroma = 0;
 
     // look for the request pixel format first
@@ -1400,15 +1395,13 @@ static int Direct3D11CreatePool(vout_display_t *vd, video_format_t *fmt)
         return VLC_ENOMEM;
     }
 
-    picsys->texture = sys->picQuad.pTexture;
-    picsys->context = sys->d3dcontext;
+    picsys->texture  = sys->picQuad.pTexture;
+    picsys->context  = sys->d3dcontext;
 
     picture_resource_t resource = {
         .p_sys = picsys,
         .pf_destroy = DestroyD3D11Picture,
     };
-    for (int i = 0; i < PICTURE_PLANE_MAX; i++)
-        resource.p[i].i_lines = fmt->i_height / (i > 0 ? 2 : 1);
 
     picture_t *picture = picture_NewFromResource(fmt, &resource);
     if (!picture) {
@@ -1555,14 +1548,12 @@ static int Direct3D11MapTexture(picture_t *picture)
     D3D11_MAPPED_SUBRESOURCE mappedResource;
     HRESULT hr;
     int res;
-    picture_sys_t *p_sys = picture->p_sys;
-    hr = ID3D11DeviceContext_Map(picture->p_sys->context, (ID3D11Resource *)p_sys->texture,
-                                 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource);
+    hr = ID3D11DeviceContext_Map(picture->p_sys->context, (ID3D11Resource *)picture->p_sys->texture, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource);
     if( FAILED(hr) )
         return VLC_EGENERIC;
 
     res = CommonUpdatePicture(picture, NULL, mappedResource.pData, mappedResource.RowPitch);
-    ID3D11DeviceContext_Unmap(picture->p_sys->context,(ID3D11Resource *)p_sys->texture, 0);
+    ID3D11DeviceContext_Unmap(picture->p_sys->context,(ID3D11Resource *)picture->p_sys->texture, 0);
     return res;
 }
 
@@ -1649,14 +1640,10 @@ static int Direct3D11MapSubpicture(vout_display_t *vd, int *subpicture_region_co
                 continue;
             }
             quad_picture = (*region)[i];
-            hr = ID3D11DeviceContext_Map(sys->d3dcontext,
-                                         (ID3D11Resource *)((d3d_quad_t *) quad_picture->p_sys)->pTexture,
-                                         0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource);
+            hr = ID3D11DeviceContext_Map(sys->d3dcontext, (ID3D11Resource *)((d3d_quad_t *) quad_picture->p_sys)->pTexture, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource);
             if( SUCCEEDED(hr) ) {
                 err = CommonUpdatePicture(quad_picture, NULL, mappedResource.pData, mappedResource.RowPitch);
-                ID3D11DeviceContext_Unmap(sys->d3dcontext,
-                                          (ID3D11Resource *)((d3d_quad_t *) quad_picture->p_sys)->pTexture,
-                                          0);
+                ID3D11DeviceContext_Unmap(sys->d3dcontext, (ID3D11Resource *)((d3d_quad_t *) quad_picture->p_sys)->pTexture, 0);
                 if (err != VLC_SUCCESS) {
                     msg_Err(vd, "Failed to set the buffer on the OSD picture" );
                     picture_Release(quad_picture);
@@ -1700,9 +1687,7 @@ static int Direct3D11MapSubpicture(vout_display_t *vd, int *subpicture_region_co
 
         float opacity = (float)r->i_alpha / 255.0f;
 
-        hr = ID3D11DeviceContext_Map(sys->d3dcontext,
-                                     (ID3D11Resource *)((d3d_quad_t *) quad_picture->p_sys)->pVertexBuffer,
-                                     0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource);
+        hr = ID3D11DeviceContext_Map(sys->d3dcontext, (ID3D11Resource *)((d3d_quad_t *) quad_picture->p_sys)->pVertexBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource);
         if( SUCCEEDED(hr) ) {
             d3d_vertex_t *dst_data = mappedResource.pData;
 
@@ -1738,9 +1723,7 @@ static int Direct3D11MapSubpicture(vout_display_t *vd, int *subpicture_region_co
             dst_data[3].texture.y = 0.0f;
             dst_data[3].opacity   = opacity;
 
-            ID3D11DeviceContext_Unmap(sys->d3dcontext,
-                                      (ID3D11Resource *)((d3d_quad_t *) quad_picture->p_sys)->pVertexBuffer,
-                                      0);
+            ID3D11DeviceContext_Unmap(sys->d3dcontext, (ID3D11Resource *)((d3d_quad_t *) quad_picture->p_sys)->pVertexBuffer, 0);
         } else {
             msg_Err(vd, "Failed to lock the subpicture vertex buffer (hr=0x%lX)", hr );
         }

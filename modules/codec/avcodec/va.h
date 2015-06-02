@@ -65,6 +65,7 @@ vlc_va_t *vlc_va_New(vlc_object_t *obj, AVCodecContext *,
  * Initializes the acceleration video decoding back-end for libavcodec.
  * @param avctx libavcodec codec context
  * @param output pointer to video chroma output by the back-end [OUT]
+ * @param b_opaque whether an opaque chroma output is allowed or not[IN]
  * @return VLC_SUCCESS on success, otherwise an error code.
  */
 static inline int vlc_va_Setup(vlc_va_t *va, AVCodecContext *avctx,

@@ -97,4 +97,3 @@ chroma_LTLIBRARIES += \
 	libi420_yuy2_sse2_plugin.la \
 	libi422_yuy2_sse2_plugin.la
 endif
-
