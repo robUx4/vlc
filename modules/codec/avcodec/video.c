@@ -1123,15 +1123,10 @@ static enum PixelFormat ffmpeg_GetFormat( AVCodecContext *p_context,
     {
         enum PixelFormat hwfmt = pi_fmt[i];
 
-        /* first try a direct rendering friendly format */
-        p_dec->fmt_out.video.i_chroma = vlc_va_GetChroma(hwfmt, hwfmt);
+        p_dec->fmt_out.video.i_chroma = vlc_va_GetChroma(hwfmt, swfmt);
         if (p_dec->fmt_out.video.i_chroma == 0)
-            continue; /* Unsupported brand of hardware acceleration */
-
+            continue; /* Unknown brand of hardware acceleration */
         if (lavc_UpdateVideoFormat(p_dec, p_context, true))
-            p_dec->fmt_out.video.i_chroma = 0;
-
-        if (p_dec->fmt_out.video.i_chroma == 0)
             continue; /* Unsupported brand of hardware acceleration */
 
         picture_t *test_pic = decoder_NewPicture(p_dec);
@@ -1146,7 +1141,6 @@ static enum PixelFormat ffmpeg_GetFormat( AVCodecContext *p_context,
 
         /* We try to call vlc_va_Setup when possible to detect errors when
          * possible (later is too late) */
-        vlc_fourcc_t i_expected_chroma = p_dec->fmt_out.video.i_chroma;
         if( p_context->width > 0 && p_context->height > 0
          && vlc_va_Setup(va, p_context, &p_dec->fmt_out.video.i_chroma))
         {
@@ -1154,54 +1148,6 @@ static enum PixelFormat ffmpeg_GetFormat( AVCodecContext *p_context,
             vlc_va_Delete(va, p_context);
             continue;
         }
-#if 0
-        if (i_expected_chroma != p_dec->fmt_out.video.i_chroma)
-        {
-            msg_Dbg( va, "cannot output %08x trying %08x", i_expected_chroma,
-                     p_dec->fmt_out.video.i_chroma );
-
-            /* the va cannot handle the output format we expected,
-             * try again with the one it prefers */
-            vlc_va_Delete(va, p_context);
-
-            if (p_dec->fmt_out.video.i_chroma == 0)
-                continue; /* Unsupported brand of hardware acceleration */
-
-            if (lavc_UpdateVideoFormat(p_dec, p_context, true))
-                p_dec->fmt_out.video.i_chroma = 0;
-
-            if (p_dec->fmt_out.video.i_chroma == 0)
-                continue; /* Unsupported brand of hardware acceleration */
-
-            picture_t *test_pic = decoder_NewPicture(p_dec);
-            assert(!test_pic || test_pic->format.i_chroma == p_dec->fmt_out.video.i_chroma);
-            va = vlc_va_New(VLC_OBJECT(p_dec), p_context, hwfmt,
-                                      &p_dec->fmt_in,
-                                      test_pic ? test_pic->p_sys : NULL);
-            if (test_pic)
-                picture_Release(test_pic);
-            if (va == NULL)
-                continue; /* Unsupported codec profile or such */
-        }
-
-        /* We try to call vlc_va_Setup when possible to detect errors when
-         * possible (later is too late) */
-        i_expected_chroma = p_dec->fmt_out.video.i_chroma;
-        if( p_context->width > 0 && p_context->height > 0
-         && vlc_va_Setup(va, p_context, &p_dec->fmt_out.video.i_chroma))
-        {
-            msg_Err( p_dec, "acceleration setup failure" );
-            vlc_va_Delete(va, p_context);
-            continue;
-        }
-
-        if (i_expected_chroma != p_dec->fmt_out.video.i_chroma)
-        {
-            msg_Dbg( va, "cannot output this format either" );
-            vlc_va_Delete(va, p_context);
-            continue;
-        }
-#endif
 
         post_mt(p_sys);
 

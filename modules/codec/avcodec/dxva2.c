@@ -40,7 +40,6 @@
 #define DXVA2API_USE_BITFIELDS
 #define COBJMACROS
 #include <libavcodec/dxva2.h>
-#include "../../video_chroma/copy.h"
 
 static int Open(vlc_va_t *, AVCodecContext *, enum PixelFormat,
                 const es_format_t *, picture_sys_t *p_sys);

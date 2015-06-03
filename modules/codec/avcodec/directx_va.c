@@ -347,6 +347,10 @@ void DestroyVideoDecoder(vlc_va_t *va, directx_sys_t *dx_sys)
     for (int i = 0; i < dx_sys->surface_count; i++)
         IUnknown_Release( dx_sys->hw_surface[i] );
 
+    for (int i = 0; i < dx_sys->surface_count; i++)
+        if (dx_sys->surface[i].p_pic)
+            picture_Release(dx_sys->surface[i].p_pic);
+
     if (dx_sys->decoder)
         IUnknown_Release( dx_sys->decoder );
 

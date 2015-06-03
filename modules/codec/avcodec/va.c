@@ -35,29 +35,14 @@ vlc_fourcc_t vlc_va_GetChroma(enum PixelFormat hwfmt, enum PixelFormat swfmt)
     /* NOTE: At the time of writing this comment, the return value was only
      * used to probe support as decoder output. So incorrect values were not
      * fatal, especially not if a software format. */
-    if (0 && hwfmt == swfmt)
-    {
-        /* A hardware format with pixels not accessible via planes
-         * Useful for GPU direct rendering but not when filters are used */
-        switch (hwfmt)
-        {
-            case AV_PIX_FMT_DXVA2_VLD:
-                return VLC_CODEC_D3D9_OPAQUE;
-#if (LIBAVUTIL_VERSION_INT >= AV_VERSION_INT(54, 13, 1))
-            case AV_PIX_FMT_D3D11VA_VLD:
-                return VLC_CODEC_D3D11_OPAQUE;
-#endif
-            default:
-                return 0;
-        }
-    }
-
     switch (hwfmt)
     {
         case AV_PIX_FMT_VAAPI_VLD:
             return VLC_CODEC_YV12;
+
         case AV_PIX_FMT_DXVA2_VLD:
             return VLC_CODEC_D3D9_OPAQUE;
+
 #if (LIBAVUTIL_VERSION_INT >= AV_VERSION_INT(54, 13, 1))
         case AV_PIX_FMT_D3D11VA_VLD:
             return VLC_CODEC_D3D11_OPAQUE;

@@ -171,7 +171,6 @@ static void Close( vlc_va_t *va, AVCodecContext *ctx )
 
 static int Setup( vlc_va_t *va, AVCodecContext *avctx, vlc_fourcc_t *pi_chroma )
 {
-    VLC_UNUSED(b_opaque);
     vlc_va_vda_t *p_vda = vlc_va_vda_Get( va );
 
     if( p_vda->hw_ctx.width == avctx->coded_width
