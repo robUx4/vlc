@@ -54,9 +54,10 @@ vlc_module_end ()
 /* VLC_CODEC_D3D11_OPAQUE */
 struct picture_sys_t
 {
-    ID3D11VideoDecoderOutputView  *decoder;
+    ID3D11VideoDecoderOutputView  *decoder; /* may be NULL for pictures from the pool */
+    ID3D11Texture2D               *texture;
     ID3D11DeviceContext           *context;
-    HINSTANCE                     hd3d11_dll;
+    HINSTANCE                     hd3d11_dll; /* TODO */
 };
 
 struct filter_sys_t {
@@ -68,16 +69,13 @@ struct filter_sys_t {
 static int assert_staging(filter_t *p_filter, picture_sys_t *p_sys)
 {
     filter_sys_t *sys = (filter_sys_t*) p_filter->p_sys;
-    ID3D11Resource *p_resource = NULL;
     HRESULT hr;
 
     if (sys->staging)
         goto ok;
 
     D3D11_TEXTURE2D_DESC texDesc;
-    ID3D11VideoDecoderOutputView_GetResource(p_sys->decoder, &p_resource);
-    ID3D11Texture2D_GetDesc( (ID3D11Texture2D*) p_resource, &texDesc);
-    ID3D11Resource_Release(p_resource);
+    ID3D11Texture2D_GetDesc( p_sys->texture, &texDesc);
 
     texDesc.MipLevels = 1;
     //texDesc.SampleDesc.Count = 1;
@@ -107,7 +105,6 @@ static void D3D11_YUY2(filter_t *p_filter, picture_t *src, picture_t *dst)
 
     D3D11_TEXTURE2D_DESC desc;
     D3D11_MAPPED_SUBRESOURCE lock;
-    ID3D11Resource *p_texture = NULL;
 
     vlc_mutex_lock(&sys->staging_lock);
     if (assert_staging(p_filter, p_sys) != VLC_SUCCESS)
@@ -119,12 +116,10 @@ static void D3D11_YUY2(filter_t *p_filter, picture_t *src, picture_t *dst)
     D3D11_VIDEO_DECODER_OUTPUT_VIEW_DESC viewDesc;
     ID3D11VideoDecoderOutputView_GetDesc( p_sys->decoder, &viewDesc );
 
-    ID3D11VideoDecoderOutputView_GetResource( p_sys->decoder, &p_texture );
     ID3D11DeviceContext_CopySubresourceRegion(p_sys->context, (ID3D11Resource*) sys->staging,
                                               0, 0, 0, 0,
-                                              p_texture, viewDesc.Texture2D.ArraySlice,
+                                              (ID3D11Resource*) p_sys->texture, viewDesc.Texture2D.ArraySlice,
                                               NULL);
-    ID3D11Resource_Release(p_texture);
 
     HRESULT hr = ID3D11DeviceContext_Map(p_sys->context, (ID3D11Resource*) sys->staging,
                                          0, D3D11_MAP_READ, 0, &lock);
@@ -193,7 +188,6 @@ static void D3D11_NV12(filter_t *p_filter, picture_t *src, picture_t *dst)
 
     D3D11_TEXTURE2D_DESC desc;
     D3D11_MAPPED_SUBRESOURCE lock;
-    ID3D11Resource *p_texture = NULL;
 
     vlc_mutex_lock(&sys->staging_lock);
     if (assert_staging(p_filter, p_sys) != VLC_SUCCESS)
@@ -205,12 +199,10 @@ static void D3D11_NV12(filter_t *p_filter, picture_t *src, picture_t *dst)
     D3D11_VIDEO_DECODER_OUTPUT_VIEW_DESC viewDesc;
     ID3D11VideoDecoderOutputView_GetDesc( p_sys->decoder, &viewDesc );
 
-    ID3D11VideoDecoderOutputView_GetResource( p_sys->decoder, &p_texture );
     ID3D11DeviceContext_CopySubresourceRegion(p_sys->context, (ID3D11Resource*) sys->staging,
                                               0, 0, 0, 0,
-                                              p_texture, viewDesc.Texture2D.ArraySlice,
+                                              (ID3D11Resource*) p_sys->texture, viewDesc.Texture2D.ArraySlice,
                                               NULL);
-    ID3D11Resource_Release(p_texture);
 
     HRESULT hr = ID3D11DeviceContext_Map(p_sys->context, (ID3D11Resource*) sys->staging,
                                          0, D3D11_MAP_READ, 0, &lock);

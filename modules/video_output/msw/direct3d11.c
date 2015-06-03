@@ -108,7 +108,8 @@ static const d3d_format_t d3d_formats[] = {
 /* VLC_CODEC_D3D11_OPAQUE */
 struct picture_sys_t
 {
-    ID3D11VideoDecoderOutputView  *decoder;
+    ID3D11VideoDecoderOutputView  *decoder; /* may be NULL for pictures from the pool */
+    ID3D11Texture2D               *texture;
     ID3D11DeviceContext           *context;
 };
 
@@ -149,7 +150,8 @@ static void Direct3D11DestroyResources(vout_display_t *);
 static int  Direct3D11CreatePool (vout_display_t *, video_format_t *);
 static void Direct3D11DestroyPool(vout_display_t *);
 
-static void DestroyD3D11Picture(picture_t *);
+static void DestroyDisplayPicture(picture_t *);
+static void DestroyDisplayPoolPicture(picture_t *);
 static int  Direct3D11MapTexture(picture_t *);
 static void Direct3D11DeleteRegions(int, picture_t **);
 static int Direct3D11MapSubpicture(vout_display_t *, int *, picture_t ***, subpicture_t *);
@@ -542,35 +544,23 @@ static picture_pool_t *Pool(vout_display_t *vd, unsigned pool_size)
     texDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
     texDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
 
-    D3D11_SHADER_RESOURCE_VIEW_DESC viewDesc = {
-        .Format              = vd->sys->picQuadConfig.textureFormat,
-        .ViewDimension       = D3D11_SRV_DIMENSION_TEXTURE2D,
-        .Texture2D.MipLevels = 1,
-    };
-
     unsigned surface_count;
     for (surface_count = 0; surface_count < pool_size; surface_count++) {
         picture_sys_t *picsys = calloc(1, sizeof(*picsys));
         if (unlikely(picsys == NULL))
             goto error;
 
-        ID3D11Texture2D *p_texture;
-        hr = ID3D11Device_CreateTexture2D( vd->sys->d3ddevice, &texDesc, NULL, &p_texture );
+        hr = ID3D11Device_CreateTexture2D( vd->sys->d3ddevice, &texDesc, NULL, &picsys->texture );
         if (FAILED(hr)) {
             msg_Err(vd, "CreateTexture2D %d failed. (hr=0x%0lx)", pool_size, hr);
             goto error;
         }
 
-        /* should be a decoder view, but all the decoder needs is the texture */
-        ID3D11Device_CreateShaderResourceView(vd->sys->d3ddevice, (ID3D11Resource*) p_texture,
-                                              &viewDesc, (ID3D11ShaderResourceView**) &picsys->decoder );
-        ID3D11Texture2D_Release(p_texture);
-
         picsys->context = vd->sys->d3dcontext;
 
         picture_resource_t resource = {
             .p_sys = picsys,
-            .pf_destroy = DestroyD3D11Picture,
+            .pf_destroy = DestroyDisplayPoolPicture,
         };
 
         picture_t *picture = picture_NewFromResource(&vd->fmt, &resource);
@@ -597,13 +587,25 @@ static picture_pool_t *Pool(vout_display_t *vd, unsigned pool_size)
 error:
     if (vd->sys->pool ==NULL && pictures) {
         for (unsigned i=0;i<picture_count; ++i)
-            DestroyD3D11Picture(pictures[i]);
+            DestroyDisplayPoolPicture(pictures[i]);
         free(pictures);
     }
     return vd->sys->pool;
 }
 
-static void DestroyD3D11Picture(picture_t *picture)
+static void DestroyDisplayPoolPicture(picture_t *picture)
+{
+    picture_sys_t *p_sys = (picture_sys_t*) picture->p_sys;
+
+    if (p_sys->texture)
+        ID3D11Texture2D_Release(p_sys->texture);
+
+    free(p_sys);
+    free(picture);
+}
+
+
+static void DestroyDisplayPicture(picture_t *picture)
 {
     picture_sys_pool_t *p_sys = (picture_sys_pool_t*) picture->p_sys;
 
@@ -728,18 +730,11 @@ static void Prepare(vout_display_t *vd, picture_t *picture, subpicture_t *subpic
         box.front = 0;
 
         picture_sys_t *p_sys = picture->p_sys;
-        ID3D11Resource *p_texture;
-        D3D11_VIDEO_DECODER_OUTPUT_VIEW_DESC viewDesc;
-
-        ID3D11VideoDecoderOutputView_GetDesc( p_sys->decoder, &viewDesc );
-        ID3D11VideoDecoderOutputView_GetResource( p_sys->decoder, &p_texture );
-
         ID3D11DeviceContext_CopySubresourceRegion(sys->d3dcontext,
                                                   (ID3D11Resource*) sys->picQuad.pTexture,
                                                   0, 0, 0, 0,
-                                                  p_texture,
-                                                  viewDesc.Texture2D.ArraySlice, &box);
-        ID3D11Resource_Release(p_texture);
+                                                  (ID3D11Resource*) p_sys->texture,
+                                                  0, &box);
     }
 
 #if VLC_WINSTORE_APP /* TODO: Choose the WinRT app background clear color */
@@ -1421,7 +1416,7 @@ static int Direct3D11CreatePool(vout_display_t *vd, video_format_t *fmt)
 
     picture_resource_t resource = {
         .p_sys = (picture_sys_t*) picsys,
-        .pf_destroy = DestroyD3D11Picture,
+        .pf_destroy = DestroyDisplayPicture,
     };
 
     picture_t *picture = picture_NewFromResource(fmt, &resource);

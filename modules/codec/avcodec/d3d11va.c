@@ -123,7 +123,8 @@ typedef struct
 /* VLC_CODEC_D3D11_OPAQUE */
 struct picture_sys_t
 {
-    ID3D11VideoDecoderOutputView  *decoder;
+    ID3D11VideoDecoderOutputView  *decoder; /* may be NULL for pictures from the pool */
+    ID3D11Texture2D               *texture;
     ID3D11DeviceContext           *context;
 };
 
@@ -221,51 +222,38 @@ static int Extract(vlc_va_t *va, picture_t *output, uint8_t *data)
 {
     vlc_va_sys_t *sys = va->sys;
     ID3D11VideoDecoderOutputView *src = (ID3D11VideoDecoderOutputView*)(uintptr_t)data;
-    ID3D11Resource *p_src_texture = NULL;
-    D3D11_VIDEO_DECODER_OUTPUT_VIEW_DESC viewDesc;
-
-    ID3D11VideoDecoderOutputView_GetDesc( src, &viewDesc );
-
-    ID3D11VideoDecoderOutputView_GetResource( src, &p_src_texture );
-    if (!p_src_texture) {
-        msg_Err(va, "Failed to get the texture of the outputview." );
-        goto error;
-    }
+    vlc_va_surface_t *surface = output->context;
 
     if (output->format.i_chroma == VLC_CODEC_D3D11_OPAQUE)
     {
         /* copy decoder slice to surface */
-        picture_sys_t *p_sys = output->p_sys;
-        assert(p_sys->decoder != NULL);
-        ID3D11Resource *p_texture;
-        ID3D11VideoDecoderOutputView_GetResource( p_sys->decoder, &p_texture );
-        ID3D11DeviceContext_CopySubresourceRegion(sys->d3dctx, p_texture,
+        D3D11_VIDEO_DECODER_OUTPUT_VIEW_DESC viewDesc;
+        picture_sys_t *p_sys_out = output->p_sys;
+        picture_sys_t *p_sys_in = surface->p_pic->p_sys;
+
+        assert(p_sys_out->texture != NULL);
+        assert(p_sys_in->decoder == src);
+
+        ID3D11VideoDecoderOutputView_GetDesc( src, &viewDesc );
+        ID3D11DeviceContext_CopySubresourceRegion(sys->d3dctx, (ID3D11Resource*) p_sys_out->texture,
                                                   0, 0, 0, 0,
-                                                  p_src_texture, viewDesc.Texture2D.ArraySlice,
+                                                  (ID3D11Resource*) p_sys_in->texture,
+                                                  viewDesc.Texture2D.ArraySlice,
                                                   NULL);
-        ID3D11Resource_Release(p_texture);
     }
     else if (output->format.i_chroma == VLC_CODEC_YV12) {
         plane_filter_t filter = {
             .filter  = *va->sys->filter,
             .pic_out = output,
         };
-        vlc_va_surface_t *surface = output->context;
         picture_Hold( surface->p_pic );
         va->sys->filter->pf_video_filter( &filter.filter, surface->p_pic );
     } else {
         msg_Err(va, "Unsupported output picture format %08X", output->format.i_chroma );
-        goto error;
+        return VLC_EGENERIC;
     }
 
-    if (p_src_texture!=NULL)
-        ID3D11Resource_Release(p_src_texture);
     return VLC_SUCCESS;
-
-error:
-    if (p_src_texture!=NULL)
-        ID3D11Resource_Release(p_src_texture);
-    return VLC_EGENERIC;
 }
 
 static int CheckDevice(vlc_va_t *va)
@@ -362,12 +350,9 @@ static int Open(vlc_va_t *va, AVCodecContext *ctx, enum PixelFormat pix_fmt,
             sys->d3dctx = p_sys->context;
             sys->d3dvidctx = d3dvidctx;
 
-            assert(p_sys->decoder != NULL);
-            ID3D11Resource *p_texture;
-            ID3D11VideoDecoderOutputView_GetResource( p_sys->decoder, &p_texture );
+            assert(p_sys->texture != NULL);
             D3D11_TEXTURE2D_DESC dstDesc;
-            ID3D11Texture2D_GetDesc( (ID3D11Texture2D*) p_texture, &dstDesc);
-            ID3D11Resource_Release(p_texture);
+            ID3D11Texture2D_GetDesc( (ID3D11Texture2D*) p_sys->texture, &dstDesc);
             sys->render = dstDesc.Format;
         }
     }
@@ -816,6 +801,15 @@ static void DxDestroySurfaces(vlc_va_t *va)
     }
 }
 
+static void DestroyPicture(picture_t *picture)
+{
+    picture_sys_t *p_sys = picture->p_sys;
+    ID3D11Texture2D_Release( p_sys->texture );
+
+    free(p_sys);
+    free(picture);
+}
+
 static picture_t *DxAllocPicture(vlc_va_t *va, const video_format_t *fmt, unsigned index)
 {
     video_format_t src_fmt = *fmt;
@@ -824,11 +818,13 @@ static picture_t *DxAllocPicture(vlc_va_t *va, const video_format_t *fmt, unsign
     if (unlikely(pic_sys == NULL))
         return NULL;
 
-    pic_sys->decoder         = (ID3D11VideoDecoderOutputView*) va->sys->dx_sys.hw_surface[index];
-    pic_sys->context         = va->sys->d3dctx;
+    pic_sys->decoder  = (ID3D11VideoDecoderOutputView*) va->sys->dx_sys.hw_surface[index];
+    ID3D11VideoDecoderOutputView_GetResource(pic_sys->decoder, (ID3D11Resource**) &pic_sys->texture);
+    pic_sys->context  = va->sys->d3dctx;
 
     picture_resource_t res = {
-        .p_sys = pic_sys,
+        .p_sys      = pic_sys,
+        .pf_destroy = DestroyPicture,
     };
     picture_t *pic = picture_NewFromResource(&src_fmt, &res);
     if (unlikely(pic == NULL))
