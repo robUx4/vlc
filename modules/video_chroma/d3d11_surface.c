@@ -55,7 +55,6 @@ vlc_module_end ()
 struct picture_sys_t
 {
     ID3D11VideoDecoderOutputView  *decoder;
-    ID3D11Device                  *device;
     ID3D11DeviceContext           *context;
     HINSTANCE                     hd3d11_dll;
 };
@@ -88,8 +87,11 @@ static int assert_staging(filter_t *p_filter, picture_sys_t *p_sys)
     texDesc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
     texDesc.BindFlags = 0;
 
+    ID3D11Device *p_device;
+    ID3D11DeviceContext_GetDevice(p_sys->context, &p_device);
     sys->staging = NULL;
-    hr = ID3D11Device_CreateTexture2D( p_sys->device, &texDesc, NULL, &sys->staging);
+    hr = ID3D11Device_CreateTexture2D( p_device, &texDesc, NULL, &sys->staging);
+    ID3D11Device_Release(p_device);
     if (FAILED(hr)) {
         msg_Err(p_filter, "Failed to create a staging texture to extract surface pixels (hr=0x%0lx)", hr );
         return VLC_EGENERIC;

@@ -109,17 +109,14 @@ static const d3d_format_t d3d_formats[] = {
 struct picture_sys_t
 {
     ID3D11ShaderResourceView      *decoder; /* we do not get access from here */
-    ID3D11Device                  *device;
     ID3D11DeviceContext           *context;
-    HINSTANCE                     hd3d11_dll;
 };
 
 /* internal picture_t pool  */
 typedef struct
 {
     ID3D11Texture2D               *texture;
-    ID3D11Device                  *device;
-    ID3D11DeviceContext           *context;
+    vout_display_t                *vd;
 } picture_sys_pool_t;
 
 /* matches the D3D11_INPUT_ELEMENT_DESC we setup */
@@ -569,7 +566,6 @@ static picture_pool_t *Pool(vout_display_t *vd, unsigned pool_size)
         ID3D11Texture2D_Release(p_texture);
 
         picsys->context = vd->sys->d3dcontext;
-        picsys->device = vd->sys->d3ddevice;
 
         picture_resource_t resource = {
             .p_sys = picsys,
@@ -585,8 +581,6 @@ static picture_pool_t *Pool(vout_display_t *vd, unsigned pool_size)
         pictures[surface_count] = picture;
         /* each picture_t holds a ref to the context and release it on Destroy */
         ID3D11DeviceContext_AddRef(picsys->context);
-        /* each picture_t holds a ref to the DLL */
-        picsys->hd3d11_dll = LoadLibrary(TEXT("D3D11.DLL"));
     }
     msg_Dbg(vd, "ID3D11VideoDecoderOutputView succeed with %d surfaces (%dx%d)",
             pool_size, vd->fmt.i_width, vd->fmt.i_height);
@@ -611,7 +605,6 @@ error:
 static void DestroyD3D11Picture(picture_t *picture)
 {
     picture_sys_pool_t *p_sys = (picture_sys_pool_t*) picture->p_sys;
-    ID3D11DeviceContext_Release(p_sys->context);
 
     if (p_sys->texture)
         ID3D11Texture2D_Release(p_sys->texture);
@@ -1419,7 +1412,7 @@ static int Direct3D11CreatePool(vout_display_t *vd, video_format_t *fmt)
     }
 
     picsys->texture  = sys->picQuad.pTexture;
-    picsys->context  = sys->d3dcontext;
+    picsys->vd       = vd;
 
     picture_resource_t resource = {
         .p_sys = (picture_sys_t*) picsys,
@@ -1432,7 +1425,6 @@ static int Direct3D11CreatePool(vout_display_t *vd, video_format_t *fmt)
         return VLC_ENOMEM;
     }
     ID3D11Texture2D_AddRef(picsys->texture);
-    ID3D11DeviceContext_AddRef(picsys->context);
 
     picture_pool_configuration_t pool_cfg;
     memset(&pool_cfg, 0, sizeof(pool_cfg));
@@ -1569,15 +1561,16 @@ static void Direct3D11DestroyResources(vout_display_t *vd)
 static int Direct3D11MapTexture(picture_t *picture)
 {
     picture_sys_pool_t *p_sys = (picture_sys_pool_t*) picture->p_sys;
+    vout_display_t     *vd = p_sys->vd;
     D3D11_MAPPED_SUBRESOURCE mappedResource;
     HRESULT hr;
     int res;
-    hr = ID3D11DeviceContext_Map(p_sys->context, (ID3D11Resource *)p_sys->texture, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource);
+    hr = ID3D11DeviceContext_Map(vd->sys->d3dcontext, (ID3D11Resource *)p_sys->texture, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource);
     if( FAILED(hr) )
         return VLC_EGENERIC;
 
     res = CommonUpdatePicture(picture, NULL, mappedResource.pData, mappedResource.RowPitch);
-    ID3D11DeviceContext_Unmap(p_sys->context,(ID3D11Resource *)p_sys->texture, 0);
+    ID3D11DeviceContext_Unmap(vd->sys->d3dcontext,(ID3D11Resource *)p_sys->texture, 0);
     return res;
 }
 

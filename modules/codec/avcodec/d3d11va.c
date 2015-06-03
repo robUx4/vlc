@@ -124,9 +124,7 @@ typedef struct
 struct picture_sys_t
 {
     ID3D11VideoDecoderOutputView  *decoder;
-    ID3D11Device                  *device;
     ID3D11DeviceContext           *context;
-    HINSTANCE                     hd3d11_dll;
 };
 
 /* */
@@ -354,13 +352,13 @@ static int Open(vlc_va_t *va, AVCodecContext *ctx, enum PixelFormat pix_fmt,
 
     dx_sys->d3ddev = NULL;
     va->sys->render = DXGI_FORMAT_UNKNOWN;
-    if ( p_sys != NULL && p_sys->device != NULL && p_sys->context != NULL ) {
+    if ( p_sys != NULL && p_sys->context != NULL ) {
         ID3D11VideoContext *d3dvidctx = NULL;
         HRESULT hr = ID3D11DeviceContext_QueryInterface(p_sys->context, &IID_ID3D11VideoContext, (void **)&d3dvidctx);
         if (FAILED(hr)) {
            msg_Err(va, "Could not Query ID3D11VideoDevice Interface from the picture. (hr=0x%lX)", hr);
         } else {
-            dx_sys->d3ddev = (IUnknown*) p_sys->device;
+            ID3D11DeviceContext_GetDevice( p_sys->context, (ID3D11Device**) &dx_sys->d3ddev );
             sys->d3dctx = p_sys->context;
             sys->d3dvidctx = d3dvidctx;
 
@@ -827,7 +825,6 @@ static picture_t *DxAllocPicture(vlc_va_t *va, const video_format_t *fmt, unsign
         return NULL;
 
     pic_sys->decoder         = (ID3D11VideoDecoderOutputView*) va->sys->dx_sys.hw_surface[index];
-    pic_sys->device          = (ID3D11Device*) va->sys->dx_sys.d3ddev;
     pic_sys->context         = va->sys->d3dctx;
 
     picture_resource_t res = {
