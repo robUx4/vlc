@@ -108,7 +108,7 @@ static const d3d_format_t d3d_formats[] = {
 /* VLC_CODEC_D3D11_OPAQUE */
 struct picture_sys_t
 {
-    ID3D11ShaderResourceView      *decoder; /* we do not get access from here */
+    ID3D11VideoDecoderOutputView  *decoder;
     ID3D11DeviceContext           *context;
 };
 
@@ -561,8 +561,9 @@ static picture_pool_t *Pool(vout_display_t *vd, unsigned pool_size)
             goto error;
         }
 
+        /* should be a decoder view, but all the decoder needs is the texture */
         ID3D11Device_CreateShaderResourceView(vd->sys->d3ddevice, (ID3D11Resource*) p_texture,
-                                              &viewDesc, &picsys->decoder );
+                                              &viewDesc, (ID3D11ShaderResourceView**) &picsys->decoder );
         ID3D11Texture2D_Release(p_texture);
 
         picsys->context = vd->sys->d3dcontext;
@@ -726,14 +727,18 @@ static void Prepare(vout_display_t *vd, picture_t *picture, subpicture_t *subpic
         box.back = 1;
         box.front = 0;
 
+        picture_sys_t *p_sys = picture->p_sys;
         ID3D11Resource *p_texture;
-        ID3D11ShaderResourceView_GetResource(picture->p_sys->decoder, &p_texture );
+        D3D11_VIDEO_DECODER_OUTPUT_VIEW_DESC viewDesc;
+
+        ID3D11VideoDecoderOutputView_GetDesc( p_sys->decoder, &viewDesc );
+        ID3D11VideoDecoderOutputView_GetResource( p_sys->decoder, &p_texture );
 
         ID3D11DeviceContext_CopySubresourceRegion(sys->d3dcontext,
                                                   (ID3D11Resource*) sys->picQuad.pTexture,
                                                   0, 0, 0, 0,
                                                   p_texture,
-                                                  0, &box);
+                                                  viewDesc.Texture2D.ArraySlice, &box);
         ID3D11Resource_Release(p_texture);
     }
 
