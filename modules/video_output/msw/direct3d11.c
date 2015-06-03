@@ -580,7 +580,6 @@ static picture_pool_t *Pool(vout_display_t *vd, unsigned pool_size)
     memset(&pool_cfg, 0, sizeof(pool_cfg));
     pool_cfg.picture_count = pool_size;
     pool_cfg.picture       = pictures;
-    pool_cfg.lock          = Direct3D11MapTexture; /* TODO we only need to map once */
 
     vd->sys->pool = picture_pool_NewExtended( &pool_cfg );
 
