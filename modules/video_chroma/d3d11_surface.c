@@ -42,7 +42,7 @@ static void CloseConverter( vlc_object_t * );
  * Module descriptor.
  *****************************************************************************/
 vlc_module_begin ()
-    set_description( N_("Conversions from D3D11VA to NV12,YV12,NV12") )
+    set_description( N_("Conversions from D3D11VA to NV12,YV12,I420") )
     set_capability( "video filter2", 10 )
     set_callbacks( OpenConverter, CloseConverter )
 vlc_module_end ()
@@ -55,7 +55,6 @@ vlc_module_end ()
 struct picture_sys_t
 {
     ID3D11VideoDecoderOutputView  *decoder;
-    ID3D11Texture2D               *texture;
     ID3D11Device                  *device;
     ID3D11DeviceContext           *context;
     HINSTANCE                     hd3d11_dll;

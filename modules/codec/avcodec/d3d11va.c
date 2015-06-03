@@ -124,7 +124,6 @@ typedef struct
 struct picture_sys_t
 {
     ID3D11VideoDecoderOutputView  *decoder;
-    ID3D11Texture2D               *texture;
     ID3D11Device                  *device;
     ID3D11DeviceContext           *context;
     HINSTANCE                     hd3d11_dll;
@@ -238,11 +237,15 @@ static int Extract(vlc_va_t *va, picture_t *output, uint8_t *data)
     if (output->format.i_chroma == VLC_CODEC_D3D11_OPAQUE)
     {
         /* copy decoder slice to surface */
-        assert(output->p_sys->texture != NULL);
-        ID3D11DeviceContext_CopySubresourceRegion(sys->d3dctx, (ID3D11Resource*) output->p_sys->texture,
+        picture_sys_t *p_sys = output->p_sys;
+        assert(p_sys->decoder != NULL);
+        ID3D11Resource *p_texture;
+        ID3D11VideoDecoderOutputView_GetResource( p_sys->decoder, &p_texture );
+        ID3D11DeviceContext_CopySubresourceRegion(sys->d3dctx, p_texture,
                                                   0, 0, 0, 0,
                                                   p_src_texture, viewDesc.Texture2D.ArraySlice,
                                                   NULL);
+        ID3D11Resource_Release(p_texture);
     }
     else if (output->format.i_chroma == VLC_CODEC_YV12) {
         plane_filter_t filter = {
@@ -361,9 +364,12 @@ static int Open(vlc_va_t *va, AVCodecContext *ctx, enum PixelFormat pix_fmt,
             sys->d3dctx = p_sys->context;
             sys->d3dvidctx = d3dvidctx;
 
+            assert(p_sys->decoder != NULL);
+            ID3D11Resource *p_texture;
+            ID3D11VideoDecoderOutputView_GetResource( p_sys->decoder, &p_texture );
             D3D11_TEXTURE2D_DESC dstDesc;
-            assert(p_sys->texture != NULL);
-            ID3D11Texture2D_GetDesc( p_sys->texture, &dstDesc);
+            ID3D11Texture2D_GetDesc( (ID3D11Texture2D*) p_texture, &dstDesc);
+            ID3D11Resource_Release(p_texture);
             sys->render = dstDesc.Format;
         }
     }
