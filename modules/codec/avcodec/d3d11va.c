@@ -114,12 +114,6 @@ struct vlc_va_sys_t
     struct AVD3D11VAContext      hw;
 };
 
-typedef struct
-{
-    filter_t     filter;
-    picture_t    *pic_out;
-} plane_filter_t;
-
 /* VLC_CODEC_D3D11_OPAQUE */
 struct picture_sys_t
 {
@@ -186,9 +180,9 @@ static void DeleteFilter( filter_t * p_filter )
     vlc_object_release( p_filter );
 }
 
-static picture_t *video_new_buffer(plane_filter_t *p_filter)
+static picture_t *video_new_buffer(filter_t *p_filter)
 {
-    return p_filter->pic_out;
+    return p_filter->owner.sys;
 }
 
 static filter_t *CreateFilter( vlc_object_t *p_this, const es_format_t *p_fmt_in,
@@ -242,12 +236,9 @@ static int Extract(vlc_va_t *va, picture_t *output, uint8_t *data)
                                                   NULL);
     }
     else if (output->format.i_chroma == VLC_CODEC_YV12) {
-        plane_filter_t filter = {
-            .filter  = *va->sys->filter,
-            .pic_out = output,
-        };
+        va->sys->filter->owner.sys = output;
         picture_Hold( surface->p_pic );
-        va->sys->filter->pf_video_filter( &filter.filter, surface->p_pic );
+        va->sys->filter->pf_video_filter( va->sys->filter, surface->p_pic );
     } else {
         msg_Err(va, "Unsupported output picture format %08X", output->format.i_chroma );
         return VLC_EGENERIC;
