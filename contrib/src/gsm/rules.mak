@@ -12,7 +12,7 @@ gsm: libgsm_$(GSM_VERSION).tar.gz .sum-gsm
 	mv gsm-1.0-* libgsm_$(GSM_VERSION)
 	$(APPLY) $(SRC)/gsm/gsm-cross.patch
 ifdef HAVE_VISUALSTUDIO
-	$(APPLY) $(SRC)/gsm/msvc.patch
+#	$(APPLY) $(SRC)/gsm/msvc.patch
 endif
 	sed -e 's/^CFLAGS.*=/CFLAGS+=/' -i.orig libgsm_$(GSM_VERSION)/Makefile
 	$(MOVE)

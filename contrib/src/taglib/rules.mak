@@ -9,7 +9,7 @@ PKGS_FOUND += taglib
 endif
 
 ifdef HAVE_VISUALSTUDIO
-BUILD_TARGET=-G "Visual Studio 12 2013 ARM"
+BUILD_TARGET=-G "Visual Studio 14 2015 x86"
 endif
 
 $(TARBALLS)/taglib-$(TAGLIB_VERSION).tar.gz:

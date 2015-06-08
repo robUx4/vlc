@@ -31,6 +31,7 @@
 #include <vlc_charset.h>
 #include "modules/modules.h"
 #include <windows.h>
+#include <stdio.h>
 #include <wchar.h>
 
 static char *GetWindowsError( void )
@@ -46,6 +47,7 @@ static char *GetWindowsError( void )
     while( !wmemchr( L"\r\n\0", wmsg[i], 3 ) )
         i++;
 
+//    _snwprintf_s( wmsg + i, 256 - i, 256 - i, L" (error %i)", i_error );
     snwprintf( wmsg + i, 256 - i, L" (error %i)", i_error );
     return FromWide( wmsg );
 }

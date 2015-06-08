@@ -15,11 +15,15 @@ FFMPEG_GITURL := git://git.libav.org/libav.git
 endif
 
 ifdef HAVE_VISUALSTUDIO
-CC:=cl
+#CC:=cl
+#CXX:=cl
+#CPP:=cl -E
 endif
 
 FFMPEGCONF = \
 	--cc="$(CC)" \
+	--ld="$(LD)" \
+	--ar="$(AR)" \
 	--pkg-config="$(PKG_CONFIG)" \
 	--disable-doc \
 	--disable-encoder=vorbis \
@@ -153,7 +157,12 @@ ifdef HAVE_WINPHONE
 FFMPEGCONF += --arch=arm --cpu=armv7-a --target-os=win32 --extra-cflags='-DWINAPI_FAMILY=WINAPI_FAMILY_PHONE_APP -MD -D__ARM_PCS_VFP -D_WIN32_WINNT=0x602' --disable-dxva2 --as=armasm
 else
 ifdef HAVE_WINDOWSRT
-FFMPEGCONF += --arch=arm --cpu=armv7-a --target-os=win32 --extra-cflags='-DWINAPI_FAMILY=WINAPI_FAMILY_APP -MD -D__ARM_PCS_VFP -D_WIN32_WINNT=0x602' --disable-dxva2 --as=armasm
+#FFMPEGCONF += --arch=arm --cpu=armv7-a --target-os=win32 --extra-cflags='-DWINAPI_FAMILY=WINAPI_FAMILY_APP -MD -D__ARM_PCS_VFP -D_WIN32_WINNT=0x602' --disable-dxva2 --as=armasm
+FFMPEGCONF += --arch=x86 --cpu=i686 --target-os=win32 --disable-dxva2
+#-D_WIN32_WINNT=0x602' 
+#-D__ARM_PCS_VFP 
+#--extra-cflags='-DWINAPI_FAMILY=WINAPI_FAMILY_APP -MD 
+#--extra-ldflags='-lkernel32 -lRuntimeObject'
 else
 FFMPEGCONF+= --cpu=i686 --arch=x86
 endif
@@ -204,5 +213,6 @@ endif
 	cd $< && $(HOSTVARS) ./configure \
 		--extra-ldflags="$(LDFLAGS)" $(FFMPEGCONF) \
 		--prefix="$(PREFIX)" --enable-static --disable-shared
+#	cd $< && $(MAKE) -j`nproc` install-libs install-headers
 	cd $< && $(MAKE) install-libs install-headers
 	touch $@
