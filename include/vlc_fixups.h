@@ -128,7 +128,9 @@ int strcasecmp (const char *, const char *);
 char *strcasestr (const char *, const char *);
 #endif
 
-#ifndef HAVE_STRDUP
+#if _MSC_VER >= 1900
+#define strdup(x) _strdup(x)
+#elif !defined(HAVE_STRDUP)
 char *strdup (const char *);
 #endif
 
@@ -172,7 +174,7 @@ lldiv_t lldiv (long long, long long);
 #endif
 
 #ifndef HAVE_STRTOF
-#ifndef __ANDROID__
+#if !defined(__ANDROID__) && _MSC_VER < 1900
 float strtof (const char *, char **);
 #endif
 #endif

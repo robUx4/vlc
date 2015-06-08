@@ -153,6 +153,13 @@ ifdef HAVE_WIN32
 ifneq ($(shell $(CC) $(CFLAGS) -E -dM -include _mingw.h - < /dev/null | grep -E __MINGW64_VERSION_MAJOR),)
 HAVE_MINGW_W64 := 1
 endif
+ifdef HAVE_WINDOWSRT
+#EXTRA_LDFLAGS += -lkernel32 -lRuntimeObject
+#EXTRA_CFLAGS += -FI`cygpath -w $INCLUDES_FOLDER/fixup.h` -FI`cygpath -w $INCLUDES_FOLDER/winstorecompat.h`
+#CC=`cygpath -a ../../../../wrappers/clwrap`
+#CPP=`cygpath -a ../../../../wrappers/clwrap -E`
+#AR=`cygpath -a ../../../../wrappers/ar`
+endif
 endif
 
 ifdef HAVE_SOLARIS
