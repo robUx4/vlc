@@ -53,3 +53,6 @@ build-*
 contrib-*
 install-*
 
+/contrib/Windows
+/Windows_Debug
+/contrib/Windows.old
