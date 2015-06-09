@@ -213,6 +213,6 @@ endif
 	cd $< && $(HOSTVARS) ./configure \
 		--extra-ldflags="$(LDFLAGS)" $(FFMPEGCONF) \
 		--prefix="$(PREFIX)" --enable-static --disable-shared
-	cd $< && $(MAKE) -j`nproc` install-libs install-headers
-#	cd $< && $(MAKE) install-libs install-headers
+#	cd $< && $(MAKE) -j`nproc` install-libs install-headers
+	cd $< && $(MAKE) install-libs install-headers
 	touch $@
