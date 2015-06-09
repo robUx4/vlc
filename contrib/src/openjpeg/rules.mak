@@ -1,7 +1,7 @@
 # jpeg
 
 OPENJPEG_VERSION := 1.5.0
-OPENJPEG_URL := http://openjpeg.googlecode.com/files/openjpeg-$(OPENJPEG_VERSION).tar.gz
+OPENJPEG_URL := http://sourceforge.net/projects/openjpeg.mirror/files/$(OPENJPEG_VERSION)/openjpeg-$(OPENJPEG_VERSION).tar.gz/download
 
 $(TARBALLS)/openjpeg-$(OPENJPEG_VERSION).tar.gz:
 	$(call download,$(OPENJPEG_URL))
@@ -15,6 +15,7 @@ ifdef HAVE_VISUALSTUDIO
 	$(APPLY) $(SRC)/openjpeg/msvc.patch
 endif
 	$(APPLY) $(SRC)/openjpeg/freebsd.patch
+	$(APPLY) $(SRC)/openjpeg/restrict.patch
 	$(UPDATE_AUTOCONFIG)
 	$(MOVE)
 
