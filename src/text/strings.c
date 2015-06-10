@@ -534,7 +534,7 @@ char *str_format_meta(input_thread_t *input, const char *s)
     size_t len;
 #ifdef HAVE_OPEN_MEMSTREAM
     FILE *stream = open_memstream(&str, &len);
-#elif defined( _WIN32 )
+#elif defined(_WIN32) && !VLC_WINSTORE_APP
     FILE *stream = vlc_win32_tmpfile();
 #else
     FILE *stream = tmpfile();

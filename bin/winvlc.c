@@ -41,10 +41,15 @@
 #endif
 #include <fcntl.h>
 #include <io.h>
-#include <shlobj.h>
 #include <wininet.h>
 #define PSAPI_VERSION 1
 #include <psapi.h>
+
+/* SHGetFolderPathW is not defined otherwise */
+//#undef WINAPI_FAMILY
+//#define WINAPI_FAMILY WINAPI_FAMILY_DESKTOP_APP
+#include <shlobj.h>
+
 #define HeapEnableTerminationOnCorruption (HEAP_INFORMATION_CLASS)1
 static void check_crashdump(void);
 LONG WINAPI vlc_exception_filter(struct _EXCEPTION_POINTERS *lpExceptionInfo);

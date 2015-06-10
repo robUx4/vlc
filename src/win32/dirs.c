@@ -34,6 +34,9 @@
 # include <w32api.h>
 #endif
 #include <direct.h>
+/* SHGetFolderPathW is not defined otherwise */
+//#undef WINAPI_FAMILY
+//#define WINAPI_FAMILY WINAPI_FAMILY_DESKTOP_APP
 #include <shlobj.h>
 
 #include "../libvlc.h"

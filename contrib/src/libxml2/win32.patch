@@ -29,17 +29,3 @@
             fi
         ;;
      esac
-
---- libxml2/threads.c.orig      2014-10-13 09:02:28.000000000 +0200
-+++ libxml2/threads.c   2015-06-09 16:12:48.837161200 +0200
-@@ -27,6 +27,9 @@
- #ifdef HAVE_PTHREAD_H
- #include <pthread.h>
- #elif defined HAVE_WIN32_THREADS
-+/* CreateMutex/WaitForSingleObject/InitializeCriticalSection is not defined otherwise */
-+#undef WINAPI_FAMILY
-+#define WINAPI_FAMILY WINAPI_FAMILY_DESKTOP_APP
- #include <windows.h>
- #ifndef HAVE_COMPILER_TLS
- #include <process.h>
-

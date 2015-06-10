@@ -106,7 +106,7 @@ int vasprintf (char **, const char *, va_list);
 #endif
 
 /* string.h */
-#ifndef HAVE_STRCASECMP
+#if !defined(HAVE_STRCASECMP) && !defined(strcasecmp)
 int strcasecmp (const char *, const char *);
 #endif
 
@@ -180,6 +180,9 @@ struct tm *localtime_r (const time_t *, struct tm *);
 
 /* unistd.h */
 #ifndef HAVE_GETPID
+# ifdef _MSC_VER
+typedef DWORD pid_t;
+# endif
 pid_t getpid (void) VLC_NOTHROW;
 #endif
 
@@ -277,7 +280,7 @@ int inet_pton(int, const char *, void *);
 const char *inet_ntop(int, const void *, char *, int);
 #endif
 
-#ifndef HAVE_STRUCT_POLLFD
+#if !defined(HAVE_STRUCT_POLLFD) && _WIN32_WINNT < 0x0600
 enum
 {
     POLLERR=0x1,
@@ -381,11 +384,11 @@ struct addrinfo
 
 /* math.h */
 
-#ifndef HAVE_NANF
+#if !defined(HAVE_NANF) && _MSC_VER < 1900
 #define nanf(tagp) NAN
 #endif
 
-#ifdef _WIN32
+#if defined(_WIN32) && !VLC_WINSTORE_APP
 FILE *vlc_win32_tmpfile(void);
 #endif
 
