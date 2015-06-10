@@ -1,5 +1,5 @@
 diff --git a/configure b/configure
-index 18f0518..4429ad0d 100755
+index 18f0518..8e6675c 100755
 --- a/configure
 +++ b/configure
 @@ -2779,7 +2779,7 @@ msvc_common_flags(){
@@ -37,15 +37,25 @@ index 18f0518..4429ad0d 100755
          ;;
  esac
  
+@@ -4236,7 +4240,7 @@ check_lib2 "windows.h psapi.h" GetProcessMemoryInfo -lpsapi
+ 
+ check_struct "sys/time.h sys/resource.h" "struct rusage" ru_maxrss
+ 
+-check_type "windows.h dxva.h" "DXVA_PicParams_HEVC"
++check_type "windows.h dxva.h" "DXVA_PicParams_HEVC" -DWINAPI_FAMILY=WINAPI_FAMILY_DESKTOP_APP
+ check_type "windows.h d3d11.h" "ID3D11VideoDecoder"
+ check_type "d3d9.h dxva2api.h" DXVA2_ConfigPictureDecode -D_WIN32_WINNT=0x0600
+ 
 diff --git a/libavcodec/dxva2_internal.h b/libavcodec/dxva2_internal.h
-index 3b651a4..1e04916 100644
+index 3b651a4..9b6bbbc3 100644
 --- a/libavcodec/dxva2_internal.h
 +++ b/libavcodec/dxva2_internal.h
-@@ -34,6 +34,8 @@
+@@ -34,6 +34,9 @@
  #include "d3d11va.h"
  #endif
  #if HAVE_DXVA_H
 +/* dxva.h defines nothing otherwise but it works */
++#undef WINAPI_FAMILY
 +#define WINAPI_FAMILY WINAPI_FAMILY_DESKTOP_APP
  #include <dxva.h>
  #endif
@@ -63,4 +73,3 @@ index 800680a..e4b776e 100644
  #pragma comment(linker, "/include:"EXTERN_PREFIX"avpriv_strtod")
  #pragma comment(linker, "/include:"EXTERN_PREFIX"avpriv_snprintf")
  #endif
-
