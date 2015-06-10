@@ -25,9 +25,9 @@
 # error _WIN32_WINNT should have been defined
 #endif
 
-#pragma push_macro("_WIN32_WINNT")
-#undef _WIN32_WINNT
-#define _WIN32_WINNT 0x0502
+//#pragma push_macro("_WIN32_WINNT")
+//#undef _WIN32_WINNT
+//#define _WIN32_WINNT 0x0502
 
 #ifdef WINAPI_FAMILY
 # pragma push_macro("WINAPI_FAMILY")
@@ -35,7 +35,7 @@
 # undef WINAPI_FAMILY
 #endif
 
-#define WINAPI_FAMILY WINAPI_FAMILY_DESKTOP_APP
+//#define WINAPI_FAMILY WINAPI_FAMILY_DESKTOP_APP
 
 #include <ws2tcpip.h>
 
@@ -45,6 +45,6 @@
 # undef WINAPI_FAMILY
 #endif
 
-#pragma pop_macro("_WIN32_WINNT")
+//#pragma pop_macro("_WIN32_WINNT")
 
 #endif
