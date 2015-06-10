@@ -206,6 +206,7 @@ ffmpeg: ffmpeg-$(HASH).tar.xz .sum-ffmpeg
 	$(XZCAT) "$<" | (cd $@-$(HASH) && tar xv --strip-components=1)
 ifdef HAVE_VISUALSTUDIO
 	$(APPLY) $(SRC)/ffmpeg/msvc.patch
+	$(APPLY) $(SRC)/ffmpeg/near_field.patch
 endif
 	$(MOVE)
 
@@ -213,6 +214,6 @@ endif
 	cd $< && $(HOSTVARS) ./configure \
 		--extra-ldflags="$(LDFLAGS)" $(FFMPEGCONF) \
 		--prefix="$(PREFIX)" --enable-static --disable-shared
-#	cd $< && $(MAKE) -j`nproc` install-libs install-headers
-	cd $< && $(MAKE) install-libs install-headers
+	cd $< && $(MAKE) -j`nproc` install-libs install-headers
+#	cd $< && $(MAKE) install-libs install-headers
 	touch $@
