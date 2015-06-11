@@ -1,0 +1,19 @@
+--- libdvbpsi/configure.ac.old	2015-06-11 09:40:07.940291000 +0200
++++ libdvbpsi/configure.ac	2015-06-11 09:53:31.984279700 +0200
+@@ -14,6 +14,7 @@
+ AC_C_INLINE
+ 
+ AM_PROG_CC_C_O
++AC_PROG_CC_C99
+ 
+ AC_LIBTOOL_WIN32_DLL
+ AM_PROG_LIBTOOL
+@@ -22,7 +23,7 @@
+ CFLAGS_save="${CFLAGS}"
+ 
+ dnl add features to CFLAGS
+-CFLAGS_dist="-Wall -Werror --std=gnu99 -D_GNU_SOURCE"
++CFLAGS_dist="-Wall -Werror -D_GNU_SOURCE"
+ CFLAGS_dist="${CFLAGS_dist} -Wpointer-arith -Wcast-align -Wcast-qual -Wstrict-prototypes -Wshadow -Waggregate-return -Wmissing-prototypes -Wnested-externs -Wsign-compare"
+ 
+ dnl check the operating system

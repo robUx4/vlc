@@ -19,6 +19,7 @@ libdvbpsi: libdvbpsi-$(DVBPSI_VERSION).tar.bz2 .sum-dvbpsi
 	$(APPLY) $(SRC)/dvbpsi/dvbpsi-noexamples.patch
 	$(APPLY) $(SRC)/dvbpsi/dvbpsi-sys-types.patch
 ifdef HAVE_VISUALSTUDIO
+	$(APPLY) $(SRC)/dvbpsi/gnu99.patch
 	$(APPLY) $(SRC)/dvbpsi/msvc.patch
 endif
 	$(MOVE)
