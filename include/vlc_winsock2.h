@@ -35,7 +35,7 @@
 # undef WINAPI_FAMILY
 #endif
 
-//#define WINAPI_FAMILY WINAPI_FAMILY_DESKTOP_APP
+#define WINAPI_FAMILY WINAPI_FAMILY_DESKTOP_APP
 
 #include <Winsock2.h>
 
