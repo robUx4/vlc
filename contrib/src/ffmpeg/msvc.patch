@@ -1,5 +1,5 @@
 diff --git a/configure b/configure
-index 18f0518..ca3a583 100755
+index b10715f..3d26996 100755
 --- a/configure
 +++ b/configure
 @@ -2779,7 +2779,7 @@ msvc_common_flags(){
@@ -35,7 +35,7 @@ index 18f0518..ca3a583 100755
              _ld_o='-out:$@'
          else
              _ld_o='-Fe$@'
-@@ -3118,6 +3118,10 @@ host_ldflags_filter=$_flags_filter
+@@ -3112,6 +3112,10 @@ host_ldflags_filter=$_flags_filter
  add_host_ldflags $_flags $_ldflags
  HOSTLD_O=${_ld_o-$HOSTLD_O}
  
@@ -46,22 +46,7 @@ index 18f0518..ca3a583 100755
  if [ -z "$CC_DEPFLAGS" ] && [ "$dep_cc" != "$cc" ]; then
      probe_cc depcc "$dep_cc"
      CCDEP=${_DEPCMD:-$DEPCMD}
-@@ -3774,10 +3778,10 @@ case $libc_type in
-         add_compat strtod.o strtod=avpriv_strtod
-         ;;
-     msvcrt)
--        add_compat strtod.o strtod=avpriv_strtod
--        add_compat msvcrt/snprintf.o snprintf=avpriv_snprintf   \
--                                     _snprintf=avpriv_snprintf  \
--                                     vsnprintf=avpriv_vsnprintf
-+#        add_compat strtod.o strtod=avpriv_strtod
-+#        add_compat msvcrt/snprintf.o snprintf=avpriv_snprintf   \
-+#                                     _snprintf=avpriv_snprintf  \
-+#                                     vsnprintf=avpriv_vsnprintf
-         ;;
- esac
- 
-@@ -4236,7 +4240,7 @@ check_lib2 "windows.h psapi.h" GetProcessMemoryInfo -lpsapi
+@@ -4234,7 +4238,7 @@ check_lib2 "windows.h psapi.h" GetProcessMemoryInfo -lpsapi
  
  check_struct "sys/time.h sys/resource.h" "struct rusage" ru_maxrss
  
@@ -84,16 +69,3 @@ index 3b651a4..9b6bbbc3 100644
  #include <dxva.h>
  #endif
  
-diff --git a/libavutil/internal.h b/libavutil/internal.h
-index 800680a..e4b776e 100644
---- a/libavutil/internal.h
-+++ b/libavutil/internal.h
-@@ -130,7 +130,7 @@
- 
- #include "libm.h"
- 
--#if defined(_MSC_VER)
-+#if defined(_MSC_VER) && _MSC_VER < 1900
- #pragma comment(linker, "/include:"EXTERN_PREFIX"avpriv_strtod")
- #pragma comment(linker, "/include:"EXTERN_PREFIX"avpriv_snprintf")
- #endif
