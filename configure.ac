@@ -596,7 +596,7 @@ AC_CHECK_TYPES([struct pollfd],,,
 #if HAVE_POLL
 # include <poll.h>
 #elif defined (_WIN32)
-# define _WIN32_WINNT 0x502
+# define WINAPI_FAMILY WINAPI_FAMILY_DESKTOP_APP
 # include <winsock2.h>
 #endif
 ])
@@ -626,6 +626,7 @@ AC_LINK_IFELSE([
         # if _WIN32_WINNT < 0x600
         #  error Needs vista+
         # endif
+        #define WINAPI_FAMILY WINAPI_FAMILY_DESKTOP_APP
         #include <ws2tcpip.h>
         #else
         #include <sys/socket.h>
@@ -645,6 +646,7 @@ ac_cv_type_socklen_t,
 [AC_COMPILE_IFELSE([AC_LANG_PROGRAM([
 [#include <sys/types.h>
 #ifdef _WIN32
+# define WINAPI_FAMILY WINAPI_FAMILY_DESKTOP_APP
 # include <winsock2.h>
 # include <ws2tcpip.h>
 #else
@@ -662,6 +664,7 @@ AC_CACHE_CHECK([for struct sockaddr_storage], ac_cv_struct_sockaddr_storage,
   [AC_TRY_COMPILE(
     [#include <sys/types.h>
      #if defined( _WIN32 )
+     # define WINAPI_FAMILY WINAPI_FAMILY_DESKTOP_APP
      # include <winsock2.h>
      #else
      # include <sys/socket.h>
