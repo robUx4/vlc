@@ -14,12 +14,6 @@ FFMPEG_SNAPURL := http://git.libav.org/?p=libav.git;a=snapshot;h=$(HASH);sf=tgz
 FFMPEG_GITURL := git://git.libav.org/libav.git
 endif
 
-ifdef HAVE_VISUALSTUDIO
-#CC:=cl
-#CXX:=cl
-#CPP:=cl -E
-endif
-
 FFMPEGCONF = \
 	--cc="$(CC)" \
 	--ld="$(LD)" \
@@ -37,6 +31,10 @@ FFMPEGCONF = \
 	--disable-bsfs \
 	--disable-bzlib \
 	--disable-avresample
+
+ifdef HAVE_VISUALSTUDIO
+#FFMPEGCONF += --extra-cflags='-nologo-'
+endif
 
 ifdef USE_FFMPEG
 FFMPEGCONF += \
