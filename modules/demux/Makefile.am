@@ -352,7 +352,7 @@ libdash_plugin_la_LIBADD = $(SOCKET_LIBS) $(LIBM)
 if HAVE_ZLIB
 libdash_plugin_la_LIBADD += -lz
 endif
-demux_LTLIBRARIES += libdash_plugin.la
+#demux_LTLIBRARIES += libdash_plugin.la
 
 
 libhls_plugin_la_SOURCES = \
@@ -382,7 +382,7 @@ libhls_plugin_la_CXXFLAGS += $(GCRYPT_CFLAGS)
 libhls_plugin_la_LIBADD += $(GCRYPT_LIBS)
 endif
 
-demux_LTLIBRARIES += libhls_plugin.la
+#demux_LTLIBRARIES += libhls_plugin.la
 
 libttml_plugin_la_SOURCES = demux/ttml.c
 demux_LTLIBRARIES += libttml_plugin.la
