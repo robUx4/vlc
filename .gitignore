@@ -55,4 +55,6 @@ install-*
 
 /contrib/Windows
 /Windows_Debug
+/Windows_Debug.ok
+/Windows_Debug.ok2
 /contrib/Windows.old
