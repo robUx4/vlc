@@ -107,7 +107,7 @@ int (poll) (struct pollfd *fds, unsigned nfds, int timeout)
 }
 #else
 # include <windows.h>
-# include <winsock2.h>
+# include <vlc_winsock2.h>
 
 int poll(struct pollfd *fds, unsigned nfds, int timeout)
 {
