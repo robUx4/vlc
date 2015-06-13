@@ -158,6 +158,7 @@ endif
 
 
 ### Win32 ###
+if !HAVE_WINSTORE
 libdirect2d_plugin_la_SOURCES = video_output/msw/direct2d.c \
 	video_output/msw/common.c video_output/msw/common.h \
 	video_output/msw/events.c video_output/msw/events.h \
@@ -180,11 +181,12 @@ libdirect3d9_plugin_la_LIBADD = -lgdi32 -lole32 -luuid
 libdirect3d9_plugin_la_LDFLAGS = $(AM_LDFLAGS) -rpath '$(voutdir)'
 vout_LTLIBRARIES += $(LTLIBdirect3d9)
 EXTRA_LTLIBRARIES += libdirect3d9_plugin.la
+endif
 
 libdirect3d11_plugin_la_SOURCES = video_output/msw/direct3d11.c \
  video_output/msw/common.c video_output/msw/common.h
 libdirect3d11_plugin_la_CPPFLAGS = $(AM_CPPFLAGS) \
- -DMODULE_NAME_IS_direct3d11
+ -DMODULE_NAME_IS_direct3d11 -DWINAPI_FAMILY=WINAPI_FAMILY_DESKTOP_APP
 if !HAVE_WINSTORE
 libdirect3d11_plugin_la_SOURCES += video_output/msw/events.c \
  video_output/msw/events.h video_output/msw/builtin_shaders.h \
@@ -197,6 +199,7 @@ libdirect3d11_plugin_la_LDFLAGS = $(AM_LDFLAGS) -rpath '$(voutdir)'
 vout_LTLIBRARIES += $(LTLIBdirect3d11)
 EXTRA_LTLIBRARIES += libdirect3d11_plugin.la
 
+if !HAVE_WINSTORE
 libdirectdraw_plugin_la_SOURCES = video_output/msw/directdraw.c \
 	video_output/msw/common.c video_output/msw/common.h \
 	video_output/msw/events.c video_output/msw/events.h \
@@ -230,6 +233,7 @@ libwingdi_plugin_la_LIBADD = -lgdi32 -lole32 -luuid
 if HAVE_WIN32
 if !HAVE_WINSTORE
 vout_LTLIBRARIES += libwingdi_plugin.la
+endif
 endif
 endif
 
