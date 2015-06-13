@@ -28,6 +28,8 @@ typedef struct {
 # ifdef CAN_COMPILE_SSE2
     uint8_t *buffer;
     size_t  size;
+# elif defined(_MSC_VER)
+    char dummy;
 # endif
 } copy_cache_t;
 

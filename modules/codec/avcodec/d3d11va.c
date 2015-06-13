@@ -32,6 +32,9 @@
 # include "config.h"
 #endif
 
+# undef WINAPI_FAMILY
+# define WINAPI_FAMILY WINAPI_FAMILY_DESKTOP_APP
+
 #include <assert.h>
 
 #include <vlc_common.h>
@@ -77,7 +80,10 @@ vlc_module_end()
 #  include <dxva.h>
 # endif
 
-#endif /* __MINGW32__ */
+#elif defined(_MSC_VER)
+#  undef MS_GUID
+#  define MS_GUID DEFINE_GUID
+#endif /* _MSC_VER */
 
 #if !defined(NDEBUG) && defined(HAVE_DXGIDEBUG_H)
 # include <dxgidebug.h>
@@ -89,6 +95,8 @@ DEFINE_GUID(IID_IDXGIDevice,         0x54ec77fa, 0x1377, 0x44e6, 0x8c, 0x32, 0x8
 DEFINE_GUID(IID_ID3D10Multithread,   0x9b7e4e00, 0x342c, 0x4106, 0xa1, 0x9f, 0x4f, 0x27, 0x04, 0xf6, 0x89, 0xf0);
 
 DEFINE_GUID(DXVA_Intel_H264_NoFGT_ClearVideo,       0x604F8E68, 0x4951, 0x4c54, 0x88, 0xFE, 0xAB, 0xD2, 0x5C, 0x15, 0xB3, 0xD6);
+
+MS_GUID    (DXVA2_NoEncrypt,                        0x1b81bed0, 0xa0c7, 0x11d3, 0xb9, 0x84, 0x00, 0xc0, 0x4f, 0x2e, 0x73, 0xc5);
 
 struct vlc_va_sys_t
 {
@@ -726,7 +734,7 @@ static int DxCreateDecoderSurfaces(vlc_va_t *va, int codec_id, const video_forma
     }
 
     /* List all configurations available for the decoder */
-    D3D11_VIDEO_DECODER_CONFIG cfg_list[cfg_count];
+    D3D11_VIDEO_DECODER_CONFIG *cfg_list = alloca(cfg_count * sizeof(D3D11_VIDEO_DECODER_CONFIG));
     for (unsigned i = 0; i < cfg_count; i++) {
         hr = ID3D11VideoDevice_GetVideoDecoderConfig( (ID3D11VideoDevice*) dx_sys->d3ddec, &decoderDesc, i, &cfg_list[i] );
         if (FAILED(hr)) {
@@ -754,7 +762,7 @@ static int DxCreateDecoderSurfaces(vlc_va_t *va, int codec_id, const video_forma
             score = 2;
         else
             continue;
-        if (IsEqualGUID(&cfg->guidConfigBitstreamEncryption, &DXVA_NoEncrypt))
+        if (IsEqualGUID(&cfg->guidConfigBitstreamEncryption, &DXVA2_NoEncrypt))
             score += 16;
 
         if (cfg_score < score) {

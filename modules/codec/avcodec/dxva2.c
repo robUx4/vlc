@@ -53,6 +53,8 @@ vlc_module_begin()
     set_callbacks(Open, Close)
 vlc_module_end()
 
+//#include <dxva2api.h>
+
 #include <initguid.h> /* must be last included to not redefine existing GUIDs */
 
 /* dxva2api.h GUIDs: http://msdn.microsoft.com/en-us/library/windows/desktop/ms697067(v=vs100).aspx
@@ -70,12 +72,15 @@ vlc_module_end()
 #  include <dxva.h>
 # endif
 
+#elif VLC_WINSTORE_APP
+#  undef MS_GUID
+#  define MS_GUID DEFINE_GUID
 #endif /* __MINGW32__ */
 
 MS_GUID(IID_IDirectXVideoDecoderService, 0xfc51a551, 0xd5e7, 0x11d9, 0xaf,0x55,0x00,0x05,0x4e,0x43,0xff,0x02);
 MS_GUID(IID_IDirectXVideoAccelerationService, 0xfc51a550, 0xd5e7, 0x11d9, 0xaf,0x55,0x00,0x05,0x4e,0x43,0xff,0x02);
 
-MS_GUID    (DXVA_NoEncrypt,                         0x1b81bed0, 0xa0c7, 0x11d3, 0xb9, 0x84, 0x00, 0xc0, 0x4f, 0x2e, 0x73, 0xc5);
+MS_GUID(DXVA2_NoEncrypt,                        0x1b81bed0, 0xa0c7, 0x11d3, 0xb9, 0x84, 0x00, 0xc0, 0x4f, 0x2e, 0x73, 0xc5);
 
 DEFINE_GUID(DXVA_Intel_H264_NoFGT_ClearVideo,       0x604F8E68, 0x4951, 0x4c54, 0x88, 0xFE, 0xAB, 0xD2, 0x5C, 0x15, 0xB3, 0xD6);
 
@@ -744,7 +749,7 @@ static int DxCreateVideoDecoder(vlc_va_t *va, int codec_id, const video_format_t
             score = 2;
         else
             continue;
-        if (IsEqualGUID(&cfg->guidConfigBitstreamEncryption, &DXVA_NoEncrypt))
+        if (IsEqualGUID(&cfg->guidConfigBitstreamEncryption, &DXVA2_NoEncrypt))
             score += 16;
 
         if (cfg_score < score) {
