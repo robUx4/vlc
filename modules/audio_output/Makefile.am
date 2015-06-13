@@ -73,11 +73,13 @@ aout_LTLIBRARIES += libwinstore_plugin.la
 endif
 endif
 
+if !HAVE_WINSTORE
 libdirectsound_plugin_la_SOURCES = audio_output/directsound.c \
 	audio_output/windows_audio_common.h
 libdirectsound_plugin_la_LIBADD = -lole32
 if HAVE_DIRECTX
 aout_LTLIBRARIES += libdirectsound_plugin.la
+endif
 endif
 
 libkai_plugin_la_SOURCES = audio_output/kai.c
