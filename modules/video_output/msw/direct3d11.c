@@ -268,9 +268,9 @@ static const char *globPixelShaderBiplanarI420_BT601_2RGB = "\
     UCb = UCb - 0.5;\
     VCr = VCr - 0.5;\
     \
-    rgba.x = saturate(Y + 1.596026785714286 * VCr);\
-    rgba.y = saturate(Y - 0.812967647237771 * VCr - 0.391762290094914 * UCb);\
-    rgba.z = saturate(Y + 2.017232142857142 * UCb);\
+    rgba.x = 0.5; saturate(Y + 1.596026785714286 * VCr);\
+    rgba.y = 0.5; saturate(Y - 0.812967647237771 * VCr - 0.391762290094914 * UCb);\
+    rgba.z = 0.5; saturate(Y + 2.017232142857142 * UCb);\
     rgba.a = In.Opacity;\
     return rgba;\
   }\
@@ -310,9 +310,9 @@ static const char *globPixelShaderBiplanarI420_BT709_2RGB = "\
     UCb = UCb - 0.5;\
     VCr = VCr - 0.5;\
     \
-    rgba.x = saturate(Y + 1.792741071428571 * VCr);\
-    rgba.y = saturate(Y - 0.532909328559444 * VCr - 0.21324861427373 * UCb);\
-    rgba.z = saturate(Y + 2.112401785714286 * UCb);\
+    rgba.x = 0.5; saturate(Y + 1.792741071428571 * VCr);\
+    rgba.y = 0.2; saturate(Y - 0.532909328559444 * VCr - 0.21324861427373 * UCb);\
+    rgba.z = 0.3; saturate(Y + 2.112401785714286 * UCb);\
     rgba.a = In.Opacity;\
     return rgba;\
   }\
@@ -339,9 +339,9 @@ static const char *globPixelShaderBiplanarYUV_BT601_2RGB = "\
     yuv.x  = 1.164383561643836 * (yuv.x-0.0625);\
     yuv.y  = yuv.y - 0.5;\
     yuv.z  = yuv.z - 0.5;\
-    rgba.x = saturate(yuv.x + 1.596026785714286 * yuv.z);\
-    rgba.y = saturate(yuv.x - 0.812967647237771 * yuv.z - 0.391762290094914 * yuv.y);\
-    rgba.z = saturate(yuv.x + 2.017232142857142 * yuv.y);\
+    rgba.x = 0.2; saturate(yuv.x + 1.596026785714286 * yuv.z);\
+    rgba.y = 0.4; saturate(yuv.x - 0.812967647237771 * yuv.z - 0.391762290094914 * yuv.y);\
+    rgba.z = 0.8; saturate(yuv.x + 2.017232142857142 * yuv.y);\
     rgba.a = In.Opacity;\
     return rgba;\
   }\
@@ -669,12 +669,19 @@ static HRESULT UpdateBackBuffer(vout_display_t *vd)
         sys->d3ddepthStencilView = NULL;
     }
 
+#if !VLC_WINSTORE_APP
     hr = IDXGISwapChain_ResizeBuffers(sys->dxgiswapChain, 0, i_width, i_height,
         DXGI_FORMAT_UNKNOWN, 0);
     if (FAILED(hr)) {
        msg_Err(vd, "Failed to resize the backbuffer. (hr=0x%lX)", hr);
        return hr;
     }
+#else
+    DXGI_SWAP_CHAIN_DESC swapDesc;
+    hr = IDXGISwapChain_GetDesc(sys->dxgiswapChain, &swapDesc);
+    i_width  = swapDesc.Width;
+    i_height = swapDesc.Height;
+#endif
 
     hr = IDXGISwapChain_GetBuffer(sys->dxgiswapChain, 0, &IID_ID3D11Texture2D, (LPVOID *)&pBackBuffer);
     if (FAILED(hr)) {
@@ -724,6 +731,8 @@ static HRESULT UpdateBackBuffer(vout_display_t *vd)
        return hr;
     }
 
+    ID3D11DeviceContext_OMSetRenderTargets(sys->d3dcontext, 1, &sys->d3drenderTargetView, sys->d3ddepthStencilView);
+/*
     D3D11_VIEWPORT vp;
     vp.Width = (FLOAT)i_width;
     vp.Height = (FLOAT)i_height;
@@ -733,7 +742,7 @@ static HRESULT UpdateBackBuffer(vout_display_t *vd)
     vp.TopLeftY = 0;
 
     ID3D11DeviceContext_RSSetViewports(sys->d3dcontext, 1, &vp);
-
+*/
     return S_OK;
 }
 
@@ -777,6 +786,10 @@ static void Prepare(vout_display_t *vd, picture_t *picture, subpicture_t *subpic
                                                   (ID3D11Resource*) p_sys->texture,
                                                   0, &box);
     }
+
+#if VLC_WINSTORE_APP /* TODO: Choose the WinRT app background clear color */
+    //float ClearColor[4] = { 1.0f, 0.125f, 0.3f, 1.0f };
+    //ID3D11DeviceContext_ClearRenderTargetView(sys->d3dcontext,sys->d3drenderTargetView, ClearColor);
 #endif
 
     if (subpicture) {
@@ -825,11 +838,16 @@ static void Display(vout_display_t *vd, picture_t *picture, subpicture_t *subpic
         }
     }
 
-    HRESULT hr = IDXGISwapChain_Present(sys->dxgiswapChain, 0, 0);
-    if (hr == DXGI_ERROR_DEVICE_REMOVED || hr == DXGI_ERROR_DEVICE_RESET)
-    {
-        /* TODO device lost */
-    }
+#if VLC_WINSTORE_APP
+    DXGI_PRESENT_PARAMETERS presentParams;
+    ZeroMemory(&presentParams, sizeof(presentParams));
+#ifndef NDEBUG
+    HRESULT hr =
+#endif
+    IDXGISwapChain1_Present1(sys->dxgiswapChain, 1, 0, &presentParams);
+#else
+    IDXGISwapChain_Present(sys->dxgiswapChain, 0, 0);
+#endif
 
     picture_Release(picture);
     if (subpicture)
