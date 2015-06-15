@@ -11,6 +11,9 @@ $(TARBALLS)/libebml-$(EBML_VERSION).tar.bz2:
 
 libebml: libebml-$(EBML_VERSION).tar.bz2 .sum-ebml
 	$(UNPACK)
+ifdef HAVE_VISUALSTUDIO
+	$(APPLY) $(SRC)/ebml/msvc.patch
+endif
 	$(MOVE)
 
 # libebml requires exceptions
