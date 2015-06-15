@@ -65,6 +65,12 @@ vlc_module_begin ()
 
     add_bool("direct3d11-hw-blending", true, HW_BLENDING_TEXT, HW_BLENDING_LONGTEXT, true)
 
+#if VLC_WINSTORE_APP
+	add_integer("winrt-d3dcontext", 0x0, NULL, NULL, true);
+	add_integer("winrt-dxgiswapchain", 0x0, NULL, NULL, true);
+	add_integer("winrt-d3ddevice", 0x0, NULL, NULL, true);
+#endif
+
     set_capability("vout display", 240)
     add_shortcut("direct3d11")
     set_callbacks(Open, Close)
@@ -253,9 +259,9 @@ static const char *globPixelShaderBiplanarI420_BT601_2RGB = "\
     UCb = UCb - 0.5;\
     VCr = VCr - 0.5;\
     \
-    rgba.x = saturate(Y + 1.596026785714286 * VCr);\
-    rgba.y = saturate(Y - 0.812967647237771 * VCr - 0.391762290094914 * UCb);\
-    rgba.z = saturate(Y + 2.017232142857142 * UCb);\
+    rgba.x = 0.5; saturate(Y + 1.596026785714286 * VCr);\
+    rgba.y = 0.5; saturate(Y - 0.812967647237771 * VCr - 0.391762290094914 * UCb);\
+    rgba.z = 0.5; saturate(Y + 2.017232142857142 * UCb);\
     rgba.a = In.Opacity;\
     return rgba;\
   }\
@@ -295,9 +301,9 @@ static const char *globPixelShaderBiplanarI420_BT709_2RGB = "\
     UCb = UCb - 0.5;\
     VCr = VCr - 0.5;\
     \
-    rgba.x = saturate(Y + 1.792741071428571 * VCr);\
-    rgba.y = saturate(Y - 0.532909328559444 * VCr - 0.21324861427373 * UCb);\
-    rgba.z = saturate(Y + 2.112401785714286 * UCb);\
+    rgba.x = 0.5; saturate(Y + 1.792741071428571 * VCr);\
+    rgba.y = 0.2; saturate(Y - 0.532909328559444 * VCr - 0.21324861427373 * UCb);\
+    rgba.z = 0.3; saturate(Y + 2.112401785714286 * UCb);\
     rgba.a = In.Opacity;\
     return rgba;\
   }\
@@ -324,9 +330,9 @@ static const char *globPixelShaderBiplanarYUV_BT601_2RGB = "\
     yuv.x  = 1.164383561643836 * (yuv.x-0.0625);\
     yuv.y  = yuv.y - 0.5;\
     yuv.z  = yuv.z - 0.5;\
-    rgba.x = saturate(yuv.x + 1.596026785714286 * yuv.z);\
-    rgba.y = saturate(yuv.x - 0.812967647237771 * yuv.z - 0.391762290094914 * yuv.y);\
-    rgba.z = saturate(yuv.x + 2.017232142857142 * yuv.y);\
+    rgba.x = 0.2; saturate(yuv.x + 1.596026785714286 * yuv.z);\
+    rgba.y = 0.4; saturate(yuv.x - 0.812967647237771 * yuv.z - 0.391762290094914 * yuv.y);\
+    rgba.z = 0.8; saturate(yuv.x + 2.017232142857142 * yuv.y);\
     rgba.a = In.Opacity;\
     return rgba;\
   }\
@@ -622,6 +628,8 @@ static HRESULT UpdateBackBuffer(vout_display_t *vd)
     HRESULT hr;
     ID3D11Texture2D* pDepthStencil;
     ID3D11Texture2D* pBackBuffer;
+    int i_width  = RECTWidth(sys->rect_dest_clipped);
+    int i_height = RECTHeight(sys->rect_dest_clipped);
 
     if (sys->d3drenderTargetView) {
         ID3D11RenderTargetView_Release(sys->d3drenderTargetView);
@@ -632,13 +640,19 @@ static HRESULT UpdateBackBuffer(vout_display_t *vd)
         sys->d3ddepthStencilView = NULL;
     }
 
-    hr = IDXGISwapChain_ResizeBuffers(sys->dxgiswapChain, 1, RECTWidth(sys->rect_dest_clipped),
-                                 RECTHeight(sys->rect_dest_clipped),
+#if !VLC_WINSTORE_APP
+    hr = IDXGISwapChain_ResizeBuffers(sys->dxgiswapChain, 1, i_width, i_height,
                                  DXGI_FORMAT_R8G8B8A8_UNORM, 0);
     if (FAILED(hr)) {
        msg_Err(vd, "Failed to resize the backbuffer. (hr=0x%lX)", hr);
        return hr;
     }
+#else
+    DXGI_SWAP_CHAIN_DESC swapDesc;
+    hr = IDXGISwapChain_GetDesc(sys->dxgiswapChain, &swapDesc);
+    i_width  = swapDesc.Width;
+    i_height = swapDesc.Height;
+#endif
 
     hr = IDXGISwapChain_GetBuffer(sys->dxgiswapChain, 0, &IID_ID3D11Texture2D, (LPVOID *)&pBackBuffer);
     if (FAILED(hr)) {
@@ -648,6 +662,10 @@ static HRESULT UpdateBackBuffer(vout_display_t *vd)
 
     hr = ID3D11Device_CreateRenderTargetView(sys->d3ddevice, (ID3D11Resource *)pBackBuffer, NULL, &sys->d3drenderTargetView);
     ID3D11Texture2D_Release(pBackBuffer);
+    if (FAILED(hr)) {
+        msg_Err(vd, "Failed to create the target view. (hr=0x%lX)", hr);
+        return hr;
+    }
 
     D3D11_TEXTURE2D_DESC deptTexDesc;
     memset(&deptTexDesc, 0,sizeof(deptTexDesc));
@@ -655,8 +673,8 @@ static HRESULT UpdateBackBuffer(vout_display_t *vd)
     deptTexDesc.BindFlags = D3D11_BIND_DEPTH_STENCIL;
     deptTexDesc.CPUAccessFlags = 0;
     deptTexDesc.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
-    deptTexDesc.Width = RECTWidth(sys->rect_dest_clipped);
-    deptTexDesc.Height = RECTHeight(sys->rect_dest_clipped);
+    deptTexDesc.Width = i_width;
+    deptTexDesc.Height = i_height;
     deptTexDesc.MipLevels = 1;
     deptTexDesc.MiscFlags = 0;
     deptTexDesc.SampleDesc.Count = 1;
@@ -685,17 +703,17 @@ static HRESULT UpdateBackBuffer(vout_display_t *vd)
     }
 
     ID3D11DeviceContext_OMSetRenderTargets(sys->d3dcontext, 1, &sys->d3drenderTargetView, sys->d3ddepthStencilView);
-
+/*
     D3D11_VIEWPORT vp;
-    vp.Width = (FLOAT)RECTWidth(sys->rect_dest_clipped);
-    vp.Height = (FLOAT)RECTHeight(sys->rect_dest_clipped);
+    vp.Width = (FLOAT)i_width;
+    vp.Height = (FLOAT)i_height;
     vp.MinDepth = 0.0f;
     vp.MaxDepth = 1.0f;
     vp.TopLeftX = 0;
     vp.TopLeftY = 0;
 
     ID3D11DeviceContext_RSSetViewports(sys->d3dcontext, 1, &vp);
-
+*/
     return S_OK;
 }
 
@@ -738,8 +756,8 @@ static void Prepare(vout_display_t *vd, picture_t *picture, subpicture_t *subpic
     }
 
 #if VLC_WINSTORE_APP /* TODO: Choose the WinRT app background clear color */
-    float ClearColor[4] = { 1.0f, 0.125f, 0.3f, 1.0f };
-    ID3D11DeviceContext_ClearRenderTargetView(sys->d3dcontext,sys->d3drenderTargetView, ClearColor);
+    //float ClearColor[4] = { 1.0f, 0.125f, 0.3f, 1.0f };
+    //ID3D11DeviceContext_ClearRenderTargetView(sys->d3dcontext,sys->d3drenderTargetView, ClearColor);
 #endif
     ID3D11DeviceContext_ClearDepthStencilView(sys->d3dcontext,sys->d3ddepthStencilView, D3D11_CLEAR_DEPTH, 1.0f, 0);
 
@@ -785,7 +803,16 @@ static void Display(vout_display_t *vd, picture_t *picture, subpicture_t *subpic
         }
     }
 
+#if VLC_WINSTORE_APP
+    DXGI_PRESENT_PARAMETERS presentParams;
+    ZeroMemory(&presentParams, sizeof(presentParams));
+#ifndef NDEBUG
+    HRESULT hr =
+#endif
+    IDXGISwapChain1_Present1(sys->dxgiswapChain, 1, 0, &presentParams);
+#else
     IDXGISwapChain_Present(sys->dxgiswapChain, 0, 0);
+#endif
 
     picture_Release(picture);
     if (subpicture)
@@ -862,18 +889,8 @@ static int Direct3D11Open(vout_display_t *vd, video_format_t *fmt)
     scd.BufferDesc.Height = fmt->i_visible_height;
     scd.BufferDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
 
-# if VLC_WINSTORE_APP
-    /* TODO : check different values for performance */
-    scd.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
-    scd.BufferCount = 2;
-    scd.SwapEffect = DXGI_SWAP_EFFECT_FLIP_SEQUENTIAL;
-    scd.Flags = DXGI_SWAP_CHAIN_FLAG_FOREGROUND_LAYER;
-    scd.AlphaMode = DXGI_ALPHA_MODE_PREMULTIPLIED;
-    scd.Scaling = DXGI_SCALING_NONE;
-# else
     scd.Windowed = TRUE;
     scd.OutputWindow = sys->hvideownd;
-# endif
 
     IDXGIAdapter *dxgiadapter;
 # if USE_DXGI
