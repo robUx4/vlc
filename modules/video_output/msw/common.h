@@ -29,7 +29,9 @@
 #ifdef MODULE_NAME_IS_direct3d11
 # include <d3d11.h>
 # if VLC_WINSTORE_APP
+#  include <D3D11_1.h>
 #  include <dxgi1_2.h>
+#  include <Dxgi1_3.h>
 # else
 #  include <dxgi.h>
 #endif
@@ -174,11 +176,13 @@ struct vout_display_sys_t
     PFN_D3D11_CREATE_DEVICE_AND_SWAP_CHAIN OurD3D11CreateDeviceAndSwapChain;
     PFN_D3D11_CREATE_DEVICE                OurD3D11CreateDevice;
     pD3DCompile                            OurD3DCompile;
-#else
-    IDXGISwapChain1          *dxgiswapChain;   /* DXGI 1.1 swap chain */
-#endif
     ID3D11Device             *d3ddevice;       /* D3D device */
     ID3D11DeviceContext      *d3dcontext;      /* D3D context */
+#else
+    IDXGISwapChain2          *dxgiswapChain;   /* DXGI 1.1 swap chain */
+    ID3D11Device1            *d3ddevice;       /* D3D device */
+    ID3D11DeviceContext1     *d3dcontext;      /* D3D context */
+#endif
     d3d_quad_t               picQuad;
     d3d_quad_cfg_t           picQuadConfig;
     ID3D11RenderTargetView   *d3drenderTargetView;
