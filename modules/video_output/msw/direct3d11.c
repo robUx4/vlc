@@ -34,7 +34,7 @@
 #include <d3d11.h>
 
 /* avoided until we can pass ISwapchainPanel without c++/cx mode
-# include <windows.ui.xaml.media.dxinterop.h> */
+# include <windows.ui.xaml.media.dxinterop.h>*/
 
 #include "common.h"
 
@@ -88,10 +88,12 @@ typedef struct
 } d3d_format_t;
 
 static const d3d_format_t d3d_formats[] = {
+#if 0
     { "I420",     DXGI_FORMAT_NV12,           VLC_CODEC_I420,     DXGI_FORMAT_R8_UNORM,           DXGI_FORMAT_R8G8_UNORM },
     { "YV12",     DXGI_FORMAT_NV12,           VLC_CODEC_YV12,     DXGI_FORMAT_R8_UNORM,           DXGI_FORMAT_R8G8_UNORM },
     { "NV12",     DXGI_FORMAT_NV12,           VLC_CODEC_NV12,     DXGI_FORMAT_R8_UNORM,           DXGI_FORMAT_R8G8_UNORM },
     { "VA_NV12",  DXGI_FORMAT_NV12,           VLC_CODEC_D3D11_OPAQUE, DXGI_FORMAT_R8_UNORM,       DXGI_FORMAT_R8G8_UNORM },
+#endif
 #ifdef BROKEN_PIXEL
     { "YUY2",     DXGI_FORMAT_YUY2,           VLC_CODEC_I422,     DXGI_FORMAT_R8G8B8A8_UNORM,     0 },
     { "AYUV",     DXGI_FORMAT_AYUV,           VLC_CODEC_YUVA,     DXGI_FORMAT_R8G8B8A8_UNORM,     0 },
@@ -103,8 +105,8 @@ static const d3d_format_t d3d_formats[] = {
     { "Y410",     DXGI_FORMAT_Y410,           VLC_CODEC_I444_10L, DXGI_FORMAT_R10G10B10A2_UNORM,  0 },
     { "NV11",     DXGI_FORMAT_NV11,           VLC_CODEC_I411,     DXGI_FORMAT_R8_UNORM,           DXGI_FORMAT_R8G8_UNORM },
 #endif
-    { "R8G8B8A8", DXGI_FORMAT_R8G8B8A8_UNORM, VLC_CODEC_RGBA,     DXGI_FORMAT_R8G8B8A8_UNORM,     0 },
     { "B8G8R8A8", DXGI_FORMAT_B8G8R8A8_UNORM, VLC_CODEC_BGRA,     DXGI_FORMAT_B8G8R8A8_UNORM,     0 },
+    { "R8G8B8A8", DXGI_FORMAT_R8G8B8A8_UNORM, VLC_CODEC_RGBA,     DXGI_FORMAT_R8G8B8A8_UNORM,     0 },
     { "R8G8B8X8", DXGI_FORMAT_B8G8R8X8_UNORM, VLC_CODEC_RGB32,    DXGI_FORMAT_B8G8R8X8_UNORM,     0 },
     { "B5G6R5",   DXGI_FORMAT_B5G6R5_UNORM,   VLC_CODEC_RGB16,    DXGI_FORMAT_B5G6R5_UNORM,       0 },
 
@@ -342,7 +344,7 @@ static const char *globPixelShaderBiplanarYUV_BT601_2RGB = "\
     rgba.x = 0.2; saturate(yuv.x + 1.596026785714286 * yuv.z);\
     rgba.y = 0.4; saturate(yuv.x - 0.812967647237771 * yuv.z - 0.391762290094914 * yuv.y);\
     rgba.z = 0.8; saturate(yuv.x + 2.017232142857142 * yuv.y);\
-    rgba.a = In.Opacity;\
+    rgba.a = 1.0; In.Opacity;\
     return rgba;\
   }\
 ";
@@ -406,11 +408,17 @@ static int Open(vlc_object_t *object)
     IDXGISwapChain1* dxgiswapChain  = var_InheritInteger(vd, "winrt-swapchain");
     if (!dxgiswapChain)
         return VLC_EGENERIC;
-    ID3D11Device* d3ddevice         = var_InheritInteger(vd, "winrt-d3ddevice");
+    ID3D11Device1* d3ddevice         = var_InheritInteger(vd, "winrt-d3ddevice1");
     if (!d3ddevice)
         return VLC_EGENERIC;
-    ID3D11DeviceContext* d3dcontext = var_InheritInteger(vd, "winrt-d3dcontext");
+    ID3D11DeviceContext1* d3dcontext = var_InheritInteger(vd, "winrt-d3dcontext1");
     if (!d3dcontext)
+        return VLC_EGENERIC;
+    ID3D11RenderTargetView* d3drenderTargetView = var_InheritInteger(vd, "winrt-rendertarget");
+    if (!d3drenderTargetView)
+        return VLC_EGENERIC;
+    ID3D11DepthStencilView* d3ddepthStencilView = var_InheritInteger(vd, "winrt-depthstencil");
+    if (!d3ddepthStencilView)
         return VLC_EGENERIC;
 #endif
 
@@ -468,12 +476,21 @@ static int Open(vlc_object_t *object)
 # endif
 
 #else
-    sys->dxgiswapChain = dxgiswapChain;
-    sys->d3ddevice     = d3ddevice;
-    sys->d3dcontext    = d3dcontext;
+    sys->dxgiswapChain       = dxgiswapChain;
+    IUnknown_AddRef(sys->dxgiswapChain);
+    sys->d3ddevice           = d3ddevice;
+    IUnknown_AddRef(sys->d3ddevice);
+    sys->d3dcontext          = d3dcontext;
+    IUnknown_AddRef(sys->d3dcontext);
+#if 0
+    sys->d3drenderTargetView = d3drenderTargetView;
+    IUnknown_AddRef(sys->d3drenderTargetView);
+    sys->d3ddepthStencilView = d3ddepthStencilView;
+    IUnknown_AddRef(sys->d3ddepthStencilView);
     IDXGISwapChain_AddRef     (sys->dxgiswapChain);
     ID3D11Device_AddRef       (sys->d3ddevice);
     ID3D11DeviceContext_AddRef(sys->d3dcontext);
+#endif
 #endif
 
     if (CommonInit(vd))
@@ -660,6 +677,7 @@ static HRESULT UpdateBackBuffer(vout_display_t *vd)
     }
 #endif
 
+#if 1 || !VLC_WINSTORE_APP
     if (sys->d3drenderTargetView) {
         ID3D11RenderTargetView_Release(sys->d3drenderTargetView);
         sys->d3drenderTargetView = NULL;
@@ -669,18 +687,20 @@ static HRESULT UpdateBackBuffer(vout_display_t *vd)
         sys->d3ddepthStencilView = NULL;
     }
 
-#if !VLC_WINSTORE_APP
+#if VLC_WINSTORE_APP
+    DXGI_SWAP_CHAIN_DESC1 desc1;
+    hr = IDXGISwapChain1_GetDesc1(sys->dxgiswapChain, &desc1);
+    i_width = desc1.Width;
+    i_height = desc1.Height;
+
+#if 0
     hr = IDXGISwapChain_ResizeBuffers(sys->dxgiswapChain, 0, i_width, i_height,
         DXGI_FORMAT_UNKNOWN, 0);
     if (FAILED(hr)) {
        msg_Err(vd, "Failed to resize the backbuffer. (hr=0x%lX)", hr);
        return hr;
     }
-#else
-    DXGI_SWAP_CHAIN_DESC swapDesc;
-    hr = IDXGISwapChain_GetDesc(sys->dxgiswapChain, &swapDesc);
-    i_width  = swapDesc.Width;
-    i_height = swapDesc.Height;
+#endif
 #endif
 
     hr = IDXGISwapChain_GetBuffer(sys->dxgiswapChain, 0, &IID_ID3D11Texture2D, (LPVOID *)&pBackBuffer);
@@ -730,9 +750,8 @@ static HRESULT UpdateBackBuffer(vout_display_t *vd)
        msg_Err(vd, "Could not create the depth stencil view. (hr=0x%lX)", hr);
        return hr;
     }
+#endif
 
-    ID3D11DeviceContext_OMSetRenderTargets(sys->d3dcontext, 1, &sys->d3drenderTargetView, sys->d3ddepthStencilView);
-/*
     D3D11_VIEWPORT vp;
     vp.Width = (FLOAT)i_width;
     vp.Height = (FLOAT)i_height;
@@ -742,7 +761,7 @@ static HRESULT UpdateBackBuffer(vout_display_t *vd)
     vp.TopLeftY = 0;
 
     ID3D11DeviceContext_RSSetViewports(sys->d3dcontext, 1, &vp);
-*/
+
     return S_OK;
 }
 
@@ -832,22 +851,26 @@ static void Display(vout_display_t *vd, picture_t *picture, subpicture_t *subpic
     DisplayD3DPicture(sys, &sys->picQuad);
 
     if (subpicture) {
-        // draw the additional vertices
+        // draw the subpicture quads
         for (int i = 0; i < sys->d3dregion_count; ++i) {
             DisplayD3DPicture(sys, (d3d_quad_t *) sys->d3dregions[i]->p_sys);
         }
     }
 
+    HRESULT hr;
 #if VLC_WINSTORE_APP
     DXGI_PRESENT_PARAMETERS presentParams;
     ZeroMemory(&presentParams, sizeof(presentParams));
-#ifndef NDEBUG
-    HRESULT hr =
-#endif
-    IDXGISwapChain1_Present1(sys->dxgiswapChain, 1, 0, &presentParams);
+    hr = IDXGISwapChain1_Present1(sys->dxgiswapChain, 1, 0, &presentParams);
+    //hr = IDXGISwapChain_Present(sys->dxgiswapChain, 1, 0);
 #else
-    IDXGISwapChain_Present(sys->dxgiswapChain, 0, 0);
+    hr = IDXGISwapChain_Present(sys->dxgiswapChain, 0, 0);
 #endif
+
+    if (hr == DXGI_ERROR_DEVICE_REMOVED || hr == DXGI_ERROR_DEVICE_RESET)
+    {
+        /* TODO device lost */
+    }
 
     picture_Release(picture);
     if (subpicture)
@@ -1037,8 +1060,6 @@ static int Direct3D11Open(vout_display_t *vd, video_format_t *fmt)
        return VLC_EGENERIC;
     }
 
-# endif
-#endif
 
     vlc_fourcc_t i_src_chroma = fmt->i_chroma;
     fmt->i_chroma = 0;
@@ -1343,8 +1364,6 @@ static int Direct3D11CreateResources(vout_display_t *vd, video_format_t *fmt)
     }
     ID3D11DeviceContext_IASetIndexBuffer(sys->d3dcontext, pIndexBuffer, DXGI_FORMAT_R16_UINT, 0);
     ID3D11Buffer_Release(pIndexBuffer);
-
-    ID3D11DeviceContext_IASetPrimitiveTopology(sys->d3dcontext, D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
     ID3DBlob* pPSBlob = NULL;
 
