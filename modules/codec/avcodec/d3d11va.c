@@ -307,7 +307,7 @@ static int Open(vlc_va_t *va, AVCodecContext *ctx, enum PixelFormat pix_fmt,
     int err = VLC_EGENERIC;
     directx_sys_t *dx_sys;
 
-    if (pix_fmt != AV_PIX_FMT_D3D11VA_VLD)
+    if (1 || pix_fmt != AV_PIX_FMT_D3D11VA_VLD)
         return VLC_EGENERIC;
 
     vlc_va_sys_t *sys = calloc(1, sizeof (*sys));
