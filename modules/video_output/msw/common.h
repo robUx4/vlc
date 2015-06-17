@@ -29,9 +29,7 @@
 #ifdef MODULE_NAME_IS_direct3d11
 # include <d3d11.h>
 # if VLC_WINSTORE_APP
-#  include <D3D11_1.h>
 #  include <dxgi1_2.h>
-#  include <Dxgi1_3.h>
 # else
 #  include <dxgi.h>
 #endif
