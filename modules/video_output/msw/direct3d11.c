@@ -66,9 +66,9 @@ vlc_module_begin ()
     add_bool("direct3d11-hw-blending", true, HW_BLENDING_TEXT, HW_BLENDING_LONGTEXT, true)
 
 #if VLC_WINSTORE_APP
-    add_integer("winrt-d3ddevice1",     0x0, NULL, NULL, true);
-    add_integer("winrt-d3dcontext1",    0x0, NULL, NULL, true);
-	add_integer("winrt-dxgiswapchain2", 0x0, NULL, NULL, true);
+    add_integer("winrt-d3ddevice",     0x0, NULL, NULL, true);
+    add_integer("winrt-d3dcontext",    0x0, NULL, NULL, true);
+    add_integer("winrt-dxgiswapchain", 0x0, NULL, NULL, true);
 #endif
 
     set_capability("vout display", 240)
@@ -396,13 +396,13 @@ static int Open(vlc_object_t *object)
 # endif
 
 #else
-    IDXGISwapChain2* dxgiswapChain   = var_InheritInteger(vd, "winrt-dxgiswapchain2");
+    IDXGISwapChain* dxgiswapChain   = var_InheritInteger(vd, "winrt-dxgiswapchain");
     if (!dxgiswapChain)
         return VLC_EGENERIC;
-    ID3D11Device1* d3ddevice         = var_InheritInteger(vd, "winrt-d3ddevice1");
+    ID3D11Device* d3ddevice         = var_InheritInteger(vd, "winrt-d3ddevice");
     if (!d3ddevice)
         return VLC_EGENERIC;
-    ID3D11DeviceContext1* d3dcontext = var_InheritInteger(vd, "winrt-d3dcontext1");
+    ID3D11DeviceContext* d3dcontext = var_InheritInteger(vd, "winrt-d3dcontext");
     if (!d3dcontext)
         return VLC_EGENERIC;
 #endif
@@ -461,18 +461,12 @@ static int Open(vlc_object_t *object)
 # endif
 
 #else
-    sys->dxgiswapChain       = dxgiswapChain;
-    IUnknown_AddRef(sys->dxgiswapChain);
-    sys->d3ddevice           = d3ddevice;
-    IUnknown_AddRef(sys->d3ddevice);
-    sys->d3dcontext          = d3dcontext;
-    IUnknown_AddRef(sys->d3dcontext);
-#if 0
-    sys->d3drenderTargetView = d3drenderTargetView;
-    IUnknown_AddRef(sys->d3drenderTargetView);
-    sys->d3ddepthStencilView = d3ddepthStencilView;
-    IUnknown_AddRef(sys->d3ddepthStencilView);
-#endif
+    sys->dxgiswapChain = dxgiswapChain;
+    sys->d3ddevice     = d3ddevice;
+    sys->d3dcontext    = d3dcontext;
+    IDXGISwapChain_AddRef     (sys->dxgiswapChain);
+    ID3D11Device_AddRef       (sys->d3ddevice);
+    ID3D11DeviceContext_AddRef(sys->d3dcontext);
 #endif
 
     if (CommonInit(vd))
@@ -656,10 +650,10 @@ static HRESULT UpdateBackBuffer(vout_display_t *vd)
     }
 
 #if VLC_WINSTORE_APP
-    DXGI_SWAP_CHAIN_DESC1 desc1;
-    hr = IDXGISwapChain1_GetDesc1(sys->dxgiswapChain, &desc1);
-    i_width = desc1.Width;
-    i_height = desc1.Height;
+    DXGI_SWAP_CHAIN_DESC swapDesc;
+    hr = IDXGISwapChain_GetDesc(sys->dxgiswapChain, &swapDesc);
+    i_width = swapDesc.Width;
+    i_height = swapDesc.Height;
 
 #if 0
     hr = IDXGISwapChain_ResizeBuffers(sys->dxgiswapChain, 1, i_width, i_height,
