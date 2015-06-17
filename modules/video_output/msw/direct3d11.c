@@ -66,11 +66,9 @@ vlc_module_begin ()
     add_bool("direct3d11-hw-blending", true, HW_BLENDING_TEXT, HW_BLENDING_LONGTEXT, true)
 
 #if VLC_WINSTORE_APP
-    add_integer("winrt-d3ddevice1", 0x0, NULL, NULL, true);
+    add_integer("winrt-d3ddevice1",     0x0, NULL, NULL, true);
     add_integer("winrt-d3dcontext1",    0x0, NULL, NULL, true);
 	add_integer("winrt-dxgiswapchain2", 0x0, NULL, NULL, true);
-    add_integer("winrt-rendertarget", 0x0, NULL, NULL, true);
-    add_integer("winrt-depthstencil", 0x0, NULL, NULL, true);
 #endif
 
     set_capability("vout display", 240)
@@ -88,12 +86,10 @@ typedef struct
 } d3d_format_t;
 
 static const d3d_format_t d3d_formats[] = {
-#if 0
     { "I420",     DXGI_FORMAT_NV12,           VLC_CODEC_I420,     DXGI_FORMAT_R8_UNORM,           DXGI_FORMAT_R8G8_UNORM },
     { "YV12",     DXGI_FORMAT_NV12,           VLC_CODEC_YV12,     DXGI_FORMAT_R8_UNORM,           DXGI_FORMAT_R8G8_UNORM },
     { "NV12",     DXGI_FORMAT_NV12,           VLC_CODEC_NV12,     DXGI_FORMAT_R8_UNORM,           DXGI_FORMAT_R8G8_UNORM },
     { "VA_NV12",  DXGI_FORMAT_NV12,           VLC_CODEC_D3D11_OPAQUE, DXGI_FORMAT_R8_UNORM,       DXGI_FORMAT_R8G8_UNORM },
-#endif
 #ifdef BROKEN_PIXEL
     { "YUY2",     DXGI_FORMAT_YUY2,           VLC_CODEC_I422,     DXGI_FORMAT_R8G8B8A8_UNORM,     0 },
     { "AYUV",     DXGI_FORMAT_AYUV,           VLC_CODEC_YUVA,     DXGI_FORMAT_R8G8B8A8_UNORM,     0 },
@@ -105,8 +101,8 @@ static const d3d_format_t d3d_formats[] = {
     { "Y410",     DXGI_FORMAT_Y410,           VLC_CODEC_I444_10L, DXGI_FORMAT_R10G10B10A2_UNORM,  0 },
     { "NV11",     DXGI_FORMAT_NV11,           VLC_CODEC_I411,     DXGI_FORMAT_R8_UNORM,           DXGI_FORMAT_R8G8_UNORM },
 #endif
-    { "B8G8R8A8", DXGI_FORMAT_B8G8R8A8_UNORM, VLC_CODEC_BGRA,     DXGI_FORMAT_B8G8R8A8_UNORM,     0 },
     { "R8G8B8A8", DXGI_FORMAT_R8G8B8A8_UNORM, VLC_CODEC_RGBA,     DXGI_FORMAT_R8G8B8A8_UNORM,     0 },
+    { "B8G8R8A8", DXGI_FORMAT_B8G8R8A8_UNORM, VLC_CODEC_BGRA,     DXGI_FORMAT_B8G8R8A8_UNORM,     0 },
     { "R8G8B8X8", DXGI_FORMAT_B8G8R8X8_UNORM, VLC_CODEC_RGB32,    DXGI_FORMAT_B8G8R8X8_UNORM,     0 },
     { "B5G6R5",   DXGI_FORMAT_B5G6R5_UNORM,   VLC_CODEC_RGB16,    DXGI_FORMAT_B5G6R5_UNORM,       0 },
 
@@ -265,9 +261,9 @@ static const char *globPixelShaderBiplanarI420_BT601_2RGB = "\
     UCb = UCb - 0.5;\
     VCr = VCr - 0.5;\
     \
-    rgba.x = 0.5; saturate(Y + 1.596026785714286 * VCr);\
-    rgba.y = 0.5; saturate(Y - 0.812967647237771 * VCr - 0.391762290094914 * UCb);\
-    rgba.z = 0.5; saturate(Y + 2.017232142857142 * UCb);\
+    rgba.x = saturate(Y + 1.596026785714286 * VCr);\
+    rgba.y = saturate(Y - 0.812967647237771 * VCr - 0.391762290094914 * UCb);\
+    rgba.z = saturate(Y + 2.017232142857142 * UCb);\
     rgba.a = In.Opacity;\
     return rgba;\
   }\
@@ -307,9 +303,9 @@ static const char *globPixelShaderBiplanarI420_BT709_2RGB = "\
     UCb = UCb - 0.5;\
     VCr = VCr - 0.5;\
     \
-    rgba.x = 0.5; saturate(Y + 1.792741071428571 * VCr);\
-    rgba.y = 0.2; saturate(Y - 0.532909328559444 * VCr - 0.21324861427373 * UCb);\
-    rgba.z = 0.3; saturate(Y + 2.112401785714286 * UCb);\
+    rgba.x = saturate(Y + 1.792741071428571 * VCr);\
+    rgba.y = saturate(Y - 0.532909328559444 * VCr - 0.21324861427373 * UCb);\
+    rgba.z = saturate(Y + 2.112401785714286 * UCb);\
     rgba.a = In.Opacity;\
     return rgba;\
   }\
@@ -336,10 +332,10 @@ static const char *globPixelShaderBiplanarYUV_BT601_2RGB = "\
     yuv.x  = 1.164383561643836 * (yuv.x-0.0625);\
     yuv.y  = yuv.y - 0.5;\
     yuv.z  = yuv.z - 0.5;\
-    rgba.x = 0.2; saturate(yuv.x + 1.596026785714286 * yuv.z);\
-    rgba.y = 0.4; saturate(yuv.x - 0.812967647237771 * yuv.z - 0.391762290094914 * yuv.y);\
-    rgba.z = 0.8; saturate(yuv.x + 2.017232142857142 * yuv.y);\
-    rgba.a = 1.0; In.Opacity;\
+    rgba.x = saturate(yuv.x + 1.596026785714286 * yuv.z);\
+    rgba.y = saturate(yuv.x - 0.812967647237771 * yuv.z - 0.391762290094914 * yuv.y);\
+    rgba.z = saturate(yuv.x + 2.017232142857142 * yuv.y);\
+    rgba.a = In.Opacity;\
     return rgba;\
   }\
 ";
@@ -408,12 +404,6 @@ static int Open(vlc_object_t *object)
         return VLC_EGENERIC;
     ID3D11DeviceContext1* d3dcontext = var_InheritInteger(vd, "winrt-d3dcontext1");
     if (!d3dcontext)
-        return VLC_EGENERIC;
-    ID3D11RenderTargetView* d3drenderTargetView = var_InheritInteger(vd, "winrt-rendertarget");
-    if (!d3drenderTargetView)
-        return VLC_EGENERIC;
-    ID3D11DepthStencilView* d3ddepthStencilView = var_InheritInteger(vd, "winrt-depthstencil");
-    if (!d3ddepthStencilView)
         return VLC_EGENERIC;
 #endif
 
@@ -816,8 +806,8 @@ static void Display(vout_display_t *vd, picture_t *picture, subpicture_t *subpic
     ID3D11DeviceContext_OMSetRenderTargets(sys->d3dcontext, 1, &sys->d3drenderTargetView, sys->d3ddepthStencilView);
 
 #if VLC_WINSTORE_APP /* TODO: Choose the WinRT app background clear color */
-    float ClearColor[4] = { 1.0f, 0.125f, 0.3f, 1.0f };
-    ID3D11DeviceContext_ClearRenderTargetView(sys->d3dcontext, sys->d3drenderTargetView, ClearColor);
+    //float ClearColor[4] = { 1.0f, 0.125f, 0.3f, 1.0f };
+    //ID3D11DeviceContext_ClearRenderTargetView(sys->d3dcontext, sys->d3drenderTargetView, ClearColor);
 #endif
     ID3D11DeviceContext_ClearDepthStencilView(sys->d3dcontext, sys->d3ddepthStencilView, D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0);
 
@@ -833,16 +823,7 @@ static void Display(vout_display_t *vd, picture_t *picture, subpicture_t *subpic
         }
     }
 
-    HRESULT hr;
-#if VLC_WINSTORE_APP
-    DXGI_PRESENT_PARAMETERS presentParams;
-    ZeroMemory(&presentParams, sizeof(presentParams));
-    hr = IDXGISwapChain1_Present1(sys->dxgiswapChain, 1, 0, &presentParams);
-    //hr = IDXGISwapChain_Present(sys->dxgiswapChain, 1, 0);
-#else
-    hr = IDXGISwapChain_Present(sys->dxgiswapChain, 0, 0);
-#endif
-
+    HRESULT hr = IDXGISwapChain_Present(sys->dxgiswapChain, 0, 0);
     if (hr == DXGI_ERROR_DEVICE_REMOVED || hr == DXGI_ERROR_DEVICE_RESET)
     {
         /* TODO device lost */
