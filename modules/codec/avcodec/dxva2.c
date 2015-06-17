@@ -53,8 +53,6 @@ vlc_module_begin()
     set_callbacks(Open, Close)
 vlc_module_end()
 
-//#include <dxva2api.h>
-
 #include <initguid.h> /* must be last included to not redefine existing GUIDs */
 
 /* dxva2api.h GUIDs: http://msdn.microsoft.com/en-us/library/windows/desktop/ms697067(v=vs100).aspx
