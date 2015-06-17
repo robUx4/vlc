@@ -396,8 +396,8 @@ static int Open(vlc_object_t *object)
 # endif
 
 #else
-    IDXGISwapChain1* dxgiswapChain1 = var_InheritInteger(vd, "winrt-dxgiswapchain");
-    if (!dxgiswapChain1)
+    IDXGISwapChain1* dxgiswapChain  = var_InheritInteger(vd, "winrt-dxgiswapchain");
+    if (!dxgiswapChain)
         return VLC_EGENERIC;
     ID3D11Device* d3ddevice         = var_InheritInteger(vd, "winrt-d3ddevice");
     if (!d3ddevice)
@@ -461,7 +461,7 @@ static int Open(vlc_object_t *object)
 # endif
 
 #else
-    sys->dxgiswapChain = dxgiswapChain1;
+    sys->dxgiswapChain = dxgiswapChain;
     sys->d3ddevice     = d3ddevice;
     sys->d3dcontext    = d3dcontext;
     IDXGISwapChain_AddRef     (sys->dxgiswapChain);
@@ -797,17 +797,13 @@ static void Display(vout_display_t *vd, picture_t *picture, subpicture_t *subpic
 
     ID3D11DeviceContext_OMSetRenderTargets(sys->d3dcontext, 1, &sys->d3drenderTargetView, sys->d3ddepthStencilView);
 
-#if VLC_WINSTORE_APP /* TODO: Choose the WinRT app background clear color */
-    float ClearColor[4] = { 1.0f, 0.125f, 0.3f, 1.0f };
-    ID3D11DeviceContext_ClearRenderTargetView(sys->d3dcontext,sys->d3drenderTargetView, ClearColor);
-#endif
     ID3D11DeviceContext_ClearDepthStencilView(sys->d3dcontext, sys->d3ddepthStencilView, D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0);
 
     /* Render the quad */
     DisplayD3DPicture(sys, &sys->picQuad);
 
     if (subpicture) {
-        // draw the subpicture quads
+        // draw the additional vertices
         for (int i = 0; i < sys->d3dregion_count; ++i) {
             DisplayD3DPicture(sys, (d3d_quad_t *) sys->d3dregions[i]->p_sys);
         }
@@ -1129,21 +1125,23 @@ static void Direct3D11Close(vout_display_t *vd)
     vout_display_sys_t *sys = vd->sys;
 
     Direct3D11DestroyResources(vd);
-#if !VLC_WINSTORE_APP
-    if (sys->dxgiswapChain)
-        IDXGISwapChain_Release(sys->dxgiswapChain);
-    if ( sys->d3dcontext )
-        ID3D11DeviceContext_Release(sys->d3dcontext);
-    if ( sys->d3ddevice )
-        ID3D11Device_Release(sys->d3ddevice);
-#else
-    if ( sys->d3dcontext )
+    if (sys->d3dcontext)
+    {
         ID3D11DeviceContext_Flush(sys->d3dcontext);
+        ID3D11DeviceContext_Release(sys->d3dcontext);
+        sys->d3dcontext = NULL;
+    }
+    if (sys->d3ddevice)
+    {
+        ID3D11Device_Release(sys->d3ddevice);
+        sys->d3ddevice = NULL;
+    }
+    if (sys->dxgiswapChain)
+    {
+        IDXGISwapChain_Release(sys->dxgiswapChain);
+        sys->dxgiswapChain = NULL;
+    }
 
-    sys->d3dcontext = NULL;
-    sys->d3ddevice = NULL;
-    sys->dxgiswapChain = NULL;
-#endif
     msg_Dbg(vd, "Direct3D11 device adapter closed");
 }
 
