@@ -90,6 +90,9 @@ static char *config_GetShellDir (int csidl)
 
 static char *config_GetAppDir (void)
 {
+#if VLC_WINSTORE_APP
+    return NULL;
+#else
     /* if portable directory exists, use it */
     TCHAR path[MAX_PATH];
     if (GetModuleFileName (NULL, path, MAX_PATH))
@@ -113,6 +116,7 @@ static char *config_GetAppDir (void)
         psz_dir = NULL;
     free (psz_parent);
     return psz_dir;
+#endif
 }
 
 #ifndef _MSC_VER
