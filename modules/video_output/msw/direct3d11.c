@@ -468,7 +468,7 @@ static int Open(vlc_object_t *object)
 # endif
 
 #else
-    sys->dxgiswapChain = dxgiswapChain;
+    sys->dxgiswapChain = dxgiswapChain1;
     sys->d3ddevice     = d3ddevice;
     sys->d3dcontext    = d3dcontext;
     IDXGISwapChain_AddRef     (sys->dxgiswapChain);
@@ -663,7 +663,6 @@ static HRESULT UpdateBackBuffer(vout_display_t *vd)
     }
 #endif
 
-#if 1 || !VLC_WINSTORE_APP
     if (sys->d3drenderTargetView) {
         ID3D11RenderTargetView_Release(sys->d3drenderTargetView);
         sys->d3drenderTargetView = NULL;
@@ -674,8 +673,8 @@ static HRESULT UpdateBackBuffer(vout_display_t *vd)
     }
 
 #if VLC_WINSTORE_APP
-    DXGI_SWAP_CHAIN_DESC swapDesc;
-    hr = IDXGISwapChain_GetDesc(sys->dxgiswapChain, &swapDesc);
+    DXGI_SWAP_CHAIN_DESC1 swapDesc;
+    hr = IDXGISwapChain1_GetDesc1(sys->dxgiswapChain, &swapDesc);
     i_width = swapDesc.Width;
     i_height = swapDesc.Height;
 
@@ -686,7 +685,6 @@ static HRESULT UpdateBackBuffer(vout_display_t *vd)
        msg_Err(vd, "Failed to resize the backbuffer. (hr=0x%lX)", hr);
        return hr;
     }
-#endif
 #endif
 
     hr = IDXGISwapChain_GetBuffer(sys->dxgiswapChain, 0, &IID_ID3D11Texture2D, (LPVOID *)&pBackBuffer);
@@ -736,7 +734,6 @@ static HRESULT UpdateBackBuffer(vout_display_t *vd)
        msg_Err(vd, "Could not create the depth stencil view. (hr=0x%lX)", hr);
        return hr;
     }
-#endif
 
     D3D11_VIEWPORT vp;
     vp.Width = (FLOAT)i_width;
@@ -791,6 +788,7 @@ static void Prepare(vout_display_t *vd, picture_t *picture, subpicture_t *subpic
                                                   (ID3D11Resource*) p_sys->texture,
                                                   0, &box);
     }
+#endif
 
 #if VLC_WINSTORE_APP /* TODO: Choose the WinRT app background clear color */
     //float ClearColor[4] = { 1.0f, 0.125f, 0.3f, 1.0f };
@@ -831,7 +829,7 @@ static void Display(vout_display_t *vd, picture_t *picture, subpicture_t *subpic
 
     ID3D11DeviceContext_OMSetRenderTargets(sys->d3dcontext, 1, &sys->d3drenderTargetView, sys->d3ddepthStencilView);
 
-    ID3D11DeviceContext_ClearDepthStencilView(sys->d3dcontext, sys->d3ddepthStencilView, D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0);
+    ID3D11DeviceContext_ClearDepthStencilView(sys->d3dcontext, sys->d3ddepthStencilView, D3D11_CLEAR_DEPTH /*| D3D11_CLEAR_STENCIL*/, 1.0f, 0);
 
     /* Render the quad */
     DisplayD3DPicture(sys, &sys->picQuad);
