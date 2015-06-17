@@ -171,12 +171,14 @@ struct vout_display_sys_t
     HINSTANCE                hd3d11_dll;       /* handle of the opened d3d11 dll */
     HINSTANCE                hd3dcompiler_dll; /* handle of the opened d3dcompiler dll */
     IDXGIFactory             *dxgifactory;     /* DXGI factory */
+    IDXGISwapChain           *dxgiswapChain;   /* DXGI 1.0 swap chain */
     /* We should find a better way to store this or atleast a shorter name */
     PFN_D3D11_CREATE_DEVICE_AND_SWAP_CHAIN OurD3D11CreateDeviceAndSwapChain;
     PFN_D3D11_CREATE_DEVICE                OurD3D11CreateDevice;
     pD3DCompile                            OurD3DCompile;
+#else
+    IDXGISwapChain1          *dxgiswapChain;   /* DXGI 1.1 swap chain */
 #endif
-    IDXGISwapChain           *dxgiswapChain;   /* DXGI 1.0 swap chain */
     ID3D11Device             *d3ddevice;       /* D3D device */
     ID3D11DeviceContext      *d3dcontext;      /* D3D context */
     d3d_quad_t               picQuad;

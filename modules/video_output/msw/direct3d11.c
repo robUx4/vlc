@@ -40,12 +40,12 @@
 #include "common.h"
 
 #if !VLC_WINSTORE_APP
-# define D3D11CreateDeviceAndSwapChain(args...) sys->OurD3D11CreateDeviceAndSwapChain(args)
-# define D3D11CreateDevice(args...)             sys->OurD3D11CreateDevice(args)
+# if USE_DXGI
+#  define D3D11CreateDeviceAndSwapChain(args...) sys->OurD3D11CreateDeviceAndSwapChain(args)
+# else
+#  define D3D11CreateDevice(args...)             sys->OurD3D11CreateDevice(args)
+# endif
 # define D3DCompile(args...)                    sys->OurD3DCompile(args)
-#else
-# define IDXGIFactory_CreateSwapChain(a,b,c,d)  IDXGIFactory2_CreateSwapChainForComposition(a,b,c,NULL,d)
-# define DXGI_SWAP_CHAIN_DESC                   DXGI_SWAP_CHAIN_DESC1
 #endif
 
 static int  Open(vlc_object_t *);
@@ -396,8 +396,8 @@ static int Open(vlc_object_t *object)
 # endif
 
 #else
-    IDXGISwapChain* dxgiswapChain   = var_InheritInteger(vd, "winrt-dxgiswapchain");
-    if (!dxgiswapChain)
+    IDXGISwapChain1* dxgiswapChain1 = var_InheritInteger(vd, "winrt-dxgiswapchain");
+    if (!dxgiswapChain1)
         return VLC_EGENERIC;
     ID3D11Device* d3ddevice         = var_InheritInteger(vd, "winrt-d3ddevice");
     if (!d3ddevice)
@@ -461,7 +461,7 @@ static int Open(vlc_object_t *object)
 # endif
 
 #else
-    sys->dxgiswapChain = dxgiswapChain;
+    sys->dxgiswapChain = dxgiswapChain1;
     sys->d3ddevice     = d3ddevice;
     sys->d3dcontext    = d3dcontext;
     IDXGISwapChain_AddRef     (sys->dxgiswapChain);
@@ -639,7 +639,6 @@ static HRESULT UpdateBackBuffer(vout_display_t *vd)
     int i_width  = RECTWidth(sys->rect_dest_clipped);
     int i_height = RECTHeight(sys->rect_dest_clipped);
 
-#if 1 || !VLC_WINSTORE_APP
     if (sys->d3drenderTargetView) {
         ID3D11RenderTargetView_Release(sys->d3drenderTargetView);
         sys->d3drenderTargetView = NULL;
@@ -650,19 +649,17 @@ static HRESULT UpdateBackBuffer(vout_display_t *vd)
     }
 
 #if VLC_WINSTORE_APP
-    DXGI_SWAP_CHAIN_DESC swapDesc;
-    hr = IDXGISwapChain_GetDesc(sys->dxgiswapChain, &swapDesc);
+    DXGI_SWAP_CHAIN_DESC1 swapDesc;
+    hr = IDXGISwapChain1_GetDesc1(sys->dxgiswapChain, &swapDesc);
     i_width = swapDesc.Width;
     i_height = swapDesc.Height;
 
-#if 0
-    hr = IDXGISwapChain_ResizeBuffers(sys->dxgiswapChain, 1, i_width, i_height,
+    hr = IDXGISwapChain_ResizeBuffers(sys->dxgiswapChain, 0, i_width, i_height,
         DXGI_FORMAT_UNKNOWN, 0);
     if (FAILED(hr)) {
        msg_Err(vd, "Failed to resize the backbuffer. (hr=0x%lX)", hr);
        return hr;
     }
-#endif
 #endif
 
     hr = IDXGISwapChain_GetBuffer(sys->dxgiswapChain, 0, &IID_ID3D11Texture2D, (LPVOID *)&pBackBuffer);
@@ -712,7 +709,6 @@ static HRESULT UpdateBackBuffer(vout_display_t *vd)
        msg_Err(vd, "Could not create the depth stencil view. (hr=0x%lX)", hr);
        return hr;
     }
-#endif
 
     D3D11_VIEWPORT vp;
     vp.Width = (FLOAT)i_width;
@@ -748,6 +744,7 @@ static void Prepare(vout_display_t *vd, picture_t *picture, subpicture_t *subpic
 {
     vout_display_sys_t *sys = vd->sys;
 
+#ifdef HAVE_ID3D11VIDEODECODER 
     if (picture->format.i_chroma == VLC_CODEC_D3D11_OPAQUE) {
         D3D11_BOX box;
         box.left = 0;
@@ -764,6 +761,7 @@ static void Prepare(vout_display_t *vd, picture_t *picture, subpicture_t *subpic
                                                   (ID3D11Resource*) p_sys->texture,
                                                   0, &box);
     }
+#endif
 
     if (subpicture) {
         int subpicture_region_count    = 0;
@@ -800,10 +798,10 @@ static void Display(vout_display_t *vd, picture_t *picture, subpicture_t *subpic
     ID3D11DeviceContext_OMSetRenderTargets(sys->d3dcontext, 1, &sys->d3drenderTargetView, sys->d3ddepthStencilView);
 
 #if VLC_WINSTORE_APP /* TODO: Choose the WinRT app background clear color */
-    //float ClearColor[4] = { 1.0f, 0.125f, 0.3f, 1.0f };
-    //ID3D11DeviceContext_ClearRenderTargetView(sys->d3dcontext, sys->d3drenderTargetView, ClearColor);
+    float ClearColor[4] = { 1.0f, 0.125f, 0.3f, 1.0f };
+    ID3D11DeviceContext_ClearRenderTargetView(sys->d3dcontext, sys->d3drenderTargetView, ClearColor);
 #endif
-    ID3D11DeviceContext_ClearDepthStencilView(sys->d3dcontext, sys->d3ddepthStencilView, D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0);
+    ID3D11DeviceContext_ClearDepthStencilView(sys->d3dcontext, sys->d3ddepthStencilView, D3D11_CLEAR_DEPTH /*| D3D11_CLEAR_STENCIL*/, 1.0f, 0);
 
     ID3D11DeviceContext_IASetPrimitiveTopology(sys->d3dcontext, D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
