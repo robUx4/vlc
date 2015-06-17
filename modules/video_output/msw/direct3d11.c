@@ -34,7 +34,7 @@
 #include <d3d11.h>
 
 /* avoided until we can pass ISwapchainPanel without c++/cx mode
-# include <windows.ui.xaml.media.dxinterop.h>*/
+# include <windows.ui.xaml.media.dxinterop.h> */
 
 #include "common.h"
 
