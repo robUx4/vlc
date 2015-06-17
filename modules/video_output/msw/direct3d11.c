@@ -35,7 +35,7 @@
 #include <d3dtypes.h>
 
 /* avoided until we can pass ISwapchainPanel without c++/cx mode
-# include <windows.ui.xaml.media.dxinterop.h>*/
+# include <windows.ui.xaml.media.dxinterop.h> */
 
 #include "common.h"
 
@@ -113,6 +113,7 @@ static const d3d_format_t d3d_formats[] = {
     { NULL, 0, 0, 0, 0}
 };
 
+#ifdef HAVE_ID3D11VIDEODECODER 
 /* VLC_CODEC_D3D11_OPAQUE */
 struct picture_sys_t
 {
@@ -120,6 +121,7 @@ struct picture_sys_t
     ID3D11Texture2D               *texture;
     ID3D11DeviceContext           *context;
 };
+#endif
 
 /* internal picture_t pool  */
 typedef struct
@@ -131,7 +133,7 @@ typedef struct
 /* matches the D3D11_INPUT_ELEMENT_DESC we setup */
 typedef struct d3d_vertex_t {
     D3DVECTOR   position;
-    union {
+    struct {
         D3DVALUE x;
         D3DVALUE y;
     } texture;
@@ -542,6 +544,7 @@ static picture_pool_t *Pool(vout_display_t *vd, unsigned pool_size)
     if ( vd->sys->pool != NULL )
         return vd->sys->pool;
 
+#ifdef HAVE_ID3D11VIDEODECODER 
     picture_t**       pictures = NULL;
     unsigned          picture_count = 0;
     HRESULT           hr;
@@ -615,9 +618,11 @@ error:
             DestroyDisplayPoolPicture(pictures[i]);
         free(pictures);
     }
+#endif
     return vd->sys->pool;
 }
 
+#ifdef HAVE_ID3D11VIDEODECODER 
 static void DestroyDisplayPoolPicture(picture_t *picture)
 {
     picture_sys_t *p_sys = (picture_sys_t*) picture->p_sys;
@@ -628,7 +633,7 @@ static void DestroyDisplayPoolPicture(picture_t *picture)
     free(p_sys);
     free(picture);
 }
-
+#endif
 
 static void DestroyDisplayPicture(picture_t *picture)
 {
@@ -1040,14 +1045,14 @@ static int Direct3D11Open(vout_display_t *vd, video_format_t *fmt)
     ISwapChainPanelNative *panelNative;
     hr = ISwapChainPanelNative_QueryInterface(brokenpanel, &IID_ISwapChainPanelNative, (void **)&pDXGIDevice);
     if (FAILED(hr)) {
-        msg_Err(vd, "Could not get the Native Panel. (hr=0x%lX)", hr);
-        return VLC_EGENERIC;
+       msg_Err(vd, "Could not get the Native Panel. (hr=0x%lX)", hr);
+       return VLC_EGENERIC;
     }
 
     hr = ISwapChainPanelNative_SetSwapChain(panelNative, sys->dxgiswapChain);
     if (FAILED(hr)) {
-        msg_Err(vd, "Could not link the SwapChain with the Native Panel. (hr=0x%lX)", hr);
-        return VLC_EGENERIC;
+       msg_Err(vd, "Could not link the SwapChain with the Native Panel. (hr=0x%lX)", hr);
+       return VLC_EGENERIC;
     }
 
 #  endif
