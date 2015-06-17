@@ -406,10 +406,10 @@ static int Open(vlc_object_t *object)
     IDXGISwapChain1* dxgiswapChain  = var_InheritInteger(vd, "winrt-swapchain");
     if (!dxgiswapChain)
         return VLC_EGENERIC;
-    ID3D11Device1* d3ddevice         = var_InheritInteger(vd, "winrt-d3ddevice1");
+    ID3D11Device* d3ddevice         = var_InheritInteger(vd, "winrt-d3ddevice");
     if (!d3ddevice)
         return VLC_EGENERIC;
-    ID3D11DeviceContext1* d3dcontext = var_InheritInteger(vd, "winrt-d3dcontext1");
+    ID3D11DeviceContext* d3dcontext = var_InheritInteger(vd, "winrt-d3dcontext");
     if (!d3dcontext)
         return VLC_EGENERIC;
 #endif
@@ -468,21 +468,15 @@ static int Open(vlc_object_t *object)
 # endif
 
 #else
-    sys->dxgiswapChain       = dxgiswapChain;
-    IUnknown_AddRef(sys->dxgiswapChain);
-    sys->d3ddevice           = d3ddevice;
-    IUnknown_AddRef(sys->d3ddevice);
-    sys->d3dcontext          = d3dcontext;
-    IUnknown_AddRef(sys->d3dcontext);
-#if 0
-    sys->d3drenderTargetView = d3drenderTargetView;
-    IUnknown_AddRef(sys->d3drenderTargetView);
-    sys->d3ddepthStencilView = d3ddepthStencilView;
-    IUnknown_AddRef(sys->d3ddepthStencilView);
+    sys->dxgiswapChain = dxgiswapChain;
+    sys->d3ddevice     = d3ddevice;
+    sys->d3dcontext    = d3dcontext;
     IDXGISwapChain_AddRef     (sys->dxgiswapChain);
     ID3D11Device_AddRef       (sys->d3ddevice);
     ID3D11DeviceContext_AddRef(sys->d3dcontext);
-#endif
+    IDXGISwapChain_AddRef     (sys->dxgiswapChain);
+    ID3D11Device_AddRef       (sys->d3ddevice);
+    ID3D11DeviceContext_AddRef(sys->d3dcontext);
 #endif
 
     if (CommonInit(vd))
@@ -680,10 +674,10 @@ static HRESULT UpdateBackBuffer(vout_display_t *vd)
     }
 
 #if VLC_WINSTORE_APP
-    DXGI_SWAP_CHAIN_DESC1 desc1;
-    hr = IDXGISwapChain1_GetDesc1(sys->dxgiswapChain, &desc1);
-    i_width = desc1.Width;
-    i_height = desc1.Height;
+    DXGI_SWAP_CHAIN_DESC swapDesc;
+    hr = IDXGISwapChain_GetDesc(sys->dxgiswapChain, &swapDesc);
+    i_width = swapDesc.Width;
+    i_height = swapDesc.Height;
 
 #if 0
     hr = IDXGISwapChain_ResizeBuffers(sys->dxgiswapChain, 0, i_width, i_height,
