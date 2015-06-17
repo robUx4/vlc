@@ -653,6 +653,7 @@ static HRESULT UpdateBackBuffer(vout_display_t *vd)
     hr = IDXGISwapChain1_GetDesc1(sys->dxgiswapChain, &swapDesc);
     i_width = swapDesc.Width;
     i_height = swapDesc.Height;
+#endif
 
     hr = IDXGISwapChain_ResizeBuffers(sys->dxgiswapChain, 0, i_width, i_height,
         DXGI_FORMAT_UNKNOWN, 0);
@@ -660,7 +661,6 @@ static HRESULT UpdateBackBuffer(vout_display_t *vd)
        msg_Err(vd, "Failed to resize the backbuffer. (hr=0x%lX)", hr);
        return hr;
     }
-#endif
 
     hr = IDXGISwapChain_GetBuffer(sys->dxgiswapChain, 0, &IID_ID3D11Texture2D, (LPVOID *)&pBackBuffer);
     if (FAILED(hr)) {
@@ -799,11 +799,9 @@ static void Display(vout_display_t *vd, picture_t *picture, subpicture_t *subpic
 
 #if VLC_WINSTORE_APP /* TODO: Choose the WinRT app background clear color */
     float ClearColor[4] = { 1.0f, 0.125f, 0.3f, 1.0f };
-    ID3D11DeviceContext_ClearRenderTargetView(sys->d3dcontext, sys->d3drenderTargetView, ClearColor);
+    ID3D11DeviceContext_ClearRenderTargetView(sys->d3dcontext,sys->d3drenderTargetView, ClearColor);
 #endif
-    ID3D11DeviceContext_ClearDepthStencilView(sys->d3dcontext, sys->d3ddepthStencilView, D3D11_CLEAR_DEPTH /*| D3D11_CLEAR_STENCIL*/, 1.0f, 0);
-
-    ID3D11DeviceContext_IASetPrimitiveTopology(sys->d3dcontext, D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+    ID3D11DeviceContext_ClearDepthStencilView(sys->d3dcontext, sys->d3ddepthStencilView, D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0);
 
     /* Render the quad */
     DisplayD3DPicture(sys, &sys->picQuad);
@@ -1011,24 +1009,6 @@ static int Direct3D11Open(vout_display_t *vd, video_format_t *fmt)
 
 # endif
 #endif
-
-#  if 0 && VLC_WINSTORE_APP /* avoided until we can pass ISwapchainPanel without c++/cx mode */
-    /* TODO: figure out how to get "ISwapChainPanel ^panel" into brokenpanel in gcc */
-    ISwapChainPanel *brokenpanel;
-    ISwapChainPanelNative *panelNative;
-    hr = ISwapChainPanelNative_QueryInterface(brokenpanel, &IID_ISwapChainPanelNative, (void **)&pDXGIDevice);
-    if (FAILED(hr)) {
-       msg_Err(vd, "Could not get the Native Panel. (hr=0x%lX)", hr);
-       return VLC_EGENERIC;
-    }
-
-    hr = ISwapChainPanelNative_SetSwapChain(panelNative, sys->dxgiswapChain);
-    if (FAILED(hr)) {
-       msg_Err(vd, "Could not link the SwapChain with the Native Panel. (hr=0x%lX)", hr);
-       return VLC_EGENERIC;
-    }
-
-#  endif
 
     vlc_fourcc_t i_src_chroma = fmt->i_chroma;
     fmt->i_chroma = 0;
@@ -1239,16 +1219,6 @@ static int Direct3D11CreateResources(vout_display_t *vd, video_format_t *fmt)
         ID3D11DepthStencilState_Release(pDepthStencilState);
     }
 
-    D3D11_VIEWPORT vp;
-    vp.Width = (FLOAT)fmt->i_visible_width;
-    vp.Height = (FLOAT)fmt->i_visible_height;
-    vp.MinDepth = 0.0f;
-    vp.MaxDepth = 1.0f;
-    vp.TopLeftX = 0;
-    vp.TopLeftY = 0;
-
-    ID3D11DeviceContext_RSSetViewports(sys->d3dcontext, 1, &vp);
-
     ID3DBlob* pVSBlob = NULL;
 
     /* TODO : Match the version to the D3D_FEATURE_LEVEL */
@@ -1317,6 +1287,8 @@ static int Direct3D11CreateResources(vout_display_t *vd, video_format_t *fmt)
     }
     ID3D11DeviceContext_IASetIndexBuffer(sys->d3dcontext, pIndexBuffer, DXGI_FORMAT_R16_UINT, 0);
     ID3D11Buffer_Release(pIndexBuffer);
+
+    ID3D11DeviceContext_IASetPrimitiveTopology(sys->d3dcontext, D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
     ID3DBlob* pPSBlob = NULL;
 
