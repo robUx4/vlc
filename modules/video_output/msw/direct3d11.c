@@ -468,7 +468,7 @@ static int Open(vlc_object_t *object)
 # endif
 
 #else
-    sys->dxgiswapChain = dxgiswapChain1;
+    sys->dxgiswapChain = dxgiswapChain;
     sys->d3ddevice     = d3ddevice;
     sys->d3dcontext    = d3dcontext;
     IDXGISwapChain_AddRef     (sys->dxgiswapChain);
@@ -835,7 +835,7 @@ static void Display(vout_display_t *vd, picture_t *picture, subpicture_t *subpic
     DisplayD3DPicture(sys, &sys->picQuad);
 
     if (subpicture) {
-        // draw the subpicture quads
+        // draw the additional vertices
         for (int i = 0; i < sys->d3dregion_count; ++i) {
             DisplayD3DPicture(sys, (d3d_quad_t *) sys->d3dregions[i]->p_sys);
         }
