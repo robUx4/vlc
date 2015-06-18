@@ -186,7 +186,7 @@ endif
 libdirect3d11_plugin_la_SOURCES = video_output/msw/direct3d11.c \
  video_output/msw/common.c video_output/msw/common.h
 libdirect3d11_plugin_la_CPPFLAGS = $(AM_CPPFLAGS) \
- -DMODULE_NAME_IS_direct3d11 -DWINAPI_FAMILY=WINAPI_FAMILY_DESKTOP_APP
+ -DMODULE_NAME_IS_direct3d11
 if !HAVE_WINSTORE
 libdirect3d11_plugin_la_SOURCES += video_output/msw/events.c \
  video_output/msw/events.h video_output/msw/builtin_shaders.h \
