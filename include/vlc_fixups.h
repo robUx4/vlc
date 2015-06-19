@@ -194,9 +194,6 @@ struct tm *localtime_r (const time_t *, struct tm *);
 
 /* unistd.h */
 #ifndef HAVE_GETPID
-# ifdef _MSC_VER
-typedef DWORD pid_t;
-# endif
 pid_t getpid (void) VLC_NOTHROW;
 #endif
 

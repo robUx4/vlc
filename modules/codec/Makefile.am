@@ -354,7 +354,11 @@ endif
 libd3d11va_plugin_la_SOURCES = \
 	codec/avcodec/d3d11va.c codec/avcodec/directx_va.c codec/avcodec/directx_va.h \
 	packetizer/h264_nal.c packetizer/h264_nal.h
+if !HAVE_WINSTORE
 libd3d11va_plugin_la_LIBADD = -lole32 -luuid
+else
+libd3d11va_plugin_la_LIBADD = -ld3d11 -lole32 -luuid
+endif
 if HAVE_AVCODEC_D3D11VA
 codec_LTLIBRARIES += libd3d11va_plugin.la
 endif

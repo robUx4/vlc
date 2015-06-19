@@ -47,6 +47,8 @@
 #include "directx_va.h"
 
 #define COBJMACROS
+#define INITGUID
+#include <d3d11.h>
 #include <libavcodec/d3d11va.h>
 
 #include "../../video_chroma/copy.h"
@@ -66,6 +68,10 @@ vlc_module_begin()
     set_subcategory(SUBCAT_INPUT_VCODEC)
     set_callbacks(Open, Close)
 vlc_module_end()
+
+#if VLC_WINSTORE_APP
+#define pf_CreateDevice                 D3D11CreateDevice
+#endif
 
 #include <initguid.h> /* must be last included to not redefine existing GUIDs */
 
@@ -360,7 +366,11 @@ static int Open(vlc_va_t *va, AVCodecContext *ctx, enum PixelFormat pix_fmt,
         }
     }
 
-    err = directx_va_Open(va, &sys->dx_sys, ctx, fmt, dx_sys->d3ddev==NULL || va->sys->d3dctx==NULL);
+#if VLC_WINSTORE_APP
+    err = directx_va_Open(va, &sys->dx_sys, ctx, fmt, false);
+#else
+    err = directx_va_Open(va, &sys->dx_sys, ctx, fmt, dx_sys->d3ddev == NULL || va->sys->d3dctx == NULL);
+#endif
     if (err!=VLC_SUCCESS)
         goto error;
 
@@ -400,6 +410,7 @@ static int D3dCreateDevice(vlc_va_t *va)
         return VLC_SUCCESS;
     }
 
+#if !VLC_WINSTORE_APP
     /* */
     PFN_D3D11_CREATE_DEVICE pf_CreateDevice;
     pf_CreateDevice = (void *)GetProcAddress(dx_sys->hdecoder_dll, "D3D11CreateDevice");
@@ -407,6 +418,7 @@ static int D3dCreateDevice(vlc_va_t *va)
         msg_Err(va, "Cannot locate reference to D3D11CreateDevice ABI in DLL");
         return VLC_EGENERIC;
     }
+#endif
 
     UINT creationFlags = D3D11_CREATE_DEVICE_VIDEO_SUPPORT;
 #if !defined(NDEBUG) //&& defined(_MSC_VER)
@@ -661,6 +673,18 @@ static int DxSetupOutput(vlc_va_t *va, const GUID *input)
             va->sys->render = DXGI_FORMAT_NV12;
             return VLC_SUCCESS;
         }
+#if TODO
+        ID3D11VideoProcessorEnumerator::CheckVideoProcessorFormat(DXGI_FORMAT_420_OPAQUE, D3D11_VIDEO_PROCESSOR_FORMAT_SUPPORT_INPUT);
+
+        hr = ID3D11VideoDevice_CheckVideoDecoderFormat((ID3D11VideoDevice*)dx_sys->d3ddec, input, DXGI_FORMAT_420_OPAQUE, &is_supported);
+        if (SUCCEEDED(hr) && is_supported)
+        {
+            /* We have our solution */
+            msg_Dbg(va, "Using decoder output NV12");
+            va->sys->render = DXGI_FORMAT_NV12;
+            return VLC_SUCCESS;
+        }
+#endif
     }
     return VLC_EGENERIC;
 }
