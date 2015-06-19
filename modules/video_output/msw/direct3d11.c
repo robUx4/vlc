@@ -103,8 +103,8 @@ static const d3d_format_t d3d_formats[] = {
     { "Y410",     DXGI_FORMAT_Y410,           VLC_CODEC_I444_10L, DXGI_FORMAT_R10G10B10A2_UNORM,  0 },
     { "NV11",     DXGI_FORMAT_NV11,           VLC_CODEC_I411,     DXGI_FORMAT_R8_UNORM,           DXGI_FORMAT_R8G8_UNORM },
 #endif
-    { "R8G8B8A8", DXGI_FORMAT_R8G8B8A8_UNORM, VLC_CODEC_RGBA,     DXGI_FORMAT_R8G8B8A8_UNORM,     0 },
     { "B8G8R8A8", DXGI_FORMAT_B8G8R8A8_UNORM, VLC_CODEC_BGRA,     DXGI_FORMAT_B8G8R8A8_UNORM,     0 },
+    { "R8G8B8A8", DXGI_FORMAT_R8G8B8A8_UNORM, VLC_CODEC_RGBA,     DXGI_FORMAT_R8G8B8A8_UNORM,     0 },
     { "R8G8B8X8", DXGI_FORMAT_B8G8R8X8_UNORM, VLC_CODEC_RGB32,    DXGI_FORMAT_B8G8R8X8_UNORM,     0 },
     { "B5G6R5",   DXGI_FORMAT_B5G6R5_UNORM,   VLC_CODEC_RGB16,    DXGI_FORMAT_B5G6R5_UNORM,       0 },
 
@@ -1335,11 +1335,38 @@ static int Direct3D11CreateResources(vout_display_t *vd, video_format_t *fmt)
         }
     }
 
+    /* Map the subpicture to sys->rect_dest */
+    int i_original_width = fmt->i_width;
+    int i_original_height = fmt->i_height;
+
+    const RECT src = sys->rect_dest_clipped;
+    const RECT video = sys->rect_dest;
+    const float scale_w = (float)(video.right - video.left) / i_original_width;
+    const float scale_h = (float)(video.bottom - video.top) / i_original_height;
+
+    RECT dst = sys->rect_dest_clipped;
+    /*
+    dst.left = video.left + scale_w * r->i_x,
+        dst.right = dst.left + scale_w * r->fmt.i_visible_width,
+        dst.top = video.top + scale_h * r->i_y,
+        dst.bottom = dst.top + scale_h * r->fmt.i_visible_height;*/
+
+    // adjust with the center at 0,0 and the edges at -1/1
+    float left = ((float)dst.left / i_original_width) * 2.0f - 1.0f;
+    float right = ((float)dst.right / i_original_width) * 2.0f - 1.0f;
+    float top = 1.0f - 2.0f * dst.top / i_original_height;
+    float bottom = 1.0f - 2.0f * dst.bottom / i_original_height;
+
+    left   = -1.0f;
+    right  =  1.0f;
+    bottom = -1.0f;
+    top    =  1.0f;
+
     float vertices[4 * sizeof(d3d_vertex_t)] = {
-    -1.0f, -1.0f, -1.0f,  0.0f, 1.0f,  1.0f, // bottom left
-     1.0f, -1.0f, -1.0f,  1.0f, 1.0f,  1.0f, // bottom right
-     1.0f,  1.0f, -1.0f,  1.0f, 0.0f,  1.0f, // top right
-    -1.0f,  1.0f, -1.0f,  0.0f, 0.0f,  1.0f, // top left
+        left,  bottom, -1.0f,  0.0f, 1.0f,  1.0f, // bottom left
+        right, bottom, -1.0f,  1.0f, 1.0f,  1.0f, // bottom right
+        right, top,    -1.0f,  1.0f, 0.0f,  1.0f, // top right
+        left,  top,    -1.0f,  0.0f, 0.0f,  1.0f, // top left
     };
 
     if (AllocQuad( vd, fmt, &sys->picQuad, &sys->picQuadConfig, pPicQuadShader, vertices )!=VLC_SUCCESS) {
@@ -1663,6 +1690,9 @@ static int Direct3D11MapSubpicture(vout_display_t *vd, int *subpicture_region_co
         picture_CopyPixels(quad_picture, r->p_picture);
 
         /* Map the subpicture to sys->rect_dest */
+        int i_original_width  = subpicture->i_original_picture_width;
+        int i_original_height = subpicture->i_original_picture_height;
+
         RECT src;
         src.left   = 0;
         src.right  = src.left + r->fmt.i_visible_width;
@@ -1670,8 +1700,8 @@ static int Direct3D11MapSubpicture(vout_display_t *vd, int *subpicture_region_co
         src.bottom = src.top  + r->fmt.i_visible_height;
 
         const RECT video = sys->rect_dest;
-        const float scale_w = (float)(video.right  - video.left) / subpicture->i_original_picture_width;
-        const float scale_h = (float)(video.bottom - video.top)  / subpicture->i_original_picture_height;
+        const float scale_w = (float)(video.right  - video.left) / i_original_width;
+        const float scale_h = (float)(video.bottom - video.top)  / i_original_height;
 
         RECT dst;
         dst.left   = video.left + scale_w * r->i_x,
@@ -1680,10 +1710,10 @@ static int Direct3D11MapSubpicture(vout_display_t *vd, int *subpicture_region_co
         dst.bottom = dst.top  + scale_h * r->fmt.i_visible_height;
 
         // adjust with the center at 0,0 and the edges at -1/1
-        float left   = ((float)dst.left   / subpicture->i_original_picture_width ) * 2.0f - 1.0f;
-        float right  = ((float)dst.right  / subpicture->i_original_picture_width ) * 2.0f - 1.0f;
-        float top    = 1.0f - 2.0f * dst.top    / subpicture->i_original_picture_height;
-        float bottom = 1.0f - 2.0f * dst.bottom / subpicture->i_original_picture_height;
+        float left   = ((float)dst.left   / i_original_width ) * 2.0f - 1.0f;
+        float right  = ((float)dst.right  / i_original_width ) * 2.0f - 1.0f;
+        float top    = 1.0f - 2.0f * dst.top    / i_original_height;
+        float bottom = 1.0f - 2.0f * dst.bottom / i_original_height;
 
         float opacity = (float)r->i_alpha / 255.0f;
 
