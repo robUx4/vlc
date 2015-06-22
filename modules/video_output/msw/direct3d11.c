@@ -105,8 +105,8 @@ static const d3d_format_t d3d_formats[] = {
     { "Y410",     DXGI_FORMAT_Y410,           VLC_CODEC_I444_10L, DXGI_FORMAT_R10G10B10A2_UNORM,  0 },
     { "NV11",     DXGI_FORMAT_NV11,           VLC_CODEC_I411,     DXGI_FORMAT_R8_UNORM,           DXGI_FORMAT_R8G8_UNORM },
 #endif
-    { "B8G8R8A8", DXGI_FORMAT_B8G8R8A8_UNORM, VLC_CODEC_BGRA,     DXGI_FORMAT_B8G8R8A8_UNORM,     0 },
     { "R8G8B8A8", DXGI_FORMAT_R8G8B8A8_UNORM, VLC_CODEC_RGBA,     DXGI_FORMAT_R8G8B8A8_UNORM,     0 },
+    { "B8G8R8A8", DXGI_FORMAT_B8G8R8A8_UNORM, VLC_CODEC_BGRA,     DXGI_FORMAT_B8G8R8A8_UNORM,     0 },
     { "R8G8B8X8", DXGI_FORMAT_B8G8R8X8_UNORM, VLC_CODEC_RGB32,    DXGI_FORMAT_B8G8R8X8_UNORM,     0 },
     { "B5G6R5",   DXGI_FORMAT_B5G6R5_UNORM,   VLC_CODEC_RGB16,    DXGI_FORMAT_B5G6R5_UNORM,       0 },
 
@@ -170,11 +170,10 @@ static void Direct3D11DeleteRegions(int, picture_t **);
 static int Direct3D11MapSubpicture(vout_display_t *, int *, picture_t ***, subpicture_t *);
 
 static int AllocQuad(vout_display_t *, const video_format_t *, d3d_quad_t *,
-                     d3d_quad_cfg_t *, ID3D11PixelShader *,
-                     const float vertices[4 * sizeof(d3d_vertex_t)]);
+                     d3d_quad_cfg_t *, ID3D11PixelShader *);
 static void ReleaseQuad(d3d_quad_t *);
 static void UpdatePicQuadPosition(vout_display_t *);
-static void UpdateQuadPosition(vout_display_t *, const d3d_quad_t *, float l, float r, float t, float b, float o);
+static void UpdateQuadPosition(vout_display_t *, const d3d_quad_t *, const RECT *, int w, int h, float o);
 
 static void Manage(vout_display_t *vd);
 
@@ -810,9 +809,6 @@ static void Display(vout_display_t *vd, picture_t *picture, subpicture_t *subpic
 
     ID3D11DeviceContext_OMSetRenderTargets(sys->d3dcontext, 1, &sys->d3drenderTargetView, sys->d3ddepthStencilView);
 
-    //float ClearColor[4] = { 1.0f, 0.125f, 0.3f, 1.0f };
-    //ID3D11DeviceContext_ClearRenderTargetView(sys->d3dcontext, sys->d3drenderTargetView, ClearColor);
-
     ID3D11DeviceContext_ClearDepthStencilView(sys->d3dcontext, sys->d3ddepthStencilView, D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0);
 
     /* Render the quad */
@@ -1164,16 +1160,15 @@ static void Direct3D11Close(vout_display_t *vd)
 static void UpdatePicQuadPosition(vout_display_t *vd)
 {
     vout_display_sys_t *sys = vd->sys;
+    int i_width  = RECTWidth(sys->rect_dest_clipped);
+    int i_height = RECTHeight(sys->rect_dest_clipped);
+#if VLC_WINSTORE_APP
+    i_width  = RECTWidth(sys->rect_display);
+    i_height = RECTHeight(sys->rect_display);
+#endif
 
     /* Map the subpicture to sys->rect_dest_clipped */
-    const RECT dst = sys->rect_dest_clipped;
-    // adjust with the center at 0,0 and the edges at -1/1
-    float left   = -1.0f + 2.0f * ((float)dst.left  / sys->rect_display.right);
-    float right  = -1.0f + 2.0f * ((float)dst.right / sys->rect_display.right);
-    float top    =  1.0f - 2.0f * dst.top           / sys->rect_display.bottom;
-    float bottom =  1.0f - 2.0f * dst.bottom        / sys->rect_display.bottom;
-
-    UpdateQuadPosition(vd, &sys->picQuad, left, right, top, bottom, 1.0f);
+    UpdateQuadPosition(vd, &sys->picQuad, &sys->rect_dest_clipped, i_width, i_height, 1.0f);
 }
 
 /* TODO : handle errors better
@@ -1364,7 +1359,7 @@ static int Direct3D11CreateResources(vout_display_t *vd, video_format_t *fmt)
         }
     }
 
-    if (AllocQuad( vd, fmt, &sys->picQuad, &sys->picQuadConfig, pPicQuadShader, NULL) != VLC_SUCCESS) {
+    if (AllocQuad( vd, fmt, &sys->picQuad, &sys->picQuadConfig, pPicQuadShader) != VLC_SUCCESS) {
         ID3D11PixelShader_Release(pPicQuadShader);
         msg_Err(vd, "Could not Create the main quad picture. (hr=0x%lX)", hr);
         return VLC_EGENERIC;
@@ -1456,24 +1451,19 @@ static void Direct3D11DestroyPool(vout_display_t *vd)
 }
 
 static int AllocQuad(vout_display_t *vd, const video_format_t *fmt, d3d_quad_t *quad,
-                     d3d_quad_cfg_t *cfg, ID3D11PixelShader *d3dpixelShader,
-                     const float vertices[4 * sizeof(d3d_vertex_t)])
+                     d3d_quad_cfg_t *cfg, ID3D11PixelShader *d3dpixelShader)
 {
     vout_display_sys_t *sys = vd->sys;
     HRESULT hr;
 
     D3D11_BUFFER_DESC bd;
     memset(&bd, 0, sizeof(bd));
-    bd.Usage = vertices==NULL ? D3D11_USAGE_DYNAMIC : D3D11_USAGE_DEFAULT;
+    bd.Usage = D3D11_USAGE_DYNAMIC;
     bd.ByteWidth = sizeof(d3d_vertex_t) * 4;
     bd.BindFlags = D3D11_BIND_VERTEX_BUFFER;
-    bd.CPUAccessFlags = vertices==NULL ? D3D11_CPU_ACCESS_WRITE : 0;
+    bd.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
 
-    D3D11_SUBRESOURCE_DATA InitData = {
-        .pSysMem = vertices,
-    };
-
-    hr = ID3D11Device_CreateBuffer(sys->d3ddevice, &bd, vertices==NULL ? NULL : &InitData, &quad->pVertexBuffer);
+    hr = ID3D11Device_CreateBuffer(sys->d3ddevice, &bd, NULL, &quad->pVertexBuffer);
     if(FAILED(hr)) {
       msg_Err(vd, "Failed to create vertex buffer.");
       goto error;
@@ -1597,10 +1587,16 @@ static void DestroyPictureQuad(picture_t *p_picture)
     free( p_picture );
 }
 
-static void UpdateQuadPosition(vout_display_t *vd, const d3d_quad_t *quad, float left, float right, float top, float bottom, float opacity)
+static void UpdateQuadPosition(vout_display_t *vd, const d3d_quad_t *quad, const RECT *dst, int i_width, int i_height, float opacity)
 {
     vout_display_sys_t *sys = vd->sys;
     D3D11_MAPPED_SUBRESOURCE mappedResource;
+
+    // adjust with the center at 0,0 and the edges at -1/1
+    float left   = -1.0f + 2.0f * ((float) dst->left   / i_width );
+    float right  = -1.0f + 2.0f * ((float) dst->right  / i_width );
+    float top    =  1.0f - 2.0f * ((float) dst->top    / i_height );
+    float bottom =  1.0f - 2.0f * ((float) dst->bottom / i_height );
 
     HRESULT hr = ID3D11DeviceContext_Map(sys->d3dcontext, (ID3D11Resource *)quad->pVertexBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource);
     if (SUCCEEDED(hr)) {
@@ -1693,7 +1689,7 @@ static int Direct3D11MapSubpicture(vout_display_t *vd, int *subpicture_region_co
                 .textureFormat      = sys->d3dregion_format,
                 .resourceFormatYRGB = sys->d3dregion_format,
             };
-            err = AllocQuad(vd, &r->fmt, d3dquad, &rgbaCfg, sys->pSPUPixelShader, NULL);
+            err = AllocQuad(vd, &r->fmt, d3dquad, &rgbaCfg, sys->pSPUPixelShader);
             if (err != VLC_SUCCESS) {
                 msg_Err(vd, "Failed to create %dx%d texture for OSD",
                         r->fmt.i_visible_width, r->fmt.i_visible_height);
@@ -1748,15 +1744,10 @@ static int Direct3D11MapSubpicture(vout_display_t *vd, int *subpicture_region_co
         dst.top    = video.top  + scale_h * r->i_y,
         dst.bottom = dst.top  + scale_h * r->fmt.i_visible_height;
 
-        // adjust with the center at 0,0 and the edges at -1/1
-        float left   = ((float)dst.left   / i_original_width ) * 2.0f - 1.0f;
-        float right  = ((float)dst.right  / i_original_width ) * 2.0f - 1.0f;
-        float top    = 1.0f - 2.0f * dst.top    / i_original_height;
-        float bottom = 1.0f - 2.0f * dst.bottom / i_original_height;
-
         float opacity = (float)r->i_alpha / 255.0f;
 
-        UpdateQuadPosition(sys, (d3d_quad_t *)quad_picture->p_sys, left, right, top, bottom, opacity);
+        UpdateQuadPosition(vd, (d3d_quad_t *)quad_picture->p_sys, &dst,
+                           i_original_width, i_original_height, opacity);
     }
     return VLC_SUCCESS;
 }
