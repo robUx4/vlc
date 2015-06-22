@@ -1345,38 +1345,19 @@ static int Direct3D11CreateResources(vout_display_t *vd, video_format_t *fmt)
         }
     }
 
-    /* Map the subpicture to sys->rect_dest */
-    int i_original_width = fmt->i_width;
-    int i_original_height = fmt->i_height;
-
-    const RECT src = sys->rect_dest_clipped;
-    const RECT video = sys->rect_dest;
-    const float scale_w = (float)(video.right - video.left) / i_original_width;
-    const float scale_h = (float)(video.bottom - video.top) / i_original_height;
-
-    RECT dst = sys->rect_dest_clipped;
-    /*
-    dst.left = video.left + scale_w * r->i_x,
-        dst.right = dst.left + scale_w * r->fmt.i_visible_width,
-        dst.top = video.top + scale_h * r->i_y,
-        dst.bottom = dst.top + scale_h * r->fmt.i_visible_height;*/
-
+    /* Map the subpicture to sys->rect_dest_clipped */
+    const RECT dst = sys->rect_dest_clipped;
     // adjust with the center at 0,0 and the edges at -1/1
-    float left = ((float)dst.left / i_original_width) * 2.0f - 1.0f;
-    float right = ((float)dst.right / i_original_width) * 2.0f - 1.0f;
-    float top = 1.0f - 2.0f * dst.top / i_original_height;
-    float bottom = 1.0f - 2.0f * dst.bottom / i_original_height;
-
-    left   = -1.0f;
-    right  =  1.0f;
-    bottom = -1.0f;
-    top    =  1.0f;
+    float left   = -1.0f + 2.0f * ((float)dst.left  / sys->rect_display.right);
+    float right  = -1.0f + 2.0f * ((float)dst.right / sys->rect_display.right);
+    float top    =  1.0f - 2.0f * dst.top    / sys->rect_display.bottom;
+    float bottom =  1.0f - 2.0f * dst.bottom / sys->rect_display.bottom;
 
     float vertices[4 * sizeof(d3d_vertex_t)] = {
-        left,  bottom, -1.0f,  0.0f, 1.0f,  1.0f, // bottom left
-        right, bottom, -1.0f,  1.0f, 1.0f,  1.0f, // bottom right
-        right, top,    -1.0f,  1.0f, 0.0f,  1.0f, // top right
-        left,  top,    -1.0f,  0.0f, 0.0f,  1.0f, // top left
+        left,  bottom, -1.0f,  0.0f, 1.0f,  1.0f, // left  bottom
+        right, bottom, -1.0f,  1.0f, 1.0f,  1.0f, // right bottom
+        right, top,    -1.0f,  1.0f, 0.0f,  1.0f, // right top
+        left,  top,    -1.0f,  0.0f, 0.0f,  1.0f, // left  top
     };
 
     if (AllocQuad( vd, fmt, &sys->picQuad, &sys->picQuadConfig, pPicQuadShader, vertices )!=VLC_SUCCESS) {
@@ -1702,12 +1683,6 @@ static int Direct3D11MapSubpicture(vout_display_t *vd, int *subpicture_region_co
         /* Map the subpicture to sys->rect_dest */
         int i_original_width  = subpicture->i_original_picture_width;
         int i_original_height = subpicture->i_original_picture_height;
-
-        RECT src;
-        src.left   = 0;
-        src.right  = src.left + r->fmt.i_visible_width;
-        src.top    = 0;
-        src.bottom = src.top  + r->fmt.i_visible_height;
 
         const RECT video = sys->rect_dest;
         const float scale_w = (float)(video.right  - video.left) / i_original_width;
