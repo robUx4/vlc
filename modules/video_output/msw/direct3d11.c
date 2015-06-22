@@ -31,10 +31,7 @@
 
 #define COBJMACROS
 #define INITGUID
-#undef WINAPI_FAMILY
-#define WINAPI_FAMILY WINAPI_FAMILY_DESKTOP_APP
 #include <d3d11.h>
-#include <d3dtypes.h>
 
 /* avoided until we can pass ISwapchainPanel without c++/cx mode
 # include <windows.ui.xaml.media.dxinterop.h> */
@@ -132,10 +129,14 @@ typedef struct
 
 /* matches the D3D11_INPUT_ELEMENT_DESC we setup */
 typedef struct d3d_vertex_t {
-    D3DVECTOR   position;
     struct {
-        D3DVALUE x;
-        D3DVALUE y;
+        FLOAT x;
+        FLOAT y;
+        FLOAT z;
+    } position;
+    struct {
+        FLOAT x;
+        FLOAT y;
     } texture;
     FLOAT       opacity;
 } d3d_vertex_t;
