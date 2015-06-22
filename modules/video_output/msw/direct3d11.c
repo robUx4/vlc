@@ -31,8 +31,6 @@
 
 #define COBJMACROS
 #define INITGUID
-#undef WINAPI_FAMILY
-#define WINAPI_FAMILY WINAPI_FAMILY_DESKTOP_APP
 #include <d3d11.h>
 
 /* avoided until we can pass ISwapchainPanel without c++/cx mode
