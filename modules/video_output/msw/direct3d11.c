@@ -173,6 +173,8 @@ static int AllocQuad(vout_display_t *, const video_format_t *, d3d_quad_t *,
                      d3d_quad_cfg_t *, ID3D11PixelShader *,
                      const float vertices[4 * sizeof(d3d_vertex_t)]);
 static void ReleaseQuad(d3d_quad_t *);
+static void UpdatePicQuadPosition(vout_display_t *);
+static void UpdateQuadPosition(vout_display_t *, const d3d_quad_t *, float l, float r, float t, float b, float o);
 
 static void Manage(vout_display_t *vd);
 
@@ -746,6 +748,8 @@ static void Manage(vout_display_t *vd)
                 RECTHeight(sys->rect_dest_clipped));
 
         UpdateBackBuffer(vd);
+
+        UpdatePicQuadPosition(vd);
     }
 }
 
@@ -1157,6 +1161,21 @@ static void Direct3D11Close(vout_display_t *vd)
     msg_Dbg(vd, "Direct3D11 device adapter closed");
 }
 
+static void UpdatePicQuadPosition(vout_display_t *vd)
+{
+    vout_display_sys_t *sys = vd->sys;
+
+    /* Map the subpicture to sys->rect_dest_clipped */
+    const RECT dst = sys->rect_dest_clipped;
+    // adjust with the center at 0,0 and the edges at -1/1
+    float left   = -1.0f + 2.0f * ((float)dst.left  / sys->rect_display.right);
+    float right  = -1.0f + 2.0f * ((float)dst.right / sys->rect_display.right);
+    float top    =  1.0f - 2.0f * dst.top           / sys->rect_display.bottom;
+    float bottom =  1.0f - 2.0f * dst.bottom        / sys->rect_display.bottom;
+
+    UpdateQuadPosition(vd, &sys->picQuad, left, right, top, bottom, 1.0f);
+}
+
 /* TODO : handle errors better
    TODO : seperate out into smaller functions like createshaders */
 static int Direct3D11CreateResources(vout_display_t *vd, video_format_t *fmt)
@@ -1345,27 +1364,14 @@ static int Direct3D11CreateResources(vout_display_t *vd, video_format_t *fmt)
         }
     }
 
-    /* Map the subpicture to sys->rect_dest_clipped */
-    const RECT dst = sys->rect_dest_clipped;
-    // adjust with the center at 0,0 and the edges at -1/1
-    float left   = -1.0f + 2.0f * ((float)dst.left  / sys->rect_display.right);
-    float right  = -1.0f + 2.0f * ((float)dst.right / sys->rect_display.right);
-    float top    =  1.0f - 2.0f * dst.top    / sys->rect_display.bottom;
-    float bottom =  1.0f - 2.0f * dst.bottom / sys->rect_display.bottom;
-
-    float vertices[4 * sizeof(d3d_vertex_t)] = {
-        left,  bottom, -1.0f,  0.0f, 1.0f,  1.0f, // left  bottom
-        right, bottom, -1.0f,  1.0f, 1.0f,  1.0f, // right bottom
-        right, top,    -1.0f,  1.0f, 0.0f,  1.0f, // right top
-        left,  top,    -1.0f,  0.0f, 0.0f,  1.0f, // left  top
-    };
-
-    if (AllocQuad( vd, fmt, &sys->picQuad, &sys->picQuadConfig, pPicQuadShader, vertices )!=VLC_SUCCESS) {
+    if (AllocQuad( vd, fmt, &sys->picQuad, &sys->picQuadConfig, pPicQuadShader, NULL) != VLC_SUCCESS) {
         ID3D11PixelShader_Release(pPicQuadShader);
         msg_Err(vd, "Could not Create the main quad picture. (hr=0x%lX)", hr);
         return VLC_EGENERIC;
     }
     ID3D11PixelShader_Release(pPicQuadShader);
+
+    UpdatePicQuadPosition(vd);
 
     D3D11_SAMPLER_DESC sampDesc;
     memset(&sampDesc, 0, sizeof(sampDesc));
@@ -1591,6 +1597,54 @@ static void DestroyPictureQuad(picture_t *p_picture)
     free( p_picture );
 }
 
+static void UpdateQuadPosition(vout_display_t *vd, const d3d_quad_t *quad, float left, float right, float top, float bottom, float opacity)
+{
+    vout_display_sys_t *sys = vd->sys;
+    D3D11_MAPPED_SUBRESOURCE mappedResource;
+
+    HRESULT hr = ID3D11DeviceContext_Map(sys->d3dcontext, (ID3D11Resource *)quad->pVertexBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource);
+    if (SUCCEEDED(hr)) {
+        d3d_vertex_t *dst_data = mappedResource.pData;
+
+        // bottom left
+        dst_data[0].position.x = left;
+        dst_data[0].position.y = bottom;
+        dst_data[0].position.z = 0.0f;
+        dst_data[0].texture.x = 0.0f;
+        dst_data[0].texture.y = 1.0f;
+        dst_data[0].opacity = opacity;
+
+        // bottom right
+        dst_data[1].position.x = right;
+        dst_data[1].position.y = bottom;
+        dst_data[1].position.z = 0.0f;
+        dst_data[1].texture.x = 1.0f;
+        dst_data[1].texture.y = 1.0f;
+        dst_data[1].opacity = opacity;
+
+        // top right
+        dst_data[2].position.x = right;
+        dst_data[2].position.y = top;
+        dst_data[2].position.z = 0.0f;
+        dst_data[2].texture.x = 1.0f;
+        dst_data[2].texture.y = 0.0f;
+        dst_data[2].opacity = opacity;
+
+        // top left
+        dst_data[3].position.x = left;
+        dst_data[3].position.y = top;
+        dst_data[3].position.z = 0.0f;
+        dst_data[3].texture.x = 0.0f;
+        dst_data[3].texture.y = 0.0f;
+        dst_data[3].opacity = opacity;
+
+        ID3D11DeviceContext_Unmap(sys->d3dcontext, (ID3D11Resource *)quad->pVertexBuffer, 0);
+    }
+    else {
+        msg_Err(vd, "Failed to lock the subpicture vertex buffer (hr=0x%lX)", hr);
+    }
+}
+
 static int Direct3D11MapSubpicture(vout_display_t *vd, int *subpicture_region_count,
                                    picture_t ***region, subpicture_t *subpicture)
 {
@@ -1702,46 +1756,7 @@ static int Direct3D11MapSubpicture(vout_display_t *vd, int *subpicture_region_co
 
         float opacity = (float)r->i_alpha / 255.0f;
 
-        hr = ID3D11DeviceContext_Map(sys->d3dcontext, (ID3D11Resource *)((d3d_quad_t *) quad_picture->p_sys)->pVertexBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource);
-        if( SUCCEEDED(hr) ) {
-            d3d_vertex_t *dst_data = mappedResource.pData;
-
-            // bottom left
-            dst_data[0].position.x = left;
-            dst_data[0].position.y = bottom;
-            dst_data[0].position.z = 0.0f;
-            dst_data[0].texture.x = 0.0f;
-            dst_data[0].texture.y = 1.0f;
-            dst_data[0].opacity   = opacity;
-
-            // bottom right
-            dst_data[1].position.x = right;
-            dst_data[1].position.y = bottom;
-            dst_data[1].position.z = 0.0f;
-            dst_data[1].texture.x = 1.0f;
-            dst_data[1].texture.y = 1.0f;
-            dst_data[1].opacity   = opacity;
-
-            // top right
-            dst_data[2].position.x = right;
-            dst_data[2].position.y = top;
-            dst_data[2].position.z = 0.0f;
-            dst_data[2].texture.x = 1.0f;
-            dst_data[2].texture.y = 0.0f;
-            dst_data[2].opacity   = opacity;
-
-            // top left
-            dst_data[3].position.x = left;
-            dst_data[3].position.y = top;
-            dst_data[3].position.z = 0.0f;
-            dst_data[3].texture.x = 0.0f;
-            dst_data[3].texture.y = 0.0f;
-            dst_data[3].opacity   = opacity;
-
-            ID3D11DeviceContext_Unmap(sys->d3dcontext, (ID3D11Resource *)((d3d_quad_t *) quad_picture->p_sys)->pVertexBuffer, 0);
-        } else {
-            msg_Err(vd, "Failed to lock the subpicture vertex buffer (hr=0x%lX)", hr );
-        }
+        UpdateQuadPosition(sys, (d3d_quad_t *)quad_picture->p_sys, left, right, top, bottom, opacity);
     }
     return VLC_SUCCESS;
 }
