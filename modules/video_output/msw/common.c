@@ -50,8 +50,6 @@ static int  CommonControlSetFullscreen(vout_display_t *, bool is_fullscreen);
 
 static void DisableScreensaver(vout_display_t *);
 static void RestoreScreensaver(vout_display_t *);
-#else
-static BOOL EqualRect(const RECT *, const RECT *);
 #endif
 
 /* */
@@ -151,12 +149,10 @@ void UpdateRects(vout_display_t *vd,
 
     /* Retrieve the window size */
 #if VLC_WINSTORE_APP
-    DXGI_SWAP_CHAIN_DESC1 swapDesc;
-    IDXGISwapChain1_GetDesc1(sys->dxgiswapChain, &swapDesc);
     rect.left   = 0;
     rect.top    = 0;
-    rect.right  = swapDesc.Width;
-    rect.bottom = swapDesc.Height;
+    rect.right  = *sys->pui_dxgi_width;
+    rect.bottom = *sys->pui_dxgi_height;
     sys->rect_display = rect;
 #else
     GetClientRect(sys->hwnd, &rect);
@@ -753,23 +749,11 @@ int CommonControl(vout_display_t *vd, int query, va_list args)
 void CommonManage(vout_display_t *vd) {
     vout_display_sys_t *sys = vd->sys;
 
-    DXGI_SWAP_CHAIN_DESC1 swapDesc;
-    IDXGISwapChain1_GetDesc1(sys->dxgiswapChain, &swapDesc);
-    RECT new_rect;
-    new_rect.left   = 0;
-    new_rect.top    = 0;
-    new_rect.right  = swapDesc.Width;
-    new_rect.bottom = swapDesc.Height;
-
-    if (!EqualRect(&new_rect, &sys->rect_display)) {
-        UpdateRects(vd, NULL, NULL, true);
-    }
+    if (*sys->pui_dxgi_width != (sys->rect_display.right - sys->rect_display.left) ||
+        *sys->pui_dxgi_height != (sys->rect_display.bottom - sys->rect_display.top))
+        UpdateRects(vd, NULL, NULL, false);
 }
 void CommonClean(vout_display_t *vd) {}
 void CommonDisplay(vout_display_t *vd) {}
 void CommonChangeThumbnailClip(vout_display_t *vd, bool show) {}
-BOOL EqualRect(const RECT *r1, const RECT *r2)
-{
-    return memcmp(r1, r2, sizeof(RECT)) == 0;
-}
 #endif
