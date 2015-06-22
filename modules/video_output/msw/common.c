@@ -50,8 +50,6 @@ static int  CommonControlSetFullscreen(vout_display_t *, bool is_fullscreen);
 
 static void DisableScreensaver(vout_display_t *);
 static void RestoreScreensaver(vout_display_t *);
-#else
-static BOOL EqualRect(const RECT *, const RECT *);
 #endif
 
 /* */

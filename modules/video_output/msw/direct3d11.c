@@ -414,6 +414,12 @@ static int Open(vlc_object_t *object)
     ID3D11DeviceContext* d3dcontext = var_InheritInteger(vd, "winrt-d3dcontext");
     if (!d3dcontext)
         return VLC_EGENERIC;
+    uint32_t *pui_width = var_InheritInteger(vd, "winrt-width");
+    if (!pui_width)
+        return VLC_EGENERIC;
+    uint32_t *pui_height = var_InheritInteger(vd, "winrt-height");
+    if (!pui_height)
+        return VLC_EGENERIC;
 #endif
 
     vout_display_sys_t *sys = vd->sys = calloc(1, sizeof(vout_display_sys_t));
@@ -470,9 +476,11 @@ static int Open(vlc_object_t *object)
 # endif
 
 #else
-    sys->dxgiswapChain = dxgiswapChain;
-    sys->d3ddevice     = d3ddevice;
-    sys->d3dcontext    = d3dcontext;
+    sys->pui_dxgi_width  = pui_width;
+    sys->pui_dxgi_height = pui_height;
+    sys->dxgiswapChain   = dxgiswapChain;
+    sys->d3ddevice       = d3ddevice;
+    sys->d3dcontext      = d3dcontext;
     IDXGISwapChain_AddRef     (sys->dxgiswapChain);
     ID3D11Device_AddRef       (sys->d3ddevice);
     ID3D11DeviceContext_AddRef(sys->d3dcontext);
@@ -664,6 +672,10 @@ static HRESULT UpdateBackBuffer(vout_display_t *vd)
         return hr;
     }
 #endif
+#if VLC_WINSTORE_APP
+    i_width  = *sys->pui_dxgi_width;
+    i_height = *sys->pui_dxgi_height;
+#endif
 
     if (sys->d3drenderTargetView) {
         ID3D11RenderTargetView_Release(sys->d3drenderTargetView);
@@ -673,13 +685,6 @@ static HRESULT UpdateBackBuffer(vout_display_t *vd)
         ID3D11DepthStencilView_Release(sys->d3ddepthStencilView);
         sys->d3ddepthStencilView = NULL;
     }
-
-#if VLC_WINSTORE_APP
-    DXGI_SWAP_CHAIN_DESC1 swapDesc;
-    hr = IDXGISwapChain1_GetDesc1(sys->dxgiswapChain, &swapDesc);
-    i_width = swapDesc.Width;
-    i_height = swapDesc.Height;
-#endif
 
 #if 0
     hr = IDXGISwapChain_ResizeBuffers(sys->dxgiswapChain, 0, i_width, i_height,
@@ -830,6 +835,9 @@ static void Display(vout_display_t *vd, picture_t *picture, subpicture_t *subpic
     /* no ID3D11Device operations should come here */
 
     ID3D11DeviceContext_OMSetRenderTargets(sys->d3dcontext, 1, &sys->d3drenderTargetView, sys->d3ddepthStencilView);
+
+    //float ClearColor[4] = { 1.0f, 0.125f, 0.3f, 1.0f };
+    //ID3D11DeviceContext_ClearRenderTargetView(sys->d3dcontext, sys->d3drenderTargetView, ClearColor);
 
     ID3D11DeviceContext_ClearDepthStencilView(sys->d3dcontext, sys->d3ddepthStencilView, D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0);
 
