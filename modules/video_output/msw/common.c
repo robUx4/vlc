@@ -130,7 +130,7 @@ picture_pool_t *CommonPool(vout_display_t *vd, unsigned count)
 void UpdateRects(vout_display_t *vd,
     const vout_display_cfg_t *cfg,
     const video_format_t *source,
-    bool is_forced)
+    bool is_forced /* TODO remove */)
 {
     vout_display_sys_t *sys = vd->sys;
 #define rect_src sys->rect_src
@@ -151,8 +151,22 @@ void UpdateRects(vout_display_t *vd,
 #if VLC_WINSTORE_APP
     rect.left   = 0;
     rect.top    = 0;
-    rect.right  = *sys->pui_dxgi_width;
-    rect.bottom = *sys->pui_dxgi_height;
+    uint32_t i_width;
+    uint32_t i_height;
+    UINT dataSize = sizeof(i_width);
+    HRESULT hr = IDXGISwapChain_GetPrivateData(sys->dxgiswapChain, &GUID_SWAPCHAIN_WIDTH, &dataSize, &i_width);
+    if (FAILED(hr)) {
+        msg_Err(vd, "Can't get swapchain width, size %d. (hr=0x%lX)", hr, dataSize);
+        return;
+    }
+    dataSize = sizeof(i_height);
+    hr = IDXGISwapChain_GetPrivateData(sys->dxgiswapChain, &GUID_SWAPCHAIN_HEIGHT, &dataSize, &i_height);
+    if (FAILED(hr)) {
+        msg_Err(vd, "Can't get swapchain height, size %d. (hr=0x%lX)", hr, dataSize);
+        return;
+    }
+    rect.right  = i_width;
+    rect.bottom = i_height;
     sys->rect_display = rect;
 #else
     GetClientRect(sys->hwnd, &rect);
@@ -748,9 +762,24 @@ int CommonControl(vout_display_t *vd, int query, va_list args)
 
 void CommonManage(vout_display_t *vd) {
     vout_display_sys_t *sys = vd->sys;
+    uint32_t i_width;
+    uint32_t i_height;
 
-    if (*sys->pui_dxgi_width != (sys->rect_display.right - sys->rect_display.left) ||
-        *sys->pui_dxgi_height != (sys->rect_display.bottom - sys->rect_display.top))
+    UINT dataSize = sizeof(i_width);
+    HRESULT hr = IDXGISwapChain_GetPrivateData(sys->dxgiswapChain, &GUID_SWAPCHAIN_WIDTH, &dataSize, &i_width);
+    if (FAILED(hr)) {
+        msg_Err(vd, "Can't get swapchain width, size %d. (hr=0x%lX)", hr, dataSize);
+        return;
+    }
+    dataSize = sizeof(i_height);
+    hr = IDXGISwapChain_GetPrivateData(sys->dxgiswapChain, &GUID_SWAPCHAIN_HEIGHT, &dataSize, &i_height);
+    if (FAILED(hr)) {
+        msg_Err(vd, "Can't get swapchain height, size %d. (hr=0x%lX)", hr, dataSize);
+        return;
+    }
+
+    if (i_width != (sys->rect_display.right - sys->rect_display.left) ||
+        i_height != (sys->rect_display.bottom - sys->rect_display.top))
         UpdateRects(vd, NULL, NULL, false);
 }
 void CommonClean(vout_display_t *vd) {}

@@ -67,6 +67,11 @@ typedef struct
     ID3D11ShaderResourceView  *d3dresViewUV;
     ID3D11PixelShader         *d3dpixelShader;
 } d3d_quad_t;
+
+#if VLC_WINSTORE_APP
+extern const GUID GUID_SWAPCHAIN_WIDTH;
+extern const GUID GUID_SWAPCHAIN_HEIGHT;
+#endif
 #endif
 
 /*****************************************************************************
@@ -176,8 +181,6 @@ struct vout_display_sys_t
     pD3DCompile                            OurD3DCompile;
 #else
     IDXGISwapChain1          *dxgiswapChain;   /* DXGI 1.1 swap chain */
-    uint32_t                 *pui_dxgi_width;
-    uint32_t                 *pui_dxgi_height;
 #endif
     ID3D11Device             *d3ddevice;       /* D3D device */
     ID3D11DeviceContext      *d3dcontext;      /* D3D context */

@@ -47,6 +47,9 @@
 # define D3DCompile(args...)                    sys->OurD3DCompile(args)
 #endif
 
+DEFINE_GUID(GUID_SWAPCHAIN_WIDTH,  0xf1b59347, 0x1643, 0x411a, 0xad, 0x6b, 0xc7, 0x80, 0x17, 0x7a, 0x06, 0xb6);
+DEFINE_GUID(GUID_SWAPCHAIN_HEIGHT, 0x6ea976a0, 0x9d60, 0x4bb7, 0xa5, 0xa9, 0x7d, 0xd1, 0x18, 0x7f, 0xc9, 0xbd);
+
 static int  Open(vlc_object_t *);
 static void Close(vlc_object_t *);
 
@@ -68,8 +71,6 @@ vlc_module_begin ()
     add_integer("winrt-d3ddevice",     0x0, NULL, NULL, true); /* ID3D11Device*        */
     add_integer("winrt-d3dcontext",    0x0, NULL, NULL, true); /* ID3D11DeviceContext* */
     add_integer("winrt-swapchain",     0x0, NULL, NULL, true); /* IDXGISwapChain1*     */
-    add_integer("winrt-width",         0x0, NULL, NULL, true); /* uint32_t*            */
-    add_integer("winrt-height",        0x0, NULL, NULL, true); /* uint32_t*            */
 #endif
 
     set_capability("vout display", 240)
@@ -411,12 +412,6 @@ static int Open(vlc_object_t *object)
     ID3D11DeviceContext* d3dcontext = var_InheritInteger(vd, "winrt-d3dcontext");
     if (!d3dcontext)
         return VLC_EGENERIC;
-    uint32_t *pui_width = var_InheritInteger(vd, "winrt-width");
-    if (!pui_width)
-        return VLC_EGENERIC;
-    uint32_t *pui_height = var_InheritInteger(vd, "winrt-height");
-    if (!pui_height)
-        return VLC_EGENERIC;
 #endif
 
     vout_display_sys_t *sys = vd->sys = calloc(1, sizeof(vout_display_sys_t));
@@ -473,8 +468,6 @@ static int Open(vlc_object_t *object)
 # endif
 
 #else
-    sys->pui_dxgi_width  = pui_width;
-    sys->pui_dxgi_height = pui_height;
     sys->dxgiswapChain   = dxgiswapChain;
     sys->d3ddevice       = d3ddevice;
     sys->d3dcontext      = d3dcontext;
@@ -650,11 +643,21 @@ static HRESULT UpdateBackBuffer(vout_display_t *vd)
     HRESULT hr;
     ID3D11Texture2D* pDepthStencil;
     ID3D11Texture2D* pBackBuffer;
-    int i_width  = RECTWidth(sys->rect_dest_clipped);
-    int i_height = RECTHeight(sys->rect_dest_clipped);
+    uint32_t i_width  = RECTWidth(sys->rect_dest_clipped);
+    uint32_t i_height = RECTHeight(sys->rect_dest_clipped);
 #if VLC_WINSTORE_APP
-    i_width  = *sys->pui_dxgi_width;
-    i_height = *sys->pui_dxgi_height;
+    UINT dataSize = sizeof(i_width);
+    hr = IDXGISwapChain_GetPrivateData(sys->dxgiswapChain, &GUID_SWAPCHAIN_WIDTH, &dataSize, &i_width);
+    if (FAILED(hr)) {
+        msg_Err(vd, "Can't get swapchain width, size %d. (hr=0x%lX)", hr, dataSize);
+        return hr;
+    }
+    dataSize = sizeof(i_height);
+    hr = IDXGISwapChain_GetPrivateData(sys->dxgiswapChain, &GUID_SWAPCHAIN_HEIGHT, &dataSize, &i_height);
+    if (FAILED(hr)) {
+        msg_Err(vd, "Can't get swapchain height, size %d. (hr=0x%lX)", hr, dataSize);
+        return hr;
+    }
 #endif
 
     if (sys->d3drenderTargetView) {
