@@ -130,7 +130,7 @@ picture_pool_t *CommonPool(vout_display_t *vd, unsigned count)
 void UpdateRects(vout_display_t *vd,
     const vout_display_cfg_t *cfg,
     const video_format_t *source,
-    bool is_forced /* TODO remove */)
+    bool is_forced)
 {
     vout_display_sys_t *sys = vd->sys;
 #define rect_src sys->rect_src
@@ -148,7 +148,7 @@ void UpdateRects(vout_display_t *vd,
         source = &vd->source;
 
     /* Retrieve the window size */
-#if WINAPI_FAMILY == WINAPI_FAMILY_PHONE_APP
+#if VLC_WINSTORE_APP
     rect.left   = 0;
     rect.top    = 0;
     uint32_t i_width;
