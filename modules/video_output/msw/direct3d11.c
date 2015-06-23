@@ -645,7 +645,7 @@ static HRESULT UpdateBackBuffer(vout_display_t *vd)
     ID3D11Texture2D* pBackBuffer;
     uint32_t i_width  = RECTWidth(sys->rect_dest_clipped);
     uint32_t i_height = RECTHeight(sys->rect_dest_clipped);
-#if VLC_WINSTORE_APP
+#if WINAPI_FAMILY == WINAPI_FAMILY_PHONE_APP
     UINT dataSize = sizeof(i_width);
     hr = IDXGISwapChain_GetPrivateData(sys->dxgiswapChain, &GUID_SWAPCHAIN_WIDTH, &dataSize, &i_width);
     if (FAILED(hr)) {

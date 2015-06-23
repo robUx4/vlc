@@ -148,7 +148,7 @@ void UpdateRects(vout_display_t *vd,
         source = &vd->source;
 
     /* Retrieve the window size */
-#if VLC_WINSTORE_APP
+#if WINAPI_FAMILY == WINAPI_FAMILY_PHONE_APP
     rect.left   = 0;
     rect.top    = 0;
     uint32_t i_width;
@@ -765,6 +765,7 @@ void CommonManage(vout_display_t *vd) {
     uint32_t i_width;
     uint32_t i_height;
 
+#if WINAPI_FAMILY == WINAPI_FAMILY_PHONE_APP
     UINT dataSize = sizeof(i_width);
     HRESULT hr = IDXGISwapChain_GetPrivateData(sys->dxgiswapChain, &GUID_SWAPCHAIN_WIDTH, &dataSize, &i_width);
     if (FAILED(hr)) {
@@ -781,6 +782,7 @@ void CommonManage(vout_display_t *vd) {
     if (i_width != (sys->rect_display.right - sys->rect_display.left) ||
         i_height != (sys->rect_display.bottom - sys->rect_display.top))
         UpdateRects(vd, NULL, NULL, false);
+#endif
 }
 void CommonClean(vout_display_t *vd) {}
 void CommonDisplay(vout_display_t *vd) {}
