@@ -148,7 +148,7 @@ void UpdateRects(vout_display_t *vd,
         source = &vd->source;
 
     /* Retrieve the window size */
-#if VLC_WINSTORE_APP
+#if WINAPI_FAMILY == WINAPI_FAMILY_PHONE_APP
     rect.left   = 0;
     rect.top    = 0;
     uint32_t i_width;
@@ -766,6 +766,7 @@ int CommonControl(vout_display_t *vd, int query, va_list args)
 
 void CommonManage(vout_display_t *vd) {
     UpdateRects(vd, NULL, NULL, false);
+#endif
 }
 void CommonClean(vout_display_t *vd) {}
 void CommonDisplay(vout_display_t *vd) {}

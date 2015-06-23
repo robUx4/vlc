@@ -68,7 +68,7 @@ typedef struct
     ID3D11PixelShader         *d3dpixelShader;
 } d3d_quad_t;
 
-#if VLC_WINSTORE_APP
+#if WINAPI_FAMILY == WINAPI_FAMILY_PHONE_APP
 extern const GUID GUID_SWAPCHAIN_WIDTH;
 extern const GUID GUID_SWAPCHAIN_HEIGHT;
 #endif
