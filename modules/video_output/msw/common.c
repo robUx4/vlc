@@ -130,7 +130,7 @@ picture_pool_t *CommonPool(vout_display_t *vd, unsigned count)
 void UpdateRects(vout_display_t *vd,
     const vout_display_cfg_t *cfg,
     const video_format_t *source,
-    bool is_forced)
+    bool is_forced /* TODO remove */)
 {
     vout_display_sys_t *sys = vd->sys;
 #define rect_src sys->rect_src

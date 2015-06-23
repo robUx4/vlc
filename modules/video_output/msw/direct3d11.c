@@ -412,12 +412,6 @@ static int Open(vlc_object_t *object)
     ID3D11DeviceContext* d3dcontext = var_InheritInteger(vd, "winrt-d3dcontext");
     if (!d3dcontext)
         return VLC_EGENERIC;
-    uint32_t *pui_width = var_InheritInteger(vd, "winrt-width");
-    if (!pui_width)
-        return VLC_EGENERIC;
-    uint32_t *pui_height = var_InheritInteger(vd, "winrt-height");
-    if (!pui_height)
-        return VLC_EGENERIC;
 #endif
 
     vout_display_sys_t *sys = vd->sys = calloc(1, sizeof(vout_display_sys_t));
@@ -474,8 +468,6 @@ static int Open(vlc_object_t *object)
 # endif
 
 #else
-    sys->pui_dxgi_width  = pui_width;
-    sys->pui_dxgi_height = pui_height;
     sys->dxgiswapChain   = dxgiswapChain;
     sys->d3ddevice       = d3ddevice;
     sys->d3dcontext      = d3dcontext;
