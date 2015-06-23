@@ -130,7 +130,7 @@ picture_pool_t *CommonPool(vout_display_t *vd, unsigned count)
 void UpdateRects(vout_display_t *vd,
     const vout_display_cfg_t *cfg,
     const video_format_t *source,
-    bool is_forced /* TODO remove */)
+    bool is_forced)
 {
     vout_display_sys_t *sys = vd->sys;
 #define rect_src sys->rect_src
@@ -148,7 +148,7 @@ void UpdateRects(vout_display_t *vd,
         source = &vd->source;
 
     /* Retrieve the window size */
-#if WINAPI_FAMILY == WINAPI_FAMILY_PHONE_APP
+#if VLC_WINSTORE_APP
     rect.left   = 0;
     rect.top    = 0;
     uint32_t i_width;
@@ -167,7 +167,6 @@ void UpdateRects(vout_display_t *vd,
     }
     rect.right  = i_width;
     rect.bottom = i_height;
-    sys->rect_display = rect;
 #else
     GetClientRect(sys->hwnd, &rect);
 #endif
@@ -178,18 +177,23 @@ void UpdateRects(vout_display_t *vd,
     ClientToScreen(sys->hwnd, &point);
 #endif
 
-#if TODO
     /* If nothing changed, we can return */
     bool has_moved;
     bool is_resized;
+#if VLC_WINSTORE_APP
+    has_moved = false;
+    is_resized = rect.right != (sys->rect_display.right - sys->rect_display.left) ||
+        rect.bottom != (sys->rect_display.bottom - sys->rect_display.top);
+    sys->rect_display = rect;
+#else
     EventThreadUpdateWindowPosition(sys->event, &has_moved, &is_resized,
         point.x, point.y,
         rect.right, rect.bottom);
+#endif
     if (is_resized)
         vout_display_SendEventDisplaySize(vd, rect.right, rect.bottom);
     if (!is_forced && !has_moved && !is_resized)
         return;
-#endif
 
     /* Update the window position and size */
     vout_display_cfg_t place_cfg = *cfg;
@@ -761,28 +765,7 @@ int CommonControl(vout_display_t *vd, int query, va_list args)
 }
 
 void CommonManage(vout_display_t *vd) {
-    vout_display_sys_t *sys = vd->sys;
-    uint32_t i_width;
-    uint32_t i_height;
-
-#if WINAPI_FAMILY == WINAPI_FAMILY_PHONE_APP
-    UINT dataSize = sizeof(i_width);
-    HRESULT hr = IDXGISwapChain_GetPrivateData(sys->dxgiswapChain, &GUID_SWAPCHAIN_WIDTH, &dataSize, &i_width);
-    if (FAILED(hr)) {
-        msg_Err(vd, "Can't get swapchain width, size %d. (hr=0x%lX)", hr, dataSize);
-        return;
-    }
-    dataSize = sizeof(i_height);
-    hr = IDXGISwapChain_GetPrivateData(sys->dxgiswapChain, &GUID_SWAPCHAIN_HEIGHT, &dataSize, &i_height);
-    if (FAILED(hr)) {
-        msg_Err(vd, "Can't get swapchain height, size %d. (hr=0x%lX)", hr, dataSize);
-        return;
-    }
-
-    if (i_width != (sys->rect_display.right - sys->rect_display.left) ||
-        i_height != (sys->rect_display.bottom - sys->rect_display.top))
-        UpdateRects(vd, NULL, NULL, false);
-#endif
+    UpdateRects(vd, NULL, NULL, false);
 }
 void CommonClean(vout_display_t *vd) {}
 void CommonDisplay(vout_display_t *vd) {}

@@ -645,7 +645,7 @@ static HRESULT UpdateBackBuffer(vout_display_t *vd)
     ID3D11Texture2D* pBackBuffer;
     uint32_t i_width  = RECTWidth(sys->rect_dest_clipped);
     uint32_t i_height = RECTHeight(sys->rect_dest_clipped);
-#if WINAPI_FAMILY == WINAPI_FAMILY_PHONE_APP
+#if VLC_WINSTORE_APP
     UINT dataSize = sizeof(i_width);
     hr = IDXGISwapChain_GetPrivateData(sys->dxgiswapChain, &GUID_SWAPCHAIN_WIDTH, &dataSize, &i_width);
     if (FAILED(hr)) {
@@ -1167,8 +1167,18 @@ static void UpdatePicQuadPosition(vout_display_t *vd)
     int i_width  = RECTWidth(sys->rect_dest_clipped);
     int i_height = RECTHeight(sys->rect_dest_clipped);
 #if VLC_WINSTORE_APP
-    i_width  = RECTWidth(sys->rect_display);
-    i_height = RECTHeight(sys->rect_display);
+    UINT dataSize = sizeof(i_width);
+    HRESULT hr = IDXGISwapChain_GetPrivateData(sys->dxgiswapChain, &GUID_SWAPCHAIN_WIDTH, &dataSize, &i_width);
+    if (FAILED(hr)) {
+        msg_Err(vd, "Can't get swapchain width, size %d. (hr=0x%lX)", hr, dataSize);
+        return hr;
+    }
+    dataSize = sizeof(i_height);
+    hr = IDXGISwapChain_GetPrivateData(sys->dxgiswapChain, &GUID_SWAPCHAIN_HEIGHT, &dataSize, &i_height);
+    if (FAILED(hr)) {
+        msg_Err(vd, "Can't get swapchain height, size %d. (hr=0x%lX)", hr, dataSize);
+        return hr;
+    }
 #endif
 
     /* Map the subpicture to sys->rect_dest_clipped */
