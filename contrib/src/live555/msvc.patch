@@ -17,16 +17,17 @@ index 18f0518..89aca02 100755
  LIBS_FOR_CONSOLE_APPLICATION = -lws2_32
 --- a/liveMedia/RTSPCommon.cpp
 +++ b/liveMedia/RTSPCommon.cpp
-@@ -26,6 +26,9 @@
+@@ -25,6 +25,10 @@
+ #include <ctype.h> // for "isxdigit()
  #include <time.h> // for "strftime()" and "gmtime()"
 
- #if defined(__WIN32__) || defined(_WIN32) || defined(_QNX4)
 +#if defined(_MSC_VER)
 +#include <stdlib.h>
 +#endif
- #else
- #include <signal.h>
- #define USE_SIGNALS 1
++
+ static void decodeURL(char* url) {
+   // Replace (in place) any %<hex><hex> sequences with the appropriate 8-bit character.
+   char* cursor = url;
 
 --- a/UsageEnvironment/UsageEnvironment.cpp
 +++ b/UsageEnvironment/UsageEnvironment.cpp
