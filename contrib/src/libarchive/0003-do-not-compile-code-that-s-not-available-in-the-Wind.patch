@@ -1,0 +1,68 @@
+From 3278b0c1a52a4187584f583151949d53ebef8c79 Mon Sep 17 00:00:00 2001
+From: Steve Lhomme <slhomme@matroska.org>
+Date: Wed, 24 Jun 2015 10:27:11 +0200
+Subject: [PATCH 3/3] do not compile code that's not available in the Windows
+ Store
+
+---
+ libarchive/archive_entry.h           | 2 +-
+ libarchive/archive_entry_copy_bhfi.c | 2 +-
+ libarchive/archive_util.c            | 2 +-
+ libarchive/filter_fork_windows.c     | 2 +-
+ 4 files changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/libarchive/archive_entry.h b/libarchive/archive_entry.h
+index a905065..40c9fc5 100644
+--- a/libarchive/archive_entry.h
++++ b/libarchive/archive_entry.h
+@@ -247,7 +247,7 @@ __LA_DECL const wchar_t	*archive_entry_uname_w(struct archive_entry *);
+ 
+ __LA_DECL void	archive_entry_set_atime(struct archive_entry *, time_t, long);
+ __LA_DECL void  archive_entry_unset_atime(struct archive_entry *);
+-#if defined(_WIN32) && !defined(__CYGWIN__)
++#if defined(_WIN32) && !defined(__CYGWIN__) && WINAPI_FAMILY_PARTITION(WINAPI_PARTITION_DESKTOP)
+ __LA_DECL void archive_entry_copy_bhfi(struct archive_entry *, BY_HANDLE_FILE_INFORMATION *);
+ #endif
+ __LA_DECL void	archive_entry_set_birthtime(struct archive_entry *, time_t, long);
+diff --git a/libarchive/archive_entry_copy_bhfi.c b/libarchive/archive_entry_copy_bhfi.c
+index 77bf38e..22f9702 100644
+--- a/libarchive/archive_entry_copy_bhfi.c
++++ b/libarchive/archive_entry_copy_bhfi.c
+@@ -29,7 +29,7 @@ __FBSDID("$FreeBSD$");
+ #include "archive_private.h"
+ #include "archive_entry.h"
+ 
+-#if defined(_WIN32) && !defined(__CYGWIN__)
++#if defined(_WIN32) && !defined(__CYGWIN__) && WINAPI_FAMILY_PARTITION(WINAPI_PARTITION_DESKTOP)
+ 
+ #define EPOC_TIME ARCHIVE_LITERAL_ULL(116444736000000000)
+ 
+diff --git a/libarchive/archive_util.c b/libarchive/archive_util.c
+index 34d8081..b3784ec 100644
+--- a/libarchive/archive_util.c
++++ b/libarchive/archive_util.c
+@@ -193,7 +193,7 @@ __archive_errx(int retvalue, const char *msg)
+ /*
+  * Create a temporary file
+  */
+-#if defined(_WIN32) && !defined(__CYGWIN__)
++#if defined(_WIN32) && !defined(__CYGWIN__) && WINAPI_FAMILY_PARTITION(WINAPI_PARTITION_DESKTOP)
+ 
+ /*
+  * Do not use Windows tmpfile() function.
+diff --git a/libarchive/filter_fork_windows.c b/libarchive/filter_fork_windows.c
+index fa59cc9..e5a2d8b 100644
+--- a/libarchive/filter_fork_windows.c
++++ b/libarchive/filter_fork_windows.c
+@@ -25,7 +25,7 @@
+ 
+ #include "archive_platform.h"
+ 
+-#if defined(_WIN32) && !defined(__CYGWIN__)
++#if defined(_WIN32) && !defined(__CYGWIN__) && WINAPI_FAMILY_PARTITION(WINAPI_PARTITION_DESKTOP)
+ #include "archive_cmdline_private.h"
+ #include "archive_string.h"
+ 
+-- 
+1.9.5.msysgit.0
+
