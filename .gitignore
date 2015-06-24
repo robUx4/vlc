@@ -53,3 +53,7 @@ build-*
 contrib-*
 install-*
 
+/contrib/Windows*
+/contrib/Metrox86*
+/Windows*
+/Metrox86*
