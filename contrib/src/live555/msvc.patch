@@ -21,7 +21,7 @@ index 18f0518..89aca02 100755
  #include <time.h> // for "strftime()" and "gmtime()"
 
  #if defined(__WIN32__) || defined(_WIN32) || defined(_QNX4)
-+#if defined(_MSC_VER) && _MSC_VER >= 1900
++#if defined(_MSC_VER)
 +#include <stdlib.h>
 +#endif
  #else
@@ -34,7 +34,7 @@ index 18f0518..89aca02 100755
 
  #include "UsageEnvironment.hh"
 
-+#if defined(_MSC_VER) && _MSC_VER >= 1900
++#if defined(_MSC_VER)
 +#include <stdlib.h>
 +#endif
 +
