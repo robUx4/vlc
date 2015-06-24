@@ -46,10 +46,10 @@ index b10715f..3d26996 100755
  if [ -z "$CC_DEPFLAGS" ] && [ "$dep_cc" != "$cc" ]; then
      probe_cc depcc "$dep_cc"
      CCDEP=${_DEPCMD:-$DEPCMD}
-@@ -3742,9 +3746,6 @@
+@@ -3742,9 +3746,4 @@
                  add_host_cppflags -Dsnprintf=_snprintf
-             else
-                 add_compat strtod.o strtod=avpriv_strtod
+-             else
+-                add_compat strtod.o strtod=avpriv_strtod
 -                add_compat msvcrt/snprintf.o snprintf=avpriv_snprintf   \
 -                                             _snprintf=avpriv_snprintf  \
 -                                             vsnprintf=avpriv_vsnprintf
@@ -80,3 +80,19 @@ index 3b651a4..9b6bbbc3 100644
  #include <dxva.h>
  #endif
  
+--- ffmpeg/libavutil/internal.h.orig    2015-06-24 15:35:36.503641400 +0200
++++ ffmpeg/libavutil/internal.h 2015-06-24 15:36:37.515131100 +0200
+@@ -202,13 +202,7 @@
+ void avpriv_request_sample(void *avc,
+                            const char *msg, ...) av_printf_format(2, 3);
+
+ #if HAVE_LIBC_MSVCRT
+-#include <crtversion.h>
+-#if defined(_VC_CRT_MAJOR_VERSION) && _VC_CRT_MAJOR_VERSION < 14
+-#pragma comment(linker, "/include:"EXTERN_PREFIX"avpriv_strtod")
+-#pragma comment(linker, "/include:"EXTERN_PREFIX"avpriv_snprintf")
+-#endif
+-
+ #define avpriv_open ff_open
+ #endif
+
