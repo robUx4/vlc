@@ -774,7 +774,11 @@ static inline void SetQWLE (void *p, uint64_t qw)
 }
 
 /* */
+#ifdef _MSC_VER
+#define VLC_UNUSED(x) UNREFERENCED_PARAMETER(x)
+#else
 #define VLC_UNUSED(x) (void)(x)
+#endif
 
 /* Stuff defined in src/extras/libc.c */
 
