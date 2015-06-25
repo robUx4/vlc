@@ -523,7 +523,7 @@ MOSTLYCLEANFILES = fourcc_gen
 
 fourcc_gen: misc/fourcc_gen.c misc/fourcc_list.h ../include/vlc_fourcc.h
 	$(AM_V_at)rm -f -- $@
-	$(AM_V_CC)$(BUILDCC) -I$(srcdir) -o $@ $<
+	$(AM_V_at)gcc -std=c99 $(BUILDCC) -I$(srcdir) -o $@ $<
 
 fourcc_tables.h: fourcc_gen
 	$(AM_V_at)rm -f -- $@.tmp
