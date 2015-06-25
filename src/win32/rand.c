@@ -33,6 +33,7 @@
 # include <windows.security.cryptography.h>
 # ifdef _MSC_VER
 #  ifndef __cplusplus
+DECLSPEC_IMPORT _Check_return_ HRESULT WINAPI RoGetActivationFactory(_In_ HSTRING activatableClassId, _In_ REFIID iid,  _COM_Outptr_ void ** factory);
 typedef __x_ABI_CWindows_CSecurity_CCryptography_CICryptographicBufferStatics ICryptographicBufferStatics;
 typedef __x_ABI_CWindows_CStorage_CStreams_CIBuffer IBuffer;
 #   define ICryptographicBufferStatics_Release __x_ABI_CWindows_CSecurity_CCryptography_CICryptographicBufferStatics_Release
