@@ -59,6 +59,10 @@ ifdef HAVE_ANDROID
 	# Disable locale on Android too
 	cd live && sed -e 's%-DPIC%-DPIC -DNO_SSTREAM=1 -DLOCALE_NOT_USED -I$(ANDROID_NDK)/platforms/$(ANDROID_API)/arch-$(PLATFORM_SHORT_ARCH)/usr/include%' -i.orig config.linux
 endif
+ifdef HAVE_VISUALSTUDIO
+	cd live && patch -lfp1 < ../../src/live555/msvc.patch
+	cd live && sed -e 's%-D__MINGW32__%%' -i.orig config.mingw
+endif
 	mv live live.$(LIVE555_VERSION)
 	# Patch for MSG_NOSIGNAL
 	$(APPLY) $(SRC)/live555/live555-nosignal.patch
@@ -81,4 +85,12 @@ SUBDIRS=groupsock liveMedia UsageEnvironment BasicUsageEnvironment
 	cd $< && for subdir in $(SUBDIRS); do $(MAKE) $(HOSTVARS) -C $$subdir; done
 	cd $< && for subdir in $(SUBDIRS); do $(MAKE) $(HOSTVARS) -C $$subdir install; done
 	cd $< && make install_shared_libraries
+ifdef HAVE_VISUALSTUDIO
+	cp \
+		$</groupsock/groupsock.lib \
+		$</liveMedia/liveMedia.lib \
+		$</UsageEnvironment/UsageEnvironment.lib \
+		$</BasicUsageEnvironment/BasicUsageEnvironment.lib \
+		"$(PREFIX)/lib/"
+endif
 	touch $@
