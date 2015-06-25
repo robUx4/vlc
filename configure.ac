@@ -234,7 +234,9 @@ case "${host_os}" in
 # define UNICODE 1 /* Define to 1 for Unicode (Wide Chars) APIs. */
 #endif])
     AC_DEFINE([_ISOC99_SOURCE], [1], [Extensions to ISO C89 from ISO C99.])
-    AC_DEFINE([_ISOC11_SOURCE], [1], [Extensions to ISO C99 from ISO C11.])
+    if test "${host_vendor}" != "msvc"; then
+      AC_DEFINE([_ISOC11_SOURCE], [1], [Extensions to ISO C99 from ISO C11.])
+    fi
     AC_DEFINE([_POSIX_SOURCE], [1], [IEEE Std 1003.1.])
     AC_DEFINE([_POSIX_C_SOURCE], [200809L], [IEEE Std 1003.1.])
     AC_DEFINE([_XOPEN_SOURCE], [700], [POSIX and XPG 7th edition])
