@@ -1,0 +1,17 @@
+--- libebml/ebml/EbmlConfig.h.old       2015-06-15 08:54:23.813878400 +0200
++++ libebml/ebml/EbmlConfig.h   2015-06-15 08:51:13.878014700 +0200
+@@ -100,6 +100,13 @@
+ #define LIBEBML_DEBUG
+ #endif
+
++#ifdef _MSC_VER
++#include <winapifamily.h>
++# if !WINAPI_FAMILY_PARTITION(WINAPI_PARTITION_DESKTOP)
++#  undef LIBEBML_DEBUG
++# endif
++#endif
++
+ // For compilers that don't define __TIMESTAMP__ (e.g. gcc 2.95, gcc 3.2)
+ #ifndef __TIMESTAMP__
+ #define __TIMESTAMP__ __DATE__ " " __TIME__
+
