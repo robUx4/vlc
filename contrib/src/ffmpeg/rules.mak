@@ -14,12 +14,10 @@ FFMPEG_SNAPURL := http://git.libav.org/?p=libav.git;a=snapshot;h=$(HASH);sf=tgz
 FFMPEG_GITURL := git://git.libav.org/libav.git
 endif
 
-ifdef HAVE_VISUALSTUDIO
-CC:=cl
-endif
-
 FFMPEGCONF = \
 	--cc="$(CC)" \
+	--ld="$(LD)" \
+	--ar="$(AR)" \
 	--pkg-config="$(PKG_CONFIG)" \
 	--disable-doc \
 	--disable-encoder=vorbis \
@@ -144,8 +142,11 @@ endif
 
 # Windows
 ifdef HAVE_WIN32
+ifndef HAVE_VISUALSTUDIO
+DEPS_ffmpeg += d3d11
 ifndef HAVE_MINGW_W64
 DEPS_ffmpeg += directx
+endif
 endif
 FFMPEGCONF += --target-os=mingw32 --enable-memalign-hack
 FFMPEGCONF += --enable-w32threads --enable-dxva2
@@ -154,10 +155,11 @@ ifdef HAVE_WIN64
 FFMPEGCONF += --cpu=athlon64 --arch=x86_64
 else # !WIN64
 ifdef HAVE_WINPHONE
-FFMPEGCONF += --arch=arm --cpu=armv7-a --target-os=win32 --extra-cflags='-DWINAPI_FAMILY=WINAPI_FAMILY_PHONE_APP -MD -D__ARM_PCS_VFP -D_WIN32_WINNT=0x602' --disable-dxva2 --as=armasm
+FFMPEGCONF += --target-os=win32 --extra-cflags='-D__ARM_PCS_VFP' --disable-dxva2
 else
 ifdef HAVE_WINDOWSRT
-FFMPEGCONF += --arch=arm --cpu=armv7-a --target-os=win32 --extra-cflags='-DWINAPI_FAMILY=WINAPI_FAMILY_APP -MD -D__ARM_PCS_VFP -D_WIN32_WINNT=0x602' --disable-dxva2 --as=armasm
+#FFMPEGCONF += --arch=arm --cpu=armv7-a --target-os=win32 --extra-cflags='-DWINAPI_FAMILY=WINAPI_FAMILY_APP -MD -D__ARM_PCS_VFP -D_WIN32_WINNT=0x602' --disable-dxva2
+FFMPEGCONF += --target-os=win32 --extra-cflags='-D__ARM_PCS_VFP' --disable-dxva2
 else
 FFMPEGCONF+= --cpu=i686 --arch=x86
 endif
@@ -166,6 +168,9 @@ endif
 
 ifdef HAVE_VISUALSTUDIO
 FFMPEGCONF += --toolchain=msvc
+ifeq ($(VLC_ARCH),arm)
+FFMPEGCONF += --as=armasm
+endif
 endif
 
 else # !Windows
@@ -201,6 +206,7 @@ ffmpeg: ffmpeg-$(HASH).tar.xz .sum-ffmpeg
 	$(XZCAT) "$<" | (cd $@-$(HASH) && tar xv --strip-components=1)
 ifdef HAVE_VISUALSTUDIO
 	$(APPLY) $(SRC)/ffmpeg/msvc.patch
+	$(APPLY) $(SRC)/ffmpeg/near_field.patch
 endif
 	$(APPLY) $(SRC)/ffmpeg/0001-d3d11va-WindowsPhone-requires-a-mutex-around-ID3D11V.patch
 	$(MOVE)
@@ -209,5 +215,6 @@ endif
 	cd $< && $(HOSTVARS) ./configure \
 		--extra-ldflags="$(LDFLAGS)" $(FFMPEGCONF) \
 		--prefix="$(PREFIX)" --enable-static --disable-shared
-	cd $< && $(MAKE) install-libs install-headers
+	cd $< && $(MAKE) -j`nproc` install-libs install-headers
+#	cd $< && $(MAKE) install-libs install-headers
 	touch $@

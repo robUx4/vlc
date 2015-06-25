@@ -1,6 +1,8 @@
---- ffmpeg/configure	2015-01-08 12:58:43.000000000 +0100
-+++ /home/vlc/vlc/contrib/windowsphone/ffmpeg/configure	2014-12-15 16:56:13.022084500 +0100
-@@ -2705,7 +2702,7 @@
+diff --git a/configure b/configure
+index b10715f..3d26996 100755
+--- a/configure
++++ b/configure
+@@ -2779,7 +2779,7 @@ msvc_common_flags(){
              -lavifil32)           echo vfw32.lib ;;
              -lavicap32)           echo vfw32.lib user32.lib ;;
              -l*)                  echo ${flag#-l}.lib ;;
@@ -9,7 +11,31 @@
              *)                    echo $flag ;;
          esac
      done
-@@ -3044,6 +3041,10 @@
+@@ -2996,20 +2996,20 @@ probe_cc(){
+         _cflags_size="-O2 -Munroll=c:1 $opt_common"
+         _cflags_noopt="-O1"
+         _flags_filter=pgi_flags
+-    elif $_cc 2>&1 | grep -q 'Microsoft.*ARM.*Assembler'; then
++    elif $_cc -nologo- 2>&1 | grep -q 'Microsoft.*ARM.*Assembler'; then
+         _type=armasm
+         _ident=$($_cc | head -n1)
+         # 4509: "This form of conditional instruction is deprecated"
+         _flags="-nologo -ignore 4509"
+         _flags_filter=armasm_flags
+-    elif $_cc 2>&1 | grep -q Microsoft; then
++    elif $_cc -nologo- 2>&1 | grep -q Microsoft; then
+         _type=msvc
+         _ident=$($_cc 2>&1 | head -n1)
+         _DEPCMD='$(DEP$(1)) $(DEP$(1)FLAGS) $($(1)DEP_FLAGS) $< 2>&1 | awk '\''/including/ { sub(/^.*file: */, ""); gsub(/\\/, "/"); if (!match($$0, / /)) print "$@:", $$0 }'\'' > $(@:.o=.d)'
+         _DEPFLAGS='$(CPPFLAGS) $(CFLAGS) -showIncludes -Zs'
+         _cflags_speed="-O2"
+         _cflags_size="-O1"
+-        if $_cc 2>&1 | grep -q Linker; then
++        if $_cc -nologo- 2>&1 | grep -q Linker; then
+             _ld_o='-out:$@'
+         else
+             _ld_o='-Fe$@'
+@@ -3112,6 +3112,10 @@ host_ldflags_filter=$_flags_filter
  add_host_ldflags $_flags $_ldflags
  HOSTLD_O=${_ld_o-$HOSTLD_O}
  
@@ -20,3 +46,26 @@
  if [ -z "$CC_DEPFLAGS" ] && [ "$dep_cc" != "$cc" ]; then
      probe_cc depcc "$dep_cc"
      CCDEP=${_DEPCMD:-$DEPCMD}
+@@ -4234,7 +4238,7 @@ check_lib2 "windows.h psapi.h" GetProcessMemoryInfo -lpsapi
+ 
+ check_struct "sys/time.h sys/resource.h" "struct rusage" ru_maxrss
+ 
+-check_type "windows.h dxva.h" "DXVA_PicParams_HEVC"
++check_type "windows.h dxva.h" "DXVA_PicParams_HEVC" -DWINAPI_FAMILY=WINAPI_FAMILY_DESKTOP_APP
+ check_type "windows.h d3d11.h" "ID3D11VideoDecoder"
+ check_type "d3d9.h dxva2api.h" DXVA2_ConfigPictureDecode -D_WIN32_WINNT=0x0600
+ 
+diff --git a/libavcodec/dxva2_internal.h b/libavcodec/dxva2_internal.h
+index 3b651a4..9b6bbbc3 100644
+--- a/libavcodec/dxva2_internal.h
++++ b/libavcodec/dxva2_internal.h
+@@ -34,6 +34,9 @@
+ #include "d3d11va.h"
+ #endif
+ #if HAVE_DXVA_H
++/* dxva.h defines nothing otherwise but it works */
++#undef WINAPI_FAMILY
++#define WINAPI_FAMILY WINAPI_FAMILY_DESKTOP_APP
+ #include <dxva.h>
+ #endif
+ 
