@@ -221,12 +221,18 @@ case "${host_os}" in
   *mingw32* | *cygwin* | *wince* | *mingwce*)
     AC_CHECK_TOOL(WINDRES, windres, :)
     AC_CHECK_TOOL(OBJCOPY, objcopy, :)
-    AH_TOP([#if defined(_WIN32) && !defined(_WIN32_WINNT)])
-    AH_TOP([# define _WIN32_WINNT 0x0502 /* Windows XP SP2 */])
-    AH_TOP([#endif])
-    AC_DEFINE([_WIN32_IE], 0x0600, [Define to '0x0600' for IE 6.0 (and shell) APIs.])
-    AC_DEFINE([_UNICODE], [1], [Define to 1 for Unicode (Wide Chars) APIs.])
-    AC_DEFINE([UNICODE], [1], [Define to 1 for Unicode (Wide Chars) APIs.])
+    AH_TOP([#if defined(_WIN32) && !defined(_WIN32_WINNT)
+# define _WIN32_WINNT 0x0502 /* Windows XP SP2 */
+#endif])
+    AH_TOP([#if !defined(_WIN32_IE)
+# define _WIN32_IE 0x0600 /* Define to '0x0600' for IE 6.0 (and shell) APIs. */
+#endif])
+    AH_TOP([#if !defined(_UNICODE)
+# define _UNICODE 1 /* Define to 1 for Unicode (Wide Chars) APIs. */
+#endif])
+    AH_TOP([#if !defined(UNICODE)
+# define UNICODE 1 /* Define to 1 for Unicode (Wide Chars) APIs. */
+#endif])
     AC_DEFINE([_ISOC99_SOURCE], [1], [Extensions to ISO C89 from ISO C99.])
     AC_DEFINE([_ISOC11_SOURCE], [1], [Extensions to ISO C99 from ISO C11.])
     AC_DEFINE([_POSIX_SOURCE], [1], [IEEE Std 1003.1.])
