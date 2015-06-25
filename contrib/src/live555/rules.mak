@@ -53,6 +53,9 @@ live555: $(LIVE555_FILE) .sum-live555
 ifdef HAVE_ANDROID
 	cd live && sed -e 's%-DPIC%-DPIC -DNO_SSTREAM=1 -DLOCALE_NOT_USED -I$(ANDROID_NDK)/platforms/$(ANDROID_API)/arch-$(PLATFORM_SHORT_ARCH)/usr/include%' -i.orig config.linux
 endif
+ifdef HAVE_VISUALSTUDIO
+	cd live && patch -lfp1 < ../../src/live555/msvc.patch
+endif
 	mv live $@
 	touch $@
 
