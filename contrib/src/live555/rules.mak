@@ -53,8 +53,13 @@ live555: $(LIVE555_FILE) .sum-live555
 ifdef HAVE_ANDROID
 	cd live && sed -e 's%-DPIC%-DPIC -DNO_SSTREAM=1 -DLOCALE_NOT_USED -I$(ANDROID_NDK)/platforms/$(ANDROID_API)/arch-$(PLATFORM_SHORT_ARCH)/usr/include%' -i.orig config.linux
 endif
+ifdef HAVE_VISUALSTUDIO
+	cd live && patch -lfp1 < ../../src/live555/msvc.patch
+endif
 	cd live && patch -lfp1 < ../../src/live555/winstore.patch
+ifndef HAVE_VISUALSTUDIO
 	cd live && patch -lfp1 < ../../src/live555/no-gettimeofday.patch
+endif
 	mv live $@
 	touch $@
 
@@ -65,12 +70,21 @@ endif
 			&& $(MAKE) $(HOSTVARS) -C UsageEnvironment \
 			&& $(MAKE) $(HOSTVARS) -C BasicUsageEnvironment
 	mkdir -p -- "$(PREFIX)/lib" "$(PREFIX)/include"
+ifdef HAVE_VISUALSTUDIO
+	cp \
+		$</groupsock/groupsock.lib \
+		$</liveMedia/liveMedia.lib \
+		$</UsageEnvironment/UsageEnvironment.lib \
+		$</BasicUsageEnvironment/BasicUsageEnvironment.lib \
+		"$(PREFIX)/lib/"
+else
 	cp \
 		$</groupsock/libgroupsock.a \
 		$</liveMedia/libliveMedia.a \
 		$</UsageEnvironment/libUsageEnvironment.a \
 		$</BasicUsageEnvironment/libBasicUsageEnvironment.a \
 		"$(PREFIX)/lib/"
+endif
 	cp \
 		$</groupsock/include/*.hh \
 		$</groupsock/include/*.h \
