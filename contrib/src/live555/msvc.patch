@@ -1,0 +1,153 @@
+diff --git a/config.mingw b/config.mingw
+index 18f0518..89aca02 100755
+--- a/config.mingw
++++ b/config.mingw
+@@ -6,12 +6,12 @@
+ CPLUSPLUS_COMPILER =   $(CXX)
+ CPLUSPLUS_FLAGS =      $(COMPILE_OPTS) -D__MINGW32__ -Wall -Wno-deprecated
+ OBJ =                  o
+-LINK =                 $(CXX) -o
++LINK =                 $(LD) -o
+ LINK_OPTS =            -L.
+ CONSOLE_LINK_OPTS =    $(LINK_OPTS)
+-LIBRARY_LINK =         $(LD) -o
++LIBRARY_LINK =         $(AR) -o
+ LIBRARY_LINK_OPTS =    $(LINK_OPTS) -r -Bstatic
+-LIB_SUFFIX =                   a
++LIB_SUFFIX =                   lib
+ LIBS_FOR_CONSOLE_APPLICATION = -lws2_32
+ LIBS_FOR_GUI_APPLICATION = -lws2_32
+ EXE =
+
+--- a/liveMedia/RTSPCommon.cpp
++++ b/liveMedia/RTSPCommon.cpp
+@@ -25,6 +25,10 @@
+ #include <ctype.h> // for "isxdigit()
+ #include <time.h> // for "strftime()" and "gmtime()"
+
++#if defined(_MSC_VER)
++#include <stdlib.h>
++#endif
++
+ static void decodeURL(char* url) {
+   // Replace (in place) any %<hex><hex> sequences with the appropriate 8-bit character.
+   char* cursor = url;
+
+--- a/UsageEnvironment/UsageEnvironment.cpp
++++ b/UsageEnvironment/UsageEnvironment.cpp
+@@ -19,6 +19,10 @@
+
+ #include "UsageEnvironment.hh"
+
++#if defined(_MSC_VER)
++#include <stdlib.h>
++#endif
++
+ Boolean UsageEnvironment::reclaim() {
+   // We delete ourselves only if we have no remainining state:
+   if (liveMediaPriv == NULL && groupsockPriv == NULL) {
+
+--- live555.nok/BasicUsageEnvironment/Makefile.tail	2016-02-23 00:25:30.000000000 +0100
++++ live555.nok/BasicUsageEnvironment/Makefile.tail.o	2016-06-20 11:39:45.634997700 +0200
+@@ -14,10 +14,10 @@ libBasicUsageEnvironment.$(LIB_SUFFIX):
+ 		$(OBJS)
+ 
+ .$(C).$(OBJ):
+-	$(C_COMPILER) -c $(C_FLAGS) $<       
++	$(C_COMPILER) -c $(C_FLAGS) $< -o $@
+ 
+ .$(CPP).$(OBJ):
+-	$(CPLUSPLUS_COMPILER) -c $(CPLUSPLUS_FLAGS) $<
++	$(CPLUSPLUS_COMPILER) -c $(CPLUSPLUS_FLAGS) $< -o $@
+ 
+ BasicUsageEnvironment0.$(CPP):	include/BasicUsageEnvironment0.hh
+ include/BasicUsageEnvironment0.hh:	include/BasicUsageEnvironment_version.hh include/DelayQueue.hh
+--- live555.nok/groupsock/Makefile.tail	2016-02-23 00:25:30.000000000 +0100
++++ live555.nok/groupsock/Makefile.tail.o	2016-06-20 11:39:52.318471100 +0200
+@@ -5,9 +5,9 @@ ALL = $(NAME).$(LIB_SUFFIX)
+ all:	$(ALL)
+ 
+ .$(C).$(OBJ):
+-	$(C_COMPILER) -c $(C_FLAGS) $<
++	$(C_COMPILER) -c $(C_FLAGS) $< -o $@
+ .$(CPP).$(OBJ):
+-	$(CPLUSPLUS_COMPILER) -c $(CPLUSPLUS_FLAGS) $<
++	$(CPLUSPLUS_COMPILER) -c $(CPLUSPLUS_FLAGS) $< -o $@
+ 
+ GROUPSOCK_LIB_OBJS = GroupsockHelper.$(OBJ) GroupEId.$(OBJ) inet.$(OBJ) Groupsock.$(OBJ) NetInterface.$(OBJ) NetAddress.$(OBJ) IOHandlers.$(OBJ)
+ 
+--- live555.nok/liveMedia/Makefile.tail	2016-02-23 00:25:30.000000000 +0100
++++ live555.nok/liveMedia/Makefile.tail.o	2016-06-20 11:40:03.287534300 +0200
+@@ -6,9 +6,9 @@ ALL = $(LIVEMEDIA_LIB)
+ all:	$(ALL)
+ 
+ .$(C).$(OBJ):
+-	$(C_COMPILER) -c $(C_FLAGS) $<
++	$(C_COMPILER) -c $(C_FLAGS) $< -o $@
+ .$(CPP).$(OBJ):
+-	$(CPLUSPLUS_COMPILER) -c $(CPLUSPLUS_FLAGS) $<
++	$(CPLUSPLUS_COMPILER) -c $(CPLUSPLUS_FLAGS) $< -o $@
+ 
+ MP3_SOURCE_OBJS = MP3FileSource.$(OBJ) MP3Transcoder.$(OBJ) MP3ADU.$(OBJ) MP3ADUdescriptor.$(OBJ) MP3ADUinterleaving.$(OBJ) MP3ADUTranscoder.$(OBJ) MP3StreamState.$(OBJ) MP3Internals.$(OBJ) MP3InternalsHuffman.$(OBJ) MP3InternalsHuffmanTable.$(OBJ) MP3ADURTPSource.$(OBJ)
+ MPEG_SOURCE_OBJS = MPEG1or2Demux.$(OBJ) MPEG1or2DemuxedElementaryStream.$(OBJ) MPEGVideoStreamFramer.$(OBJ) MPEG1or2VideoStreamFramer.$(OBJ) MPEG1or2VideoStreamDiscreteFramer.$(OBJ) MPEG4VideoStreamFramer.$(OBJ) MPEG4VideoStreamDiscreteFramer.$(OBJ) H264or5VideoStreamFramer.$(OBJ) H264or5VideoStreamDiscreteFramer.$(OBJ) H264VideoStreamFramer.$(OBJ) H264VideoStreamDiscreteFramer.$(OBJ) H265VideoStreamFramer.$(OBJ) H265VideoStreamDiscreteFramer.$(OBJ) MPEGVideoStreamParser.$(OBJ) MPEG1or2AudioStreamFramer.$(OBJ) MPEG1or2AudioRTPSource.$(OBJ) MPEG4LATMAudioRTPSource.$(OBJ) MPEG4ESVideoRTPSource.$(OBJ) MPEG4GenericRTPSource.$(OBJ) $(MP3_SOURCE_OBJS) MPEG1or2VideoRTPSource.$(OBJ) MPEG2TransportStreamMultiplexor.$(OBJ) MPEG2TransportStreamFromPESSource.$(OBJ) MPEG2TransportStreamFromESSource.$(OBJ) MPEG2TransportStreamFramer.$(OBJ) ADTSAudioFileSource.$(OBJ)
+--- live555.nok/UsageEnvironment/Makefile.tail	2016-02-23 00:25:30.000000000 +0100
++++ live555.nok/UsageEnvironment/Makefile.tail.o	2016-06-20 11:40:12.349923700 +0200
+@@ -11,10 +11,10 @@ $(USAGE_ENVIRONMENT_LIB): $(OBJS)
+ 	$(LIBRARY_LINK)$@ $(LIBRARY_LINK_OPTS) $(OBJS)
+ 
+ .$(C).$(OBJ):
+-	$(C_COMPILER) -c $(C_FLAGS) $<       
++	$(C_COMPILER) -c $(C_FLAGS) $< -o $@
+ 
+ .$(CPP).$(OBJ):
+-	$(CPLUSPLUS_COMPILER) -c $(CPLUSPLUS_FLAGS) $<
++	$(CPLUSPLUS_COMPILER) -c $(CPLUSPLUS_FLAGS) $< -o $@
+ 
+ UsageEnvironment.$(CPP):	include/UsageEnvironment.hh
+ include/UsageEnvironment.hh:	include/UsageEnvironment_version.hh include/Boolean.hh include/strDup.hh
+--- live555/BasicUsageEnvironment/Makefile.tail	2017-01-26 13:05:38.302032000 +0100
++++ live555/BasicUsageEnvironment/Makefile.tail.msvc	2017-01-26 13:03:20.849020800 +0100
+@@ -35,8 +35,8 @@ install: install1 $(INSTALL2)
+ install1: libBasicUsageEnvironment.$(LIB_SUFFIX)
+ 	  install -d $(DESTDIR)$(PREFIX)/include/BasicUsageEnvironment $(DESTDIR)$(LIBDIR)
+ 	  install -m 644 include/*.hh $(DESTDIR)$(PREFIX)/include/BasicUsageEnvironment
+-	  install -m 644 libBasicUsageEnvironment.$(LIB_SUFFIX) $(DESTDIR)$(LIBDIR)
+-install_shared_libraries: libBasicUsageEnvironment.$(LIB_SUFFIX)
++	  install -m 644 BasicUsageEnvironment.$(LIB_SUFFIX) $(DESTDIR)$(LIBDIR)
++install_shared_libraries: BasicUsageEnvironment.$(LIB_SUFFIX)
+ 	  ln -fs $(NAME).$(LIB_SUFFIX) $(DESTDIR)$(LIBDIR)/$(NAME).$(SHORT_LIB_SUFFIX)
+ 	  ln -fs $(NAME).$(LIB_SUFFIX) $(DESTDIR)$(LIBDIR)/$(NAME).so
+ 
+--- live555/groupsock/Makefile.tail	2017-01-26 13:05:34.094319500 +0100
++++ live555/groupsock/Makefile.tail.msvc	2017-01-26 13:03:27.793162100 +0100
+@@ -37,7 +37,7 @@ install: install1 $(INSTALL2)
+ install1: libgroupsock.$(LIB_SUFFIX)
+ 	  install -d $(DESTDIR)$(PREFIX)/include/groupsock $(DESTDIR)$(LIBDIR)
+ 	  install -m 644 include/*.hh include/*.h $(DESTDIR)$(PREFIX)/include/groupsock
+-	  install -m 644 libgroupsock.$(LIB_SUFFIX) $(DESTDIR)$(LIBDIR)
++	  install -m 644 groupsock.$(LIB_SUFFIX) $(DESTDIR)$(LIBDIR)
+ install_shared_libraries: libgroupsock.$(LIB_SUFFIX)
+ 	  ln -fs libgroupsock.$(LIB_SUFFIX) $(DESTDIR)$(LIBDIR)/libgroupsock.$(SHORT_LIB_SUFFIX)
+ 	  ln -fs libgroupsock.$(LIB_SUFFIX) $(DESTDIR)$(LIBDIR)/libgroupsock.so
+--- live555/liveMedia/Makefile.tail	2017-01-26 13:05:32.064845200 +0100
++++ live555/liveMedia/Makefile.tail.msvc	2017-01-26 13:04:01.003062500 +0100
+@@ -396,7 +396,7 @@ install: install1 $(INSTALL2)
+ install1: $(LIVEMEDIA_LIB)
+ 	 install -d $(DESTDIR)$(PREFIX)/include/liveMedia $(DESTDIR)$(LIBDIR)
+ 	 install -m 644 include/*.hh $(DESTDIR)$(PREFIX)/include/liveMedia
+-	 install -m 644 $(LIVEMEDIA_LIB) $(DESTDIR)$(LIBDIR)
++	 install -m 644 liveMedia.$(LIB_SUFFIX) $(DESTDIR)$(LIBDIR)
+ install_shared_libraries: $(LIVEMEDIA_LIB)
+ 	 ln -fs $(NAME).$(LIB_SUFFIX) $(DESTDIR)$(LIBDIR)/$(NAME).$(SHORT_LIB_SUFFIX)
+ 	 ln -fs $(NAME).$(LIB_SUFFIX) $(DESTDIR)$(LIBDIR)/$(NAME).so
+--- live555/UsageEnvironment/Makefile.tail	2017-01-26 13:05:36.286516600 +0100
++++ live555/UsageEnvironment/Makefile.tail.msvc	2017-01-26 13:03:18.729271500 +0100
+@@ -29,7 +29,7 @@ install: install1 $(INSTALL2)
+ install1: $(USAGE_ENVIRONMENT_LIB)
+ 	  install -d $(DESTDIR)$(PREFIX)/include/UsageEnvironment $(DESTDIR)$(LIBDIR)
+ 	  install -m 644 include/*.hh $(DESTDIR)$(PREFIX)/include/UsageEnvironment
+-	  install -m 644 $(USAGE_ENVIRONMENT_LIB) $(DESTDIR)$(LIBDIR)
++	  install -m 644 UsageEnvironment.$(LIB_SUFFIX) $(DESTDIR)$(LIBDIR)
+ install_shared_libraries: $(USAGE_ENVIRONMENT_LIB)
+ 	  ln -fs $(NAME).$(LIB_SUFFIX) $(DESTDIR)$(LIBDIR)/$(NAME).$(SHORT_LIB_SUFFIX)
+ 	  ln -fs $(NAME).$(LIB_SUFFIX) $(DESTDIR)$(LIBDIR)/$(NAME).so
