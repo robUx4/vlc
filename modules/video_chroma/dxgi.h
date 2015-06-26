@@ -25,6 +25,19 @@
 
 #include <dxgiformat.h>
 
+#include <vlc_common.h>
+#include <vlc_fourcc.h>
+
+typedef struct
+{
+    const char   *name;
+    DXGI_FORMAT  formatTexture;
+    vlc_fourcc_t fourcc;
+    DXGI_FORMAT  formatY;
+    DXGI_FORMAT  formatUV;
+} d3d_format_t;
+
 extern const char *DxgiFormatToStr(DXGI_FORMAT format);
+extern const d3d_format_t *GetRenderFormatList();
 
 #endif /* _VLC_VIDEOCHROMA_DXGI_H */
