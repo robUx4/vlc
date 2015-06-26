@@ -17,6 +17,9 @@ libmodplug: libmodplug-$(MODPLUG_VERSION).tar.gz .sum-modplug
 	$(UNPACK)
 	$(APPLY) $(SRC)/modplug/modplug-win32-static.patch
 	$(call pkg_static,"libmodplug.pc.in")
+ifdef HAVE_VISUALSTUDIO
+	$(APPLY) $(SRC)/modplug/msvc.patch
+endif
 	$(MOVE)
 
 .modplug: libmodplug
