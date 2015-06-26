@@ -1,0 +1,82 @@
+--- flac/src/share/grabbag/file.c       2014-11-27 02:19:47.048799900 +0100
++++ flac.ok/src/share/grabbag/file.c    2015-06-25 17:07:30.562255500 +0200
+@@ -117,6 +117,29 @@
+ FLAC__bool grabbag__file_are_same(const char *f1, const char *f2)
+ {
+ #if defined _MSC_VER || defined __MINGW32__
++# include <winapifamily.h>
++# if WINAPI_FAMILY_PARTITION(WINAPI_PARTITION_APP)
++       FLAC__bool same = false;
++       FILE_ID_INFO info1, info2;
++       HANDLE h1, h2;
++       BOOL ok = 1;
++       h1 = CreateFile_utf8(f1, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
++       h2 = CreateFile_utf8(f2, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
++       if(h1 == INVALID_HANDLE_VALUE || h2 == INVALID_HANDLE_VALUE)
++               ok = 0;
++       ok &= GetFileInformationByHandleEx(h1, FileIdInfo, &info1, sizeof(FILE_ID_INFO));
++       ok &= GetFileInformationByHandleEx(h2, FileIdInfo, &info2, sizeof(FILE_ID_INFO));
++       if(ok)
++               same =
++                       info1.VolumeSerialNumber == info2.VolumeSerialNumber &&
++                       memcmp(info1.FileId.Identifier, info2.FileId.Identifier, 16)==0;
++               ;
++       if(h1 != INVALID_HANDLE_VALUE)
++               CloseHandle(h1);
++       if(h2 != INVALID_HANDLE_VALUE)
++               CloseHandle(h2);
++       return same;
++# else
+        /* see
+         * http://www.hydrogenaudio.org/forums/index.php?showtopic=49439&pid=444300&st=0
+         *  http://msdn.microsoft.com/library/default.asp?url=/library/en-us/fileio/fs/getfileinformationbyhandle.asp
+@@ -145,6 +168,7 @@
+        if(h2 != INVALID_HANDLE_VALUE)
+                CloseHandle(h2);
+        return same;
++#endif
+ #else
+        struct flac_stat_s s1, s2;
+        return f1 && f2 && flac_stat(f1, &s1) == 0 && flac_stat(f2, &s2) == 0 && s1.st_ino == s2.st_ino && s1.st_dev == s2.st_dev;
+
+--- flac/src/share/win_utf8_io/win_utf8_io.c    2014-11-27 02:19:47.052799900 +0100
++++ flac.ok/src/share/win_utf8_io/win_utf8_io.c 2015-06-25 17:53:05.203668000 +0200
+@@ -42,6 +42,7 @@
+ #include <stdarg.h>
+ #define WIN32_LEAN_AND_MEAN
+ #include <windows.h> /* for WideCharToMultiByte and MultiByteToWideChar */
++#include <winapifamily.h>
+
+ #include "share/win_utf8_io.h"
+
+@@ -163,9 +164,11 @@
+ int win_get_console_width(void)
+ {
+        int width = 80;
++#if WINAPI_FAMILY_PARTITION(WINAPI_PARTITION_DESKTOP)
+        CONSOLE_SCREEN_BUFFER_INFO csbi;
+        HANDLE hOut = GetStdHandle(STD_OUTPUT_HANDLE);
+        if (GetConsoleScreenBufferInfo(hOut, &csbi) != 0) width = csbi.dwSize.X;
++#endif
+        return width;
+ }
+
+@@ -173,6 +176,9 @@
+
+ int print_console(FILE *stream, const wchar_t *text, size_t len)
+ {
++#if !WINAPI_FAMILY_PARTITION(WINAPI_PARTITION_DESKTOP)
++       return 0;
++#else
+        static HANDLE hOut;
+        static HANDLE hErr;
+        DWORD out;
+@@ -189,6 +195,7 @@
+                if (ret < 0) return ret;
+                return len;
+        }
++#endif
+ }
+
+ int printf_utf8(const char *format, ...)
+
