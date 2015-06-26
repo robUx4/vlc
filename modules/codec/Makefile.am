@@ -353,7 +353,8 @@ endif
 
 libd3d11va_plugin_la_SOURCES = \
 	codec/avcodec/d3d11va.c codec/avcodec/directx_va.c codec/avcodec/directx_va.h \
-	packetizer/h264_nal.c packetizer/h264_nal.h
+	packetizer/h264_nal.c packetizer/h264_nal.h \
+	video_chroma/dxgi.c video_chroma/dxgi.h
 libd3d11va_plugin_la_LIBADD = -lole32 -luuid
 if HAVE_AVCODEC_D3D11VA
 codec_LTLIBRARIES += libd3d11va_plugin.la
