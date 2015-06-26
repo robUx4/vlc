@@ -27,6 +27,9 @@ endif
 endif
 	$(call pkg_static,"src/libFLAC/flac.pc.in")
 	$(UPDATE_AUTOCONFIG)
+ifdef HAVE_VISUALSTUDIO
+	$(APPLY) $(SRC)/flac/msvc.patch
+endif
 	$(MOVE)
 
 FLACCONF := $(HOSTCONF) \
@@ -48,7 +51,7 @@ FLAC_CFLAGS += -mstackrealign
 endif
 
 ifdef HAVE_WIN32
-FLACCFLAGS="-DFLAC__NO_DLL"
+	FLAC_CFLAGS="-DFLAC__NO_DLL"
 endif
 
 DEPS_flac = ogg $(DEPS_ogg)
