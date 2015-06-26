@@ -633,148 +633,142 @@ static int DxSetupOutput(vlc_va_t *va, const GUID *input, const video_format_t *
     }
 #endif
 
-    /* */
-    BOOL is_supported = false;
+    DXGI_FORMAT processorInput[4];
+    int idx = 0;
+    if ( va->sys->render != DXGI_FORMAT_UNKNOWN )
+        processorInput[idx++] = va->sys->render;
 #if 0
-    hr = ID3D11VideoDevice_CheckVideoDecoderFormat((ID3D11VideoDevice*) dx_sys->d3ddec, input, DXGI_FORMAT_NV12, &is_supported);
-    if (SUCCEEDED(hr) && is_supported)
-        msg_Dbg(va, "NV12 is supported for output");
+    processorInput[idx++] = DXGI_FORMAT_NV12;
 #endif
+    processorInput[idx++] = DXGI_FORMAT_420_OPAQUE;
+    processorInput[idx++] = DXGI_FORMAT_UNKNOWN;
 
-    if ( !is_supported )
+    /* */
+    for (idx = 0; processorInput[idx] != DXGI_FORMAT_UNKNOWN; ++idx)
     {
         BOOL is_supported = false;
-        hr = ID3D11VideoDevice_CheckVideoDecoderFormat((ID3D11VideoDevice*) dx_sys->d3ddec, input, DXGI_FORMAT_420_OPAQUE, &is_supported);
+        hr = ID3D11VideoDevice_CheckVideoDecoderFormat((ID3D11VideoDevice*) dx_sys->d3ddec, input, processorInput[idx], &is_supported);
         if (SUCCEEDED(hr) && is_supported)
-            msg_Dbg(va, "I420 OPAQUE is supported for output");
+            msg_Dbg(va, "%s is supported for output", DxgiFormatToStr(processorInput[idx]));
         else
         {
-            msg_Dbg(va, "Can't get a video output format for the video.");
-            return VLC_EGENERIC;
+            msg_Dbg(va, "Can't get a decoder for output format %s.", DxgiFormatToStr(processorInput[idx]));
+            continue;
         }
 
-        ID3D11VideoProcessorEnumerator *processorEnumerator;
-        D3D11_VIDEO_PROCESSOR_CONTENT_DESC processorDesc = {
-            .InputFrameFormat = D3D11_VIDEO_FRAME_FORMAT_PROGRESSIVE,   /* TODO */
-            .InputFrameRate = {
-                .Numerator   = fmt->i_frame_rate,
-                .Denominator = fmt->i_frame_rate_base,
-            },
-            .InputWidth   = fmt->i_width,
-            .InputHeight  = fmt->i_height,
-            .OutputWidth  = fmt->i_width,
-            .OutputHeight = fmt->i_height,
-            .Usage = D3D11_VIDEO_USAGE_PLAYBACK_NORMAL,
-        };
-        hr = ID3D11VideoDevice_CreateVideoProcessorEnumerator((ID3D11VideoDevice*) dx_sys->d3ddec, &processorDesc, &processorEnumerator);
-        if ( processorEnumerator == NULL )
-        {
-            msg_Dbg(va, "Can't get a video processor for the video.");
-            return VLC_EGENERIC;
-        }
+        // check if we can create render texture of that format
+        // check the decoder can output to that format
+        const UINT i_quadSupportFlags = D3D11_FORMAT_SUPPORT_TEXTURE2D | D3D11_FORMAT_SUPPORT_SHADER_LOAD;
+        UINT i_formatSupport;
+        bool b_needsProcessor = true;
+        if( SUCCEEDED( ID3D11Device_CheckFormatSupport((ID3D11Device*) dx_sys->d3ddev,
+                                                       processorInput[idx],
+                                                       &i_formatSupport)) &&
+                ( i_formatSupport & i_quadSupportFlags ) == i_quadSupportFlags )
+            b_needsProcessor = false;
 
-        UINT flags;
-#ifndef NDEBUG
-        for (int format = 0; format < 188; format++) {
-            hr = ID3D11VideoProcessorEnumerator_CheckVideoProcessorFormat(processorEnumerator, format, &flags);
-            if (SUCCEEDED(hr) && (flags & D3D11_VIDEO_PROCESSOR_FORMAT_SUPPORT_INPUT))
-                msg_Dbg(va, "processor format %s is supported for input", DxgiFormatToStr(format));
-            if (SUCCEEDED(hr) && (flags & D3D11_VIDEO_PROCESSOR_FORMAT_SUPPORT_OUTPUT))
-                msg_Dbg(va, "processor format %s is supported for output", DxgiFormatToStr(format));
-        }
-#endif
-        DXGI_FORMAT decoderOutput = DXGI_FORMAT_UNKNOWN;
-        if ( va->sys->render != DXGI_FORMAT_UNKNOWN )
+        if ( b_needsProcessor )
         {
-            hr = ID3D11VideoProcessorEnumerator_CheckVideoProcessorFormat(processorEnumerator, va->sys->render, &flags);
-            if (FAILED(hr) && !(flags & D3D11_VIDEO_PROCESSOR_FORMAT_SUPPORT_OUTPUT))
-                msg_Dbg(va, "processor format %s not supported for output", DxgiFormatToStr(va->sys->render));
-            else
-                decoderOutput = va->sys->render;
-        }
-
-        if (decoderOutput == DXGI_FORMAT_UNKNOWN)
-        {
-            // check if we can create render texture of that format
-            // check the decoder can output to that format
-            const UINT i_quadSupportFlags = D3D11_FORMAT_SUPPORT_TEXTURE2D | D3D11_FORMAT_SUPPORT_SHADER_LOAD;
-            for (const d3d_format_t *output = GetRenderFormatList();
-                 output->name != NULL; ++output)
+            ID3D11VideoProcessorEnumerator *processorEnumerator;
+            D3D11_VIDEO_PROCESSOR_CONTENT_DESC processorDesc = {
+                .InputFrameFormat = D3D11_VIDEO_FRAME_FORMAT_PROGRESSIVE,   /* TODO */
+                .InputFrameRate = {
+                    .Numerator   = fmt->i_frame_rate,
+                    .Denominator = fmt->i_frame_rate_base,
+                },
+                .InputWidth   = fmt->i_width,
+                .InputHeight  = fmt->i_height,
+                .OutputWidth  = fmt->i_width,
+                .OutputHeight = fmt->i_height,
+                .Usage = D3D11_VIDEO_USAGE_PLAYBACK_NORMAL,
+            };
+            hr = ID3D11VideoDevice_CreateVideoProcessorEnumerator((ID3D11VideoDevice*) dx_sys->d3ddec, &processorDesc, &processorEnumerator);
+            if ( processorEnumerator == NULL )
             {
-                UINT i_formatSupport;
-                if( SUCCEEDED( ID3D11Device_CheckFormatSupport((ID3D11Device*) dx_sys->d3ddev,
-                                                               output->formatTexture,
-                                                               &i_formatSupport)) &&
-                        ( i_formatSupport & i_quadSupportFlags ) == i_quadSupportFlags )
-                {
-                    msg_Dbg(va, "Render pixel format %s supported", DxgiFormatToStr(output->formatTexture) );
+                msg_Dbg(va, "Can't get a video processor for the video.");
+                continue;
+            }
 
-                    hr = ID3D11VideoProcessorEnumerator_CheckVideoProcessorFormat(processorEnumerator, output->formatTexture, &flags);
-                    if (FAILED(hr) && !(flags & D3D11_VIDEO_PROCESSOR_FORMAT_SUPPORT_OUTPUT))
+            UINT flags;
+#ifndef NDEBUG
+            for (int format = 0; format < 188; format++) {
+                hr = ID3D11VideoProcessorEnumerator_CheckVideoProcessorFormat(processorEnumerator, format, &flags);
+                if (SUCCEEDED(hr) && (flags & D3D11_VIDEO_PROCESSOR_FORMAT_SUPPORT_INPUT))
+                    msg_Dbg(va, "processor format %s is supported for input", DxgiFormatToStr(format));
+                if (SUCCEEDED(hr) && (flags & D3D11_VIDEO_PROCESSOR_FORMAT_SUPPORT_OUTPUT))
+                    msg_Dbg(va, "processor format %s is supported for output", DxgiFormatToStr(format));
+            }
+#endif
+            DXGI_FORMAT processorOutput = DXGI_FORMAT_UNKNOWN;
+            if ( va->sys->render != DXGI_FORMAT_UNKNOWN )
+            {
+                hr = ID3D11VideoProcessorEnumerator_CheckVideoProcessorFormat(processorEnumerator, va->sys->render, &flags);
+                if (FAILED(hr) && !(flags & D3D11_VIDEO_PROCESSOR_FORMAT_SUPPORT_OUTPUT))
+                    msg_Dbg(va, "processor format %s not supported for output", DxgiFormatToStr(va->sys->render));
+                else
+                    processorOutput = va->sys->render;
+            }
+
+            if (processorOutput == DXGI_FORMAT_UNKNOWN)
+            {
+                // check if we can create render texture of that format
+                // check the decoder can output to that format
+                const UINT i_quadSupportFlags = D3D11_FORMAT_SUPPORT_TEXTURE2D | D3D11_FORMAT_SUPPORT_SHADER_LOAD;
+                for (const d3d_format_t *output = GetRenderFormatList();
+                     output->name != NULL; ++output)
+                {
+                    UINT i_formatSupport;
+                    if( SUCCEEDED( ID3D11Device_CheckFormatSupport((ID3D11Device*) dx_sys->d3ddev,
+                                                                   output->formatTexture,
+                                                                   &i_formatSupport)) &&
+                            ( i_formatSupport & i_quadSupportFlags ) == i_quadSupportFlags )
                     {
-                        msg_Dbg(va, "Processor format %s not supported for output", DxgiFormatToStr(output->formatTexture));
-                    }
-                    else
-                    {
-                        decoderOutput = output->formatTexture;
-                        break;
+                        msg_Dbg(va, "Render pixel format %s supported", DxgiFormatToStr(output->formatTexture) );
+
+                        hr = ID3D11VideoProcessorEnumerator_CheckVideoProcessorFormat(processorEnumerator, output->formatTexture, &flags);
+                        if (FAILED(hr) && !(flags & D3D11_VIDEO_PROCESSOR_FORMAT_SUPPORT_OUTPUT))
+                            msg_Dbg(va, "Processor format %s not supported for output", DxgiFormatToStr(output->formatTexture));
+                        else
+                        {
+                            processorOutput = output->formatTexture;
+                            break;
+                        }
                     }
                 }
             }
-        }
 
-        if (decoderOutput != DXGI_FORMAT_UNKNOWN)
-        {
-            D3D11_VIDEO_PROCESSOR_CAPS processorCaps;
-
-            msg_Dbg(va, "Using processor output %s", DxgiFormatToStr(decoderOutput));
-
-            hr = ID3D11VideoProcessorEnumerator_GetVideoProcessorCaps(processorEnumerator, &processorCaps);
-
-            ID3D11VideoProcessor *opaque_processor = NULL;
-            for (UINT type = 0; type < processorCaps.RateConversionCapsCount; ++type)
+            if (processorOutput != DXGI_FORMAT_UNKNOWN)
             {
-                hr = ID3D11VideoDevice_CreateVideoProcessor((ID3D11VideoDevice*) dx_sys->d3ddec, processorEnumerator, type, &opaque_processor);
-                if (SUCCEEDED(hr))
-                    break;
-                opaque_processor = NULL;
-            }
-            if (opaque_processor != NULL)
-            {
-                va->sys->d3dprocessor = opaque_processor;
-                va->sys->processor_output = decoderOutput;
-            }
+                D3D11_VIDEO_PROCESSOR_CAPS processorCaps;
 
+                hr = ID3D11VideoProcessorEnumerator_GetVideoProcessorCaps(processorEnumerator, &processorCaps);
+
+                ID3D11VideoProcessor *opaque_processor = NULL;
+                for (UINT type = 0; type < processorCaps.RateConversionCapsCount; ++type)
+                {
+                    hr = ID3D11VideoDevice_CreateVideoProcessor((ID3D11VideoDevice*) dx_sys->d3ddec, processorEnumerator, type, &opaque_processor);
+                    if (SUCCEEDED(hr))
+                        break;
+                    opaque_processor = NULL;
+                }
+
+                if (opaque_processor != NULL)
+                {
+                    msg_Dbg(va, "Using processor %s to %s", DxgiFormatToStr(processorInput[idx]), DxgiFormatToStr(processorOutput));
+
+                    va->sys->d3dprocessor     = opaque_processor;
+                    va->sys->processor_output = processorOutput;
+                    va->sys->render           = processorInput[idx];
+                    ID3D11VideoProcessorEnumerator_Release(processorEnumerator);
+                    return VLC_SUCCESS;
+                }
+
+            }
+            ID3D11VideoProcessorEnumerator_Release(processorEnumerator);
         }
-        ID3D11VideoProcessorEnumerator_Release(processorEnumerator);
     }
 
-    if ( va->sys->render != DXGI_FORMAT_UNKNOWN )
-    {
-        is_supported = false;
-        hr = ID3D11VideoDevice_CheckVideoDecoderFormat((ID3D11VideoDevice*) dx_sys->d3ddec, input, va->sys->render, &is_supported);
-        if (SUCCEEDED(hr) && is_supported)
-        {
-            /* We have our solution */
-            msg_Dbg(va, "Using decoder output from picture source.");
-            return VLC_SUCCESS;
-        }
-        msg_Dbg(va, "Output format from picture source not supported.");
-        return VLC_EGENERIC;
-    }
-    else
-    {
-        /* */
-        is_supported = false;
-        hr = ID3D11VideoDevice_CheckVideoDecoderFormat((ID3D11VideoDevice*) dx_sys->d3ddec, input, DXGI_FORMAT_NV12, &is_supported);
-        if (SUCCEEDED(hr) && is_supported)
-        {
-            /* We have our solution */
-            msg_Dbg(va, "Using decoder output NV12");
-            va->sys->render = DXGI_FORMAT_NV12;
-            return VLC_SUCCESS;
-        }
-    }
+    msg_Dbg(va, "Output format from picture source not supported.");
     return VLC_EGENERIC;
 }
 
