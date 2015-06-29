@@ -67,11 +67,11 @@ typedef struct
     ID3D11ShaderResourceView  *d3dresViewUV;
     ID3D11PixelShader         *d3dpixelShader;
 } d3d_quad_t;
+#endif
 
 #if VLC_WINSTORE_APP
 extern const GUID GUID_SWAPCHAIN_WIDTH;
 extern const GUID GUID_SWAPCHAIN_HEIGHT;
-#endif
 #endif
 
 /*****************************************************************************
