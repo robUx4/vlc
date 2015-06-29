@@ -25,6 +25,7 @@
 # include "config.h"
 #endif
 
+#include <assert.h>
 #include <vlc_common.h>
 #include <vlc_plugin.h>
 #include <vlc_vout_display.h>
@@ -526,9 +527,9 @@ static picture_pool_t *Pool(vout_display_t *vd, unsigned pool_size)
     texDesc.SampleDesc.Count = 1;
     texDesc.MiscFlags = 0; //D3D11_RESOURCE_MISC_SHARED;
     texDesc.ArraySize = 1;
-    texDesc.Usage = D3D11_USAGE_DYNAMIC;
-    texDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
-    texDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+    texDesc.Usage = D3D11_USAGE_DEFAULT;
+    texDesc.BindFlags = D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE;
+    texDesc.CPUAccessFlags = 0;
 
     unsigned surface_count;
     for (surface_count = 0; surface_count < pool_size; surface_count++) {
@@ -1060,29 +1061,31 @@ static int Direct3D11Open(vout_display_t *vd, video_format_t *fmt)
         sys->d3dregion_format = DXGI_FORMAT_UNKNOWN;
     }
 
-    switch (fmt->i_chroma)
+    sys->d3dPxShader = globPixelShaderDefault;
+    if (sys->picQuadConfig.textureFormat == DXGI_FORMAT_R8_UNORM)
     {
-    case VLC_CODEC_NV12:
-    case VLC_CODEC_D3D11_OPAQUE:
-        if( fmt->i_height > 576 )
-            sys->d3dPxShader = globPixelShaderBiplanarYUV_BT709_2RGB;
-        else
-            sys->d3dPxShader = globPixelShaderBiplanarYUV_BT601_2RGB;
-        break;
-    case VLC_CODEC_YV12:
-    case VLC_CODEC_I420:
-        if( fmt->i_height > 576 )
-            sys->d3dPxShader = globPixelShaderBiplanarI420_BT709_2RGB;
-        else
-            sys->d3dPxShader = globPixelShaderBiplanarI420_BT601_2RGB;
-        break;
-    case VLC_CODEC_RGB32:
-    case VLC_CODEC_BGRA:
-    case VLC_CODEC_RGB16:
-    default:
-        sys->d3dPxShader = globPixelShaderDefault;
-        break;
+        switch (fmt->i_chroma)
+        {
+        case VLC_CODEC_NV12:
+        case VLC_CODEC_D3D11_OPAQUE:
+            if( fmt->i_height > 576 )
+                sys->d3dPxShader = globPixelShaderBiplanarYUV_BT709_2RGB;
+            else
+                sys->d3dPxShader = globPixelShaderBiplanarYUV_BT601_2RGB;
+            break;
+        case VLC_CODEC_YV12:
+        case VLC_CODEC_I420:
+            if( fmt->i_height > 576 )
+                sys->d3dPxShader = globPixelShaderBiplanarI420_BT709_2RGB;
+            else
+                sys->d3dPxShader = globPixelShaderBiplanarI420_BT601_2RGB;
+            break;
+        default:
+            vlc_assert_unreachable();
+            break;
+        }
     }
+
     if (sys->d3dregion_format != DXGI_FORMAT_UNKNOWN)
         sys->psz_rgbaPxShader = globPixelShaderDefault;
     else
