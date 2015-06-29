@@ -69,6 +69,9 @@ endif
 ifneq ($(findstring $(origin STRIP),undefined default),)
 STRIP := strip
 endif
+ifneq ($(findstring $(origin WIDL),undefined default),)
+WIDL := widl
+endif
 else
 ifneq ($(findstring $(origin CC),undefined default),)
 CC := $(HOST)-gcc
@@ -88,6 +91,9 @@ endif
 ifneq ($(findstring $(origin STRIP),undefined default),)
 STRIP := $(HOST)-strip
 endif
+ifneq ($(findstring $(origin WIDL),undefined default),)
+WIDL := $(HOST)-widl
+endif
 endif
 
 ifdef HAVE_ANDROID
@@ -96,7 +102,7 @@ CXX := $(HOST)-g++ --sysroot=$(ANDROID_NDK)/platforms/$(ANDROID_API)/arch-$(PLAT
 endif
 
 ifdef HAVE_MACOSX
-MIN_OSX_VERSION=10.6
+MIN_OSX_VERSION=10.7
 CC=xcrun cc
 CXX=xcrun c++
 AR=xcrun ar
@@ -104,7 +110,8 @@ LD=xcrun ld
 STRIP=xcrun strip
 RANLIB=xcrun ranlib
 EXTRA_CFLAGS += -isysroot $(MACOSX_SDK) -mmacosx-version-min=$(MIN_OSX_VERSION) -DMACOSX_DEPLOYMENT_TARGET=$(MIN_OSX_VERSION)
-EXTRA_LDFLAGS += -Wl,-syslibroot,$(MACOSX_SDK) -mmacosx-version-min=$(MIN_OSX_VERSION) -isysroot $(MACOSX_SDK) -DMACOSX_DEPLOYMENT_TARGET=$(MIN_OSX_VERSION)
+EXTRA_CXXFLAGS += -stdlib=libc++
+EXTRA_LDFLAGS += -Wl,-syslibroot,$(MACOSX_SDK) -mmacosx-version-min=$(MIN_OSX_VERSION) -lc++ -isysroot $(MACOSX_SDK) -DMACOSX_DEPLOYMENT_TARGET=$(MIN_OSX_VERSION)
 ifeq ($(ARCH),x86_64)
 EXTRA_CFLAGS += -m64
 EXTRA_LDFLAGS += -m64
@@ -170,7 +177,7 @@ cppcheck = $(shell $(CC) $(CFLAGS) -E -dM - < /dev/null | grep -E $(1))
 EXTRA_CFLAGS += -I$(PREFIX)/include
 CPPFLAGS := $(CPPFLAGS) $(EXTRA_CFLAGS)
 CFLAGS := $(CFLAGS) $(EXTRA_CFLAGS)
-CXXFLAGS := $(CXXFLAGS) $(EXTRA_CFLAGS)
+CXXFLAGS := $(CXXFLAGS) $(EXTRA_CFLAGS) $(EXTRA_CXXFLAGS)
 EXTRA_LDFLAGS += -L$(PREFIX)/lib
 LDFLAGS := $(LDFLAGS) $(EXTRA_LDFLAGS)
 

@@ -25,6 +25,7 @@
 # include "config.h"
 #endif
 
+#include <assert.h>
 #include <vlc_common.h>
 #include <vlc_plugin.h>
 #include <vlc_vout_display.h>
@@ -33,10 +34,9 @@
 #define INITGUID
 #include <d3d11.h>
 
-/* avoided until we can pass ISwapchainPanel without c++/cx mode
-# include <windows.ui.xaml.media.dxinterop.h> */
-
 #include "common.h"
+
+#include "../../video_chroma/dxgi.h"
 
 #if !VLC_WINSTORE_APP
 # if USE_DXGI
@@ -78,39 +78,7 @@ vlc_module_begin ()
     set_callbacks(Open, Close)
 vlc_module_end ()
 
-typedef struct
-{
-    const char   *name;
-    DXGI_FORMAT  formatTexture;
-    vlc_fourcc_t fourcc;
-    DXGI_FORMAT  formatY;
-    DXGI_FORMAT  formatUV;
-} d3d_format_t;
-
-static const d3d_format_t d3d_formats[] = {
-    { "I420",     DXGI_FORMAT_NV12,           VLC_CODEC_I420,     DXGI_FORMAT_R8_UNORM,           DXGI_FORMAT_R8G8_UNORM },
-    { "YV12",     DXGI_FORMAT_NV12,           VLC_CODEC_YV12,     DXGI_FORMAT_R8_UNORM,           DXGI_FORMAT_R8G8_UNORM },
-    { "NV12",     DXGI_FORMAT_NV12,           VLC_CODEC_NV12,     DXGI_FORMAT_R8_UNORM,           DXGI_FORMAT_R8G8_UNORM },
-    { "VA_NV12",  DXGI_FORMAT_NV12,           VLC_CODEC_D3D11_OPAQUE, DXGI_FORMAT_R8_UNORM,       DXGI_FORMAT_R8G8_UNORM },
-#ifdef BROKEN_PIXEL
-    { "YUY2",     DXGI_FORMAT_YUY2,           VLC_CODEC_I422,     DXGI_FORMAT_R8G8B8A8_UNORM,     0 },
-    { "AYUV",     DXGI_FORMAT_AYUV,           VLC_CODEC_YUVA,     DXGI_FORMAT_R8G8B8A8_UNORM,     0 },
-    { "Y416",     DXGI_FORMAT_Y416,           VLC_CODEC_I444_16L, DXGI_FORMAT_R16G16B16A16_UINT,  0 },
-#endif
-#ifdef UNTESTED
-    { "P010",     DXGI_FORMAT_P010,           VLC_CODEC_I420_10L, DXGI_FORMAT_R16_UNORM,          DXGI_FORMAT_R16_UNORM },
-    { "Y210",     DXGI_FORMAT_Y210,           VLC_CODEC_I422_10L, DXGI_FORMAT_R16G16B16A16_UNORM, 0 },
-    { "Y410",     DXGI_FORMAT_Y410,           VLC_CODEC_I444_10L, DXGI_FORMAT_R10G10B10A2_UNORM,  0 },
-    { "NV11",     DXGI_FORMAT_NV11,           VLC_CODEC_I411,     DXGI_FORMAT_R8_UNORM,           DXGI_FORMAT_R8G8_UNORM },
-#endif
-    { "R8G8B8A8", DXGI_FORMAT_R8G8B8A8_UNORM, VLC_CODEC_RGBA,     DXGI_FORMAT_R8G8B8A8_UNORM,     0 },
-    { "B8G8R8A8", DXGI_FORMAT_B8G8R8A8_UNORM, VLC_CODEC_BGRA,     DXGI_FORMAT_B8G8R8A8_UNORM,     0 },
-    { "R8G8B8X8", DXGI_FORMAT_B8G8R8X8_UNORM, VLC_CODEC_RGB32,    DXGI_FORMAT_B8G8R8X8_UNORM,     0 },
-    { "B5G6R5",   DXGI_FORMAT_B5G6R5_UNORM,   VLC_CODEC_RGB16,    DXGI_FORMAT_B5G6R5_UNORM,       0 },
-
-    { NULL, 0, 0, 0, 0}
-};
-
+#ifdef HAVE_ID3D11VIDEODECODER 
 #ifdef HAVE_ID3D11VIDEODECODER 
 /* VLC_CODEC_D3D11_OPAQUE */
 struct picture_sys_t
@@ -474,6 +442,9 @@ static int Open(vlc_object_t *object)
     IDXGISwapChain_AddRef     (sys->dxgiswapChain);
     ID3D11Device_AddRef       (sys->d3ddevice);
     ID3D11DeviceContext_AddRef(sys->d3dcontext);
+    IDXGISwapChain_AddRef     (sys->dxgiswapChain);
+    ID3D11Device_AddRef       (sys->d3ddevice);
+    ID3D11DeviceContext_AddRef(sys->d3dcontext);
 #endif
 
     if (CommonInit(vd))
@@ -560,9 +531,9 @@ static picture_pool_t *Pool(vout_display_t *vd, unsigned pool_size)
     texDesc.SampleDesc.Count = 1;
     texDesc.MiscFlags = 0; //D3D11_RESOURCE_MISC_SHARED;
     texDesc.ArraySize = 1;
-    texDesc.Usage = D3D11_USAGE_DYNAMIC;
-    texDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
-    texDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+    texDesc.Usage = D3D11_USAGE_DEFAULT;
+    texDesc.BindFlags = D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE;
+    texDesc.CPUAccessFlags = 0;
 
     unsigned surface_count;
     for (surface_count = 0; surface_count < pool_size; surface_count++) {
@@ -889,7 +860,7 @@ static int Direct3D11Open(vout_display_t *vd, video_format_t *fmt)
 
 #if !VLC_WINSTORE_APP
 
-    UINT creationFlags = 0;
+    UINT creationFlags = D3D11_CREATE_DEVICE_VIDEO_SUPPORT;
     HRESULT hr = S_OK;
 
 # if !defined(NDEBUG) && defined(_MSC_VER)
@@ -1028,20 +999,21 @@ static int Direct3D11Open(vout_display_t *vd, video_format_t *fmt)
     // look for the request pixel format first
     UINT i_quadSupportFlags = D3D11_FORMAT_SUPPORT_TEXTURE2D | D3D11_FORMAT_SUPPORT_SHADER_LOAD;
     UINT i_formatSupport;
-    for (unsigned i = 0; d3d_formats[i].name != 0; i++)
+    for (const d3d_format_t *output_format = GetRenderFormatList();
+         output_format->name != NULL; ++output_format)
     {
-        if( i_src_chroma == d3d_formats[i].fourcc)
+        if( i_src_chroma == output_format->fourcc)
         {
             if( SUCCEEDED( ID3D11Device_CheckFormatSupport(sys->d3ddevice,
-                                                           d3d_formats[i].formatTexture,
+                                                           output_format->formatTexture,
                                                            &i_formatSupport)) &&
                     ( i_formatSupport & i_quadSupportFlags ) == i_quadSupportFlags )
             {
-                msg_Dbg(vd, "Using pixel format %s", d3d_formats[i].name );
-                fmt->i_chroma = d3d_formats[i].fourcc;
-                sys->picQuadConfig.textureFormat      = d3d_formats[i].formatTexture;
-                sys->picQuadConfig.resourceFormatYRGB = d3d_formats[i].formatY;
-                sys->picQuadConfig.resourceFormatUV   = d3d_formats[i].formatUV;
+                msg_Dbg(vd, "Using pixel format %s", output_format->name );
+                fmt->i_chroma = output_format->fourcc;
+                sys->picQuadConfig.textureFormat      = output_format->formatTexture;
+                sys->picQuadConfig.resourceFormatYRGB = output_format->formatY;
+                sys->picQuadConfig.resourceFormatUV   = output_format->formatUV;
                 break;
             }
         }
@@ -1050,18 +1022,19 @@ static int Direct3D11Open(vout_display_t *vd, video_format_t *fmt)
     // look for any pixel format that we can handle
     if ( !fmt->i_chroma )
     {
-        for (unsigned i = 0; d3d_formats[i].name != 0; i++)
+        for (const d3d_format_t *output_format = GetRenderFormatList();
+             output_format->name != NULL; ++output_format)
         {
             if( SUCCEEDED( ID3D11Device_CheckFormatSupport(sys->d3ddevice,
-                                                           d3d_formats[i].formatTexture,
+                                                           output_format->formatTexture,
                                                            &i_formatSupport)) &&
                     ( i_formatSupport & i_quadSupportFlags ) == i_quadSupportFlags )
             {
-                msg_Dbg(vd, "Using pixel format %s", d3d_formats[i].name );
-                fmt->i_chroma = d3d_formats[i].fourcc;
-                sys->picQuadConfig.textureFormat      = d3d_formats[i].formatTexture;
-                sys->picQuadConfig.resourceFormatYRGB = d3d_formats[i].formatY;
-                sys->picQuadConfig.resourceFormatUV   = d3d_formats[i].formatUV;
+                msg_Dbg(vd, "Using pixel format %s", output_format->name );
+                fmt->i_chroma = output_format->fourcc;
+                sys->picQuadConfig.textureFormat      = output_format->formatTexture;
+                sys->picQuadConfig.resourceFormatYRGB = output_format->formatY;
+                sys->picQuadConfig.resourceFormatUV   = output_format->formatUV;
                 break;
             }
         }
@@ -1092,29 +1065,31 @@ static int Direct3D11Open(vout_display_t *vd, video_format_t *fmt)
         sys->d3dregion_format = DXGI_FORMAT_UNKNOWN;
     }
 
-    switch (fmt->i_chroma)
+    sys->d3dPxShader = globPixelShaderDefault;
+    if (sys->picQuadConfig.textureFormat == DXGI_FORMAT_R8_UNORM)
     {
-    case VLC_CODEC_NV12:
-    case VLC_CODEC_D3D11_OPAQUE:
-        if( fmt->i_height > 576 )
-            sys->d3dPxShader = globPixelShaderBiplanarYUV_BT709_2RGB;
-        else
-            sys->d3dPxShader = globPixelShaderBiplanarYUV_BT601_2RGB;
-        break;
-    case VLC_CODEC_YV12:
-    case VLC_CODEC_I420:
-        if( fmt->i_height > 576 )
-            sys->d3dPxShader = globPixelShaderBiplanarI420_BT709_2RGB;
-        else
-            sys->d3dPxShader = globPixelShaderBiplanarI420_BT601_2RGB;
-        break;
-    case VLC_CODEC_RGB32:
-    case VLC_CODEC_BGRA:
-    case VLC_CODEC_RGB16:
-    default:
-        sys->d3dPxShader = globPixelShaderDefault;
-        break;
+        switch (fmt->i_chroma)
+        {
+        case VLC_CODEC_NV12:
+        case VLC_CODEC_D3D11_OPAQUE:
+            if( fmt->i_height > 576 )
+                sys->d3dPxShader = globPixelShaderBiplanarYUV_BT709_2RGB;
+            else
+                sys->d3dPxShader = globPixelShaderBiplanarYUV_BT601_2RGB;
+            break;
+        case VLC_CODEC_YV12:
+        case VLC_CODEC_I420:
+            if( fmt->i_height > 576 )
+                sys->d3dPxShader = globPixelShaderBiplanarI420_BT709_2RGB;
+            else
+                sys->d3dPxShader = globPixelShaderBiplanarI420_BT601_2RGB;
+            break;
+        default:
+            vlc_assert_unreachable();
+            break;
+        }
     }
+
     if (sys->d3dregion_format != DXGI_FORMAT_UNKNOWN)
         sys->psz_rgbaPxShader = globPixelShaderDefault;
     else

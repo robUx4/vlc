@@ -35,6 +35,7 @@
 #include <stdlib.h>                                      /* malloc(), free() */
 #include <string.h>
 #include <vlc_common.h>
+#include <vlc_atomic.h>
 #include <vlc_keys.h>
 #include <vlc_dialog.h>
 #include <vlc_url.h>
@@ -77,7 +78,6 @@
 /*****************************************************************************
  * Local prototypes.
  *****************************************************************************/
-static void Run (intf_thread_t *p_intf);
 
 static void updateProgressPanel (void *, const char *, float);
 static bool checkProgressPanel (void *);
@@ -100,9 +100,10 @@ static int BossCallback(vlc_object_t *, const char *,
 #pragma mark -
 #pragma mark VLC Interface Object Callbacks
 
-static bool b_intf_starting = false;
-static vlc_mutex_t start_mutex = VLC_STATIC_MUTEX;
-static vlc_cond_t  start_cond = VLC_STATIC_COND;
+static atomic_bool b_intf_starting = ATOMIC_VAR_INIT(false);
+
+static NSLock * o_vout_provider_lock = nil;
+
 
 /*****************************************************************************
  * OpenIntf: initialize interface
@@ -114,13 +115,34 @@ int OpenIntf (vlc_object_t *p_this)
 
     intf_thread_t *p_intf = (intf_thread_t*) p_this;
     msg_Dbg(p_intf, "Starting macosx interface");
-    Run(p_intf);
+
+    [VLCApplication sharedApplication];
+
+    o_vout_provider_lock = [[NSLock alloc] init];
+
+    [[VLCMain sharedInstance] setIntf: p_intf];
+
+    [NSBundle loadNibNamed: @"MainMenu" owner: NSApp];
+
+    [NSBundle loadNibNamed:@"MainWindow" owner: [VLCMain sharedInstance]];
+    [[[VLCMain sharedInstance] mainWindow] makeKeyAndOrderFront:nil];
+
+    atomic_store(&b_intf_starting, true);
 
     [o_pool release];
     return VLC_SUCCESS;
 }
 
-static NSLock * o_vout_provider_lock = nil;
+void CloseIntf (vlc_object_t *p_this)
+{
+    NSAutoreleasePool * o_pool = [[NSAutoreleasePool alloc] init];
+
+    msg_Dbg(p_this, "Closing macosx interface");
+    [[VLCMain sharedInstance] applicationWillTerminate:nil];
+    [o_vout_provider_lock release];
+    o_vout_provider_lock = nil;
+    [o_pool release];
+}
 
 static int WindowControl(vout_window_t *, int i_query, va_list);
 
@@ -132,29 +154,10 @@ int WindowOpen(vout_window_t *p_wnd, const vout_window_cfg_t *cfg)
 
     msg_Dbg(p_wnd, "Opening video window");
 
-    /*
-     * HACK: Wait 200ms for the interface to come up.
-     * WindowOpen might be called before the mac intf is started. Lets wait until OpenIntf gets called
-     * and does basic initialization. Enqueuing the vout controller request into the main loop later on
-     * ensures that the actual window is created after the interface is fully initialized
-     * (applicationDidFinishLaunching).
-     *
-     * Timeout is needed as the mac intf is not always started at all.
-     */
-    mtime_t deadline = mdate() + 200000;
-    vlc_mutex_lock(&start_mutex);
-    while (!b_intf_starting) {
-        if (vlc_cond_timedwait(&start_cond, &start_mutex, deadline)) {
-            break; // timeout
-        }
-    }
-
-    if (!b_intf_starting) {
+    if (!atomic_load(&b_intf_starting)) {
         msg_Err(p_wnd, "Cannot create vout as Mac OS X interface was not found");
-        vlc_mutex_unlock(&start_mutex);
         return VLC_EGENERIC;
     }
-    vlc_mutex_unlock(&start_mutex);
 
     NSAutoreleasePool *o_pool = [[NSAutoreleasePool alloc] init];
 
@@ -304,48 +307,6 @@ void WindowClose(vout_window_t *p_wnd)
     [o_vout_provider_lock unlock];
 
     [o_pool release];
-}
-
-/* Used to abort the app.exec() on OSX after libvlc_Quit is called */
-#include "../../../lib/libvlc_internal.h" /* libvlc_SetExitHandler */
-
-static void QuitVLC( void *obj )
-{
-    [[VLCApplication sharedApplication] performSelectorOnMainThread:@selector(terminate:) withObject:nil waitUntilDone:NO];
-}
-
-/*****************************************************************************
- * Run: main loop
- *****************************************************************************/
-static NSLock * o_appLock = nil;    // controls access to f_appExit
-
-static void Run(intf_thread_t *p_intf)
-{
-    NSAutoreleasePool * o_pool = [[NSAutoreleasePool alloc] init];
-    [VLCApplication sharedApplication];
-
-    o_appLock = [[NSLock alloc] init];
-    o_vout_provider_lock = [[NSLock alloc] init];
-
-    libvlc_SetExitHandler(p_intf->p_libvlc, QuitVLC, p_intf);
-    [[VLCMain sharedInstance] setIntf: p_intf];
-
-    vlc_mutex_lock(&start_mutex);
-    b_intf_starting = true;
-    vlc_cond_signal(&start_cond);
-    vlc_mutex_unlock(&start_mutex);
-
-    [NSBundle loadNibNamed: @"MainMenu" owner: NSApp];
-
-    [NSApp run];
-    msg_Dbg(p_intf, "Run loop has been stopped");
-    [[VLCMain sharedInstance] applicationWillTerminate:nil];
-    [o_appLock release];
-    [o_vout_provider_lock release];
-    o_vout_provider_lock = nil;
-    [o_pool release];
-
-    raise(SIGTERM);
 }
 
 #pragma mark -
@@ -785,12 +746,6 @@ static VLCMain *_o_sharedMainInstance = nil;
     items_at_launch = p_playlist->p_local_category->i_children;
     PL_UNLOCK;
 
-    [NSBundle loadNibNamed:@"MainWindow" owner: self];
-
-    // This cannot be called directly here, as the main loop is not running yet so it would have no effect.
-    // So lets enqueue it into the loop for later execution.
-    [o_mainwindow performSelector:@selector(makeKeyAndOrderFront:) withObject:nil afterDelay:0];
-
 #ifdef HAVE_SPARKLE
     [[SUUpdater sharedUpdater] setDelegate:self];
 #endif
@@ -854,29 +809,19 @@ static VLCMain *_o_sharedMainInstance = nil;
     PL_UNLOCK;
 }
 
-/* don't allow a double termination call. If the user has
- * already invoked the quit then simply return this time. */
-static bool f_appExit = false;
-
 #pragma mark -
 #pragma mark Termination
 
 - (BOOL)isTerminating
 {
-    return f_appExit;
+    return b_intf_terminating;
 }
 
 - (void)applicationWillTerminate:(NSNotification *)notification
 {
-    bool isTerminating;
-
-    [o_appLock lock];
-    isTerminating = f_appExit;
-    f_appExit = true;
-    [o_appLock unlock];
-
-    if (isTerminating)
+    if (b_intf_terminating)
         return;
+    b_intf_terminating = true;
 
     [self resumeItunesPlayback:nil];
 

@@ -52,9 +52,10 @@ namespace adaptative
 
             bool    start(demux_t *);
 
-            Stream::status demux(mtime_t);
+            Stream::status demux(mtime_t, bool);
             mtime_t getDuration() const;
             mtime_t getPCR() const;
+            mtime_t getFirstDTS() const;
             int     getGroup() const;
             int     esCount() const;
             bool    setPosition(mtime_t);

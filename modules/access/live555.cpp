@@ -28,12 +28,6 @@
  * Preamble
  *****************************************************************************/
 
-/* For inttypes.h
- * Note: config.h may include inttypes.h, so make sure we define this option
- * early enough. */
-#define __STDC_CONSTANT_MACROS 1
-#define __STDC_LIMIT_MACROS 1
-
 #ifdef HAVE_CONFIG_H
 # include "config.h"
 #endif
@@ -67,8 +61,6 @@
 extern "C" {
 #include "../access/mms/asf.h"  /* Who said ugly ? */
 }
-
-using namespace std;
 
 /*****************************************************************************
  * Module descriptor
@@ -109,7 +101,7 @@ vlc_module_begin ()
 
     add_submodule ()
         set_description( N_("RTSP/RTP access and demux") )
-        add_shortcut( "rtsp", "pnm", "live", "livedotcom" )
+        add_shortcut( "rtsp", "pnm", "live", "livedotcom", "satip" )
         set_capability( "access_demux", 0 )
         set_callbacks( Open, Close )
         add_bool( "rtsp-tcp", false,
@@ -339,6 +331,17 @@ static int  Open ( vlc_object_t *p_this )
         while( (p = strchr( p, ' ' )) != NULL ) *p = '+';
     }
 
+    if( strcasecmp( p_demux->psz_access, "satip" ) == 0 )
+    {
+        asprintf(&p_sys->p_sdp, "v=0\r\n"
+                "o=- 0 %s\r\n"
+                "s=SATIP:stream\r\n"
+                "i=SATIP RTP Stream\r\n"
+                "m=video 0 RTP/AVP 33\r\n"
+                "a=control:rtsp://%s\r\n\r\n",
+                p_sys->url.psz_host, p_sys->psz_path);
+    }
+
     if( p_demux->s != NULL )
     {
         /* Gather the complete sdp file */
@@ -531,7 +534,15 @@ static void continueAfterOPTIONS( RTSPClient* client, int result_code,
       result_code == 0
       && result_string != NULL
       && strstr( result_string, "GET_PARAMETER" ) != NULL;
-    client->sendDescribeCommand( continueAfterDESCRIBE );
+    if( p_sys->p_sdp == NULL )
+    {
+        client->sendDescribeCommand( continueAfterDESCRIBE );
+    }
+    else
+    {
+        p_sys->b_error = false;
+        p_sys->event_rtsp = 1;
+    }
     delete[] result_string;
 }
 
@@ -1216,9 +1227,9 @@ static int Play( demux_t *p_demux )
         if( p_sys->i_timeout <= 0 )
             p_sys->i_timeout = 60; /* default value from RFC2326 */
 
-        /* start timeout-thread only if GET_PARAMETER is supported by the server */
-        /* or start it if wmserver dialect, since they don't report that GET_PARAMETER is supported correctly */
-        if( !p_sys->p_timeout && ( p_sys->b_get_param || var_InheritBool( p_demux, "rtsp-wmserver" ) ) )
+        /* start timeout-thread. GET_PARAMETER will be used if supported by
+         * the server. OPTIONS will be used as a fallback */
+        if( !p_sys->p_timeout )
         {
             msg_Dbg( p_demux, "We have a timeout of %d seconds",  p_sys->i_timeout );
             p_sys->p_timeout = (timeout_thread_t *)malloc( sizeof(timeout_thread_t) );
@@ -1267,7 +1278,13 @@ static int Demux( demux_t *p_demux )
     if( p_sys->b_timeout_call && p_sys->rtsp && p_sys->ms )
     {
         char *psz_bye = NULL;
-        p_sys->rtsp->sendGetParameterCommand( *p_sys->ms, NULL, psz_bye );
+        /* Use GET_PARAMETERS if supported. wmserver dialect supports
+         * it, but does not report this properly. */
+        if( p_sys->b_get_param || var_GetBool( p_demux, "rtsp-wmserver" ) )
+            p_sys->rtsp->sendGetParameterCommand( *p_sys->ms, NULL, psz_bye );
+        else
+            p_sys->rtsp->sendOptionsCommand(NULL, NULL);
+
         p_sys->b_timeout_call = false;
     }
 

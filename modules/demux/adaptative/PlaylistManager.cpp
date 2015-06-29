@@ -19,12 +19,6 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston MA 02110-1301, USA.
  *****************************************************************************/
 
-/* config.h may include inttypes.h, so make sure we define that option
- * early enough. */
-#define __STDC_FORMAT_MACROS
-#define __STDC_CONSTANT_MACROS
-#define __STDC_LIMIT_MACROS
-
 #ifdef HAVE_CONFIG_H
 # include "config.h"
 #endif
@@ -117,7 +111,7 @@ bool PlaylistManager::start(demux_t *demux)
     return true;
 }
 
-Stream::status PlaylistManager::demux(mtime_t nzdeadline)
+Stream::status PlaylistManager::demux(mtime_t nzdeadline, bool send)
 {
     Stream::status i_return = Stream::status_eof;
 
@@ -127,7 +121,7 @@ Stream::status PlaylistManager::demux(mtime_t nzdeadline)
             continue;
 
         Stream::status i_ret =
-                streams[type]->demux(conManager, nzdeadline);
+                streams[type]->demux(conManager, nzdeadline, send);
 
         if(i_ret == Stream::status_buffering)
         {
@@ -154,6 +148,19 @@ mtime_t PlaylistManager::getPCR() const
             pcr = streams[type]->getPCR();
     }
     return pcr;
+}
+
+mtime_t PlaylistManager::getFirstDTS() const
+{
+    mtime_t dts = VLC_TS_INVALID;
+    for(int type=0; type<StreamTypeCount; type++)
+    {
+        if(!streams[type])
+            continue;
+        if(dts == VLC_TS_INVALID || dts > streams[type]->getFirstDTS())
+            dts = streams[type]->getFirstDTS();
+    }
+    return dts;
 }
 
 int PlaylistManager::getGroup() const

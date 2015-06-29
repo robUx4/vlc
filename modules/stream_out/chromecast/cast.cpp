@@ -33,17 +33,12 @@
 # include <poll.h>
 #endif
 
-#ifndef __STDC_CONSTANT_MACROS
-# define __STDC_CONSTANT_MACROS
-#endif
-
 #include <vlc_common.h>
 #include <vlc_plugin.h>
 #include <vlc_sout.h>
 #include <vlc_tls.h>
 #include <vlc_url.h>
 #include <vlc_threads.h>
-#include <vlc_atomic.h>
 
 #include <cerrno>
 
@@ -76,7 +71,6 @@ struct sout_stream_sys_t
         : p_tls(NULL), i_requestId(0),
           i_status(CHROMECAST_DISCONNECTED), p_out(NULL)
     {
-        atomic_init(&ab_error, false);
     }
 
     std::string serverIP;
@@ -93,7 +87,6 @@ struct sout_stream_sys_t
     std::queue<castchannel::CastMessage> messagesToSend;
 
     int i_status;
-    atomic_bool ab_error;
     vlc_mutex_t lock;
     vlc_cond_t loadCommandCond;
 
@@ -194,8 +187,6 @@ static int Send(sout_stream_t *p_stream, sout_stream_id_sys_t *id,
                 block_t *p_buffer)
 {
     sout_stream_sys_t *p_sys = p_stream->p_sys;
-    if (atomic_load(&p_sys->ab_error))
-        return VLC_EGENERIC;
 
     return p_sys->p_out->pf_send(p_sys->p_out, id, p_buffer);
 }
@@ -715,7 +706,6 @@ static int processMessage(sout_stream_t *p_stream, const castchannel::CastMessag
         else if (type == "LOAD_FAILED")
         {
             msg_Err(p_stream, "Media load failed");
-            atomic_store(&p_sys->ab_error, true);
             msgClose(p_stream, p_sys->appTransportId);
             vlc_mutex_lock(&p_sys->lock);
             p_sys->i_status = CHROMECAST_CONNECTION_DEAD;
@@ -945,7 +935,6 @@ static void* chromecastThread(void* p_data)
             msg_Err(p_stream, "The connection to the Chromecast died.");
             vlc_mutex_locker locker(&p_sys->lock);
             p_sys->i_status = CHROMECAST_CONNECTION_DEAD;
-            atomic_store(&p_sys->ab_error, true);
             break;
         }
 
@@ -981,7 +970,6 @@ static void* chromecastThread(void* p_data)
         vlc_mutex_lock(&p_sys->lock);
         if ( p_sys->i_status == CHROMECAST_CONNECTION_DEAD )
         {
-            atomic_store(&p_sys->ab_error, true);
             vlc_mutex_unlock(&p_sys->lock);
             break;
         }

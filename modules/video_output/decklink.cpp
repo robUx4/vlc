@@ -26,9 +26,6 @@
  * TODO: test non stereo audio
  */
 
-#define __STDC_FORMAT_MACROS
-#define __STDC_CONSTANT_MACROS
-
 #ifdef HAVE_CONFIG_H
 # include "config.h"
 #endif
@@ -44,7 +41,6 @@
 
 #include <vlc_block.h>
 #include <vlc_image.h>
-#include <vlc_atomic.h>
 #include <vlc_aout.h>
 #include <arpa/inet.h>
 

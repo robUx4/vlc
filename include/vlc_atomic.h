@@ -26,86 +26,13 @@
  * Atomic operations do not require locking, but they are not very powerful.
  */
 
-# if !defined (__cplusplus) && (__STDC_VERSION__ >= 201112L) \
-  && !defined (__STDC_NO_ATOMICS__)
-
+# ifndef __cplusplus
+#  if (__STDC_VERSION__ >= 201112L) && !defined (__STDC_NO_ATOMICS__)
 /*** Native C11 atomics ***/
-#  include <stdatomic.h>
+#   include <stdatomic.h>
 
-# elif defined (__cplusplus) && (__cplusplus >= 201103L) \
-  && VLC_GCC_VERSION(5, 0)
-#   include <atomic>
-using std::atomic_is_lock_free;
-using std::atomic_init;
-using std::atomic_store;
-using std::atomic_store_explicit;
-using std::atomic_load;
-using std::atomic_load_explicit;
-using std::atomic_exchange;
-using std::atomic_exchange_explicit;
-using std::atomic_compare_exchange_strong;
-using std::atomic_compare_exchange_strong_explicit;
-using std::atomic_compare_exchange_weak;
-using std::atomic_compare_exchange_weak_explicit;
-using std::atomic_fetch_add;
-using std::atomic_fetch_add_explicit;
-using std::atomic_fetch_sub;
-using std::atomic_fetch_sub_explicit;
-using std::atomic_fetch_or;
-using std::atomic_fetch_or_explicit;
-using std::atomic_fetch_xor;
-using std::atomic_fetch_xor_explicit;
-using std::atomic_fetch_and;
-using std::atomic_fetch_and_explicit;
-using std::atomic_thread_fence;
-using std::atomic_signal_fence;
-
-using std::memory_order;
-using std::memory_order_relaxed;
-using std::memory_order_consume;
-using std::memory_order_release;
-using std::memory_order_acq_rel;
-using std::memory_order_seq_cst;
-
-using std::atomic_flag;
-using std::atomic_bool;
-using std::atomic_char;
-using std::atomic_schar;
-using std::atomic_uchar;
-using std::atomic_short;
-using std::atomic_ushort;
-using std::atomic_int;
-using std::atomic_uint;
-using std::atomic_long;
-using std::atomic_ulong;
-using std::atomic_llong;
-using std::atomic_ullong;
-//using std::atomic_char16_t;
-//using std::atomic_char32_t;
-using std::atomic_wchar_t;
-using std::atomic_int_least8_t;
-using std::atomic_uint_least8_t;
-using std::atomic_int_least16_t;
-using std::atomic_uint_least16_t;
-using std::atomic_int_least32_t;
-using std::atomic_uint_least32_t;
-using std::atomic_int_least64_t;
-using std::atomic_uint_least64_t;
-using std::atomic_int_fast8_t;
-using std::atomic_uint_fast8_t;
-using std::atomic_int_fast16_t;
-using std::atomic_uint_fast16_t;
-using std::atomic_int_fast32_t;
-using std::atomic_uint_fast32_t;
-using std::atomic_int_fast64_t;
-using std::atomic_uint_fast64_t;
-using std::atomic_intptr_t;
-using std::atomic_uintptr_t;
-using std::atomic_size_t;
-using std::atomic_ptrdiff_t;
-using std::atomic_intmax_t;
-using std::atomic_uintmax_t;
-# else
+#  else
+/*** Intel/GCC atomics ***/
 
 #  define ATOMIC_FLAG_INIT false
 
@@ -126,22 +53,6 @@ using std::atomic_uintmax_t;
 #  define atomic_is_lock_free(obj) \
     false
 
-/* In principles, __sync_*() only supports int, long and long long and their
- * unsigned equivalents, i.e. 4-bytes and 8-bytes types, although GCC also
- * supports 1 and 2-bytes types. Some non-x86 architectures do not support
- * 8-byte atomic types (or not efficiently). */
-#  if defined (_MSC_VER)
-/* Some atomic operations of the Interlocked API are only
-   available for desktop apps. Thus we define the atomic types to
-   be at least 32 bits wide. */
-typedef      int_least32_t atomic_flag;
-typedef      int_least32_t atomic_bool;
-typedef      int_least32_t atomic_char;
-typedef      int_least32_t atomic_schar;
-typedef     uint_least32_t atomic_uchar;
-typedef      int_least32_t atomic_short;
-typedef     uint_least32_t atomic_ushort;
-#  else
 typedef          bool      atomic_flag;
 typedef          bool      atomic_bool;
 typedef          char      atomic_char;
@@ -149,7 +60,6 @@ typedef   signed char      atomic_schar;
 typedef unsigned char      atomic_uchar;
 typedef          short     atomic_short;
 typedef unsigned short     atomic_ushort;
-#  endif
 typedef          int       atomic_int;
 typedef unsigned int       atomic_uint;
 typedef          long      atomic_long;
@@ -181,10 +91,6 @@ typedef            size_t atomic_size_t;
 typedef         ptrdiff_t atomic_ptrdiff_t;
 typedef          intmax_t atomic_intmax_t;
 typedef         uintmax_t atomic_uintmax_t;
-
-# if defined (__GCC_HAVE_SYNC_COMPARE_AND_SWAP_4) || (defined (__clang__))
-
-/*** Intel/GCC atomics ***/
 
 #  define atomic_store(object,desired) \
     do { \
@@ -276,204 +182,7 @@ typedef         uintmax_t atomic_uintmax_t;
 #  define atomic_flag_clear_explicit(object,order) \
     atomic_flag_clear(object)
 
-# elif defined (__GNUC__)
-
-/*** No atomics ***/
-
-#  define atomic_store(object,desired) \
-    do { \
-        typeof (object) _obj = (object); \
-        typeof (*object) _des = (desired); \
-        vlc_global_lock(VLC_ATOMIC_MUTEX); \
-        *_obj = _des; \
-        vlc_global_unlock(VLC_ATOMIC_MUTEX); \
-    } while (0)
-#  define atomic_store_explicit(object,desired,order) \
-    atomic_store(object,desired)
-
-#  define atomic_load(object) \
-({ \
-    typeof (object) _obj = (object); \
-    typeof (*object) _old; \
-    vlc_global_lock(VLC_ATOMIC_MUTEX); \
-    _old = *_obj; \
-    vlc_global_unlock(VLC_ATOMIC_MUTEX); \
-    _old; \
-})
-#  define atomic_load_explicit(object,order) \
-    atomic_load(object)
-
-#  define atomic_exchange(object,desired) \
-({ \
-    typeof (object) _obj = (object); \
-    typeof (*object) _des = (desired); \
-    typeof (*object) _old; \
-    vlc_global_lock(VLC_ATOMIC_MUTEX); \
-    _old = *_obj; \
-    *_obj = _des; \
-    vlc_global_unlock(VLC_ATOMIC_MUTEX); \
-    _old; \
-})
-#  define atomic_exchange_explicit(object,desired,order) \
-    atomic_exchange(object,desired)
-
-#  define atomic_compare_exchange_strong(object,expected,desired) \
-({ \
-    typeof (object) _obj = (object); \
-    typeof (object) _exp = (expected); \
-    typeof (*object) _des = (desired); \
-    bool ret; \
-    vlc_global_lock(VLC_ATOMIC_MUTEX); \
-    ret = *_obj == *_exp; \
-    if (ret) \
-        *_obj = _des; \
-    else \
-        *_exp = *_obj; \
-    vlc_global_unlock(VLC_ATOMIC_MUTEX); \
-    ret; \
-})
-#  define atomic_compare_exchange_strong_explicit(object,expected,desired,order) \
-    atomic_compare_exchange_strong(object, expected, desired)
-#  define atomic_compare_exchange_weak(object,expected,desired) \
-    atomic_compare_exchange_strong(object, expected, desired)
-#  define atomic_compare_exchange_weak_explicit(object,expected,desired,order) \
-    atomic_compare_exchange_weak(object, expected, desired)
-
-#  define atomic_fetch_OP(object,desired,op) \
-({ \
-    typeof (object) _obj = (object); \
-    typeof (*object) _des = (desired); \
-    typeof (*object) _old; \
-    vlc_global_lock(VLC_ATOMIC_MUTEX); \
-    _old = *_obj; \
-    *_obj = (*_obj) op (_des); \
-    vlc_global_unlock(VLC_ATOMIC_MUTEX); \
-    _old; \
-})
-
-#  define atomic_fetch_add(object,operand) \
-    atomic_fetch_OP(object,operand,+)
-#  define atomic_fetch_add_explicit(object,operand,order) \
-    atomic_fetch_add(object,operand)
-
-#  define atomic_fetch_sub(object,operand) \
-    atomic_fetch_OP(object,operand,-)
-#  define atomic_fetch_sub_explicit(object,operand,order) \
-    atomic_fetch_sub(object,operand)
-
-#  define atomic_fetch_or(object,operand) \
-    atomic_fetch_OP(object,operand,|)
-#  define atomic_fetch_or_explicit(object,operand,order) \
-    atomic_fetch_or(object,operand)
-
-#  define atomic_fetch_xor(object,operand) \
-    atomic_fetch_OP(object,operand,^)
-#  define atomic_fetch_xor_explicit(object,operand,order) \
-    atomic_fetch_sub(object,operand)
-
-#  define atomic_fetch_and(object,operand) \
-    atomic_fetch_OP(object,operand,&)
-#  define atomic_fetch_and_explicit(object,operand,order) \
-    atomic_fetch_and(object,operand)
-
-#  define atomic_flag_test_and_set(object) \
-    atomic_exchange(object, true)
-
-#  define atomic_flag_test_and_set_explicit(object,order) \
-    atomic_flag_test_and_set(object)
-
-#  define atomic_flag_clear(object) \
-    atomic_store(object, false)
-
-#  define atomic_flag_clear_explicit(object,order) \
-    atomic_flag_clear(object)
-
-# elif defined (_MSC_VER)
-
-# include <windows.h>
-
-/*** Use the Interlocked API. ***/
-
-/* Define macros in order to dispatch to the correct function depending on the type.
-   Several ranges are need because some operations are not implemented for all types. */
-#  define atomic_type_dispatch_32_64(operation, object, ...) \
-    (sizeof(*object) == 4 ? operation((LONG *)object, __VA_ARGS__) : \
-    sizeof(*object) == 8 ? operation##64((LONGLONG *)object, __VA_ARGS__) : \
-    (abort(), 0))
-
-#  define atomic_type_dispatch_16_64(operation, object, ...) \
-    (sizeof(*object) == 2 ? operation##16((short *)object, __VA_ARGS__) : \
-    atomic_type_dispatch_32_64(operation, object, __VA_ARGS__))
-
-#  define atomic_type_dispatch_8_64(operation, object, ...) \
-    (sizeof(*object) == 1 ? operation##8((char *)object, __VA_ARGS__) : \
-    atomic_type_dispatch_16_64(operation, object, __VA_ARGS__))
-
-#  define atomic_store(object,desired) \
-    atomic_type_dispatch_16_64(InterlockedExchange, object, desired)
-#  define atomic_store_explicit(object,desired,order) \
-    atomic_store(object, desired)
-
-#  define atomic_load(object) \
-    atomic_type_dispatch_16_64(InterlockedCompareExchange, object, 0, 0)
-#  define atomic_load_explicit(object,order) \
-    atomic_load(object)
-
-#  define atomic_exchange(object,desired) \
-    atomic_type_dispatch_16_64(InterlockedExchange, object, desired)
-#  define atomic_exchange_explicit(object,desired,order) \
-    atomic_exchange(object, desired)
-
-#  define atomic_compare_exchange_strong(object,expected,desired) \
-    atomic_type_dispatch_16_64(InterlockedCompareExchange, object, *expected, desired) == *expected
-#  define atomic_compare_exchange_strong_explicit(object,expected,desired,order) \
-    atomic_compare_exchange_strong(object, expected, desired)
-#  define atomic_compare_exchange_weak(object,expected,desired) \
-    atomic_compare_exchange_strong(object, expected, desired)
-#  define atomic_compare_exchange_weak_explicit(object,expected,desired,order) \
-    atomic_compare_exchange_weak(object, expected, desired)
-
-#  define atomic_fetch_add(object,operand) \
-    atomic_type_dispatch_32_64(InterlockedExchangeAdd, object, operand)
-#  define atomic_fetch_add_explicit(object,operand,order) \
-    atomic_fetch_add(object, operand)
-
-#  define atomic_fetch_sub(object,operand) \
-    atomic_type_dispatch_32_64(InterlockedExchangeAdd, object, -(LONGLONG)operand)
-#  define atomic_fetch_sub_explicit(object,operand,order) \
-    atomic_fetch_sub(object, operand)
-
-#  define atomic_fetch_or(object,operand) \
-    atomic_type_dispatch_8_64(InterlockedOr, object, operand)
-#  define atomic_fetch_or_explicit(object,operand,order) \
-    atomic_fetch_or(object, operand)
-
-#  define atomic_fetch_xor(object,operand) \
-    atomic_type_dispatch_8_64(InterlockedXor, object, operand)
-#  define atomic_fetch_xor_explicit(object,operand,order) \
-    atomic_fetch_sub(object, operand)
-
-#  define atomic_fetch_and(object,operand) \
-    atomic_type_dispatch_8_64(InterlockedAnd, object, operand)
-#  define atomic_fetch_and_explicit(object,operand,order) \
-    atomic_fetch_and(object, operand)
-
-#  define atomic_flag_test_and_set(object) \
-    atomic_exchange(object, true)
-
-#  define atomic_flag_test_and_set_explicit(object,order) \
-    atomic_flag_test_and_set(object)
-
-#  define atomic_flag_clear(object) \
-    atomic_store(object, false)
-
-#  define atomic_flag_clear_explicit(object,order) \
-    atomic_flag_clear(object)
-
-# else
-#  error FIXME: implement atomic operations for this compiler.
-# endif
-# endif
+# endif /* !C11 */
 
 typedef atomic_uint_least32_t vlc_atomic_float;
 
@@ -499,5 +208,10 @@ static inline void vlc_atomic_store_float(vlc_atomic_float *atom, float f)
     u.f = f;
     atomic_store(atom, u.i);
 }
+
+# else /* C++ */
+/*** Native C++11 atomics ***/
+#   include <atomic>
+# endif /* C++ */
 
 #endif

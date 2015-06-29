@@ -10,7 +10,7 @@ endif
 VLC-dev.app: VLC-tmp
 	rm -Rf $@
 	cp -R VLC-tmp $@
-	$(INSTALL) -m 0755 $(top_builddir)/bin/.libs/vlc $@/Contents/MacOS/VLC
+	$(INSTALL) -m 0755 $(top_builddir)/bin/.libs/vlc-osx $@/Contents/MacOS/VLC
 	$(LN_S) -f ../../../modules $@/Contents/MacOS/plugins
 
 # VLC.app for packaging and giving it to your friends
@@ -25,7 +25,7 @@ VLC.app: VLC-tmp
 	rm -Rf $@/Contents/Frameworks/BGHUDAppKit.framework/Versions/A/Resources/README.textile
 
 
-VLC-tmp: vlc
+VLC-tmp:
 	$(AM_V_GEN)for i in src lib share; do \
 		(cd $$i && $(MAKE) $(AM_MAKEFLAGS) install $(silentstd)); \
 	done

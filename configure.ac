@@ -45,6 +45,7 @@ dnl Check for tools
 dnl
 AC_PROG_CC_C99
 AC_USE_SYSTEM_EXTENSIONS
+VLC_PROG_CC_C11
 AC_DEFINE([_FORTIFY_SOURCE], 2, [Define to 2 to get glibc warnings.])
 AC_DEFINE([_FILE_OFFSET_BITS], 64, [Define to 64 for large files support.])
 AH_TOP([
@@ -69,8 +70,10 @@ AM_PROG_AS
 AC_ARG_VAR([DESKTOP_FILE_VALIDATE], [Validator for desktop entry files])
 AC_CHECK_PROGS(DESKTOP_FILE_VALIDATE, [${DESKTOP_FILE_VALIDATE} desktop-file-validate], :)
 AC_PATH_PROG(YASM, yasm)
-AC_ARG_VAR([BUILDCC], [Build system C99 compiler command])
-AC_PATH_PROGS(BUILDCC, [c99-gcc c99])
+AC_ARG_VAR([BUILDCC], [Build system C11 or C99 compiler command])
+AC_PATH_PROGS(BUILDCC, [c11-gcc c11 c99-gcc c99], [
+  AC_MSG_ERROR([Cannot find native C99 compiler: please define BUILDCC.])
+])
 
 dnl Check for compiler properties
 AC_C_CONST
@@ -163,11 +166,11 @@ case "${host_os}" in
     esac
 
     SYS=darwin
-    CFLAGS="${CFLAGS} -D_INTL_REDIRECT_MACROS ${ARCH_flag}"
-    CXXFLAGS="${CXXFLAGS} -D_INTL_REDIRECT_MACROS ${ARCH_flag}"
+    CFLAGS="${CFLAGS} -D_INTL_REDIRECT_MACROS -std=gnu11 ${ARCH_flag}"
+    CXXFLAGS="${CXXFLAGS} -D_INTL_REDIRECT_MACROS -stdlib=libc++ ${ARCH_flag}"
     CPPFLAGS="${CPPFLAGS} ${ARCH_flag}"
-    OBJCFLAGS="${OBJCFLAGS} -D_INTL_REDIRECT_MACROS -std=gnu99 ${ARCH_flag}"
-    LDFLAGS="${LDFLAGS} -Wl,-headerpad_max_install_names ${ARCH_flag}"
+    OBJCFLAGS="${OBJCFLAGS} -D_INTL_REDIRECT_MACROS -std=gnu11 ${ARCH_flag}"
+    LDFLAGS="${LDFLAGS} -lc++ -Wl,-headerpad_max_install_names ${ARCH_flag}"
     VLC_ADD_LIBS([libvlc vlc],[-Wl,-undefined,dynamic_lookup,-framework,AppKit])
     VLC_ADD_LIBS([libvlccore],[-Wl,-framework,CoreFoundation,-framework,CoreServices])
 
@@ -3256,16 +3259,6 @@ PKG_ENABLE_MODULES_VLC([SVG], [], [librsvg-2.0 >= 2.9.0], [SVG rendering library
 PKG_ENABLE_MODULES_VLC([SVGDEC], [], [librsvg-2.0 >= 2.9.0 cairo >= 1.13.1], [SVG image decoder library],[auto])
 
 dnl
-dnl  android surface module
-dnl
-AC_ARG_ENABLE(android-surface,
-  [  --enable-android-surface   Android Surface video output module (default disabled)])
-if test "${enable_android_surface}" = "yes"; then
-     VLC_ADD_PLUGIN([android_surface])
-     VLC_ADD_PLUGIN([android_window])
-fi
-
-dnl
 dnl  Windows DirectX module
 dnl
 
@@ -3798,18 +3791,12 @@ AC_ARG_ENABLE(macosx,
   [  --enable-macosx         Mac OS X gui support (default enabled on Mac OS X)])
 if test "x${enable_macosx}" != "xno" -a "${SYS}" = "darwin"
 then
-  VLC_ADD_LIBS([macosx], [-Wl,-framework,Cocoa -Wl,-framework,Carbon -Wl,-framework,CoreServices])
-  VLC_ADD_OBJCFLAGS([macosx], [-fobjc-exceptions] )
   VLC_ADD_PLUGIN([macosx])
-
-  VLC_ADD_LIBS([macosx], [-Wl,-framework,QTKit -Wl,-framework,IOKit -Wl,-framework,AddressBook -Wl,-framework,WebKit -Wl,-framework,CoreAudio -Wl,-framework,SystemConfiguration -Wl,-framework,ScriptingBridge])
 
   if test ! -d ${CONTRIB_DIR}/BGHUDAppKit.framework
   then
     AC_MSG_ERROR([BGHUDAppKit framework is required and was not found in ${CONTRIB_DIR}])
   fi
-  VLC_ADD_LIBS([macosx], [-F${CONTRIB_DIR} -Wl,-framework,BGHUDAppKit])
-  VLC_ADD_OBJCFLAGS([macosx], [-F${CONTRIB_DIR}])
 fi
 AM_CONDITIONAL(ENABLE_MACOSX_UI, [test "$enable_macosx" != "no"])
 
@@ -3824,8 +3811,7 @@ then
   then
     AC_MSG_ERROR([Sparkle framework is required and was not found in ${CONTRIB_DIR}])
   fi
-  VLC_ADD_LIBS([macosx], [-F${CONTRIB_DIR} -Wl,-framework,Sparkle])
-  VLC_ADD_OBJCFLAGS([macosx], [-F${CONTRIB_DIR}])
+
   AC_DEFINE([HAVE_SPARKLE], [1], [Define to 1 if sparkle is enabled.])
 fi
 AM_CONDITIONAL(HAVE_SPARKLE, [test "$enable_sparkle" != "no"])
@@ -3838,11 +3824,8 @@ AC_ARG_ENABLE(minimal-macosx,
   [  --enable-minimal-macosx Minimal Mac OS X support (default disabled)])
 if test "${enable_minimal_macosx}" = "yes" -a "${SYS}" = "darwin"
 then
-  VLC_ADD_LIBS([minimal_macosx], [-Wl,-framework,Cocoa])
-  VLC_ADD_OBJCFLAGS([minimal_macosx], [-fobjc-exceptions] )
   VLC_ADD_PLUGIN([minimal_macosx])
 fi
-AM_CONDITIONAL(ENABLE_MINIMAL_MACOSX, [test "$enable_minimal_macosx" != "no"])
 
 dnl
 dnl  MacOS X dialog provider
@@ -3852,10 +3835,8 @@ AC_ARG_ENABLE(macosx-dialog-provider,
 if test "x${enable_macosx_dialog_provider}" != "xno" &&
   (test "${SYS}" = "darwin" || test "${enable_macosx_dialog_provider}" = "yes")
 then
-  VLC_ADD_LIBS([macosx_dialog_provider],[-Wl,-framework,Cocoa])
   VLC_ADD_PLUGIN([macosx_dialog_provider])
 fi
-AM_CONDITIONAL(ENABLE_MACOSX_DIALOG_PROVIDER, [test "$enable_macosx_dialog_provider" != "no"])
 
 dnl
 dnl  ncurses module
@@ -4176,10 +4157,7 @@ AC_CONFIG_FILES([
   lib/Makefile
   bin/Makefile
   test/Makefile
-  modules/gui/ios_dialog_provider/Makefile
   modules/gui/macosx/Makefile
-  modules/gui/minimal_macosx/Makefile
-  modules/gui/macosx_dialog_provider/Makefile
   modules/gui/qt4/Makefile
   modules/gui/skins2/Makefile
   modules/hw/mmal/Makefile

@@ -17,7 +17,6 @@
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston MA 02110-1301, USA.
  *****************************************************************************/
-#define __STDC_CONSTANT_MACROS
 #include "Streams.hpp"
 #include "StreamsType.hpp"
 #include "http/HTTPConnection.hpp"
@@ -108,6 +107,11 @@ mtime_t Stream::getPCR() const
     return output->getPCR();
 }
 
+mtime_t Stream::getFirstDTS() const
+{
+    return output->getFirstDTS();
+}
+
 int Stream::getGroup() const
 {
     return output->getGroup();
@@ -139,7 +143,7 @@ bool Stream::seekAble() const
     return (output && output->seekAble());
 }
 
-Stream::status Stream::demux(HTTPConnectionManager *connManager, mtime_t nz_deadline)
+Stream::status Stream::demux(HTTPConnectionManager *connManager, mtime_t nz_deadline, bool send)
 {
     if(nz_deadline + VLC_TS_0 > output->getPCR()) /* not already demuxed */
     {
@@ -151,7 +155,8 @@ Stream::status Stream::demux(HTTPConnectionManager *connManager, mtime_t nz_dead
             return Stream::status_buffering;
     }
 
-    output->sendToDecoder(nz_deadline);
+    if(send)
+        output->sendToDecoder(nz_deadline);
     return Stream::status_demuxed;
 }
 
@@ -282,6 +287,7 @@ BaseStreamOutput::BaseStreamOutput(demux_t *demux, const std::string &name) :
     seekable = true;
     restarting = false;
     demuxstream = NULL;
+    b_drop = false;
 
     fakeesout = new es_out_t;
     if (!fakeesout)
@@ -315,6 +321,30 @@ BaseStreamOutput::~BaseStreamOutput()
     vlc_mutex_destroy(&lock);
 }
 
+mtime_t BaseStreamOutput::getFirstDTS() const
+{
+    mtime_t ret = VLC_TS_INVALID;
+    vlc_mutex_lock(const_cast<vlc_mutex_t *>(&lock));
+    std::list<Demuxed *>::const_iterator it;
+    for(it=queues.begin(); it!=queues.end();++it)
+    {
+        const Demuxed *pair = *it;
+        const block_t *p_block = pair->p_queue;
+        while( p_block && p_block->i_dts == VLC_TS_INVALID )
+        {
+            p_block = p_block->p_next;
+        }
+
+        if(p_block)
+        {
+            ret = p_block->i_dts;
+            break;
+        }
+    }
+    vlc_mutex_unlock(const_cast<vlc_mutex_t *>(&lock));
+    return ret;
+}
+
 int BaseStreamOutput::esCount() const
 {
     return queues.size();
@@ -341,12 +371,20 @@ void BaseStreamOutput::setPosition(mtime_t nztime)
         if(pair->p_queue && pair->p_queue->i_dts > VLC_TS_0 + nztime)
             pair->drop();
     }
-    pcr = VLC_TS_INVALID;
+    /* disable appending until restarted */
+    b_drop = true;
     vlc_mutex_unlock(&lock);
-    es_out_Control(realdemux->out, ES_OUT_SET_NEXT_DISPLAY_TIME,
-                   VLC_TS_0 + nztime);
+
     if(reinitsOnSeek())
         restart();
+
+    vlc_mutex_lock(&lock);
+    b_drop = false;
+    pcr = VLC_TS_INVALID;
+    vlc_mutex_unlock(&lock);
+
+    es_out_Control(realdemux->out, ES_OUT_SET_NEXT_DISPLAY_TIME,
+                   VLC_TS_0 + nztime);
 }
 
 bool BaseStreamOutput::restart()
@@ -487,14 +525,21 @@ int BaseStreamOutput::esOutSend(es_out_t *fakees, es_out_id_t *p_es, block_t *p_
 {
     BaseStreamOutput *me = (BaseStreamOutput *) fakees->p_sys;
     vlc_mutex_lock(&me->lock);
-    std::list<Demuxed *>::const_iterator it;
-    for(it=me->queues.begin(); it!=me->queues.end();++it)
+    if(me->b_drop)
     {
-        Demuxed *pair = *it;
-        if(pair->es_id == p_es)
+        block_ChainRelease( p_block );
+    }
+    else
+    {
+        std::list<Demuxed *>::const_iterator it;
+        for(it=me->queues.begin(); it!=me->queues.end();++it)
         {
-            block_ChainLastAppend(&pair->pp_queue_last, p_block);
-            break;
+            Demuxed *pair = *it;
+            if(pair->es_id == p_es)
+            {
+                block_ChainLastAppend(&pair->pp_queue_last, p_block);
+                break;
+            }
         }
     }
     vlc_mutex_unlock(&me->lock);
@@ -539,13 +584,17 @@ int BaseStreamOutput::esOutControl(es_out_t *fakees, int i_query, va_list args)
     BaseStreamOutput *me = (BaseStreamOutput *) fakees->p_sys;
     if (i_query == ES_OUT_SET_PCR )
     {
+        vlc_mutex_lock(&me->lock);
         me->pcr = (int64_t)va_arg( args, int64_t );
+        vlc_mutex_unlock(&me->lock);
         return VLC_SUCCESS;
     }
     else if( i_query == ES_OUT_SET_GROUP_PCR )
     {
+        vlc_mutex_lock(&me->lock);
         me->group = (int) va_arg( args, int );
         me->pcr = (int64_t)va_arg( args, int64_t );
+        vlc_mutex_unlock(&me->lock);
         return VLC_SUCCESS;
     }
     else if( i_query == ES_OUT_GET_ES_STATE )
@@ -555,7 +604,12 @@ int BaseStreamOutput::esOutControl(es_out_t *fakees, int i_query, va_list args)
         *pb = true;
         return VLC_SUCCESS;
     }
-    else if( me->restarting )
+
+    vlc_mutex_lock(&me->lock);
+    bool b_restarting = me->restarting;
+    vlc_mutex_unlock(&me->lock);
+
+    if( b_restarting )
     {
         return VLC_EGENERIC;
     }

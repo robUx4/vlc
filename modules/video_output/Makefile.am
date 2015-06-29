@@ -184,7 +184,8 @@ EXTRA_LTLIBRARIES += libdirect3d9_plugin.la
 endif
 
 libdirect3d11_plugin_la_SOURCES = video_output/msw/direct3d11.c \
- video_output/msw/common.c video_output/msw/common.h
+ video_output/msw/common.c video_output/msw/common.h \
+ video_chroma/dxgi.c video_chroma/dxgi.h
 libdirect3d11_plugin_la_CPPFLAGS = $(AM_CPPFLAGS) \
  -DMODULE_NAME_IS_direct3d11
 if !HAVE_WINSTORE
@@ -270,7 +271,8 @@ libegl_android_plugin_la_SOURCES = video_output/egl.c
 libegl_android_plugin_la_CFLAGS = $(AM_CFLAGS) $(EGL_CFLAGS) -DUSE_PLATFORM_ANDROID=1
 libegl_android_plugin_la_LIBADD = $(EGL_LIBS)
 
-libandroid_native_window_plugin_la_SOURCES = video_output/android/nativewindow.c video_output/android/utils.c
+libandroid_native_window_plugin_la_SOURCES = video_output/android/nativewindow.c \
+	video_output/android/utils.c video_output/android/utils.h
 libandroid_native_window_plugin_la_CFLAGS = $(AM_CFLAGS)
 libandroid_native_window_plugin_la_LIBADD = $(LIBDL)
 
@@ -278,18 +280,10 @@ libandroid_window_plugin_la_SOURCES = video_output/android/android_window.c vide
 libandroid_window_plugin_la_CFLAGS = $(AM_CFLAGS)
 libandroid_window_plugin_la_LIBADD = $(LIBDL)
 libandroid_window_plugin_la_LDFLAGS = $(AM_LDFLAGS) -rpath '$(voutdir)'
-EXTRA_LTLIBRARIES += libandroid_window_plugin.la
-
-libandroid_surface_plugin_la_SOURCES = video_output/android/surface.c video_output/android/utils.c video_output/android/utils.h
-libandroid_surface_plugin_la_CFLAGS = $(AM_CFLAGS)
-libandroid_surface_plugin_la_LIBADD = $(LIBDL)
-libandroid_surface_plugin_la_LDFLAGS = $(AM_LDFLAGS) -rpath '$(voutdir)'
-EXTRA_LTLIBRARIES += libandroid_surface_plugin.la
 
 if HAVE_ANDROID
-vout_LTLIBRARIES += libandroid_native_window_plugin.la
+vout_LTLIBRARIES += libandroid_native_window_plugin.la libandroid_window_plugin.la
 vout_LTLIBRARIES += $(LTLIBandroid_window)
-vout_LTLIBRARIES += $(LTLIBandroid_surface)
 if HAVE_EGL
 vout_LTLIBRARIES += libegl_android_plugin.la
 endif

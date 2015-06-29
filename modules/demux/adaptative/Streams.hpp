@@ -65,11 +65,12 @@ namespace adaptative
                     SegmentTracker *, AbstractStreamOutputFactory &);
         bool isEOF() const;
         mtime_t getPCR() const;
+        mtime_t getFirstDTS() const;
         int getGroup() const;
         int esCount() const;
         bool seekAble() const;
         typedef enum {status_eof, status_buffering, status_demuxed} status;
-        status demux(HTTPConnectionManager *, mtime_t);
+        status demux(HTTPConnectionManager *, mtime_t, bool);
         bool setPosition(mtime_t, bool);
         mtime_t getPosition() const;
         void prune();
@@ -95,6 +96,7 @@ namespace adaptative
 
         virtual void pushBlock(block_t *) = 0;
         virtual mtime_t getPCR() const;
+        virtual mtime_t getFirstDTS() const = 0;
         virtual int getGroup() const;
         virtual int esCount() const = 0;
         virtual bool seekAble() const = 0;
@@ -127,6 +129,7 @@ namespace adaptative
         BaseStreamOutput(demux_t *, const std::string &);
         virtual ~BaseStreamOutput();
         virtual void pushBlock(block_t *); /* reimpl */
+        virtual mtime_t getFirstDTS() const; /* reimpl */
         virtual int esCount() const; /* reimpl */
         virtual bool seekAble() const; /* reimpl */
         virtual void setPosition(mtime_t); /* reimpl */
@@ -161,6 +164,7 @@ namespace adaptative
             es_format_t fmtcpy;
         };
         std::list<Demuxed *> queues;
+        bool b_drop;
         vlc_mutex_t lock;
         void sendToDecoderUnlocked(mtime_t);
         bool restart();
