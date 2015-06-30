@@ -15,14 +15,10 @@ FFMPEG_GITURL := git://git.libav.org/libav.git
 endif
 
 FFMPEGCONF = \
-	--cc="$(CC)" \
-	--ld="$(LD)" \
-	--ar="$(AR)" \
-	--pkg-config="$(PKG_CONFIG)" \
 	--disable-doc \
 	--disable-encoder=vorbis \
 	--enable-libgsm \
-	--enable-libopenjpeg \
+	--disable-libopenjpeg \
 	--disable-debug \
 	--disable-avdevice \
 	--disable-devices \
@@ -201,6 +197,7 @@ ffmpeg: ffmpeg-$(HASH).tar.xz .sum-ffmpeg
 	rm -Rf $@ $@-$(HASH)
 	mkdir -p $@-$(HASH)
 	$(XZCAT) "$<" | (cd $@-$(HASH) && tar xv --strip-components=1)
+	$(APPLY) $(SRC)/ffmpeg/0001-d3d11va-WindowsPhone-requires-a-mutex-around-ID3D11V.patch
 ifdef HAVE_VISUALSTUDIO
 	$(APPLY) $(SRC)/ffmpeg/msvc.patch
 	$(APPLY) $(SRC)/ffmpeg/near_field.patch

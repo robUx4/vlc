@@ -25,11 +25,18 @@
 # include "config.h"
 #endif
 
+#if _WIN32_WINNT < 0x0600
+/* for CreateMutexEx */
+#undef _WIN32_WINNT
+#define _WIN32_WINNT 0x601
+#endif /* _WIN32_WINNT */
+
 #include <assert.h>
 #include <vlc_common.h>
 #include <vlc_plugin.h>
 #include <vlc_vout_display.h>
 
+#include <synchapi.h>
 #define COBJMACROS
 #define INITGUID
 #include <d3d11.h>
@@ -49,6 +56,7 @@
 
 DEFINE_GUID(GUID_SWAPCHAIN_WIDTH,  0xf1b59347, 0x1643, 0x411a, 0xad, 0x6b, 0xc7, 0x80, 0x17, 0x7a, 0x06, 0xb6);
 DEFINE_GUID(GUID_SWAPCHAIN_HEIGHT, 0x6ea976a0, 0x9d60, 0x4bb7, 0xa5, 0xa9, 0x7d, 0xd1, 0x18, 0x7f, 0xc9, 0xbd);
+DEFINE_GUID(GUID_CONTEXT_MUTEX,    0x472e8835, 0x3f8e, 0x4f93, 0xa0, 0xcb, 0x25, 0x79, 0x77, 0x6c, 0xed, 0x86);
 
 static int  Open(vlc_object_t *);
 static void Close(vlc_object_t *);
@@ -730,6 +738,7 @@ static void Prepare(vout_display_t *vd, picture_t *picture, subpicture_t *subpic
 {
     vout_display_sys_t *sys = vd->sys;
 
+    WaitForSingleObjectEx(sys->contextMutex, INFINITE, FALSE);
 #ifdef HAVE_ID3D11VIDEODECODER 
     if (picture->format.i_chroma == VLC_CODEC_D3D11_OPAQUE) {
         D3D11_BOX box;
@@ -800,6 +809,7 @@ static void Display(vout_display_t *vd, picture_t *picture, subpicture_t *subpic
     {
         /* TODO device lost */
     }
+    ReleaseMutex(sys->contextMutex);
 
     picture_Release(picture);
     if (subpicture)
@@ -1165,6 +1175,9 @@ static int Direct3D11CreateResources(vout_display_t *vd, video_format_t *fmt)
 {
     vout_display_sys_t *sys = vd->sys;
     HRESULT hr;
+
+    sys->contextMutex = CreateMutexEx(NULL, TEXT("DeviceContext"), 0, SYNCHRONIZE);
+    ID3D11Device_SetPrivateData(sys->d3ddevice, &GUID_CONTEXT_MUTEX, sizeof(HANDLE), &sys->contextMutex);
 
     hr = UpdateBackBuffer(vd);
     if (FAILED(hr)) {
@@ -1537,6 +1550,8 @@ static void Direct3D11DestroyResources(vout_display_t *vd)
         ID3D11DepthStencilView_Release(sys->d3ddepthStencilView);
     if (sys->pSPUPixelShader)
         ID3D11VertexShader_Release(sys->pSPUPixelShader);
+    if (sys->contextMutex)
+        CloseHandle(sys->contextMutex);
 
     msg_Dbg(vd, "Direct3D11 resources destroyed");
 }
