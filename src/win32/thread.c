@@ -488,7 +488,9 @@ retry:
         }
     }
     vlc_mutex_unlock (&super_mutex);
+#if VLC_WINSTORE_APP
     s_condvars[th->uid].p_obj = NULL;
+#endif
 
     if (th->id == NULL) /* Detached thread */
         free (th);
@@ -540,7 +542,9 @@ static int vlc_clone_attr (vlc_thread_t *p_handle, bool detached,
     }
     else
         th->id = (HANDLE)h;
+#if VLC_WINSTORE_APP
     th->uid = atomic_fetch_add(&s_nbthreads, 1) % MAX_SIMULTANEOUS_THREADS;
+#endif
 
     if (p_handle != NULL)
         *p_handle = th;

@@ -128,7 +128,7 @@ int strcasecmp (const char *, const char *);
 char *strcasestr (const char *, const char *);
 #endif
 
-#if _MSC_VER >= 1900
+#if defined(_MSC_VER) && _MSC_VER >= 1900
 #define strdup(x) _strdup(x)
 #elif !defined(HAVE_STRDUP)
 char *strdup (const char *);
@@ -174,7 +174,7 @@ lldiv_t lldiv (long long, long long);
 #endif
 
 #ifndef HAVE_STRTOF
-#if !defined(__ANDROID__) && _MSC_VER < 1900
+#if !defined(__ANDROID__) && defined(_MSC_VER) && _MSC_VER < 1900
 float strtof (const char *, char **);
 #endif
 #endif
@@ -395,7 +395,7 @@ struct addrinfo
 
 /* math.h */
 
-#if !defined(HAVE_NANF) && _MSC_VER < 1900
+#if !defined(HAVE_NANF) && defined(_MSC_VER) && _MSC_VER < 1900
 #define nanf(tagp) NAN
 #endif
 

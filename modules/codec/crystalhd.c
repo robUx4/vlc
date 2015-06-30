@@ -64,7 +64,7 @@
 #ifdef USE_DL_OPENING
 #  ifndef _MSC_VER
 #   warning DLL opening mode
-#  #endif
+#  endif
 #  define BC_FUNC( a ) Our ## a
 #  define BC_FUNC_PSYS( a ) p_sys->Our ## a
 #else
