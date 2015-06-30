@@ -401,6 +401,14 @@ static int Open(vlc_va_t *va, AVCodecContext *ctx, enum PixelFormat pix_fmt,
            msg_Err(va, "Could not Query ID3D11VideoDevice Interface from the picture. (hr=0x%lX)", hr);
         } else {
             ID3D11DeviceContext_GetDevice( p_sys->context, (ID3D11Device**) &dx_sys->d3ddev );
+
+            ID3D10Multithread *pMultithread;
+            hr = ID3D11Device_QueryInterface(dx_sys->d3ddev, &IID_ID3D10Multithread, (void **)&pMultithread);
+            if (SUCCEEDED(hr)) {
+                ID3D10Multithread_SetMultithreadProtected(pMultithread, TRUE);
+                ID3D10Multithread_Release(pMultithread);
+            }
+
             sys->d3dctx = p_sys->context;
             sys->d3dvidctx = d3dvidctx;
 
