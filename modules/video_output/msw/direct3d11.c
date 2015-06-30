@@ -79,7 +79,6 @@ vlc_module_begin ()
 vlc_module_end ()
 
 #ifdef HAVE_ID3D11VIDEODECODER 
-#ifdef HAVE_ID3D11VIDEODECODER 
 /* VLC_CODEC_D3D11_OPAQUE */
 struct picture_sys_t
 {
