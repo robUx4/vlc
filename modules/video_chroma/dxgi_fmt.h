@@ -38,6 +38,6 @@ typedef struct
 } d3d_format_t;
 
 extern const char *DxgiFormatToStr(DXGI_FORMAT format);
-extern const d3d_format_t *GetRenderFormatList();
+extern const d3d_format_t *GetRenderFormatList(void);
 
 #endif /* _VLC_VIDEOCHROMA_DXGI_H */

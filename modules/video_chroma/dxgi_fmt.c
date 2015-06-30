@@ -92,7 +92,7 @@ const char *DxgiFormatToStr(DXGI_FORMAT format)
     return NULL;
 }
 
-const d3d_format_t *GetRenderFormatList()
+const d3d_format_t *GetRenderFormatList(void)
 {
     return d3d_formats;
 }
