@@ -24,7 +24,7 @@
 # include "config.h"
 #endif
 
-#include "dxgi.h"
+#include "dxgi_fmt.h"
 
 typedef struct
 {

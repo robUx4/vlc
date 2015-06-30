@@ -354,7 +354,7 @@ endif
 libd3d11va_plugin_la_SOURCES = \
 	codec/avcodec/d3d11va.c codec/avcodec/directx_va.c codec/avcodec/directx_va.h \
 	packetizer/h264_nal.c packetizer/h264_nal.h \
-	video_chroma/dxgi.c video_chroma/dxgi.h
+	video_chroma/dxgi_fmt.c video_chroma/dxgi_fmt.h
 if !HAVE_WINSTORE
 libd3d11va_plugin_la_LIBADD = -lole32 -luuid
 else

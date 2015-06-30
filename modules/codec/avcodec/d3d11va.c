@@ -51,7 +51,7 @@
 #include <d3d11.h>
 #include <libavcodec/d3d11va.h>
 
-#include "../../video_chroma/dxgi.h"
+#include "../../video_chroma/dxgi_fmt.h"
 
 static int Open(vlc_va_t *, AVCodecContext *, enum PixelFormat,
                 const es_format_t *, picture_sys_t *p_sys);

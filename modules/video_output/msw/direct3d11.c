@@ -36,7 +36,7 @@
 
 #include "common.h"
 
-#include "../../video_chroma/dxgi.h"
+#include "../../video_chroma/dxgi_fmt.h"
 
 #if !VLC_WINSTORE_APP
 # if USE_DXGI
