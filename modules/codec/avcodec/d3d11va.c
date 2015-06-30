@@ -122,8 +122,8 @@ struct vlc_va_sys_t
     DXGI_FORMAT                  render;
 
     ID3D11DeviceContext          *d3dctx;
-#if LIBAVUTIL_VERSION_CHECK(56, 30, 0, 30, 100)
-    HANDLE                       contextMutex;
+#if VLC_WINSTORE_APP && LIBAVCODEC_VERSION_CHECK(56, 30, 0, 30, 100)
+    HANDLE                       context_mutex;
 #endif
 
     /* Video decoder */
@@ -192,8 +192,12 @@ void SetupAVCodecContext(vlc_va_t *va)
     sys->hw.cfg = &sys->cfg;
     sys->hw.surface_count = dx_sys->surface_count;
     sys->hw.surface = (ID3D11VideoDecoderOutputView**) dx_sys->hw_surface;
-#if LIBAVUTIL_VERSION_CHECK(56, 30, 0, 30, 100)
-    sys->hw.context_mutex = sys->contextMutex;
+#if LIBAVCODEC_VERSION_CHECK(56, 30, 0, 30, 100)
+#if VLC_WINSTORE_APP
+    sys->hw.context_mutex = sys->context_mutex;
+#else
+    sys->hw.context_mutex = INVALID_HANDLE_VALUE;
+#endif
 #endif
 
     if (IsEqualGUID(&dx_sys->input, &DXVA_Intel_H264_NoFGT_ClearVideo))
@@ -416,12 +420,12 @@ static int Open(vlc_va_t *va, AVCodecContext *ctx, enum PixelFormat pix_fmt,
                 ID3D10Multithread_Release(pMultithread);
             }
 
-#if LIBAVUTIL_VERSION_CHECK(56, 30, 0, 30, 100)
-            HANDLE contextMutex = INVALID_HANDLE_VALUE;
-            UINT dataSize = sizeof(contextMutex);
-            hr = ID3D11Device_GetPrivateData((ID3D11Device*) dx_sys->d3ddev, &GUID_CONTEXT_MUTEX, &dataSize, &contextMutex);
+#if VLC_WINSTORE_APP && LIBAVCODEC_VERSION_CHECK(56, 30, 0, 30, 100)
+            HANDLE context_lock = INVALID_HANDLE_VALUE;
+            UINT dataSize = sizeof(context_lock);
+            hr = ID3D11Device_GetPrivateData((ID3D11Device*)dx_sys->d3ddev, &GUID_CONTEXT_MUTEX, &dataSize, &context_lock);
             if (SUCCEEDED(hr))
-                sys->contextMutex = contextMutex;
+                sys->context_mutex = context_lock;
 #endif
 
             sys->d3dctx = p_sys->context;

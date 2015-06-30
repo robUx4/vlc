@@ -738,9 +738,9 @@ static void Prepare(vout_display_t *vd, picture_t *picture, subpicture_t *subpic
 {
     vout_display_sys_t *sys = vd->sys;
 
-    WaitForSingleObjectEx(sys->contextMutex, INFINITE, FALSE);
 #ifdef HAVE_ID3D11VIDEODECODER 
     if (picture->format.i_chroma == VLC_CODEC_D3D11_OPAQUE) {
+        WaitForSingleObjectEx(sys->context_lock, INFINITE, FALSE);
         D3D11_BOX box;
         box.left = 0;
         box.right = picture->format.i_visible_width;
@@ -809,7 +809,10 @@ static void Display(vout_display_t *vd, picture_t *picture, subpicture_t *subpic
     {
         /* TODO device lost */
     }
-    ReleaseMutex(sys->contextMutex);
+#ifdef HAVE_ID3D11VIDEODECODER 
+    if (picture->format.i_chroma == VLC_CODEC_D3D11_OPAQUE)
+        ReleaseMutex(sys->context_lock);
+#endif
 
     picture_Release(picture);
     if (subpicture)
@@ -1106,11 +1109,14 @@ static int Direct3D11Open(vout_display_t *vd, video_format_t *fmt)
 
     UpdateRects(vd, NULL, NULL, true);
 
+    WaitForSingleObjectEx(sys->context_lock, INFINITE, FALSE);
     if (Direct3D11CreateResources(vd, fmt)) {
+        ReleaseMutex(sys->context_lock);
         msg_Err(vd, "Failed to allocate resources");
         Direct3D11DestroyResources(vd);
         return VLC_EGENERIC;
     }
+    ReleaseMutex(sys->context_lock);
 
 #if !VLC_WINSTORE_APP
     EventThreadUpdateTitle(sys->event, VOUT_TITLE " (Direct3D11 output)");
@@ -1176,8 +1182,8 @@ static int Direct3D11CreateResources(vout_display_t *vd, video_format_t *fmt)
     vout_display_sys_t *sys = vd->sys;
     HRESULT hr;
 
-    sys->contextMutex = CreateMutexEx(NULL, TEXT("DeviceContext"), 0, SYNCHRONIZE);
-    ID3D11Device_SetPrivateData(sys->d3ddevice, &GUID_CONTEXT_MUTEX, sizeof(HANDLE), &sys->contextMutex);
+    sys->context_lock = CreateMutexEx(NULL, TEXT("D3DDeviceContextMutex"), 0, SYNCHRONIZE);
+    ID3D11Device_SetPrivateData(sys->d3ddevice, &GUID_CONTEXT_MUTEX, sizeof(sys->context_lock), &sys->context_lock);
 
     hr = UpdateBackBuffer(vd);
     if (FAILED(hr)) {
@@ -1550,8 +1556,8 @@ static void Direct3D11DestroyResources(vout_display_t *vd)
         ID3D11DepthStencilView_Release(sys->d3ddepthStencilView);
     if (sys->pSPUPixelShader)
         ID3D11VertexShader_Release(sys->pSPUPixelShader);
-    if (sys->contextMutex)
-        CloseHandle(sys->contextMutex);
+    if (sys->context_lock>0)
+        CloseHandle(sys->context_lock);
 
     msg_Dbg(vd, "Direct3D11 resources destroyed");
 }

@@ -184,7 +184,7 @@ struct vout_display_sys_t
 #endif
     ID3D11Device             *d3ddevice;       /* D3D device */
     ID3D11DeviceContext      *d3dcontext;      /* D3D context */
-    HANDLE                   contextMutex;
+    HANDLE                   context_lock;
     d3d_quad_t               picQuad;
     d3d_quad_cfg_t           picQuadConfig;
     ID3D11RenderTargetView   *d3drenderTargetView;
