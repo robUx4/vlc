@@ -1,0 +1,20 @@
+--- harfbuzz/autogen.sh.orig    2015-07-10 18:20:03.399104000 +0200
++++ harfbuzz/autogen.sh 2015-07-10 18:20:26.183657700 +0200
+@@ -7,11 +7,11 @@
+ olddir=`pwd`
+ cd $srcdir
+
+-echo -n "checking for ragel... "
+-which ragel || {
+-       echo "You need to install ragel... See http://www.complang.org/ragel/"
+-       exit 1
+-}
++#echo -n "checking for ragel... "
++#which ragel || {
++#      echo "You need to install ragel... See http://www.complang.org/ragel/"
++#      exit 1
++#}
+
+ echo -n "checking for pkg-config... "
+ which pkg-config || {
+
