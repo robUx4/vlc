@@ -34,6 +34,7 @@
 #include "../playlist/BaseRepresentation.h"
 #include "../playlist/BasePeriod.h"
 
+using namespace adaptative;
 using namespace adaptative::logic;
 
 RateBasedAdaptationLogic::RateBasedAdaptationLogic  (int w, int h) :

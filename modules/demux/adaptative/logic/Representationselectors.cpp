@@ -23,6 +23,7 @@
 #include "../playlist/BasePeriod.h"
 #include <limits>
 
+using namespace adaptative;
 using namespace adaptative::logic;
 
 RepresentationSelector::RepresentationSelector()

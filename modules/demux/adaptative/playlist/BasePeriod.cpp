@@ -33,6 +33,7 @@
 #include <vlc_common.h>
 #include <vlc_arrays.h>
 
+using namespace adaptative;
 using namespace adaptative::playlist;
 
 BasePeriod::BasePeriod(AbstractPlaylist *playlist_) :

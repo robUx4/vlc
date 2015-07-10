@@ -28,6 +28,7 @@
 #include "AlwaysBestAdaptationLogic.h"
 #include "Representationselectors.hpp"
 
+using namespace adaptative;
 using namespace adaptative::logic;
 using namespace adaptative::playlist;
 

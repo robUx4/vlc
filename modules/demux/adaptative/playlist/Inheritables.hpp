@@ -22,6 +22,7 @@
 
 #include "../tools/Properties.hpp"
 #include <string>
+#include <cstdint>
 
 namespace adaptative
 {

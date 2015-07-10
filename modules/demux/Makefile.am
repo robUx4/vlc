@@ -352,7 +352,7 @@ libdash_plugin_la_LIBADD = $(SOCKET_LIBS) $(LIBM)
 if HAVE_ZLIB
 libdash_plugin_la_LIBADD += -lz
 endif
-#demux_LTLIBRARIES += libdash_plugin.la
+demux_LTLIBRARIES += libdash_plugin.la
 
 
 libhls_plugin_la_SOURCES = \

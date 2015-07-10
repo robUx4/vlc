@@ -20,6 +20,7 @@
 #include "AlwaysLowestAdaptationLogic.hpp"
 #include "Representationselectors.hpp"
 
+using namespace adaptative;
 using namespace adaptative::logic;
 using namespace adaptative::playlist;
 
