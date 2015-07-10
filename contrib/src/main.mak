@@ -364,7 +364,8 @@ endif
 RECONF = mkdir -p -- $(PREFIX)/share/aclocal && \
 	cd $< && $(AUTORECONF) -fiv $(ACLOCAL_AMFLAGS)
 CMAKE = cmake . -DCMAKE_TOOLCHAIN_FILE=$(abspath toolchain.cmake) \
-		-DCMAKE_INSTALL_PREFIX=$(PREFIX)
+		-DCMAKE_INSTALL_PREFIX=$(PREFIX) \
+		$(CMAKE_TARGET)
 
 #
 # Per-package build rules
