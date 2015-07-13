@@ -158,8 +158,13 @@ ifdef HAVE_WINPHONE
 FFMPEGCONF += --target-os=win32 --extra-cflags='-D__ARM_PCS_VFP' --disable-dxva2
 else
 ifdef HAVE_WINDOWSRT
-#FFMPEGCONF += --arch=arm --cpu=armv7-a --target-os=win32 --extra-cflags='-DWINAPI_FAMILY=WINAPI_FAMILY_APP -MD -D__ARM_PCS_VFP -D_WIN32_WINNT=0x602' --disable-dxva2
-FFMPEGCONF += --target-os=win32 --extra-cflags='-D__ARM_PCS_VFP' --disable-dxva2
+#FFMPEGCONF += --arch=arm --cpu=armv7-a --target-os=win32 --extra-cflags='-DWINAPI_FAMILY=WINAPI_FAMILY_APP -MD -D__ARM_PCS_VFP -D_WIN32_WINNT=0x602' --disable-dxva2 --as=armasm
+#FFMPEGCONF += --arch=x86 --cpu=i686 --target-os=win32 --disable-dxva2
+FFMPEGCONF += --target-os=win32 --disable-dxva2
+#-D_WIN32_WINNT=0x602' 
+#-D__ARM_PCS_VFP 
+#--extra-cflags='-DWINAPI_FAMILY=WINAPI_FAMILY_APP -MD 
+#--extra-ldflags='-lkernel32 -lRuntimeObject'
 else
 FFMPEGCONF+= --cpu=i686 --arch=x86
 endif
