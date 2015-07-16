@@ -101,6 +101,10 @@ FFMPEGCONF += --arch=x86
 endif
 endif
 
+ifeq ($(ARCH),x86)
+FFMPEGCONF+= --cpu=i686 --arch=x86
+endif
+
 # x86_64 stuff
 ifeq ($(ARCH),x86_64)
 ifndef HAVE_DARWIN_OS
