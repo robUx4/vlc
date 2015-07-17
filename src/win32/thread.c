@@ -46,13 +46,7 @@ static vlc_cond_t  super_variable;
 
 /*** Common helpers ***/
 #if VLC_WINSTORE_APP
-#define MAX_SIMULTANEOUS_THREADS 128
 static bool isCancelled(void);
-struct {
-    const HANDLE *p_obj;
-    vlc_mutex_t mutex;
-} s_condvars[MAX_SIMULTANEOUS_THREADS];
-static int s_nbthreads;
 #endif
 
 /** Per-thread data */
@@ -65,7 +59,7 @@ struct vlc_thread
     bool           killed;
 #else
     atomic_bool    killed;
-    int            uid;
+    HANDLE         killEvent;
 #endif
     vlc_cleanup_t *cleaners;
 
@@ -149,10 +143,10 @@ void *vlc_threadvar_get(vlc_threadvar_t key)
 /*** Threads ***/
 static vlc_threadvar_t thread_key;
 
-static DWORD vlc_WaitForMultipleObjects (DWORD count, const HANDLE *handles,
+static DWORD vlc_WaitForMultipleObjects (DWORD count, HANDLE handle,
                                          DWORD delay)
 {
-    DWORD ret;
+    DWORD ret = WAIT_FAILED;
     if (count == 0)
     {
 #if VLC_WINSTORE_APP
@@ -173,27 +167,16 @@ static DWORD vlc_WaitForMultipleObjects (DWORD count, const HANDLE *handles,
         if (ret == 0)
             ret = WAIT_TIMEOUT;
     }
-    else 
+    else if (count == 1 && handle != NULL)
     {
 #if VLC_WINSTORE_APP
         struct vlc_thread *th = vlc_threadvar_get(thread_key);
+        HANDLE handles[2] = { handle, NULL };
         if (th != NULL)
-        {
-            vlc_mutex_lock(&s_condvars[th->uid].mutex);
-            s_condvars[th->uid].p_obj = handles[0];
-            mutex_cleanup_push(&s_condvars[th->uid].mutex);
-            vlc_testcancel();
-            vlc_cleanup_run();
-        }
+            handles[count++] = th->killEvent;
         ret = WaitForMultipleObjectsEx(count, handles, FALSE, delay, TRUE);
-        if (th != NULL)
-        {
-            vlc_mutex_lock(&s_condvars[th->uid].mutex);
-            s_condvars[th->uid].p_obj = NULL;
-            vlc_mutex_unlock(&s_condvars[th->uid].mutex);
-        }
 #else
-        ret = WaitForMultipleObjectsEx (count, handles, FALSE, delay, TRUE);
+        ret = WaitForSingleObjectsEx (count, handle, FALSE, delay, TRUE);
 #endif
     }
 
@@ -207,7 +190,7 @@ static DWORD vlc_WaitForMultipleObjects (DWORD count, const HANDLE *handles,
 
 static DWORD vlc_WaitForSingleObject (HANDLE handle, DWORD delay)
 {
-    return vlc_WaitForMultipleObjects (1, &handle, delay);
+    return vlc_WaitForMultipleObjects (1, handle, delay);
 }
 
 static DWORD vlc_Sleep (DWORD delay)
@@ -488,9 +471,6 @@ retry:
         }
     }
     vlc_mutex_unlock (&super_mutex);
-#if VLC_WINSTORE_APP
-    s_condvars[th->uid].p_obj = NULL;
-#endif
 
     if (th->id == NULL) /* Detached thread */
         free (th);
@@ -543,7 +523,7 @@ static int vlc_clone_attr (vlc_thread_t *p_handle, bool detached,
     else
         th->id = (HANDLE)h;
 #if VLC_WINSTORE_APP
-    th->uid = atomic_fetch_add(&s_nbthreads, 1) % MAX_SIMULTANEOUS_THREADS;
+    th->killEvent = CreateEvent(NULL, FALSE, FALSE, NULL);
 #endif
 
     if (p_handle != NULL)
@@ -569,6 +549,9 @@ void vlc_join (vlc_thread_t th, void **result)
 
     if (result != NULL)
         *result = th->data;
+#if VLC_WINSTORE_APP
+    CloseHandle(th->killEvent);
+#endif
     CloseHandle (th->id);
     free (th);
 }
@@ -608,14 +591,8 @@ void vlc_cancel (vlc_thread_t th)
 #if !VLC_WINSTORE_APP
     QueueUserAPC (vlc_cancel_self, th->id, (uintptr_t)th);
 #else
-    vlc_mutex_lock(&s_condvars[th->uid].mutex);
     atomic_store(&th->killed, true);
-    const HANDLE* obj = s_condvars[th->uid].p_obj;
-    if (obj != NULL)
-    {
-        SetEvent(obj);
-    }
-    vlc_mutex_unlock(&s_condvars[th->uid].mutex);
+    SetEvent(th->killEvent);
 #endif
 }
 
@@ -1059,17 +1036,9 @@ BOOL WINAPI DllMain (HINSTANCE hinstDll, DWORD fdwReason, LPVOID lpvReserved)
             vlc_threadvar_create (&thread_key, NULL);
             vlc_rwlock_init (&config_lock);
             vlc_CPU_init ();
-#if VLC_WINSTORE_APP
-            for (int i = 0; i < MAX_SIMULTANEOUS_THREADS; ++i)
-                vlc_mutex_init(&s_condvars[i].mutex);
-#endif
             break;
 
         case DLL_PROCESS_DETACH:
-#if VLC_WINSTORE_APP
-            for (int i = 0; i < MAX_SIMULTANEOUS_THREADS; ++i)
-                vlc_mutex_destroy(&s_condvars[i].mutex);
-#endif
             vlc_rwlock_destroy (&config_lock);
             vlc_threadvar_delete (&thread_key);
             vlc_cond_destroy (&super_variable);
