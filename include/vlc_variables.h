@@ -592,7 +592,7 @@ static inline int var_CountChoices( vlc_object_t *p_obj, const char *psz_name )
     vlc_value_t count;
     if( var_Change( p_obj, psz_name, VLC_VAR_CHOICESCOUNT, &count, NULL ) )
         return 0;
-    return count.i_int;
+    return (int) count.i_int;
 }
 #define var_CountChoices(a,b) var_CountChoices( VLC_OBJECT(a),b)
 
