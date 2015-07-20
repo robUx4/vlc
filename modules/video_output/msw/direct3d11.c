@@ -529,9 +529,9 @@ static picture_pool_t *Pool(vout_display_t *vd, unsigned pool_size)
     texDesc.SampleDesc.Count = 1;
     texDesc.MiscFlags = 0; //D3D11_RESOURCE_MISC_SHARED;
     texDesc.ArraySize = 1;
-    texDesc.Usage = D3D11_USAGE_DYNAMIC;
-    texDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
-    texDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+    texDesc.Usage = D3D11_USAGE_DEFAULT;
+    texDesc.BindFlags = D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE;
+    texDesc.CPUAccessFlags = 0;
 
     unsigned surface_count;
     for (surface_count = 0; surface_count < pool_size; surface_count++) {
@@ -858,7 +858,7 @@ static int Direct3D11Open(vout_display_t *vd, video_format_t *fmt)
 
 #if !VLC_WINSTORE_APP
 
-    UINT creationFlags = 0;
+    UINT creationFlags = D3D11_CREATE_DEVICE_VIDEO_SUPPORT;
     HRESULT hr = S_OK;
 
 # if !defined(NDEBUG) && defined(_MSC_VER)
