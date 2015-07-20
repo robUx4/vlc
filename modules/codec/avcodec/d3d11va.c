@@ -32,6 +32,9 @@
 # include "config.h"
 #endif
 
+# undef WINAPI_FAMILY
+# define WINAPI_FAMILY WINAPI_FAMILY_DESKTOP_APP
+
 #include <assert.h>
 
 #include <vlc_common.h>
@@ -61,6 +64,10 @@ vlc_module_begin()
     set_subcategory(SUBCAT_INPUT_VCODEC)
     set_callbacks(Open, Close)
 vlc_module_end()
+
+#if VLC_WINSTORE_APP
+#define pf_CreateDevice                 D3D11CreateDevice
+#endif
 
 #include <initguid.h> /* must be last included to not redefine existing GUIDs */
 
@@ -435,6 +442,7 @@ static int D3dCreateDevice(vlc_va_t *va)
         return VLC_SUCCESS;
     }
 
+#if !VLC_WINSTORE_APP
     /* */
     PFN_D3D11_CREATE_DEVICE pf_CreateDevice;
     pf_CreateDevice = (void *)GetProcAddress(dx_sys->hdecoder_dll, "D3D11CreateDevice");
@@ -442,6 +450,7 @@ static int D3dCreateDevice(vlc_va_t *va)
         msg_Err(va, "Cannot locate reference to D3D11CreateDevice ABI in DLL");
         return VLC_EGENERIC;
     }
+#endif
 
     UINT creationFlags = D3D11_CREATE_DEVICE_VIDEO_SUPPORT;
 #if !defined(NDEBUG) //&& defined(_MSC_VER)
