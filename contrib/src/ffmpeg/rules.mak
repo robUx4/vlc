@@ -179,6 +179,7 @@ ffmpeg: ffmpeg-$(HASH).tar.xz .sum-ffmpeg
 	rm -Rf $@ $@-$(HASH)
 	mkdir -p $@-$(HASH)
 	$(XZCAT) "$<" | (cd $@-$(HASH) && tar xv --strip-components=1)
+	$(APPLY) $(SRC)/ffmpeg/0001-d3d11va-WindowsPhone-requires-a-mutex-around-ID3D11V.patch
 	$(MOVE)
 
 .ffmpeg: ffmpeg
