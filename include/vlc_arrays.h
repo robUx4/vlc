@@ -375,7 +375,7 @@ vlc_array_remove( vlc_array_t * p_array, int i_index )
  * fast and not suck too much. This one is pretty fast and did 0 collisions
  * in wenglish's dictionary.
  */
-static inline uint64_t DictHash( const char *psz_string, int hashsize )
+static inline int DictHash( const char *psz_string, int hashsize )
 {
     uint64_t i_hash = 0;
     if( psz_string )
@@ -387,7 +387,7 @@ static inline uint64_t DictHash( const char *psz_string, int hashsize )
             i_hash ^= i_hash >> 8;
         }
     }
-    return i_hash % hashsize;
+    return (int) (i_hash % hashsize);
 }
 
 typedef struct vlc_dictionary_entry_t
