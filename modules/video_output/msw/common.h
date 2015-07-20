@@ -181,6 +181,7 @@ struct vout_display_sys_t
     pD3DCompile                            OurD3DCompile;
 #else
     IDXGISwapChain1          *dxgiswapChain;   /* DXGI 1.1 swap chain */
+    HANDLE                   context_lock;
 #endif
     ID3D11Device             *d3ddevice;       /* D3D device */
     ID3D11DeviceContext      *d3dcontext;      /* D3D context */
