@@ -415,7 +415,9 @@ if HAVE_WIN32
 libsmb_plugin_la_LIBADD += -lmpr
 endif
 libsmb_plugin_la_LDFLAGS = $(AM_LDFLAGS) -rpath '$(accessdir)'
+if !HAVE_WINSTORE
 access_LTLIBRARIES += $(LTLIBsmb)
+endif
 EXTRA_LTLIBRARIES += libsmb_plugin.la
 
 libdsm_plugin_la_SOURCES = access/dsm/access.c access/dsm/sd.c

@@ -520,13 +520,17 @@ libqsv_plugin_la_CPPFLAGS = $(AM_CPPFLAGS)
 libdmo_plugin_la_LIBADD = $(LIBM)
 if HAVE_WIN32
 libdmo_plugin_la_LIBADD += -lole32 -luuid
+if !HAVE_WINSTORE
 codec_LTLIBRARIES += libdmo_plugin.la
+endif
 endif
 
 libmft_plugin_la_SOURCES = codec/mft.c packetizer/h264_nal.c packetizer/h264_nal.h
 if HAVE_WIN32
 libmft_plugin_la_LIBADD = -lole32 -luuid -lmfuuid -lmfplat
+if !HAVE_WINSTORE
 codec_LTLIBRARIES += libmft_plugin.la
+endif
 endif
 
 libquicktime_plugin_la_SOURCES = codec/quicktime.c
