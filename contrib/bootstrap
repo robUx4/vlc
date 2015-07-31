@@ -306,6 +306,11 @@ case "${OS}" in
 		;;
 	*mingw*)
 		add_make_enabled "HAVE_WIN32"
+		case "${HOST}" in
+			*winphone*|*windowsphone*|*winrt*)
+			add_make_enabled "HAVE_WINRT"
+			;;
+		esac
 		;;
 	*solaris*)
 		add_make_enabled "HAVE_SOLARIS"
