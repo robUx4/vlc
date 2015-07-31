@@ -24,5 +24,10 @@ taglib: taglib-$(TAGLIB_VERSION).tar.gz .sum-taglib
 		-DENABLE_STATIC:BOOL=ON \
 		-DWITH_ASF:BOOL=ON \
 		-DWITH_MP4:BOOL=ON .
+ifdef HAVE_VISUALSTUDIO
+	cd $< && msbuild.exe -p:Configuration=$(VLC_CONFIGURATION) -m -nologo INSTALL.vcxproj
+	cd $< && cp taglib/$(VLC_CONFIGURATION)/tag.lib "$(PREFIX)/lib/libtag.a"
+else
 	cd $< && $(MAKE) install
+endif
 	touch $@
