@@ -76,7 +76,9 @@ libdirectsound_plugin_la_SOURCES = audio_output/directsound.c \
 	audio_output/windows_audio_common.h
 libdirectsound_plugin_la_LIBADD = -lole32
 if HAVE_DIRECTX
+if !HAVE_WINSTORE
 aout_LTLIBRARIES += libdirectsound_plugin.la
+endif
 endif
 
 libkai_plugin_la_SOURCES = audio_output/kai.c
@@ -95,7 +97,9 @@ libwaveout_plugin_la_SOURCES = audio_output/waveout.c \
 	audio_output/windows_audio_common.h
 libwaveout_plugin_la_LIBADD = -lwinmm
 if HAVE_WIN32
+if !HAVE_WINSTORE
 aout_LTLIBRARIES += libwaveout_plugin.la
+endif
 endif
 
 libauhal_plugin_la_SOURCES = audio_output/auhal.c \
