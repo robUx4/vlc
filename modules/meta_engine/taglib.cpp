@@ -59,6 +59,7 @@
 #include <fileref.h>
 #include <tag.h>
 #include <tbytevector.h>
+#include <tiostream.h>
 
 #if TAGLIB_VERSION >= VERSION_INT(1,7,0)
 # define TAGLIB_HAVE_APEFILE_H
@@ -113,6 +114,103 @@ vlc_module_begin ()
 vlc_module_end ()
 
 using namespace TagLib;
+
+class VlcIostream : public IOStream
+{
+public:
+    VlcIostream(demux_t* p_demux)
+        :  m_demux( p_demux )
+    {
+        m_previousPos = stream_Tell( m_demux->s );
+    }
+
+    ~VlcIostream()
+    {
+        stream_Seek( m_demux->s, m_previousPos );
+    }
+
+    FileName name() const
+    {
+        return m_demux->psz_location;
+    }
+
+    ByteVector readBlock(ulong length)
+    {
+        ByteVector res(length, 0);
+        int i_read = stream_Read( m_demux->s, res.data(), length);
+        if (i_read < 0)
+            return ByteVector::null;;
+        res.resize(i_read);
+        return res;
+    }
+
+    void writeBlock(const ByteVector& data)
+    {
+        // Let's stay Read-Only for now
+        return;
+    }
+
+    void insert(const ByteVector& data, ulong start, ulong replace)
+    {
+        return;
+    }
+
+    void removeBlock(ulong start, ulong length)
+    {
+        return;
+    }
+
+    bool readOnly() const
+    {
+        return true;
+    }
+
+    bool isOpen() const
+    {
+        return true;
+    }
+
+    void seek(long offset, Position p)
+    {
+        uint64_t pos = 0;
+        switch (p)
+        {
+            case Current:
+                pos = stream_Tell( m_demux->s );
+                break;
+            case End:
+                pos = stream_Size( m_demux->s );
+                break;
+            default:
+                break;
+        }
+        stream_Seek( m_demux->s, pos + offset );
+    }
+
+    void clear()
+    {
+        return;
+    }
+
+    long tell() const
+    {
+        return stream_Tell( m_demux->s );
+    }
+
+    long length()
+    {
+        return stream_Size( m_demux->s );
+    }
+
+    void truncate(long length)
+    {
+        return;
+    }
+
+private:
+    demux_t* m_demux;
+    int64_t m_previousPos;
+};
 
 static void ExtractTrackNumberValues( vlc_meta_t* p_meta, const char *psz_value )
 {
@@ -671,11 +769,16 @@ static int ReadMeta( vlc_object_t* p_this)
     demux_meta_t*   p_demux_meta = (demux_meta_t *)p_this;
     demux_t*        p_demux = p_demux_meta->p_demux;
     vlc_meta_t*     p_meta;
-    FileRef f;
 
     p_demux_meta->p_meta = NULL;
     if( strcmp( p_demux->psz_access, "file" ) )
         return VLC_EGENERIC;
+
+#ifdef VLC_WINSTORE_APP
+    VlcIostream s( p_demux );
+    FileRef f( &s );
+#else
+    FileRef f;
 
     char *psz_path = strdup( p_demux->psz_file );
     if( !psz_path )
@@ -694,6 +797,7 @@ static int ReadMeta( vlc_object_t* p_this)
     f = FileRef( psz_path );
 #endif
     free( psz_path );
+#endif
 
     if( f.isNull() )
         return VLC_EGENERIC;
