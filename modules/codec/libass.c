@@ -213,6 +213,9 @@ static int Create( vlc_object_t *p_this )
 #if defined( __ANDROID__ )
     const char *psz_font = "/system/fonts/DroidSans-Bold.ttf";
     const char *psz_family = "Droid Sans Bold";
+#elif VLC_WINSTORE_APP
+    const char *psz_font = "segoeui.ttf";
+    const char *psz_family = "Segoe UI";
 #else
     const char *psz_font = NULL; /* We don't ship a default font with VLC */
     const char *psz_family = "Arial"; /* Use Arial if we can't find anything more suitable */
