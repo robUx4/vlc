@@ -501,7 +501,9 @@ static subpicture_t *Filter( filter_t *p_filter, mtime_t date )
     p_spu->p_region->i_y = p_sys->i_yoff;
 
     //FIXME: Provide a way to force a default style to a list of segments
+#ifndef _MSC_VER
 #warning Missing style
+#endif
 //    p_spu->p_region->p_style = text_style_Duplicate( p_sys->p_style );
 
     if( p_feed->p_pic )
