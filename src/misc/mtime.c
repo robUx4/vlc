@@ -44,6 +44,9 @@
 # include <time.h> /* clock_gettime() */
 #else
 # include <sys/time.h>
+# ifdef _WIN32
+#  include <winsock2.h>
+# endif
 #endif
 
 /**
