@@ -33,6 +33,7 @@
 
 #include <mmsystem.h>
 #include <winsock.h>
+#include <winsock2.h>
 
 
 static int system_InitWSA(int hi, int lo)
