@@ -24,6 +24,8 @@
 #ifndef MINGW_WORKAROUNDS_H
 #define MINGW_WORKAROUNDS_H
 
+#ifndef _MSC_VER
+
 #ifdef __MINGW32__
 # include <_mingw.h>
 #endif
@@ -228,4 +230,5 @@ struct ITaskbarList3Vtbl
 # define THBN_CLICKED        0x1800
 #endif
 
+#endif /* _MSC_VER */
 #endif //MINGW_WORKAROUNDS_H
