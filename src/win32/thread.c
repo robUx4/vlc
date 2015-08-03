@@ -42,70 +42,113 @@
 /*** Static mutex and condition variable ***/
 static vlc_mutex_t super_mutex;
 static vlc_cond_t  super_variable;
+static DWORD thread_key;
 
+#if VLC_WINSTORE_APP
+/* keep trace of what the threads are waiting for */
+#define MAX_SIMULTANEOUS_THREADS 128
+struct {
+    const HANDLE *p_wake_up;
+    vlc_mutex_t  mutex;
+} s_condvars[MAX_SIMULTANEOUS_THREADS];
+static int s_nbthreads;
+#endif
+
+/*** Threads ***/
+struct vlc_thread
+{
+    int cookie;
+    HANDLE         id;
+
+    bool           killable;
+#if !VLC_WINSTORE_APP
+    bool           killed;
+#else
+    atomic_bool    killed;
+    HANDLE         wakeUp;
+    int            uid;
+#endif
+    vlc_cleanup_t *cleaners;
+
+    void        *(*entry) (void *);
+    void          *data;
+};
 
 /*** Common helpers ***/
 #if VLC_WINSTORE_APP
 static bool isCancelled(void);
 #endif
 
-static DWORD vlc_WaitForMultipleObjects (DWORD count, const HANDLE *handles,
-                                         DWORD delay)
+static DWORD vlc_WaitForSingleObject (HANDLE handle, DWORD delay)
 {
     DWORD ret;
-    if (count == 0)
-    {
 #if VLC_WINSTORE_APP
-        do {
-            DWORD new_delay = 50;
-            if (new_delay > delay)
-                new_delay = delay;
-            ret = SleepEx (new_delay, TRUE);
-            if (delay != INFINITE)
-                delay -= new_delay;
-            if (isCancelled())
-                ret = WAIT_IO_COMPLETION;
-        } while (delay && ret == 0);
-#else
-        ret = SleepEx (delay, TRUE);
-#endif
+    HANDLE wakeUp = NULL;
+    struct vlc_thread *th = TlsGetValue(thread_key);
+    if (th != NULL)
+    {
+        wakeUp = th->wakeUp;
+        vlc_mutex_lock(&s_condvars[th->uid].mutex);
+        s_condvars[th->uid].p_wake_up = wakeUp;
+        mutex_cleanup_push(&s_condvars[th->uid].mutex);
+        vlc_testcancel();
+        vlc_cleanup_pop();
+        vlc_mutex_unlock(&s_condvars[th->uid].mutex);
+    }
 
-        if (ret == 0)
+    if (wakeUp == NULL)
+        ret = WaitForSingleObjectEx(handle, delay, TRUE);
+    else
+    {
+        HANDLE handles[2] = { handle, wakeUp };
+        ret = WaitForMultipleObjectsEx(2, handles, FALSE, delay, TRUE);
+        if (ret == WAIT_OBJECT_0 + 1)
             ret = WAIT_TIMEOUT;
     }
-    else {
-#if VLC_WINSTORE_APP
-        do {
-            DWORD new_delay = 50;
-            if (new_delay > delay)
-                new_delay = delay;
-            ret = WaitForMultipleObjectsEx (count, handles, FALSE, new_delay, TRUE);
-            if (delay != INFINITE)
-                delay -= new_delay;
-            if (isCancelled())
-                ret = WAIT_IO_COMPLETION;
-        } while (delay && ret == WAIT_TIMEOUT);
-#else
-        ret = WaitForMultipleObjectsEx (count, handles, FALSE, delay, TRUE);
-#endif
+
+    if (th != NULL && likely(wakeUp != NULL))
+    {
+        vlc_mutex_lock(&s_condvars[th->uid].mutex);
+        s_condvars[th->uid].p_wake_up = NULL;
+        vlc_mutex_unlock(&s_condvars[th->uid].mutex);
     }
 
+    if (ret == WAIT_TIMEOUT && isCancelled())
+        ret = WAIT_IO_COMPLETION;
+#else
+    ret = WaitForSingleObjectEx (handle, delay, TRUE);
+#endif
+
     /* We do not abandon objects... this would be a bug */
-    assert (ret < WAIT_ABANDONED_0 || WAIT_ABANDONED_0 + count - 1 < ret);
+    assert(ret != WAIT_ABANDONED_0);
 
     if (unlikely(ret == WAIT_FAILED))
         abort (); /* We are screwed! */
     return ret;
 }
 
-static DWORD vlc_WaitForSingleObject (HANDLE handle, DWORD delay)
-{
-    return vlc_WaitForMultipleObjects (1, &handle, delay);
-}
-
 static DWORD vlc_Sleep (DWORD delay)
 {
-    DWORD ret = vlc_WaitForMultipleObjects (0, NULL, delay);
+    DWORD ret;
+#if VLC_WINSTORE_APP
+    do {
+        DWORD new_delay = 50;
+        if (new_delay > delay)
+            new_delay = delay;
+        ret = SleepEx (new_delay, TRUE);
+        if (delay != INFINITE)
+            delay -= new_delay;
+        if (isCancelled())
+            ret = WAIT_IO_COMPLETION;
+    } while (delay && ret == 0);
+#else
+    ret = SleepEx (delay, TRUE);
+#endif
+
+    if (unlikely(ret == WAIT_FAILED))
+        abort (); /* We are screwed! */
+    if (ret == 0)
+        ret = WAIT_TIMEOUT;
     return (ret != WAIT_TIMEOUT) ? ret : 0;
 }
 
@@ -440,25 +483,6 @@ retry:
     vlc_mutex_unlock(&super_mutex);
 }
 
-/*** Threads ***/
-static DWORD thread_key;
-
-struct vlc_thread
-{
-    HANDLE         id;
-
-    bool           killable;
-#if !VLC_WINSTORE_APP
-    bool           killed;
-#else
-    atomic_bool    killed;
-#endif
-    vlc_cleanup_t *cleaners;
-
-    void        *(*entry) (void *);
-    void          *data;
-};
-
 #if VLC_WINSTORE_APP
 static bool isCancelled(void)
 {
@@ -479,6 +503,9 @@ static unsigned __stdcall vlc_entry (void *p)
     th->data = th->entry (th->data);
     TlsSetValue(thread_key, NULL);
 
+#if VLC_WINSTORE_APP
+    s_condvars[th->uid].p_wake_up = NULL;
+#endif
     if (th->id == NULL) /* Detached thread */
         free(th);
     return 0;
@@ -519,6 +546,17 @@ static int vlc_clone_attr (vlc_thread_t *p_handle, bool detached,
     }
     else
         th->id = (HANDLE)h;
+#if VLC_WINSTORE_APP
+    th->uid = atomic_fetch_add(&s_nbthreads, 1) % MAX_SIMULTANEOUS_THREADS;
+    th->wakeUp = CreateEvent(NULL, FALSE, FALSE, NULL);
+    if (th->wakeUp == NULL)
+    {
+        if (th->id != NULL)
+            CloseHandle(th->id);
+        free (th);
+        return VLC_EGENERIC;
+    }
+#endif
 
     if (p_handle != NULL)
         *p_handle = th;
@@ -543,6 +581,12 @@ void vlc_join (vlc_thread_t th, void **result)
 
     if (result != NULL)
         *result = th->data;
+#if VLC_WINSTORE_APP
+    CloseHandle(th->wakeUp);
+#endif
+#if VLC_WINSTORE_APP
+    s_condvars[th->uid].p_wake_up = NULL;
+#endif
     CloseHandle (th->id);
     free (th);
 }
@@ -582,7 +626,11 @@ void vlc_cancel (vlc_thread_t th)
 #if !VLC_WINSTORE_APP
     QueueUserAPC (vlc_cancel_self, th->id, (uintptr_t)th);
 #else
+    vlc_mutex_lock(&s_condvars[th->uid].mutex);
     atomic_store (&th->killed, true);
+    if (s_condvars[th->uid].p_wake_up != NULL)
+        SetEvent(s_condvars[th->uid].p_wake_up);
+    vlc_mutex_unlock(&s_condvars[th->uid].mutex);
 #endif
 }
 
@@ -629,6 +677,9 @@ void vlc_testcancel (void)
 
     th->data = NULL; /* TODO: special value? */
     TlsSetValue(thread_key, NULL);
+#if VLC_WINSTORE_APP
+    s_condvars[th->uid].p_wake_up = NULL;
+#endif
     if (th->id == NULL) /* Detached thread */
         free(th);
     _endthreadex(0);
@@ -1036,9 +1087,17 @@ BOOL WINAPI DllMain (HINSTANCE hinstDll, DWORD fdwReason, LPVOID lpvReserved)
             vlc_cond_init (&super_variable);
             vlc_rwlock_init (&config_lock);
             vlc_CPU_init ();
+#if VLC_WINSTORE_APP
+            for (int i = 0; i < MAX_SIMULTANEOUS_THREADS; ++i)
+                vlc_mutex_init(&s_condvars[i].mutex);
+#endif
             break;
 
         case DLL_PROCESS_DETACH:
+#if VLC_WINSTORE_APP
+            for (int i = 0; i < MAX_SIMULTANEOUS_THREADS; ++i)
+                vlc_mutex_destroy(&s_condvars[i].mutex);
+#endif
             vlc_rwlock_destroy (&config_lock);
             vlc_cond_destroy (&super_variable);
             vlc_mutex_destroy (&super_mutex);
