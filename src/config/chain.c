@@ -279,7 +279,7 @@ void config_ChainParse( vlc_object_t *p_this, const char *psz_prefix,
         if (optname[0] == '*')
             optname++;
 
-        char name[plen + strlen( optname )];
+        char *name = alloca(plen + strlen( optname ));
         snprintf( name, sizeof (name), "%s%s", psz_prefix, optname );
         if( var_Create( p_this, name,
                         config_GetType( p_this, name ) | VLC_VAR_DOINHERIT ) )
@@ -330,7 +330,7 @@ void config_ChainParse( vlc_object_t *p_this, const char *psz_prefix,
         }
 
         /* create name */
-        char name[plen + strlen( ppsz_options[i] )];
+        char *name = alloca(plen + strlen( ppsz_options[i] ));
         const char *psz_name = name;
         snprintf( name, sizeof (name), "%s%s", psz_prefix,
                   b_once ? (ppsz_options[i] + 1) : ppsz_options[i] );

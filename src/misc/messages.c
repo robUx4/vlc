@@ -100,7 +100,7 @@ void vlc_vaLog (vlc_object_t *obj, int type, const char *module,
     p = strchr(module, '.');
 
     size_t modlen = (p != NULL) ? (p - module) : 0;
-    char modulebuf[modlen + 1];
+    char *modulebuf = alloca(modlen + 1);
     if (p != NULL)
     {
         memcpy(modulebuf, module, modlen);
