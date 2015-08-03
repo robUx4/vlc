@@ -43,7 +43,11 @@
 #if (_POSIX_TIMERS > 0)
 # include <time.h> /* clock_gettime() */
 #else
-# include <sys/time.h>
+# ifdef _WIN32
+#  include <winsock2.h>
+# else
+#  include <sys/time.h>
+# endif
 #endif
 
 /**

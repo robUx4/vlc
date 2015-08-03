@@ -29,7 +29,11 @@
 #include <assert.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#ifdef _WIN32
+#include <winsock2.h>
+#else
 #include <sys/time.h>
+#endif
 #include <dirent.h>
 #include <time.h>
 
