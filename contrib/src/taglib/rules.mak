@@ -20,7 +20,7 @@ taglib: taglib-$(TAGLIB_VERSION).tar.gz .sum-taglib
 	$(MOVE)
 
 .taglib: taglib toolchain.cmake
-	cd $< && $(HOSTVARS_PIC) $(CMAKE) \
+	cd $< && $(HOSTVARS_CMAKE) $(CMAKE) \
 		-DENABLE_STATIC:BOOL=ON \
 		-DWITH_ASF:BOOL=ON \
 		-DWITH_MP4:BOOL=ON .
