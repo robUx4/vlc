@@ -165,6 +165,17 @@ EXTRA_LDFLAGS += -m32
 endif
 endif
 
+ifdef HAVE_WINRT
+ifdef HAVE_VISUALSTUDIO
+EXTRA_CMAKE_FLAGS += -FI`cygpath -w ../../../../headers/fixup.h`
+endif
+endif
+
+ifdef HAVE_VISUALSTUDIO
+# allow mixing debug and runtime contribs
+#EXTRA_CFLAGS += -D_ALLOW_ITERATOR_DEBUG_LEVEL_MISMATCH -D_ALLOW_RUNTIME_LIBRARY_MISMATCH
+endif
+
 cppcheck = $(shell $(CC) $(CFLAGS) -E -dM - < /dev/null | grep -E $(1))
 
 EXTRA_CFLAGS += -I$(PREFIX)/include
@@ -306,6 +317,11 @@ HOSTVARS_PIC := $(HOSTTOOLS) \
 	CFLAGS="$(CFLAGS) $(PIC)" \
 	CXXFLAGS="$(CXXFLAGS) $(PIC)" \
 	LDFLAGS="$(LDFLAGS)"
+HOSTVARS_CMAKE :=  $(HOSTTOOLS) \
+	CPPFLAGS="$(CPPFLAGS) $(PIC)" \
+	CFLAGS="$(CFLAGS) $(EXTRA_CMAKE_FLAGS) $(PIC)" \
+	CXXFLAGS="$(CXXFLAGS) $(EXTRA_CMAKE_FLAGS) $(PIC)" \
+	LDFLAGS="$(LDFLAGS)"
 
 download_git = \
 	rm -Rf $(@:.tar.xz=) && \
@@ -439,7 +455,10 @@ list:
 toolchain.cmake:
 	$(RM) $@
 ifdef HAVE_WIN32
+ifdef HAVE_WINRT
+else
 	echo "set(CMAKE_SYSTEM_NAME Windows)" >> $@
+endif
 	echo "set(CMAKE_RC_COMPILER $(HOST)-windres)" >> $@
 endif
 ifdef HAVE_DARWIN_OS
