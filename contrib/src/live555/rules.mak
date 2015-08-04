@@ -36,6 +36,7 @@ endif
 endif
 
 LIVE_EXTRA_CFLAGS := $(EXTRA_CFLAGS) -fexceptions
+XT_FL := "$(LIVE_EXTRA_CFLAGS)"
 
 live555: $(LIVE555_FILE) .sum-live555
 	rm -Rf live
@@ -46,8 +47,10 @@ live555: $(LIVE555_FILE) .sum-live555
 	cd live && sed -i.orig -e s/"libtool -s -o"/"ar cr"/g config.macosx*
 	cd live && sed -i.orig \
 		-e 's%$(CXX)%$(CXX)\ $(EXTRA_LDFLAGS)%' config.macosx
-	cd live && sed -i.orig \
-		-e 's%^\(COMPILE_OPTS.*\)$$%\1 '"$(LIVE_EXTRA_CFLAGS)%" config.*
+#	echo extra CFLAGS: $(LIVE_EXTRA_CFLAGS)
+#	echo XT_FL: $(XT_FL)
+#	cd live && sed -i.orig \
+#		-e 's%^\(COMPILE_OPTS.*\)$$%\1 '"$(LIVE_EXTRA_CFLAGS)%" config.*
 	cd live && sed -e 's%-D_FILE_OFFSET_BITS=64%-D_FILE_OFFSET_BITS=64\ -fPIC\ -DPIC%' -i.orig config.linux
 	cd live && sed -e 's%-DSOLARIS%-DSOLARIS -DXLOCALE_NOT_USED%' -i.orig config.solaris-*bit
 ifdef HAVE_ANDROID
@@ -56,6 +59,7 @@ endif
 ifdef HAVE_VISUALSTUDIO
 	cd live && patch -lfp1 < ../../src/live555/msvc.patch
 endif
+	cd live && patch -lfp1 < ../../src/live555/winstore.patch
 	mv live $@
 	touch $@
 
