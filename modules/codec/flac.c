@@ -156,7 +156,7 @@ DecoderWriteCallback( const FLAC__StreamDecoder *decoder,
 {
     /* XXX it supposes our internal format is WG4 */
     static const unsigned char ppi_reorder[1+8][8] = {
-        { },
+        { 0 }, //Keep MSVC happy
         { 0, },
         { 0, 1 },
         { 0, 1, 2 },
