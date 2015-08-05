@@ -49,7 +49,30 @@
 #define INITGUID
 #include <winstring.h>
 #include <windows.storage.h>
-#include <roapi.h>
+#ifndef _MSC_VER /* roapi.h is a C++ include file that doesn't work with C files */
+# include <roapi.h>
+#else /* _MSC_VER */
+DECLSPEC_IMPORT HRESULT WINAPI RoGetActivationFactory(HSTRING activatableClassId, REFIID iid, void **factory);
+typedef __x_ABI_CWindows_CStorage_CIStorageFolder           IStorageFolder;
+typedef __x_ABI_CWindows_CStorage_CIApplicationDataStatics  IApplicationDataStatics;
+typedef __x_ABI_CWindows_CStorage_CIApplicationData         IApplicationData;
+typedef __x_ABI_CWindows_CStorage_CIKnownFoldersStatics     IKnownFoldersStatics;
+typedef __x_ABI_CWindows_CStorage_CIStorageItem             IStorageItem;
+
+#define IStorageItem_get_Path                       __x_ABI_CWindows_CStorage_CIStorageItem_get_Path
+#define IStorageItem_Release                        __x_ABI_CWindows_CStorage_CIStorageItem_Release
+#define IStorageFolder_QueryInterface               __x_ABI_CWindows_CStorage_CIStorageFolder_QueryInterface
+#define IStorageFolder_Release                      __x_ABI_CWindows_CStorage_CIStorageFolder_Release
+#define IApplicationDataStatics_get_Current         __x_ABI_CWindows_CStorage_CIApplicationDataStatics_get_Current
+#define IApplicationDataStatics_Release             __x_ABI_CWindows_CStorage_CIApplicationDataStatics_Release
+#define IKnownFoldersStatics_get_DocumentsLibrary   __x_ABI_CWindows_CStorage_CIKnownFoldersStatics_get_DocumentsLibrary
+#define IKnownFoldersStatics_get_MusicLibrary       __x_ABI_CWindows_CStorage_CIKnownFoldersStatics_get_MusicLibrary
+#define IKnownFoldersStatics_get_PicturesLibrary    __x_ABI_CWindows_CStorage_CIKnownFoldersStatics_get_PicturesLibrary
+#define IKnownFoldersStatics_get_VideosLibrary      __x_ABI_CWindows_CStorage_CIKnownFoldersStatics_get_VideosLibrary
+#define IKnownFoldersStatics_Release                __x_ABI_CWindows_CStorage_CIKnownFoldersStatics_Release
+#define IApplicationData_get_LocalFolder            __x_ABI_CWindows_CStorage_CIApplicationData_get_LocalFolder
+#define IApplicationData_Release                    __x_ABI_CWindows_CStorage_CIApplicationData_Release
+#endif /* _MSC_VER */
 
 DEFINE_GUID(IID_IStorageItem, 0x4207a996, 0xca2f, 0x42f7, 0xbd, 0xe8, 0x8b, 0x10, 0x45, 0x7a, 0x7f, 0x30);
 DEFINE_GUID(IID_IApplicationDataStatics, 0x5612147b, 0xe843, 0x45e3, 0x94, 0xd8, 0x06, 0x16, 0x9e, 0x3c, 0x8e, 0x17);
