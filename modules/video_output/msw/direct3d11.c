@@ -1726,8 +1726,14 @@ static int Direct3D11MapSubpicture(vout_display_t *vd, int *subpicture_region_co
 
         float opacity = (float)r->i_alpha / 255.0f;
 
+#if VLC_WINSTORE_APP
         UpdateQuadPosition(vd, (d3d_quad_t *)quad_picture->p_sys, &dst,
-                           i_original_width, i_original_height, opacity);
+                           sys->rect_display.right - sys->rect_display.left,
+                           sys->rect_display.bottom - sys->rect_display.top, opacity);
+#else
+        UpdateQuadPosition(vd, (d3d_quad_t *)quad_picture->p_sys, &dst,
+                           video.right - video.left, video.bottom - video.top, opacity);
+#endif
     }
     return VLC_SUCCESS;
 }
