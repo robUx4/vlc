@@ -126,10 +126,13 @@ libdeinterlace_plugin_la_SOURCES = \
 	video_filter/deinterlace/helpers.c video_filter/deinterlace/helpers.h \
 	video_filter/deinterlace/algo_basic.c video_filter/deinterlace/algo_basic.h \
 	video_filter/deinterlace/algo_x.c video_filter/deinterlace/algo_x.h \
-	video_filter/deinterlace/algo_yadif.c video_filter/deinterlace/algo_yadif.h \
-	video_filter/deinterlace/yadif.h video_filter/deinterlace/yadif_template.h \
 	video_filter/deinterlace/algo_phosphor.c video_filter/deinterlace/algo_phosphor.h \
 	video_filter/deinterlace/algo_ivtc.c video_filter/deinterlace/algo_ivtc.h
+if !HAVE_WINSTORE
+libdeinterlace_plugin_la_SOURCES += \
+	video_filter/deinterlace/algo_yadif.c video_filter/deinterlace/algo_yadif.h \
+	video_filter/deinterlace/yadif.h video_filter/deinterlace/yadif_template.h
+endif
 # inline ASM doesn't build with -O0
 libdeinterlace_plugin_la_CFLAGS = $(AM_CFLAGS) -O2
 if HAVE_NEON
