@@ -419,7 +419,7 @@ void freeaddrinfo (struct addrinfo *res);
 #define nanf(tagp) NAN
 #endif
 
-#ifdef _WIN32
+#if defined(_WIN32) && !VLC_WINSTORE_APP
 FILE *vlc_win32_tmpfile(void);
 #endif
 
