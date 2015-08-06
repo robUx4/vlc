@@ -39,7 +39,9 @@ struct vlc_object_t;
 /* Local algorithm headers */
 #include "algo_basic.h"
 #include "algo_x.h"
+#ifndef _MSC_VER
 #include "algo_yadif.h"
+#endif
 #include "algo_phosphor.h"
 #include "algo_ivtc.h"
 #include "common.h"

@@ -160,10 +160,12 @@ static struct filter_mode_t filter_mode [] = {
                  { false, false, false, true }, true, true },
     { "blend", .pf_render_single_pic = RenderBlend,
                  { false, false, false, false }, true, true },
+#ifndef _MSC_VER
     { "yadif", .pf_render_single_pic = RenderYadifSingle,
                  { false, true, false, false }, false, true },
     { "yadif2x", .pf_render_ordered = RenderYadif,
                  { true, true, false, false }, false, true },
+#endif
     { "x", .pf_render_single_pic = RenderX,
                  { false, false, false, false }, false, false },
     { "phosphor", .pf_render_ordered = RenderPhosphor,
