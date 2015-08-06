@@ -18,7 +18,11 @@ ifdef HAVE_IOS
 LUA_TARGET := ios
 endif
 ifdef HAVE_WIN32
+ifdef HAVE_WINRT
+LUA_TARGET := generic
+else
 LUA_TARGET := mingw
+endif
 endif
 ifdef HAVE_SOLARIS
 LUA_TARGET := solaris
