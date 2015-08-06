@@ -184,6 +184,7 @@ static void SetFilterMethod( filter_t *p_filter, const char *mode, bool pack )
                  " for packed format", mode );
         mode = "blend";
     }
+#ifndef _MSC_VER
     else if( !strcmp( mode, "yadif" ) )
     {
         p_sys->i_mode = DEINTERLACE_YADIF;
@@ -195,6 +196,7 @@ static void SetFilterMethod( filter_t *p_filter, const char *mode, bool pack )
         p_sys->b_double_rate = true;
         p_sys->b_use_frame_history = true;
     }
+#endif
     else if( p_sys->chroma->pixel_size > 1 )
     {
         msg_Err( p_filter, "unknown or incompatible deinterlace mode \"%s\""
@@ -472,6 +474,7 @@ picture_t *Deinterlace( filter_t *p_filter, picture_t *p_pic )
             RenderX( p_dst[0], p_pic );
             break;
 
+#ifndef _MSC_VER
         case DEINTERLACE_YADIF:
             if( RenderYadif( p_filter, p_dst[0], p_pic, 0, 0 ) )
                 goto drop;
@@ -485,7 +488,7 @@ picture_t *Deinterlace( filter_t *p_filter, picture_t *p_pic )
             if( p_dst[2] )
                 RenderYadif( p_filter, p_dst[2], p_pic, 2, !b_top_field_first );
             break;
-
+#endif
         case DEINTERLACE_PHOSPHOR:
             if( RenderPhosphor( p_filter, p_dst[0], 0,
                                 !b_top_field_first ) )
@@ -504,6 +507,10 @@ picture_t *Deinterlace( filter_t *p_filter, picture_t *p_pic )
             if( RenderIVTC( p_filter, p_dst[0] ) )
                 goto drop;
             break;
+#ifdef _MSC_VER
+        default:
+            vlc_assert_unreachable();
+#endif
     }
 
     /* Set output timestamps, if the algorithm didn't request CUSTOM_PTS
