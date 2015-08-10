@@ -15,6 +15,9 @@ $(TARBALLS)/speexdsp-$(SPEEXDSP_VERSION).tar.gz:
 
 speexdsp: speexdsp-$(SPEEXDSP_VERSION).tar.gz .sum-speexdsp
 	$(UNPACK)
+ifdef HAVE_VISUALSTUDIO
+	$(APPLY) $(SRC)/speexdsp/msvc.patch
+endif
 	$(MOVE)
 
 SPEEXDSP_CONF := --enable-resample-full-sinc-table --disable-examples
