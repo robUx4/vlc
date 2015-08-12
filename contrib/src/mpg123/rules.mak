@@ -15,6 +15,9 @@ $(TARBALLS)/mpg123-$(MPG123_VERSION).tar.bz2:
 mpg123: mpg123-$(MPG123_VERSION).tar.bz2 .sum-mpg123
 	$(UNPACK)
 	$(APPLY) $(SRC)/mpg123/no-programs.patch
+ifdef HAVE_WINRT
+	$(APPLY) $(SRC)/mpg123/winstore.patch
+endif
 	$(MOVE)
 
 .mpg123: mpg123
