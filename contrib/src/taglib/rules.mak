@@ -18,6 +18,7 @@ taglib: taglib-$(TAGLIB_VERSION).tar.gz .sum-taglib
 	$(APPLY) $(SRC)/taglib/taglib-pc.patch
 	$(APPLY) $(SRC)/taglib/0002-Rewrote-ByteVector-replace-simpler.patch
 	$(APPLY) $(SRC)/taglib/iostream.patch
+	$(APPLY) $(SRC)/taglib/m4v.patch
 #ifdef HAVE_WINRT
 	$(APPLY) $(SRC)/taglib/unicode.patch
 #endif
