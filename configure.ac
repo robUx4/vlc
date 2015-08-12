@@ -2780,7 +2780,9 @@ AC_CHECK_HEADERS(png.h, [
   LDFLAGS="${LDFLAGS} -lz $LIBM"
   AC_CHECK_LIB(png, png_set_rows, [
     VLC_ADD_PLUGIN([png])
-  ], [], [-lz $LIBM])
+  ], [
+    PKG_CHECK_MODULES([png], [libpng], VLC_ADD_PLUGIN([png]))
+  ], [-lz $LIBM])
   VLC_RESTORE_FLAGS
   ])
 ])
