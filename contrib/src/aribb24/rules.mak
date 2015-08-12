@@ -7,6 +7,7 @@ PKGS += aribb24
 ifeq ($(call need_pkg,"aribb24"),)
 PKGS_FOUND += aribb24
 endif
+DEPS_ffmpeg += png
 
 $(TARBALLS)/aribb24-$(ARIBB24_VERSION).tar.gz:
 	$(call download,$(ARIBB24_URL))
