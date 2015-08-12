@@ -192,6 +192,7 @@ ffmpeg: ffmpeg-$(HASH).tar.xz .sum-ffmpeg
 	$(XZCAT) "$<" | (cd $@-$(HASH) && tar xv --strip-components=1)
 ifdef HAVE_VISUALSTUDIO
 	$(APPLY) $(SRC)/ffmpeg/msvc.patch
+	$(APPLY) $(SRC)/ffmpeg/near_field.patch
 endif
 	$(MOVE)
 
