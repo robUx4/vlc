@@ -234,6 +234,7 @@ ffmpeg: ffmpeg-$(FFMPEG_BASENAME).tar.xz .sum-ffmpeg
 	tar xvJf "$<" --strip-components=1 -C $@-$(FFMPEG_BASENAME)
 ifdef HAVE_VISUALSTUDIO
 	$(APPLY) $(SRC)/ffmpeg/msvc.patch
+	$(APPLY) $(SRC)/ffmpeg/near_field.patch
 endif
 	$(MOVE)
 
