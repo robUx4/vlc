@@ -95,6 +95,9 @@ endif
 ifdef HAVE_ARMV6
 FFMPEGCONF += --cpu=armv6 --disable-neon
 endif
+ifdef HAVE_VISUALSTUDIO
+FFMPEGCONF += --cpu=armv7-a --extra-cflags=' -D__ARM_PCS_VFP' --as=armasm
+endif
 endif
 
 # ARM64 stuff
