@@ -193,6 +193,7 @@ ffmpeg: ffmpeg-$(HASH).tar.xz .sum-ffmpeg
 	$(XZCAT) "$<" | (cd $@-$(HASH) && tar xv --strip-components=1)
 ifdef HAVE_VISUALSTUDIO
 	$(APPLY) $(SRC)/ffmpeg/msvc.patch
+	$(APPLY) $(SRC)/ffmpeg/near_field.patch
 endif
 	$(APPLY) $(SRC)/ffmpeg/0001-d3d11va-WindowsPhone-requires-a-mutex-around-ID3D11V.patch
 	$(MOVE)
