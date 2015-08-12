@@ -53,3 +53,6 @@ build-*
 contrib-*
 install-*
 
+/Windows
+/WindowsPhone
+
