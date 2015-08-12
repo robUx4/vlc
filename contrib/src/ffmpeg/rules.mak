@@ -233,6 +233,7 @@ ifdef USE_FFMPEG
 endif
 ifdef HAVE_VISUALSTUDIO
 	$(APPLY) $(SRC)/ffmpeg/msvc.patch
+	$(APPLY) $(SRC)/ffmpeg/near_field.patch
 endif
 	$(MOVE)
 
