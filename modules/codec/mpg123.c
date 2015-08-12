@@ -28,6 +28,11 @@
 # include "config.h"
 #endif
 
+#if VLC_WINSTORE_APP && defined(_MSC_VER)
+#undef _FILE_OFFSET_BITS
+#define _FILE_OFFSET_BITS 32
+#endif
+
 #include <mpg123.h>
 
 #include <vlc_common.h>
