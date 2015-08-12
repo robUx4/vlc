@@ -148,6 +148,9 @@ endif
 endif
 FFMPEGCONF += --target-os=mingw32 --enable-memalign-hack
 FFMPEGCONF += --enable-w32threads --enable-dxva2
+ifdef HAVE_VISUALSTUDIO
+FFMPEGCONF += --target-os=win32
+endif
 
 ifdef HAVE_WIN64
 FFMPEGCONF += --cpu=athlon64 --arch=x86_64
