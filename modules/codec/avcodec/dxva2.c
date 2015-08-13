@@ -73,6 +73,9 @@ vlc_module_end()
 #  include <dxva.h>
 # endif
 
+#elif _MSC_VER
+#  undef MS_GUID
+#  define MS_GUID DEFINE_GUID
 #endif /* __MINGW32__ */
 
 MS_GUID(IID_IDirectXVideoDecoderService, 0xfc51a551, 0xd5e7, 0x11d9, 0xaf,0x55,0x00,0x05,0x4e,0x43,0xff,0x02);
