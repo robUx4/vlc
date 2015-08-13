@@ -29,7 +29,6 @@ ifdef HAVE_IOS
 endif
 ifdef HAVE_WINRT
 	$(APPLY) $(SRC)/iconv/libiconv-android-ios.patch
-	$(APPLY) $(SRC)/iconv/libiconv-winrt.patch
 endif
 	$(UPDATE_AUTOCONFIG) && cd $(UNPACK_DIR) && mv config.guess config.sub build-aux
 	$(UPDATE_AUTOCONFIG) && cd $(UNPACK_DIR) && mv config.guess config.sub libcharset/build-aux
