@@ -96,7 +96,10 @@ vlc_module_end()
 #  include <dxva.h>
 # endif
 
-#endif /* __MINGW32__ */
+#elif defined(_MSC_VER)
+#  undef MS_GUID
+#  define MS_GUID DEFINE_GUID
+#endif /* _MSC_VER */
 
 #if !defined(NDEBUG) && defined(HAVE_DXGIDEBUG_H)
 # include <dxgidebug.h>
