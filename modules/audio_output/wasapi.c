@@ -18,9 +18,13 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston MA 02110-1301, USA.
  *****************************************************************************/
 
-#define _WIN32_WINNT 0x600
 #ifdef HAVE_CONFIG_H
 # include <config.h>
+#endif
+
+#if !defined(_WIN32_WINNT) || _WIN32_WINNT < 0x600
+# undef _WIN32_WINNT
+# define _WIN32_WINNT 0x600
 #endif
 
 #define INITGUID
@@ -35,6 +39,15 @@
 #include <vlc_aout.h>
 #include <vlc_plugin.h>
 #include "audio_output/mmdevice.h"
+
+#ifdef _MSC_VER
+DEFINE_GUID(IID_IAudioClient, 0x1cb9ad4c, 0xdbfa, 0x4c32, 0xb1,0x78, 0xc2,0xf5,0x68,0xa7,0x03,0xb2);
+DEFINE_GUID(IID_IAudioRenderClient, 0xf294acfc, 0x3146, 0x4483, 0xa7,0xbf, 0xad,0xdc,0xa7,0xc2,0x60,0xe2);
+DEFINE_GUID(IID_IAudioClock, 0xcd63314f, 0x3fba, 0x4a1b, 0x81,0x2c, 0xef,0x96,0x35,0x87,0x28,0xe7);
+DEFINE_GUID(IID_ISimpleAudioVolume, 0x87ce5498, 0x68d6, 0x44e5, 0x92, 0x15, 0x6d, 0xa4, 0x7e, 0xf8, 0x83, 0xd8);
+#endif
+DEFINE_GUID(KSDATAFORMAT_SUBTYPE_IEEE_FLOAT, WAVE_FORMAT_IEEE_FLOAT, 0x0000, 0x0010, 0x80, 0x00, 0x00, 0xaa, 0x00, 0x38, 0x9b, 0x71);
+DEFINE_GUID(KSDATAFORMAT_SUBTYPE_PCM, WAVE_FORMAT_PCM, 0x0000, 0x0010, 0x80, 0x00, 0x00, 0xaa, 0x00, 0x38, 0x9b, 0x71);
 
 static BOOL CALLBACK InitFreq(INIT_ONCE *once, void *param, void **context)
 #ifdef _MSC_VER
@@ -77,6 +90,58 @@ typedef struct aout_stream_sys
     UINT32 frames; /**< Total buffer size (frames) */
 } aout_stream_sys_t;
 
+
+static HRESULT SetVolume(aout_stream_t *s, float vol)
+{
+    aout_stream_sys_t *sys = s->sys;
+    ISimpleAudioVolume *pc_AudioVolume = NULL;
+    HRESULT hr;
+
+    hr = IAudioClient_GetService(sys->client, &IID_ISimpleAudioVolume, &pc_AudioVolume);
+    if (FAILED(hr))
+    {
+        msg_Err(s, "cannot get volume service (error 0x%lx)", hr);
+        goto done;
+    }
+
+    hr = ISimpleAudioVolume_SetMasterVolume(pc_AudioVolume, vol, NULL);
+    if (FAILED(hr))
+    {
+        msg_Err(s, "cannot set volume (error 0x%lx)", hr);
+        goto done;
+    }
+
+done:
+    ISimpleAudioVolume_Release(pc_AudioVolume);
+
+    return hr;
+}
+
+static HRESULT Mute(aout_stream_t *s, bool mute)
+{
+    aout_stream_sys_t *sys = s->sys;
+    ISimpleAudioVolume *pc_AudioVolume = NULL;
+    HRESULT hr;
+
+    hr = IAudioClient_GetService(sys->client, &IID_ISimpleAudioVolume, &pc_AudioVolume);
+    if (FAILED(hr))
+    {
+        msg_Err(s, "cannot get volume service (error 0x%lx)", hr);
+        goto done;
+    }
+
+    hr = ISimpleAudioVolume_SetMute(pc_AudioVolume, mute, NULL);
+    if (FAILED(hr))
+    {
+        msg_Err(s, "cannot set mute (error 0x%lx)", hr);
+        goto done;
+    }
+
+done:
+    ISimpleAudioVolume_Release(pc_AudioVolume);
+
+    return hr;
+}
 
 /*** VLC audio output callbacks ***/
 static HRESULT TimeGet(aout_stream_t *s, mtime_t *restrict delay)
@@ -436,6 +501,8 @@ static HRESULT Start(aout_stream_t *s, audio_sample_format_t *restrict fmt,
     sys->written = 0;
     s->sys = sys;
     s->time_get = TimeGet;
+    s->set_volume = SetVolume;
+    s->mute = Mute;
     s->play = Play;
     s->pause = Pause;
     s->flush = Flush;
