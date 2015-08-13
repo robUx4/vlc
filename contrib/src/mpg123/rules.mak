@@ -18,6 +18,9 @@ mpg123: mpg123-$(MPG123_VERSION).tar.bz2 .sum-mpg123
 ifdef HAVE_WINRT
 	$(APPLY) $(SRC)/mpg123/winstore.patch
 endif
+ifdef HAVE_VISUALSTUDIO
+	$(APPLY) $(SRC)/mpg123/msvc.patch
+endif
 	$(MOVE)
 
 .mpg123: mpg123
