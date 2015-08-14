@@ -35,6 +35,8 @@ struct aout_stream
     HRESULT (*play)(aout_stream_t *, block_t *);
     HRESULT (*pause)(aout_stream_t *, bool);
     HRESULT (*flush)(aout_stream_t *);
+    HRESULT (*set_volume)(aout_stream_t *,float);
+    HRESULT (*mute)(aout_stream_t *,bool);
 
     struct
     {
@@ -84,6 +86,16 @@ static inline HRESULT aout_stream_Flush(aout_stream_t *s, bool wait)
     }
     else
         return (s->flush)(s);
+}
+
+static inline HRESULT aout_stream_SetVolume(aout_stream_t *s, float volume)
+{
+    return s->set_volume ? (s->set_volume)(s, volume) : E_POINTER;
+}
+
+static inline HRESULT aout_stream_Mute(aout_stream_t *s, bool mute)
+{
+    return s->mute ? (s->mute)(s, mute) : E_POINTER;
 }
 
 static inline

@@ -74,6 +74,58 @@ typedef struct aout_stream_sys
 } aout_stream_sys_t;
 
 
+static HRESULT SetVolume(aout_stream_t *s, float vol)
+{
+    aout_stream_sys_t *sys = s->sys;
+    ISimpleAudioVolume *pc_AudioVolume = NULL;
+    HRESULT hr;
+
+    hr = IAudioClient_GetService(sys->client, &IID_ISimpleAudioVolume, &pc_AudioVolume);
+    if (FAILED(hr))
+    {
+        msg_Err(s, "cannot get volume service (error 0x%lx)", hr);
+        goto done;
+    }
+
+    hr = ISimpleAudioVolume_SetMasterVolume(pc_AudioVolume, vol, NULL);
+    if (FAILED(hr))
+    {
+        msg_Err(s, "cannot set volume (error 0x%lx)", hr);
+        goto done;
+    }
+
+done:
+    ISimpleAudioVolume_Release(pc_AudioVolume);
+
+    return hr;
+}
+
+static HRESULT Mute(aout_stream_t *s, bool mute)
+{
+    aout_stream_sys_t *sys = s->sys;
+    ISimpleAudioVolume *pc_AudioVolume = NULL;
+    HRESULT hr;
+
+    hr = IAudioClient_GetService(sys->client, &IID_ISimpleAudioVolume, &pc_AudioVolume);
+    if (FAILED(hr))
+    {
+        msg_Err(s, "cannot get volume service (error 0x%lx)", hr);
+        goto done;
+    }
+
+    hr = ISimpleAudioVolume_SetMute(pc_AudioVolume, mute, NULL);
+    if (FAILED(hr))
+    {
+        msg_Err(s, "cannot set mute (error 0x%lx)", hr);
+        goto done;
+    }
+
+done:
+    ISimpleAudioVolume_Release(pc_AudioVolume);
+
+    return hr;
+}
+
 /*** VLC audio output callbacks ***/
 static HRESULT TimeGet(aout_stream_t *s, mtime_t *restrict delay)
 {
@@ -432,6 +484,8 @@ static HRESULT Start(aout_stream_t *s, audio_sample_format_t *restrict fmt,
     sys->written = 0;
     s->sys = sys;
     s->time_get = TimeGet;
+    s->set_volume = SetVolume;
+    s->mute = Mute;
     s->play = Play;
     s->pause = Pause;
     s->flush = Flush;
