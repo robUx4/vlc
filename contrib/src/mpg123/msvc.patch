@@ -1,0 +1,21 @@
+--- mpg123/configure.ac 2015-08-13 11:18:04.902004500 +0200
++++ mpg123/configure.ac.msvc    2015-08-13 11:29:05.737677800 +0200
+@@ -177,6 +177,7 @@
+ AC_SUBST(MODULE_OBJ)
+ AC_SUBST(LT_LDFLAGS)
+ AC_SUBST(EXEC_LT_LDFLAGS)
++AC_SUBST(LIBEXT, .$libext)
+
+ dnl ############## Configurable Options
+
+
+--- mpg123/libmpg123.pc.in      2014-09-28 23:27:28.000000000 +0200
++++ mpg123/libmpg123.pc.in.msvc 2015-08-13 11:32:39.983974800 +0200
+@@ -7,5 +7,5 @@
+ Description: An optimised MPEG Audio decoder
+ Requires:
+ Version: @PACKAGE_VERSION@
+-Libs: -L${libdir} -lmpg123
++Libs: -L${libdir} -lmpg123@LIBEXT@
+ Cflags: -I${includedir}
+
