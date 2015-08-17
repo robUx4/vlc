@@ -35,6 +35,9 @@
 #include <vlc_url.h>                /* make_path */
 #include <vlc_mime.h>               /* mime type */
 #include <vlc_fs.h>
+#if VLC_WINSTORE_APP
+#include <vlc_access.h>
+#endif
 
 #include <sys/stat.h>
 
@@ -59,7 +62,9 @@
 #include <fileref.h>
 #include <tag.h>
 #include <tbytevector.h>
+#if VLC_WINSTORE_APP
 #include <tiostream.h>
+#endif
 
 #if TAGLIB_VERSION >= VERSION_INT(1,7,0)
 # define TAGLIB_HAVE_APEFILE_H
@@ -115,20 +120,19 @@ vlc_module_end ()
 
 using namespace TagLib;
 
+#if VLC_WINSTORE_APP
 class VlcIostream : public IOStream
 {
 public:
-    VlcIostream(demux_t* p_demux)
+    VlcIostream(access_t* p_demux)
         :  m_demux( p_demux )
     {
         vlc_object_hold( m_demux );
-        m_previousPos = stream_Tell( m_demux->s );
     }
 
     ~VlcIostream()
     {
-        stream_Seek( m_demux->s, m_previousPos );
-        vlc_object_release( m_demux );
+        vlc_access_Delete( m_demux );
     }
 
     FileName name() const
@@ -139,7 +143,7 @@ public:
     ByteVector readBlock(ulong length)
     {
         ByteVector res(length, 0);
-        int i_read = stream_Read( m_demux->s, res.data(), length);
+        int i_read = vlc_access_Read( m_demux, res.data(), length);
         if (i_read < 0)
             return ByteVector::null;;
         res.resize(i_read);
@@ -178,15 +182,15 @@ public:
         switch (p)
         {
             case Current:
-                pos = stream_Tell( m_demux->s );
+                pos = vlc_access_Tell( m_demux );
                 break;
             case End:
-                pos = stream_Size( m_demux->s );
+                pos = access_GetSize( m_demux );
                 break;
             default:
                 break;
         }
-        stream_Seek( m_demux->s, pos + offset );
+        vlc_access_Seek( m_demux, pos + offset );
     }
 
     void clear()
@@ -196,12 +200,12 @@ public:
 
     long tell() const
     {
-        return stream_Tell( m_demux->s );
+        return vlc_access_Tell( m_demux );
     }
 
     long length()
     {
-        return stream_Size( m_demux->s );
+        return access_GetSize( m_demux );
     }
 
     void truncate(long length)
@@ -210,9 +214,9 @@ public:
     }
 
 private:
-    demux_t* m_demux;
-    int64_t m_previousPos;
+    access_t* m_demux;
 };
+#endif /* VLC_WINSTORE_APP */
 
 static void ExtractTrackNumberValues( vlc_meta_t* p_meta, const char *psz_value )
 {
@@ -773,20 +777,31 @@ static int ReadMeta( vlc_object_t* p_this)
     vlc_mutex_locker locker (&taglib_lock);
     demux_meta_t*   p_demux_meta = (demux_meta_t *)p_this;
     vlc_meta_t*     p_meta;
+    FileRef f;
 
     p_demux_meta->p_meta = NULL;
-
-#if VLC_WINSTORE_APP
-    VlcIostream s( (demux_t*) p_demux_meta->p_parent );
-    FileRef f( &s );
-#else /* VLC_WINSTORE_APP */
-    FileRef f;
 
     char *psz_uri = input_item_GetURI( p_demux_meta->p_item );
     if( unlikely(psz_uri == NULL) )
         return VLC_ENOMEM;
 
     char *psz_path = make_path( psz_uri );
+#if VLC_WINSTORE_APP
+    if( psz_path == NULL )
+    {
+        free( psz_uri );
+        return VLC_EGENERIC;
+    }
+    free( psz_path );
+
+    access_t *p_access = vlc_access_NewMRL( p_this, psz_uri );
+    free( psz_uri );
+    if( p_access == NULL )
+        return VLC_EGENERIC;
+
+    VlcIostream s( p_access );
+    f = FileRef( &s );
+#else /* VLC_WINSTORE_APP */
     free( psz_uri );
     if( psz_path == NULL )
         return VLC_EGENERIC;
