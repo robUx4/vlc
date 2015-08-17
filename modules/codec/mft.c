@@ -64,6 +64,7 @@ vlc_module_begin()
 vlc_module_end()
 
 #ifdef VLC_WINSTORE_APP
+# ifdef _MSC_VER
 typedef struct __WIDL_mfobjects_generated_name_00000016 {
     GUID guidMajorType;
     GUID guidSubtype;
@@ -83,6 +84,7 @@ enum _MFT_ENUM_FLAG {
   };
 
 DEFINE_GUID (MF_MT_ORIGINAL_WAVE_FORMAT_TAG, 0x8cbbc843, 0x9fd9, 0x49c2, 0x88, 0x2f, 0xa7, 0x25, 0x86, 0xc4, 0x08, 0xad);
+# endif
 
 STDAPI MFTEnumEx (GUID guidCategory, UINT32 Flags, const MFT_REGISTER_TYPE_INFO *pInputType, const MFT_REGISTER_TYPE_INFO *pOutputType, IMFActivate ***pppMFTActivate, UINT32 *pnumMFTActivate);
 #endif
