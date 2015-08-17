@@ -1006,7 +1006,7 @@ static text_segment_t * Eia608TextLine( struct eia608_screen *screen, int i_row,
 
     char utf8[4];
     const unsigned i_text_max = 4 * EIA608_SCREEN_COLUMNS + 1;
-    char psz_text[i_text_max + 1];
+    char *psz_text = alloca(i_text_max + 1);
     psz_text[0] = '\0';
 
     text_segment_t *p_segment, *p_segments_head = p_segment = text_segment_New( NULL );
