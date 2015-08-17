@@ -171,11 +171,6 @@ EXTRA_CMAKE_FLAGS += -FI`cygpath -w ../../../../headers/fixup.h`
 endif
 endif
 
-ifdef HAVE_VISUALSTUDIO
-# allow mixing debug and runtime contribs
-#EXTRA_CFLAGS += -D_ALLOW_ITERATOR_DEBUG_LEVEL_MISMATCH -D_ALLOW_RUNTIME_LIBRARY_MISMATCH
-endif
-
 cppcheck = $(shell $(CC) $(CFLAGS) -E -dM - < /dev/null | grep -E $(1))
 
 EXTRA_CFLAGS += -I$(PREFIX)/include
