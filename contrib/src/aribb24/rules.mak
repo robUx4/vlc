@@ -16,6 +16,9 @@ $(TARBALLS)/aribb24-$(ARIBB24_VERSION).tar.gz:
 
 aribb24: aribb24-$(ARIBB24_VERSION).tar.gz .sum-aribb24
 	$(UNPACK)
+ifdef HAVE_VISUALSTUDIO
+	$(APPLY) $(SRC)/aribb24/msvc.patch
+endif
 	$(MOVE)
 
 DEPS_aribb24 = png
