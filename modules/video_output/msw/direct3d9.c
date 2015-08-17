@@ -47,6 +47,8 @@
 
 #include <windows.h>
 #include <d3d9.h>
+#define COBJMACROS
+#include <d3d10.h>
 
 #include "common.h"
 #include "builtin_shaders.h"
@@ -1275,8 +1277,8 @@ static int Direct3D9CompileShader(vout_display_t *vd, const char *shader_source,
             LPCSTR pFunctionName,
             LPCSTR pProfile,
             DWORD Flags,
-            LPD3DXBUFFER *ppShader,
-            LPD3DXBUFFER *ppErrorMsgs,
+            ID3D10Blob **ppShader,
+            ID3D10Blob **ppErrorMsgs,
             LPD3DXCONSTANTTABLE *ppConstantTable);
 
     OurD3DXCompileShader = (void*)GetProcAddress(sys->hd3d9x_dll, "D3DXCompileShader");
@@ -1285,8 +1287,8 @@ static int Direct3D9CompileShader(vout_display_t *vd, const char *shader_source,
         return VLC_EGENERIC;
     }
 
-    LPD3DXBUFFER error_msgs = NULL;
-    LPD3DXBUFFER compiled_shader = NULL;
+    ID3D10Blob *error_msgs = NULL;
+    ID3D10Blob *compiled_shader = NULL;
 
     DWORD shader_flags = 0;
     HRESULT hr = OurD3DXCompileShader(shader_source, source_length, NULL, NULL,
@@ -1295,20 +1297,20 @@ static int Direct3D9CompileShader(vout_display_t *vd, const char *shader_source,
     if (FAILED(hr)) {
         msg_Warn(vd, "D3DXCompileShader Error (hr=0x%0lx)", hr);
         if (error_msgs) {
-            msg_Warn(vd, "HLSL Compilation Error: %s", (char*)ID3DXBuffer_GetBufferPointer(error_msgs));
-            ID3DXBuffer_Release(error_msgs);
+            msg_Warn(vd, "HLSL Compilation Error: %s", (char*)ID3D10Blob_GetBufferPointer(error_msgs));
+            ID3D10Blob_Release(error_msgs);
     }
         return VLC_EGENERIC;
     }
 
     hr = IDirect3DDevice9_CreatePixelShader(sys->d3ddev,
-            ID3DXBuffer_GetBufferPointer(compiled_shader),
+            ID3D10Blob_GetBufferPointer(compiled_shader),
             &sys->d3dx_shader);
 
     if (compiled_shader)
-        ID3DXBuffer_Release(compiled_shader);
+        ID3D10Blob_Release(compiled_shader);
     if (error_msgs)
-        ID3DXBuffer_Release(error_msgs);
+        ID3D10Blob_Release(error_msgs);
 
     if (FAILED(hr)) {
         msg_Warn(vd, "IDirect3DDevice9_CreatePixelShader error (hr=0x%0lx)", hr);
