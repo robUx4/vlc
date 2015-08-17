@@ -4,7 +4,7 @@
  #define LIBEBML_DEBUG
  #endif
 
-+#ifdef _WIN32
++#if defined(_WIN32)||defined(WIN32)
 +#include <winapifamily.h>
 +# if !WINAPI_FAMILY_PARTITION(WINAPI_PARTITION_DESKTOP)
 +#  undef LIBEBML_DEBUG
