@@ -27,12 +27,11 @@
 #import <vlc_vout_window.h>
 #import "KeyboardBacklight.h"
 
+@class VLCControlsBarCommon;
 @class VLCVideoWindowCommon;
 @class VLCVoutView;
 
 @interface VLCVoutWindowController : NSObject
-
-+ (VLCVoutWindowController *)sharedInstance;
 
 @property (readonly, atomic) NSLock *lock;
 
@@ -44,7 +43,7 @@
 - (void)setWindowLevel:(NSInteger)i_level forWindow:(vout_window_t *)p_wnd;
 - (void)setFullscreen:(int)i_full forWindow:(vout_window_t *)p_wnd withAnimation:(BOOL)b_animation;
 
-- (void)updateWindowsControlsBarWithSelector:(SEL)aSel;
+- (void)updateControlsBarsUsingBlock:(void (^)(VLCControlsBarCommon *controlsBar))block;
 - (void)updateWindowsUsingBlock:(void (^)(VLCVideoWindowCommon *o_window))windowUpdater;
 
 - (void)updateWindowLevelForHelperWindows:(NSInteger)i_level;

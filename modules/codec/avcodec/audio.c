@@ -244,6 +244,7 @@ static block_t *DecodeAudio( decoder_t *p_dec, block_t **pp_block )
 {
     decoder_sys_t *p_sys = p_dec->p_sys;
     AVCodecContext *ctx = p_sys->p_context;
+    AVFrame *frame = NULL;
 
     if( !pp_block || !*pp_block )
         return NULL;
@@ -290,7 +291,7 @@ static block_t *DecodeAudio( decoder_t *p_dec, block_t **pp_block )
         p_block->i_flags |= BLOCK_FLAG_PRIVATE_REALLOCATED;
     }
 
-    AVFrame *frame = av_frame_alloc();
+    frame = av_frame_alloc();
     if (unlikely(frame == NULL))
         goto end;
 
@@ -368,6 +369,7 @@ static block_t *DecodeAudio( decoder_t *p_dec, block_t **pp_block )
         p_block = vlc_av_frame_Wrap(frame);
         if (unlikely(p_block == NULL))
             goto drop;
+        frame = NULL;
     }
 
     if (p_sys->b_extract)
@@ -403,6 +405,7 @@ static block_t *DecodeAudio( decoder_t *p_dec, block_t **pp_block )
 end:
     *pp_block = NULL;
 drop:
+    av_frame_free(&frame);
     if( p_block != NULL )
         block_Release(p_block);
     return NULL;

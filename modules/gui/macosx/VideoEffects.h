@@ -23,10 +23,12 @@
 
 #import <Cocoa/Cocoa.h>
 
-@interface VLCVideoEffects : NSObject
+@class VLCPopupPanelController;
+@class VLCTextfieldPanelController;
+
+@interface VLCVideoEffects : NSWindowController
 
 /* generic */
-@property (readwrite, weak) IBOutlet NSWindow *window;
 @property (readwrite, weak) IBOutlet NSTabView *tabView;
 @property (readwrite, weak) IBOutlet NSPopUpButton *profilePopup;
 
@@ -142,6 +144,9 @@
 @property (readwrite, weak) IBOutlet NSSlider *addLogoTransparencySlider;
 @property (readwrite, weak) IBOutlet NSButton *anaglyphCheckbox;
 
+@property (strong) VLCPopupPanelController *popupPanel;
+@property (strong) VLCTextfieldPanelController *textfieldPanel;
+
 /* text field / stepper binding values */
 /* use setter to modify gui elements */
 @property (nonatomic) int cropLeftValue;
@@ -162,7 +167,6 @@
 @property (nonatomic) int posterizeValue;
 
 /* generic */
-+ (VLCVideoEffects *)sharedInstance;
 - (void)updateCocoaWindowLevel:(NSInteger)i_level;
 - (void)saveCurrentProfile;
 

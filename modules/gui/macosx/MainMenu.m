@@ -46,6 +46,7 @@
 #import "ConvertAndSave.h"
 #import "DebugMessageVisualizer.h"
 #import "AddonsWindowController.h"
+#import "VLCTimeSelectionPanelController.h"
 
 #ifdef HAVE_SPARKLE
 #import <Sparkle/Sparkle.h>
@@ -53,27 +54,20 @@
 
 @interface VLCMainMenu()
 {
-    BOOL b_nib_videoeffects_loaded;
-    BOOL b_nib_audioeffects_loaded;
-    BOOL b_nib_tracksynchrloaded;
     BOOL b_nib_bookmarks_loaded;
-    BOOL b_nib_convertandsave_loaded;
 
     AboutWindowController *_aboutWindowController;
     HelpWindowController  *_helpWindowController;
-    VLCVideoEffects *_videoEffectsWindowController;
-    VLCAudioEffects *_audioEffectsWindowController;
-    VLCTrackSynchronization *_trackSynchronizationWindowController;
-    VLCConvertAndSave *_convertAndSaveWindowController;
     AddonsWindowController *_addonsController;
-
-    ExtensionsManager *_extensionManager;
 
     // information for playlist table columns menu
     NSDictionary *_translationsForPlaylistTableColumns;
     NSArray *_menuOrderOfPlaylistTableColumns;
 
     NSMenu *_playlistTableColumnsContextMenu;
+
+    __strong VLCTimeSelectionPanelController *_timeSelectionPanel;
+
 }
 @end
 
@@ -83,6 +77,7 @@
 
 - (void)dealloc
 {
+    msg_Dbg(VLCIntf, "Deinitializing main menu");
     [[NSNotificationCenter defaultCenter] removeObserver: self];
 
     [self releaseRepresentedObjects:[NSApp mainMenu]];
@@ -90,6 +85,8 @@
 
 - (void)awakeFromNib
 {
+    _timeSelectionPanel = [[VLCTimeSelectionPanelController alloc] init];
+
     /* check whether the user runs OSX with a RTL language */
     NSArray* languages = [NSLocale preferredLanguages];
     NSString* preferredLanguage = [languages firstObject];
@@ -135,7 +132,6 @@
 
     /* Get ExtensionsManager */
     intf_thread_t *p_intf = VLCIntf;
-    _extensionManager = [ExtensionsManager sharedInstance];
 
     [self initStrings];
 
@@ -243,12 +239,13 @@
 
     /* setup extensions menu */
     /* Let the ExtensionsManager itself build the menu */
-    [_extensionManager buildMenu:_extensionsMenu];
+    ExtensionsManager *extMgr = [[VLCMain sharedInstance] extensionsManager];
+    [extMgr buildMenu:_extensionsMenu];
     [_extensions setEnabled: ([_extensionsMenu numberOfItems] > 0)];
 
     // FIXME: Implement preference for autoloading extensions on mac
-    if (![_extensionManager isLoaded] && ![_extensionManager cannotLoad])
-        [_extensionManager loadExtensions];
+    if (![extMgr isLoaded] && ![extMgr cannotLoad])
+        [extMgr loadExtensions];
 
     /* setup post-proc menu */
     NSUInteger count = (NSUInteger) [_postprocessingMenu numberOfItems];
@@ -495,12 +492,6 @@
     [_voutMenumute setTitle: _NS("Mute")];
     [_voutMenufullscreen setTitle: _NS("Fullscreen")];
     [_voutMenusnapshot setTitle: _NS("Snapshot")];
-
-    [_specificTime_cancelButton setTitle: _NS("Cancel")];
-    [_specificTime_okButton setTitle: _NS("OK")];
-    [_specificTime_secLabel setStringValue: _NS("sec.")];
-    [_specificTime_goToLabel setStringValue: _NS("Jump to Time")];
-    [_specificTime_enterTextField setFormatter:[[PositionFormatter alloc] init]];
 }
 
 - (NSMenu *)setupPlaylistTableColumnsMenu
@@ -872,53 +863,27 @@
 
 - (IBAction)goToSpecificTime:(id)sender
 {
-    if (sender == _specificTime_cancelButton)
-    {
-        [NSApp endSheet: _specificTimeWindow];
-        [_specificTimeWindow close];
-    } else if (sender == _specificTime_okButton) {
-        input_thread_t *p_input = pl_CurrentInput(VLCIntf);
-        if (p_input) {
-            int64_t timeInSec = 0;
-            NSString *fieldContent = [_specificTime_enterTextField stringValue];
-            if ([[fieldContent componentsSeparatedByString: @":"] count] > 1 &&
-                [[fieldContent componentsSeparatedByString: @":"] count] <= 3) {
-                NSArray *ourTempArray = \
-                [fieldContent componentsSeparatedByString: @":"];
+    input_thread_t *p_input = pl_CurrentInput(VLCIntf);
+    if (p_input) {
+        /* we can obviously only do that if an input is available */
+        int64_t length = var_GetInteger(p_input, "length");
+        [_timeSelectionPanel setMaxValue:(length / CLOCK_FREQ)];
+        int64_t pos = var_GetInteger(p_input, "time");
+        [_timeSelectionPanel setJumpTimeValue: (pos / CLOCK_FREQ)];
+        [_timeSelectionPanel runModalForWindow:[NSApp mainWindow]
+                             completionHandler:^(NSInteger returnCode, int64_t returnTime) {
 
-                if ([[fieldContent componentsSeparatedByString: @":"] count] == 3) {
-                    timeInSec += ([[ourTempArray firstObject] intValue] *3600); //h
-                    timeInSec += ([[ourTempArray objectAtIndex:1] intValue] *60); //m
-                    timeInSec += [[ourTempArray objectAtIndex:2] intValue];        //s
-                } else {
-                    timeInSec += ([[ourTempArray firstObject] intValue] *60); //m
-                    timeInSec += [[ourTempArray objectAtIndex:1] intValue]; //s
-                }
+            if (returnCode != NSOKButton)
+                return;
+
+            input_thread_t *p_input = pl_CurrentInput(VLCIntf);
+            if (p_input) {
+                input_Control(p_input, INPUT_SET_TIME, (int64_t)(returnTime *1000000));
+                vlc_object_release(p_input);
             }
-            else
-                timeInSec = [fieldContent intValue];
+        }];
 
-            input_Control(p_input, INPUT_SET_TIME, (int64_t)(timeInSec *1000000));
-            vlc_object_release(p_input);
-        }
-
-        [NSApp endSheet: _specificTimeWindow];
-        [_specificTimeWindow close];
-    } else {
-        input_thread_t *p_input = pl_CurrentInput(VLCIntf);
-        if (p_input) {
-            /* we can obviously only do that if an input is available */
-            int64_t pos, length;
-            length = var_GetInteger(p_input, "length");
-            [_specificTime_stepper setMaxValue: (length / CLOCK_FREQ)];
-            pos = var_GetInteger(p_input, "time");
-            [self setJumpTimeValue: (pos / CLOCK_FREQ)];
-            [NSApp beginSheet: _specificTimeWindow modalForWindow: \
-             [NSApp mainWindow] modalDelegate: self didEndSelector: nil \
-                  contextInfo: nil];
-            [_specificTimeWindow makeKeyWindow];
-            vlc_object_release(p_input);
-        }
+        vlc_object_release(p_input);
     }
 }
 
@@ -1272,46 +1237,22 @@
 
 - (IBAction)showConvertAndSave:(id)sender
 {
-    if (_convertAndSaveWindowController == nil)
-        _convertAndSaveWindowController = [[VLCConvertAndSave alloc] init];
-
-    if (!b_nib_convertandsave_loaded)
-        b_nib_convertandsave_loaded = [NSBundle loadNibNamed:@"ConvertAndSave" owner: NSApp];
-
-    [_convertAndSaveWindowController toggleWindow];
+    [[[VLCMain sharedInstance] convertAndSaveWindow] showWindow:self];
 }
 
 - (IBAction)showVideoEffects:(id)sender
 {
-    if (_videoEffectsWindowController == nil)
-        _videoEffectsWindowController = [[VLCVideoEffects alloc] init];
-
-    if (!b_nib_videoeffects_loaded)
-        b_nib_videoeffects_loaded = [NSBundle loadNibNamed:@"VideoEffects" owner: _videoEffectsWindowController];
-
-    [_videoEffectsWindowController toggleWindow:sender];
+    [[[VLCMain sharedInstance] videoEffectsPanel] toggleWindow:sender];
 }
 
 - (IBAction)showTrackSynchronization:(id)sender
 {
-    if (!_trackSynchronizationWindowController)
-        _trackSynchronizationWindowController = [[VLCTrackSynchronization alloc] init];
-
-    if (!b_nib_tracksynchrloaded)
-        b_nib_tracksynchrloaded = [NSBundle loadNibNamed:@"SyncTracks" owner:_trackSynchronizationWindowController];
-
-    [_trackSynchronizationWindowController toggleWindow:sender];
+    [[[VLCMain sharedInstance] trackSyncPanel] toggleWindow:sender];
 }
 
 - (IBAction)showAudioEffects:(id)sender
 {
-    if (!_audioEffectsWindowController)
-        _audioEffectsWindowController = [[VLCAudioEffects alloc] init];
-
-    if (!b_nib_audioeffects_loaded)
-        b_nib_audioeffects_loaded = [NSBundle loadNibNamed:@"AudioEffects" owner:_audioEffectsWindowController];
-
-    [_audioEffectsWindowController toggleWindow:sender];
+    [[[VLCMain sharedInstance] audioEffectsPanel] toggleWindow:sender];
 }
 
 - (IBAction)showBookmarks:(id)sender
@@ -1335,17 +1276,17 @@
 
 - (IBAction)showMessagesPanel:(id)showMessagesPanel
 {
-    [[VLCDebugMessageVisualizer sharedInstance] showPanel];
+    [[[VLCMain sharedInstance] debugMsgPanel] showWindow:self];
 }
 
 - (IBAction)showMainWindow:(id)sender
 {
-    [[VLCMainWindow sharedInstance] makeKeyAndOrderFront:sender];
+    [[[VLCMain sharedInstance] mainWindow] makeKeyAndOrderFront:sender];
 }
 
 - (IBAction)showPlaylist:(id)sender
 {
-    [[VLCMainWindow sharedInstance] changePlaylistState: psUserMenuEvent];
+    [[[VLCMain sharedInstance] mainWindow] changePlaylistState: psUserMenuEvent];
 }
 
 #pragma mark - Help and Docs

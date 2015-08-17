@@ -238,6 +238,44 @@ static const int DEFAULT_ALIGN = 0;
 /*****************************************************************************
  * OpenEncoder: probe the encoder
  *****************************************************************************/
+static void probe_video_frame_rate( encoder_t *p_enc, AVCodecContext *p_context, AVCodec *p_codec )
+{
+    /* if we don't have i_frame_rate_base, we are probing and just checking if we can find codec
+     * so set fps to requested fps if asked by user or input fps is availabled */
+    p_context->time_base.num = p_enc->fmt_in.video.i_frame_rate_base ? p_enc->fmt_in.video.i_frame_rate_base : 1;
+
+    // MP4V doesn't like CLOCK_FREQ denominator in time_base, so use 1/25 as default for that
+    p_context->time_base.den = p_enc->fmt_in.video.i_frame_rate_base ? p_enc->fmt_in.video.i_frame_rate :
+                                  ( p_enc->fmt_out.i_codec == VLC_CODEC_MP4V ? 25 : CLOCK_FREQ );
+
+    msg_Dbg( p_enc, "Time base for probing setted to %d/%d", p_context->time_base.num, p_context->time_base.den );
+    if( p_codec->supported_framerates )
+    {
+        /* We are finding fps values so 1/time_base */
+        AVRational target = {
+            .num = p_context->time_base.den,
+            .den = p_context->time_base.num
+        };
+        int idx = av_find_nearest_q_idx(target, p_codec->supported_framerates);
+
+        p_context->time_base.num = p_codec->supported_framerates[idx].den ?
+                                    p_codec->supported_framerates[idx].den : 1;
+        p_context->time_base.den = p_codec->supported_framerates[idx].den ?
+                                    p_codec->supported_framerates[idx].num : CLOCK_FREQ;
+
+        /* If we have something reasonable on supported framerates, use that*/
+        if( p_context->time_base.den && p_context->time_base.den < CLOCK_FREQ )
+        {
+            p_enc->fmt_out.video.i_frame_rate_base =
+                p_enc->fmt_in.video.i_frame_rate_base =
+                p_context->time_base.num;
+            p_enc->fmt_out.video.i_frame_rate =
+                p_enc->fmt_in.video.i_frame_rate =
+                p_context->time_base.den;
+        }
+    }
+    msg_Dbg( p_enc, "Time base set to %d/%d", p_context->time_base.num, p_context->time_base.den );
+}
 
 int OpenEncoder( vlc_object_t *p_this )
 {
@@ -463,22 +501,7 @@ int OpenEncoder( vlc_object_t *p_this )
         p_context->width = p_enc->fmt_in.video.i_visible_width;
         p_context->height = p_enc->fmt_in.video.i_visible_height;
 
-        /* if we don't have i_frame_rate_base, we are probing and just checking if we can find codec
-         * so set fps to 25 as some codecs (DIV3 atleast) needs time_base data */
-        p_context->time_base.num = p_enc->fmt_in.video.i_frame_rate_base ? p_enc->fmt_in.video.i_frame_rate_base : 1;
-        p_context->time_base.den = p_enc->fmt_in.video.i_frame_rate_base ? p_enc->fmt_in.video.i_frame_rate : 25 ;
-        if( p_codec->supported_framerates )
-        {
-            AVRational target = {
-                .num = p_enc->fmt_in.video.i_frame_rate,
-                .den = p_enc->fmt_in.video.i_frame_rate_base,
-            };
-            int idx = av_find_nearest_q_idx(target, p_codec->supported_framerates);
-
-            p_context->time_base.num = p_codec->supported_framerates[idx].den;
-            p_context->time_base.den = p_codec->supported_framerates[idx].num;
-        }
-        msg_Dbg( p_enc, "Time base set to %d/%d", p_context->time_base.num, p_context->time_base.den );
+        probe_video_frame_rate( p_enc, p_context, p_codec );
 
         /* Defaults from ffmpeg.c */
         p_context->qblur = 0.5;
@@ -782,12 +805,10 @@ int OpenEncoder( vlc_object_t *p_this )
                 p_context->mb_lmax = p_context->lmax = 42 * FF_QP2LAMBDA;
             }
 
-            } else {
-            if( !var_GetInteger( p_enc, ENC_CFG_PREFIX "qmin" ) )
-            {
+        } else if( !var_GetInteger( p_enc, ENC_CFG_PREFIX "qmin" ) )
+        {
                 p_context->qmin = 1;
                 p_context->mb_lmin = p_context->lmin = FF_QP2LAMBDA;
-            }
         }
 
 
@@ -1017,7 +1038,7 @@ static void vlc_av_packet_Release(block_t *block)
     free(b);
 }
 
-static block_t *vlc_av_packet_Wrap(AVPacket *packet, mtime_t i_length)
+static block_t *vlc_av_packet_Wrap(AVPacket *packet, mtime_t i_length, AVCodecContext *context )
 {
     vlc_av_packet_t *b = malloc( sizeof( *b ) );
     if( unlikely(b == NULL) )
@@ -1035,6 +1056,8 @@ static block_t *vlc_av_packet_Wrap(AVPacket *packet, mtime_t i_length)
     p_block->i_dts = packet->dts;
     if( unlikely( packet->flags & AV_PKT_FLAG_CORRUPT ) )
         p_block->i_flags |= BLOCK_FLAG_CORRUPTED;
+    p_block->i_pts = p_block->i_pts * CLOCK_FREQ * context->time_base.num / context->time_base.den;
+    p_block->i_dts = p_block->i_dts * CLOCK_FREQ * context->time_base.num / context->time_base.den;
 
     return p_block;
 }
@@ -1064,8 +1087,14 @@ static block_t *EncodeVideo( encoder_t *p_enc, picture_t *p_pict )
         frame->interlaced_frame = !p_pict->b_progressive;
         frame->top_field_first = !!p_pict->b_top_field_first;
 
-        /* Set the pts of the frame being encoded */
-        frame->pts = (p_pict->date == VLC_TS_INVALID) ? AV_NOPTS_VALUE : p_pict->date;
+        /* Set the pts of the frame being encoded
+         * avcodec likes pts to be in time_base units
+         * frame number */
+        if( likely( p_pict->date > VLC_TS_INVALID ) )
+            frame->pts = p_pict->date * p_sys->p_context->time_base.den /
+                          CLOCK_FREQ / p_sys->p_context->time_base.num;
+        else
+            frame->pts = AV_NOPTS_VALUE;
 
         if ( p_sys->b_hurry_up && frame->pts != AV_NOPTS_VALUE )
         {
@@ -1140,7 +1169,7 @@ static block_t *EncodeVideo( encoder_t *p_enc, picture_t *p_pict )
     }
 
     block_t *p_block = vlc_av_packet_Wrap( &av_pkt,
-            av_pkt.duration / p_sys->p_context->time_base.den );
+            av_pkt.duration / p_sys->p_context->time_base.den, p_sys->p_context );
     if( unlikely(p_block == NULL) )
     {
         av_free_packet( &av_pkt );

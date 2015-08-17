@@ -34,6 +34,7 @@
 #endif
 
 #include <vlc_common.h>
+#include <vlc_charset.h>
 #include <vlc_filter.h>
 #include <vlc_text_style.h>
 
@@ -55,7 +56,6 @@
 # include <hb-ft.h>
 #endif
 
-#include "text_renderer.h"
 #include "text_layout.h"
 #include "freetype.h"
 
@@ -69,7 +69,7 @@ typedef struct run_desc_t
     int i_start_offset;
     int i_end_offset;
     FT_Face p_face;
-    text_style_t *p_style;
+    const text_style_t *p_style;
 
 #ifdef HAVE_HARFBUZZ
     hb_script_t script;
@@ -104,7 +104,7 @@ typedef struct paragraph_t
 {
     uni_char_t *p_code_points;            //Unicode code points
     int *pi_glyph_indices;                //Glyph index values within the run's font face
-    text_style_t **pp_styles;
+    const text_style_t **pp_styles;
     int *pi_run_ids;                      //The run to which each glyph belongs
     glyph_bitmaps_t *p_glyph_bitmaps;
     uint8_t *pi_karaoke_bar;
@@ -207,8 +207,8 @@ static void BBoxEnlarge( FT_BBox *p_max, const FT_BBox *p )
 
 static paragraph_t *NewParagraph( filter_t *p_filter,
                                   int i_size,
-                                  uni_char_t *p_code_points,
-                                  text_style_t **pp_styles,
+                                  const uni_char_t *p_code_points,
+                                  const text_style_t **pp_styles,
                                   uint32_t *pi_k_dates,
                                   int i_runs_size )
 {
@@ -444,7 +444,7 @@ static int ItemizeParagraph( filter_t *p_filter, paragraph_t *p_paragraph )
     }
 
     int i_last_run_start = 0;
-    text_style_t *p_last_style = p_paragraph->pp_styles[ 0 ];
+    const text_style_t *p_last_style = p_paragraph->pp_styles[ 0 ];
 
 #ifdef HAVE_HARFBUZZ
     hb_script_t last_script = p_paragraph->p_scripts[ 0 ];
@@ -458,11 +458,14 @@ static int ItemizeParagraph( filter_t *p_filter, paragraph_t *p_paragraph )
             || last_script != p_paragraph->p_scripts[ i ]
             || last_level != p_paragraph->p_levels[ i ]
 #endif
-            || p_last_style->i_font_size != p_paragraph->pp_styles[ i ]->i_font_size
-            || ( ( p_last_style->i_style_flags
-                 ^ p_paragraph->pp_styles[ i ]->i_style_flags )
-                 & STYLE_HALFWIDTH )
-            ||!FaceStyleEquals( p_last_style, p_paragraph->pp_styles[ i ] ) )
+            || ( p_paragraph->pp_styles[ i ] != NULL && (
+                p_last_style->i_font_size != p_paragraph->pp_styles[ i ]->i_font_size
+                || ( ( p_last_style->i_style_flags
+                     ^ p_paragraph->pp_styles[ i ]->i_style_flags )
+                     & STYLE_HALFWIDTH )
+                ||!FaceStyleEquals( p_last_style, p_paragraph->pp_styles[ i ] ) )
+            )
+        )
         {
             int i_ret = AddRun( p_filter, p_paragraph, i_last_run_start, i, 0 );
             if( i_ret )
@@ -510,7 +513,7 @@ static int ShapeParagraphHarfBuzz( filter_t *p_filter,
     for( int i = 0; i < p_paragraph->i_runs_count; ++i )
     {
         run_desc_t *p_run = p_paragraph->p_runs + i;
-        text_style_t *p_style = p_run->p_style;
+        const text_style_t *p_style = p_run->p_style;
 
         /*
          * When using HarfBuzz, this is where font faces are loaded.
@@ -524,7 +527,7 @@ static int ShapeParagraphHarfBuzz( filter_t *p_filter,
             if( !p_face )
             {
                 p_face = p_sys->p_face;
-                p_style = &p_sys->style;
+                p_style = p_sys->p_style;
                 p_run->p_style = p_style;
             }
             p_run->p_face = p_face;
@@ -771,7 +774,7 @@ static int LoadGlyphs( filter_t *p_filter, paragraph_t *p_paragraph,
     for( int i = 0; i < p_paragraph->i_runs_count; ++i )
     {
         run_desc_t *p_run = p_paragraph->p_runs + i;
-        text_style_t *p_style = p_run->p_style;
+        const text_style_t *p_style = p_run->p_style;
 
         FT_Face p_face = 0;
         if( !p_run->p_face )
@@ -780,7 +783,7 @@ static int LoadGlyphs( filter_t *p_filter, paragraph_t *p_paragraph,
             if( !p_face )
             {
                 p_face = p_sys->p_face;
-                p_style = &p_sys->style;
+                p_style = p_sys->p_style;
                 p_run->p_style = p_style;
             }
             p_run->p_face = p_face;
@@ -848,7 +851,7 @@ static int LoadGlyphs( filter_t *p_filter, paragraph_t *p_paragraph,
                     p_bitmaps->p_outline = 0;
             }
 
-            if( p_filter->p_sys->style.i_shadow_alpha > 0 )
+            if( p_filter->p_sys->p_style->i_shadow_alpha > 0 )
                 p_bitmaps->p_shadow = p_bitmaps->p_outline ?
                                       p_bitmaps->p_outline : p_bitmaps->p_glyph;
 
@@ -889,7 +892,7 @@ static int LayoutLine( filter_t *p_filter,
     filter_sys_t *p_sys = p_filter->p_sys;
     int i_last_run = -1;
     run_desc_t *p_run = 0;
-    text_style_t *p_style = 0;
+    const text_style_t *p_style = 0;
     FT_Face p_face = 0;
     FT_Vector pen = { .x = 0, .y = 0 };
     int i_line_index = 0;
@@ -998,7 +1001,7 @@ static int LayoutLine( filter_t *p_filter,
 
         int i_line_offset    = 0;
         int i_line_thickness = 0;
-        text_style_t *p_glyph_style = p_paragraph->pp_styles[ i_paragraph_index ];
+        const text_style_t *p_glyph_style = p_paragraph->pp_styles[ i_paragraph_index ];
         if( p_glyph_style->i_style_flags & (STYLE_UNDERLINE | STYLE_STRIKEOUT) )
         {
             i_line_offset =
@@ -1203,7 +1206,7 @@ error:
 int LayoutText( filter_t *p_filter, line_desc_t **pp_lines,
                 FT_BBox *p_bbox, int *pi_max_face_height,
 
-                uni_char_t *psz_text, text_style_t **pp_styles,
+                const uni_char_t *psz_text, const text_style_t **pp_styles,
                 uint32_t *pi_k_dates, int i_len )
 {
     line_desc_t *p_first_line = 0;
@@ -1268,7 +1271,7 @@ int LayoutText( filter_t *p_filter, line_desc_t **pp_lines,
              * and any extra width caused by visual reordering
              */
             int i_max_width = ( int ) p_filter->fmt_out.video.i_visible_width
-                              - 2 * p_filter->p_sys->style.i_font_size;
+                              - 2 * p_filter->p_sys->p_style->i_font_size;
             if( LayoutParagraph( p_filter, p_paragraph,
                                  i_max_width, pp_line ) )
                 goto error;
@@ -1311,3 +1314,4 @@ error:
     if( p_paragraph ) FreeParagraph( p_paragraph );
     return VLC_EGENERIC;
 }
+

@@ -46,7 +46,11 @@
 /*****************************************************************************
  * Local prototypes.
  *****************************************************************************/
-#define VLCIntf [[VLCMain sharedInstance] intf]
+
+// deprecated macro
+#define VLCIntf getIntf()
+
+intf_thread_t *getIntf();
 
 static NSString * VLCInputChangedNotification = @"VLCInputChangedNotification";
 
@@ -64,19 +68,21 @@ static NSString * VLCInputChangedNotification = @"VLCInputChangedNotification";
 @class VLCCoreDialogProvider;
 @class VLCBookmarks;
 @class VLCOpen;
+@class VLCDebugMessageVisualizer;
+@class VLCTrackSynchronization;
+@class VLCAudioEffects;
+@class VLCVideoEffects;
+@class VLCConvertAndSave;
+@class ExtensionsManager;
 
 @interface VLCMain : NSObject <NSWindowDelegate, NSApplicationDelegate>
-{
-    IBOutlet VLCMainWindow *o_mainwindow;            /* VLCMainWindow */
-}
 
 @property (readonly) VLCVoutWindowController* voutController;
 @property (readonly) BOOL nativeFullscreenMode;
 @property (nonatomic, readwrite) BOOL playlistUpdatedSelectorInQueue;
-+ (VLCMain *)sharedInstance;
 
-- (intf_thread_t *)intf;
-- (void)setIntf:(intf_thread_t *)p_mainintf;
++ (VLCMain *)sharedInstance;
++ (void)killInstance;
 
 - (VLCMainMenu *)mainMenu;
 - (VLCMainWindow *)mainWindow;
@@ -88,6 +94,16 @@ static NSString * VLCInputChangedNotification = @"VLCInputChangedNotification";
 - (VLCCoreDialogProvider *)coreDialogProvider;
 - (ResumeDialogController *)resumeDialog;
 - (VLCInputManager *)inputManager;
+- (ExtensionsManager *)extensionsManager;
+
+- (VLCDebugMessageVisualizer *)debugMsgPanel;
+
+- (VLCTrackSynchronization *)trackSyncPanel;
+- (VLCAudioEffects *)audioEffectsPanel;
+- (VLCVideoEffects *)videoEffectsPanel;
+
+- (VLCConvertAndSave *)convertAndSaveWindow;
+
 - (void)setActiveVideoPlayback:(BOOL)b_value;
 - (BOOL)activeVideoPlayback;
 - (void)applicationWillTerminate:(NSNotification *)notification;

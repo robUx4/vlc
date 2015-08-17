@@ -979,7 +979,6 @@ VCDClose ( vlc_object_t *p_this )
     FREENULL( p_vcdplayer->track );
     FREENULL( p_vcdplayer->segment );
     FREENULL( p_vcdplayer->entry );
-    FREENULL( p_access->psz_demux );
     FREENULL( p_vcdplayer );
     p_vcd_access    = NULL;
 }
@@ -1083,7 +1082,7 @@ static int VCDControl( access_t *p_access, int i_query, va_list args )
         break;
 
     case ACCESS_GET_CONTENT_TYPE:
-        *va_arg = strdup( "video/mpeg" );
+        *va_arg( args, char ** ) = strdup( "video/MP2P" );
         break;
 
     case ACCESS_SET_TITLE:

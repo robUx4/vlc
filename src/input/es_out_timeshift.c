@@ -576,16 +576,6 @@ static int ControlLocked( es_out_t *p_out, int i_query, va_list args )
 
     switch( i_query )
     {
-    /* Invalid query for this es_out level */
-    case ES_OUT_SET_ES_BY_ID:
-    case ES_OUT_RESTART_ES_BY_ID:
-    case ES_OUT_SET_ES_DEFAULT_BY_ID:
-    case ES_OUT_GET_ES_OBJECTS_BY_ID:
-    case ES_OUT_SET_DELAY:
-    case ES_OUT_SET_RECORD_STATE:
-        vlc_assert_unreachable();
-        return VLC_EGENERIC;
-
     /* Pass-through control */
     case ES_OUT_SET_MODE:
     case ES_OUT_SET_GROUP:
@@ -697,9 +687,16 @@ static int ControlLocked( es_out_t *p_out, int i_query, va_list args )
         return es_out_Control( p_sys->p_out, ES_OUT_GET_GROUP_FORCED, pi_group );
     }
 
-
     default:
         msg_Err( p_sys->p_input, "Unknown es_out_Control query !" );
+        // ft
+    /* Invalid queries for this es_out level */
+    case ES_OUT_SET_ES_BY_ID:
+    case ES_OUT_RESTART_ES_BY_ID:
+    case ES_OUT_SET_ES_DEFAULT_BY_ID:
+    case ES_OUT_GET_ES_OBJECTS_BY_ID:
+    case ES_OUT_SET_DELAY:
+    case ES_OUT_SET_RECORD_STATE:
         vlc_assert_unreachable();
         return VLC_EGENERIC;
     }
@@ -1513,22 +1510,26 @@ static int CmdExecuteControl( es_out_t *p_out, ts_cmd_t *p_cmd )
 }
 static void CmdCleanControl( ts_cmd_t *p_cmd )
 {
-    if( ( p_cmd->u.control.i_query == ES_OUT_SET_GROUP_META ||
-          p_cmd->u.control.i_query == ES_OUT_SET_META ) &&
-        p_cmd->u.control.u.int_meta.p_meta )
+    switch( p_cmd->u.control.i_query )
     {
-        vlc_meta_Delete( p_cmd->u.control.u.int_meta.p_meta );
-    }
-    else if( p_cmd->u.control.i_query == ES_OUT_SET_GROUP_EPG &&
-             p_cmd->u.control.u.int_epg.p_epg )
-    {
-        vlc_epg_Delete( p_cmd->u.control.u.int_epg.p_epg );
-    }
-    else if( p_cmd->u.control.i_query == ES_OUT_SET_ES_FMT &&
-             p_cmd->u.control.u.es_fmt.p_fmt )
-    {
-        es_format_Clean( p_cmd->u.control.u.es_fmt.p_fmt );
-        free( p_cmd->u.control.u.es_fmt.p_fmt );
+    case ES_OUT_SET_GROUP_META:
+    case ES_OUT_SET_META:
+        if( p_cmd->u.control.u.int_meta.p_meta )
+            vlc_meta_Delete( p_cmd->u.control.u.int_meta.p_meta );
+        break;
+    case ES_OUT_SET_GROUP_EPG:
+        if( p_cmd->u.control.u.int_epg.p_epg )
+            vlc_epg_Delete( p_cmd->u.control.u.int_epg.p_epg );
+        break;
+    case ES_OUT_SET_ES_FMT:
+        if( p_cmd->u.control.u.es_fmt.p_fmt )
+        {
+            es_format_Clean( p_cmd->u.control.u.es_fmt.p_fmt );
+            free( p_cmd->u.control.u.es_fmt.p_fmt );
+        }
+        // ft
+    default:
+        break;
     }
 }
 

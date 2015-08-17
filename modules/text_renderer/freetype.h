@@ -25,6 +25,11 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston MA 02110-1301, USA.
  *****************************************************************************/
 
+#ifndef VLC_FREETYPE_H
+#define VLC_FREETYPE_H
+
+#include <vlc_text_style.h>                                   /* text_style_t*/
+
 typedef struct faces_cache_t
 {
     FT_Face        *p_faces;
@@ -45,14 +50,13 @@ struct filter_sys_t
     FT_Face        p_face;      /* handle to face object */
     FT_Stroker     p_stroker;   /* handle to path stroker object */
 
-    xml_reader_t  *p_xml;       /* vlc xml parser */
-
-    text_style_t   style;       /* Current Style */
+    text_style_t  *p_default_style;
+    text_style_t  *p_style;       /* Current Style */
+    text_style_t  *p_forced_style;/* Renderer overridings */
 
     /* More styles... */
     float          f_shadow_vector_x;
     float          f_shadow_vector_y;
-    int            i_default_font_size;
 
     /* Attachments */
     input_attachment_t **pp_font_attachments;
@@ -73,4 +77,22 @@ struct filter_sys_t
  #define FT_MulFix(v, s) (((v)*(s))>>16)
 #endif
 
+#ifdef __OS2__
+typedef uint16_t uni_char_t;
+# define FREETYPE_TO_UCS    "UCS-2LE"
+#else
+typedef uint32_t uni_char_t;
+# if defined(WORDS_BIGENDIAN)
+#  define FREETYPE_TO_UCS   "UCS-4BE"
+# else
+#  define FREETYPE_TO_UCS   "UCS-4LE"
+# endif
+#endif
+
+
 FT_Face LoadFace( filter_t *p_filter, const text_style_t *p_style );
+
+bool FaceStyleEquals( const text_style_t *p_style1,
+                      const text_style_t *p_style2 );
+
+#endif

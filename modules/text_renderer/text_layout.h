@@ -25,6 +25,8 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston MA 02110-1301, USA.
  *****************************************************************************/
 
+#include "freetype.h"
+
 typedef struct
 {
     FT_BitmapGlyph p_glyph;
@@ -51,8 +53,7 @@ struct line_desc_t
 void FreeLines( line_desc_t *p_lines );
 line_desc_t *NewLine( int i_count );
 
-int LayoutText( filter_t *p_filter, line_desc_t **pp_lines,
+int LayoutText(filter_t *p_filter, line_desc_t **pp_lines,
                 FT_BBox *p_bbox, int *pi_max_face_height,
-
-                uni_char_t *psz_text, text_style_t **pp_styles,
+                const uni_char_t *psz_text, const text_style_t **pp_styles,
                 uint32_t *pi_k_dates, int i_len );

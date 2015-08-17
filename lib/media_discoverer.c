@@ -210,17 +210,12 @@ libvlc_media_discoverer_new( libvlc_instance_t * p_inst, const char * psz_name )
 
     vlc_dictionary_init( &p_mdis->catname_to_submedialist, 0 );
 
-    p_mdis->p_event_manager = libvlc_event_manager_new( p_mdis, p_inst );
+    p_mdis->p_event_manager = libvlc_event_manager_new( p_mdis );
     if( unlikely(p_mdis->p_event_manager == NULL) )
     {
         free( p_mdis );
         return NULL;
     }
-
-    libvlc_event_manager_register_event_type( p_mdis->p_event_manager,
-            libvlc_MediaDiscovererStarted );
-    libvlc_event_manager_register_event_type( p_mdis->p_event_manager,
-            libvlc_MediaDiscovererEnded );
 
     p_mdis->p_sd = vlc_sd_Create( (vlc_object_t*)p_inst->p_libvlc_int,
                                   psz_name );
@@ -254,6 +249,7 @@ libvlc_media_discoverer_new( libvlc_instance_t * p_inst, const char * psz_name )
                       services_discovery_removeall,
                       p_mdis );
 
+    libvlc_retain( p_inst );
     return p_mdis;
 }
 
@@ -347,6 +343,7 @@ libvlc_media_discoverer_release( libvlc_media_discoverer_t * p_mdis )
 
     vlc_dictionary_clear( &p_mdis->catname_to_submedialist, NULL, NULL );
     libvlc_event_manager_release( p_mdis->p_event_manager );
+    libvlc_release( p_mdis->p_libvlc_instance );
 
     free( p_mdis );
 }

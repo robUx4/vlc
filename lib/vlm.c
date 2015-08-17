@@ -117,6 +117,7 @@ static void libvlc_vlm_release_internal( libvlc_instance_t *p_instance )
     p_instance->libvlc_vlm.p_event_manager = NULL;
     vlm_Delete( p_vlm );
     p_instance->libvlc_vlm.p_vlm = NULL;
+    libvlc_release( p_instance );
 }
 
 static int libvlc_vlm_init( libvlc_instance_t *p_instance )
@@ -124,42 +125,9 @@ static int libvlc_vlm_init( libvlc_instance_t *p_instance )
     if( !p_instance->libvlc_vlm.p_event_manager )
     {
         p_instance->libvlc_vlm.p_event_manager =
-            libvlc_event_manager_new( p_instance->libvlc_vlm.p_vlm, p_instance );
+            libvlc_event_manager_new( p_instance->libvlc_vlm.p_vlm );
         if( unlikely(p_instance->libvlc_vlm.p_event_manager == NULL) )
             return VLC_ENOMEM;
-        libvlc_event_manager_register_event_type(
-            p_instance->libvlc_vlm.p_event_manager,
-            libvlc_VlmMediaAdded );
-        libvlc_event_manager_register_event_type(
-            p_instance->libvlc_vlm.p_event_manager,
-            libvlc_VlmMediaRemoved );
-        libvlc_event_manager_register_event_type(
-            p_instance->libvlc_vlm.p_event_manager,
-            libvlc_VlmMediaChanged );
-        libvlc_event_manager_register_event_type(
-            p_instance->libvlc_vlm.p_event_manager,
-            libvlc_VlmMediaInstanceStarted );
-        libvlc_event_manager_register_event_type(
-            p_instance->libvlc_vlm.p_event_manager,
-            libvlc_VlmMediaInstanceStopped );
-        libvlc_event_manager_register_event_type(
-            p_instance->libvlc_vlm.p_event_manager,
-            libvlc_VlmMediaInstanceStatusInit );
-        libvlc_event_manager_register_event_type(
-            p_instance->libvlc_vlm.p_event_manager,
-            libvlc_VlmMediaInstanceStatusOpening );
-        libvlc_event_manager_register_event_type(
-            p_instance->libvlc_vlm.p_event_manager,
-            libvlc_VlmMediaInstanceStatusPlaying );
-        libvlc_event_manager_register_event_type(
-            p_instance->libvlc_vlm.p_event_manager,
-            libvlc_VlmMediaInstanceStatusPause );
-        libvlc_event_manager_register_event_type(
-            p_instance->libvlc_vlm.p_event_manager,
-            libvlc_VlmMediaInstanceStatusEnd );
-        libvlc_event_manager_register_event_type(
-            p_instance->libvlc_vlm.p_event_manager,
-            libvlc_VlmMediaInstanceStatusError );
     }
 
     if( !p_instance->libvlc_vlm.p_vlm )
@@ -174,6 +142,7 @@ static int libvlc_vlm_init( libvlc_instance_t *p_instance )
                          "intf-event", VlmEvent,
                          p_instance->libvlc_vlm.p_event_manager );
         p_instance->libvlc_vlm.pf_release = libvlc_vlm_release_internal;
+        libvlc_retain( p_instance );
     }
 
     return VLC_SUCCESS;

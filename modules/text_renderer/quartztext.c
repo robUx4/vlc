@@ -1,7 +1,7 @@
 /*****************************************************************************
  * quartztext.c : Put text on the video, using Mac OS X Quartz Engine
  *****************************************************************************
- * Copyright (C) 2007, 2009, 2012 VLC authors and VideoLAN
+ * Copyright (C) 2007, 2009, 2012, 2015 VLC authors and VideoLAN
  * $Id$
  *
  * Authors: Bernie Purcell <bitmap@videolan.org>
@@ -40,6 +40,7 @@
 
 #include <TargetConditionals.h>
 
+
 #if TARGET_OS_IPHONE
 #include <CoreText/CoreText.h>
 #include <CoreGraphics/CoreGraphics.h>
@@ -53,6 +54,7 @@
 #endif
 
 #define DEFAULT_FONT           "Helvetica-Neue"
+#define DEFAULT_MONOFONT       "Andale-Mono"
 #define DEFAULT_FONT_COLOR     0xffffff
 #define DEFAULT_REL_FONT_SIZE  16
 
@@ -68,9 +70,6 @@ static void Destroy(vlc_object_t *);
 static int LoadFontsFromAttachments(filter_t *p_filter);
 
 static int RenderText(filter_t *, subpicture_region_t *,
-                       subpicture_region_t *,
-                       const vlc_fourcc_t *);
-static int RenderHtml(filter_t *, subpicture_region_t *,
                        subpicture_region_t *,
                        const vlc_fourcc_t *);
 
@@ -92,6 +91,7 @@ static void setFontAttibutes(char *psz_fontname, int i_font_size, uint32_t i_fon
  * RenderText. */
 #define FONT_TEXT N_("Font")
 #define FONT_LONGTEXT N_("Name for the font you want to use")
+#define MONOSPACE_FONT_TEXT N_("Monospace Font")
 #define FONTSIZER_TEXT N_("Relative font size")
 #define FONTSIZER_LONGTEXT N_("This is the relative default size of the " \
     "fonts that will be rendered on the video. If absolute font size is set, "\
@@ -109,11 +109,6 @@ static const int pi_color_values[] = {
   0x00FF0000, 0x00FF00FF, 0x00FFFF00, 0x00808000, 0x00008000, 0x00008080,
   0x0000FF00, 0x00800080, 0x00000080, 0x000000FF, 0x0000FFFF };
 
-static const char *const ppsz_color_names[] = {
-    "black", "gray", "silver", "white", "maroon",
-    "red", "fuchsia", "yellow", "olive", "green",
-    "teal", "lime", "purple", "navy", "blue", "aqua" };
-
 static const char *const ppsz_color_descriptions[] = {
   N_("Black"), N_("Gray"), N_("Silver"), N_("White"), N_("Maroon"),
   N_("Red"), N_("Fuchsia"), N_("Yellow"), N_("Olive"), N_("Green"), N_("Teal"),
@@ -130,6 +125,8 @@ vlc_module_begin ()
     set_subcategory(SUBCAT_VIDEO_SUBPIC)
 
     add_string("quartztext-font", DEFAULT_FONT, FONT_TEXT, FONT_LONGTEXT,
+              false)
+    add_string("quartztext-monofont", DEFAULT_MONOFONT, MONOSPACE_FONT_TEXT, FONT_LONGTEXT,
               false)
     add_integer("quartztext-rel-fontsize", DEFAULT_REL_FONT_SIZE, FONTSIZER_TEXT,
                  FONTSIZER_LONGTEXT, false)
@@ -182,12 +179,7 @@ struct offscreen_bitmap_t
  *****************************************************************************/
 struct filter_sys_t
 {
-    char          *psz_font_name;
-    uint8_t        i_font_opacity;
-    int            i_font_color;
-    int            i_font_size;
-    bool           b_outline;
-    bool           b_shadow;
+    text_style_t  *p_default_style;
 
 #ifndef TARGET_OS_IPHONE
     ATSFontContainerRef    *p_fonts;
@@ -209,15 +201,43 @@ static int Create(vlc_object_t *p_this)
     p_filter->p_sys = p_sys = malloc(sizeof(filter_sys_t));
     if (!p_sys)
         return VLC_ENOMEM;
-    p_sys->psz_font_name  = var_CreateGetString(p_this, "quartztext-font");
-    p_sys->i_font_opacity = 255;
-    p_sys->i_font_color = VLC_CLIP(var_CreateGetInteger(p_this, "quartztext-color") , 0, 0xFFFFFF);
-    p_sys->b_outline = var_InheritBool(p_this, "quartztext-outline");
-    p_sys->b_shadow = var_InheritBool(p_this, "quartztext-shadow");
-    p_sys->i_font_size = GetFontSize(p_filter);
 
-    p_filter->pf_render_text = RenderText;
-    p_filter->pf_render_html = RenderHtml;
+    p_sys->p_default_style = text_style_Create( STYLE_FULLY_SET );
+    if(unlikely(!p_sys->p_default_style))
+    {
+        free(p_sys);
+        return VLC_ENOMEM;
+    }
+    p_sys->p_default_style->psz_fontname = var_CreateGetString(p_this, "quartztext-font");;
+    p_sys->p_default_style->psz_monofontname = var_CreateGetString(p_this, "quartztext-monofont");
+    p_sys->p_default_style->i_font_size = GetFontSize(p_filter);
+
+    p_sys->p_default_style->i_font_color = VLC_CLIP(var_CreateGetInteger(p_this, "quartztext-color") , 0, 0xFFFFFF);
+    p_sys->p_default_style->i_features |= STYLE_HAS_FONT_COLOR;
+
+    if( var_InheritBool(p_this, "quartztext-outline") )
+    {
+        p_sys->p_default_style->i_style_flags |= STYLE_OUTLINE;
+        p_sys->p_default_style->i_features |= STYLE_HAS_FLAGS;
+    }
+
+    if( var_InheritBool(p_this, "quartztext-shadow") )
+    {
+        p_sys->p_default_style->i_style_flags |= STYLE_SHADOW;
+        p_sys->p_default_style->i_features |= STYLE_HAS_FLAGS;
+    }
+
+    if (p_sys->p_default_style->i_font_size <= 0)
+    {
+        vlc_value_t val;
+        msg_Warn(p_filter, "invalid fontsize, using 12");
+        if (VLC_SUCCESS == var_Get(p_filter, "scale", &val))
+            p_sys->p_default_style->i_font_size = 12 * val.i_int / 1000;
+        else
+            p_sys->p_default_style->i_font_size = 12;
+    }
+
+    p_filter->pf_render = RenderText;
 
 #ifndef TARGET_OS_IPHONE
     p_sys->p_fonts = NULL;
@@ -246,7 +266,7 @@ static void Destroy(vlc_object_t *p_this)
         free(p_sys->p_fonts);
     }
 #endif
-    free(p_sys->psz_font_name);
+    text_style_Delete( p_sys->p_default_style );
     free(p_sys);
 }
 
@@ -296,21 +316,6 @@ static int LoadFontsFromAttachments(filter_t *p_filter)
 #endif
 }
 
-static char *EliminateCRLF(char *psz_string)
-{
-    char *q;
-
-    for (char * p = psz_string; p && *p; p++) {
-        if ((*p == '\r') && (*(p+1) == '\n')) {
-            for (q = p + 1; *q; q++)
-                *(q - 1) = *q;
-
-            *(q - 1) = '\0';
-        }
-    }
-    return psz_string;
-}
-
 /* Renders a text subpicture region into another one.
  * It is used as pf_add_string callback in the vout method by this module */
 static int RenderText(filter_t *p_filter, subpicture_region_t *p_region_out,
@@ -318,55 +323,37 @@ static int RenderText(filter_t *p_filter, subpicture_region_t *p_region_out,
                        const vlc_fourcc_t *p_chroma_list)
 {
     filter_sys_t *p_sys = p_filter->p_sys;
-    char         *psz_string;
-    char         *psz_fontname;
-    int           i_font_size;
-    int           i_spacing = 0;
-    uint32_t      i_font_color;
-    bool          b_bold, b_uline, b_italic, b_halfwidth;
-    vlc_value_t val;
-    b_bold = b_uline = b_italic = b_halfwidth = FALSE;
+    char         *psz_render_string = NULL;
     VLC_UNUSED(p_chroma_list);
 
-    p_sys->i_font_size = GetFontSize(p_filter);
-
     // Sanity check
-    if (!p_region_in || !p_region_out)
+    if (!p_region_in || !p_region_out) {
+        msg_Warn(p_filter, "No region");
         return VLC_EGENERIC;
-
-    psz_string = p_region_in->psz_text;
-    if (!psz_string || !*psz_string)
-        return VLC_EGENERIC;
-
-    if (p_region_in->p_style) {
-        psz_fontname = p_region_in->p_style->psz_fontname ?
-            p_region_in->p_style->psz_fontname : p_sys->psz_font_name;
-        i_font_color = VLC_CLIP(p_region_in->p_style->i_font_color, 0, 0xFFFFFF);
-        i_font_size  = VLC_CLIP(p_region_in->p_style->i_font_size, 0, 255);
-        if (p_region_in->p_style->i_style_flags) {
-            if (p_region_in->p_style->i_style_flags & STYLE_BOLD)
-                b_bold = TRUE;
-            if (p_region_in->p_style->i_style_flags & STYLE_ITALIC)
-                b_italic = TRUE;
-            if (p_region_in->p_style->i_style_flags & STYLE_UNDERLINE)
-                b_uline = TRUE;
-            if (p_region_in->p_style->i_style_flags & STYLE_HALFWIDTH)
-                b_halfwidth = TRUE;
-        }
-        i_spacing = VLC_CLIP(p_region_in->p_style->i_spacing, 0, 255);
-    } else {
-        psz_fontname = p_sys->psz_font_name;
-        i_font_color = p_sys->i_font_color;
-        i_font_size  = p_sys->i_font_size;
     }
 
-    if (i_font_size <= 0) {
-        msg_Warn(p_filter, "invalid fontsize, using 12");
-        if (VLC_SUCCESS == var_Get(p_filter, "scale", &val))
-            i_font_size = 12 * val.i_int / 1000;
-        else
-            i_font_size = 12;
+    /* Convert to segments to single raw text */
+    /* FIXME: render split segment/style */
+    size_t i_len = 0;
+    for (const text_segment_t *p_text = p_region_in->p_text; p_text != NULL; p_text = p_text->p_next)
+    {
+        i_len += (p_text->psz_text) ? strlen(p_text->psz_text) : 0;
     }
+    if(i_len == 0)
+        return VLC_EGENERIC;
+
+    char *psz = psz_render_string = malloc(i_len + 1);
+    if(!psz_render_string)
+        return VLC_EGENERIC;
+    *psz = 0;
+
+    for (const text_segment_t *p_text = p_region_in->p_text; p_text != NULL; p_text = p_text->p_next)
+    {
+        if(p_text->psz_text)
+            strcat(psz, p_text->psz_text);
+    }
+
+    const int i_font_size = GetFontSize(p_filter);
 
     p_region_out->i_x = p_region_in->i_x;
     p_region_out->i_y = p_region_in->i_y;
@@ -377,169 +364,36 @@ static int RenderText(filter_t *p_filter, subpicture_region_t *p_region_out,
         CFStringRef   p_cfString;
         int           len;
 
-        EliminateCRLF(psz_string);
-        p_cfString = CFStringCreateWithCString(NULL, psz_string, kCFStringEncodingUTF8);
+        p_cfString = CFStringCreateWithCString(NULL, psz_render_string, kCFStringEncodingUTF8);
+        if (!p_cfString)
+        {
+            CFRelease(p_attrString);
+            free(psz_render_string);
+            return VLC_EGENERIC;
+        }
+
         CFAttributedStringReplaceString(p_attrString, CFRangeMake(0, 0), p_cfString);
         CFRelease(p_cfString);
         len = CFAttributedStringGetLength(p_attrString);
 
-        setFontAttibutes(psz_fontname, i_font_size, i_font_color, b_bold, b_italic, b_uline, b_halfwidth,
-                                             i_spacing,
-                                             CFRangeMake(0, len), p_attrString);
+        setFontAttibutes((p_sys->p_default_style->i_style_flags & STYLE_MONOSPACED) ? p_sys->p_default_style->psz_monofontname :
+                                                                                      p_sys->p_default_style->psz_fontname,
+                         i_font_size,
+                         p_sys->p_default_style->i_font_color,
+                         p_sys->p_default_style->i_style_flags & STYLE_BOLD,
+                         p_sys->p_default_style->i_style_flags & STYLE_ITALIC,
+                         p_sys->p_default_style->i_style_flags & STYLE_UNDERLINE,
+                         p_sys->p_default_style->i_style_flags & STYLE_HALFWIDTH,
+                         p_sys->p_default_style->i_spacing,
+                         CFRangeMake(0, len), p_attrString);
 
         RenderYUVA(p_filter, p_region_out, p_attrString);
         CFRelease(p_attrString);
     }
 
-    return VLC_SUCCESS;
-}
-
-
-static int PushFont(font_stack_t **p_font, const char *psz_name, int i_size,
-                     uint32_t i_color)
-{
-    font_stack_t *p_new;
-
-    if (!p_font)
-        return VLC_EGENERIC;
-
-    p_new = malloc(sizeof(font_stack_t));
-    if (! p_new)
-        return VLC_ENOMEM;
-
-    p_new->p_next = NULL;
-
-    if (psz_name)
-        p_new->psz_name = strdup(psz_name);
-    else
-        p_new->psz_name = NULL;
-
-    p_new->i_size   = i_size;
-    p_new->i_color  = i_color;
-
-    if (!*p_font)
-        *p_font = p_new;
-    else {
-        font_stack_t *p_last;
-
-        for (p_last = *p_font; p_last->p_next; p_last = p_last->p_next)
-        ;
-
-        p_last->p_next = p_new;
-    }
-    return VLC_SUCCESS;
-}
-
-static int PopFont(font_stack_t **p_font)
-{
-    font_stack_t *p_last, *p_next_to_last;
-
-    if (!p_font || !*p_font)
-        return VLC_EGENERIC;
-
-    p_next_to_last = NULL;
-    for (p_last = *p_font; p_last->p_next; p_last = p_last->p_next)
-        p_next_to_last = p_last;
-
-    if (p_next_to_last)
-        p_next_to_last->p_next = NULL;
-    else
-        *p_font = NULL;
-
-    free(p_last->psz_name);
-    free(p_last);
+    free(psz_render_string);
 
     return VLC_SUCCESS;
-}
-
-static int PeekFont(font_stack_t **p_font, char **psz_name, int *i_size,
-                     uint32_t *i_color)
-{
-    font_stack_t *p_last;
-
-    if (!p_font || !*p_font)
-        return VLC_EGENERIC;
-
-    for (p_last=*p_font;
-         p_last->p_next;
-         p_last=p_last->p_next)
-    ;
-
-    *psz_name = p_last->psz_name;
-    *i_size   = p_last->i_size;
-    *i_color  = p_last->i_color;
-
-    return VLC_SUCCESS;
-}
-
-static int HandleFontAttributes(xml_reader_t *p_xml_reader,
-                                  font_stack_t **p_fonts)
-{
-    int        rv;
-    char      *psz_fontname = NULL;
-    uint32_t   i_font_color = 0xffffff;
-    int        i_font_alpha = 0;
-    int        i_font_size  = 24;
-    const char *attr, *value;
-
-    /* Default all attributes to the top font in the stack -- in case not
-     * all attributes are specified in the sub-font */
-    if (VLC_SUCCESS == PeekFont(p_fonts,
-                                &psz_fontname,
-                                &i_font_size,
-                                &i_font_color)) {
-        if (psz_fontname)
-            psz_fontname = strdup(psz_fontname);
-        i_font_size = i_font_size;
-    }
-    i_font_alpha = (i_font_color >> 24) & 0xff;
-    i_font_color &= 0x00ffffff;
-
-    while ((attr = xml_ReaderNextAttr(p_xml_reader, &value))) {
-        if (!strcasecmp("face", attr)) {
-            free(psz_fontname);
-            if (value)
-                psz_fontname = strdup(value);
-        } else if (!strcasecmp("size", attr)) {
-            if ((*value == '+') || (*value == '-')) {
-                int i_value = atoi(value);
-
-                if ((i_value >= -5) && (i_value <= 5))
-                    i_font_size += (i_value * i_font_size) / 10;
-                else if (i_value < -5)
-                    i_font_size = - i_value;
-                else if (i_value > 5)
-                    i_font_size = i_value;
-            }
-            else
-                i_font_size = atoi(value);
-        } else if (!strcasecmp("color", attr)) {
-            if (value[0] == '#') {
-                i_font_color = strtol(value + 1, NULL, 16);
-                i_font_color &= 0x00ffffff;
-            } else {
-                /* color detection fallback */
-                unsigned int count = sizeof(ppsz_color_names);
-                for (unsigned x = 0; x < count; x++) {
-                    if (!strcmp(value, ppsz_color_names[x])) {
-                        i_font_color = pi_color_values[x];
-                        break;
-                    }
-                }
-            }
-        } else if (!strcasecmp("alpha", attr) && (value[0] == '#')) {
-            i_font_alpha = strtol(value + 1, NULL, 16);
-            i_font_alpha &= 0xff;
-        }
-    }
-    rv = PushFont(p_fonts,
-                  psz_fontname,
-                  i_font_size,
-                  (i_font_color & 0xffffff) | ((i_font_alpha & 0xff) << 24));
-
-    free(psz_fontname);
-
-    return rv;
 }
 
 static void setFontAttibutes(char *psz_fontname, int i_font_size, uint32_t i_font_color,
@@ -646,223 +500,6 @@ static void setFontAttibutes(char *psz_fontname, int i_font_size, uint32_t i_fon
     }
 }
 
-static void GetAttrStrFromFontStack(font_stack_t **p_fonts,
-        bool b_bold, bool b_italic, bool b_uline,
-        CFRange p_range, CFMutableAttributedStringRef p_attrString)
-{
-    char       *psz_fontname = NULL;
-    int         i_font_size  = 0;
-    uint32_t    i_font_color = 0;
-
-    if (VLC_SUCCESS == PeekFont(p_fonts, &psz_fontname, &i_font_size,
-                                &i_font_color)) {
-        setFontAttibutes(psz_fontname,
-                         i_font_size,
-                         i_font_color,
-                         b_bold, b_italic, b_uline, FALSE,
-                         0,
-                         p_range,
-                         p_attrString);
-    }
-}
-
-static int ProcessNodes(filter_t *p_filter,
-                         xml_reader_t *p_xml_reader,
-                         text_style_t *p_font_style,
-                         CFMutableAttributedStringRef p_attrString)
-{
-    int           rv             = VLC_SUCCESS;
-    filter_sys_t *p_sys          = p_filter->p_sys;
-    font_stack_t *p_fonts        = NULL;
-
-    int type;
-    const char *node;
-
-    bool b_italic = false;
-    bool b_bold   = false;
-    bool b_uline  = false;
-
-    if (p_font_style) {
-        rv = PushFont(&p_fonts,
-               p_font_style->psz_fontname,
-               p_font_style->i_font_size,
-               (p_font_style->i_font_color & 0xffffff) |
-                   ((p_font_style->i_font_alpha & 0xff) << 24));
-
-        if (p_font_style->i_style_flags & STYLE_BOLD)
-            b_bold = true;
-        if (p_font_style->i_style_flags & STYLE_ITALIC)
-            b_italic = true;
-        if (p_font_style->i_style_flags & STYLE_UNDERLINE)
-            b_uline = true;
-    } else {
-        rv = PushFont(&p_fonts,
-                       p_sys->psz_font_name,
-                       p_sys->i_font_size,
-                       p_sys->i_font_color);
-    }
-    if (rv != VLC_SUCCESS)
-        return rv;
-
-    while ((type = xml_ReaderNextNode(p_xml_reader, &node)) > 0) {
-        switch (type) {
-            case XML_READER_ENDELEM:
-                if (!strcasecmp("font", node))
-                    PopFont(&p_fonts);
-                else if (!strcasecmp("b", node))
-                    b_bold   = false;
-                else if (!strcasecmp("i", node))
-                    b_italic = false;
-                else if (!strcasecmp("u", node))
-                    b_uline  = false;
-
-                break;
-            case XML_READER_STARTELEM:
-                if (!strcasecmp("font", node))
-                    rv = HandleFontAttributes(p_xml_reader, &p_fonts);
-                else if (!strcasecmp("b", node))
-                    b_bold = true;
-                else if (!strcasecmp("i", node))
-                    b_italic = true;
-                else if (!strcasecmp("u", node))
-                    b_uline = true;
-                else if (!strcasecmp("br", node)) {
-                    CFMutableAttributedStringRef p_attrnode = CFAttributedStringCreateMutable(kCFAllocatorDefault, 0);
-                    CFAttributedStringReplaceString(p_attrnode, CFRangeMake(0, 0), CFSTR("\n"));
-
-                    GetAttrStrFromFontStack(&p_fonts, b_bold, b_italic, b_uline,
-                                             CFRangeMake(0, 1),
-                                             p_attrnode);
-                    CFAttributedStringReplaceAttributedString(p_attrString,
-                                    CFRangeMake(CFAttributedStringGetLength(p_attrString), 0),
-                                    p_attrnode);
-                    CFRelease(p_attrnode);
-                }
-                break;
-            case XML_READER_TEXT:
-            {
-                CFStringRef   p_cfString;
-                int           len;
-
-                // Turn any multiple-whitespaces into single spaces
-                if (!node)
-                    break;
-                char *dup = strdup(node);
-                if (!dup)
-                    break;
-                char *s = strpbrk(dup, "\t\r\n ");
-                while(s)
-                {
-                    int i_whitespace = strspn(s, "\t\r\n ");
-
-                    if (i_whitespace > 1)
-                        memmove(&s[1],
-                                 &s[i_whitespace],
-                                 strlen(s) - i_whitespace + 1);
-                    *s++ = ' ';
-
-                    s = strpbrk(s, "\t\r\n ");
-                }
-
-
-                CFMutableAttributedStringRef p_attrnode = CFAttributedStringCreateMutable(kCFAllocatorDefault, 0);
-                p_cfString = CFStringCreateWithCString(NULL, dup, kCFStringEncodingUTF8);
-                CFAttributedStringReplaceString(p_attrnode, CFRangeMake(0, 0), p_cfString);
-                CFRelease(p_cfString);
-                len = CFAttributedStringGetLength(p_attrnode);
-
-                GetAttrStrFromFontStack(&p_fonts, b_bold, b_italic, b_uline,
-                                         CFRangeMake(0, len),
-                                         p_attrnode);
-
-                CFAttributedStringReplaceAttributedString(p_attrString,
-                                CFRangeMake(CFAttributedStringGetLength(p_attrString), 0),
-                                p_attrnode);
-                CFRelease(p_attrnode);
-
-                free(dup);
-                break;
-            }
-        }
-    }
-
-    while(VLC_SUCCESS == PopFont(&p_fonts));
-
-    return rv;
-}
-
-static int RenderHtml(filter_t *p_filter, subpicture_region_t *p_region_out,
-                       subpicture_region_t *p_region_in,
-                       const vlc_fourcc_t *p_chroma_list)
-{
-    int          rv = VLC_SUCCESS;
-    stream_t     *p_sub = NULL;
-    xml_reader_t *p_xml_reader = NULL;
-    VLC_UNUSED(p_chroma_list);
-
-    if (!p_region_in || !p_region_in->psz_html)
-        return VLC_EGENERIC;
-
-    /* Reset the default fontsize in case screen metrics have changed */
-    p_filter->p_sys->i_font_size = GetFontSize(p_filter);
-
-    p_sub = stream_MemoryNew(VLC_OBJECT(p_filter),
-                              (uint8_t *) p_region_in->psz_html,
-                              strlen(p_region_in->psz_html),
-                              true);
-    if (p_sub) {
-        p_xml_reader = xml_ReaderCreate(p_filter, p_sub);
-        if (p_xml_reader) {
-            /* Look for Root Node */
-            const char *name;
-            if (xml_ReaderNextNode(p_xml_reader, &name)
-                    == XML_READER_STARTELEM) {
-                if (!strcasecmp("karaoke", name)) {
-                    /* We're going to have to render the text a number
-                     * of times to show the progress marker on the text. */
-                    var_SetBool(p_filter, "text-rerender", true);
-                } else if (strcasecmp("text", name)) {
-                    /* Only text and karaoke tags are supported */
-                    msg_Dbg(p_filter, "Unsupported top-level tag "
-                                      "<%s> ignored.", name);
-                    rv = VLC_EGENERIC;
-                }
-            } else {
-                msg_Err(p_filter, "Malformed HTML subtitle");
-                rv = VLC_EGENERIC;
-            }
-
-            if (rv != VLC_SUCCESS) {
-                xml_ReaderDelete(p_xml_reader);
-                p_xml_reader = NULL;
-            }
-        }
-
-        if (p_xml_reader) {
-            int         i_len;
-
-            CFMutableAttributedStringRef p_attrString = CFAttributedStringCreateMutable(kCFAllocatorDefault, 0);
-            rv = ProcessNodes(p_filter, p_xml_reader,
-                              p_region_in->p_style, p_attrString);
-
-            i_len = CFAttributedStringGetLength(p_attrString);
-
-            p_region_out->i_x = p_region_in->i_x;
-            p_region_out->i_y = p_region_in->i_y;
-
-            if ((rv == VLC_SUCCESS) && (i_len > 0))
-                RenderYUVA(p_filter, p_region_out, p_attrString);
-
-            CFRelease(p_attrString);
-
-            xml_ReaderDelete(p_xml_reader);
-        }
-        stream_Delete(p_sub);
-    }
-
-    return rv;
-}
-
 static CGContextRef CreateOffScreenContext(int i_width, int i_height,
                          offscreen_bitmap_t **pp_memory, CGColorSpaceRef *pp_colorSpace)
 {
@@ -939,14 +576,14 @@ static offscreen_bitmap_t *Compose(filter_t *p_filter,
             CGPathRelease(p_path);
 
             // Set up black outlining of the text --
-            if (p_sys->b_outline)
+            if (p_sys->p_default_style->i_style_flags & STYLE_OUTLINE)
             {
                 CGContextSetRGBStrokeColor(p_context, 0, 0, 0, 0.5);
                 CGContextSetTextDrawingMode(p_context, kCGTextFillStroke);
             }
 
             // Shadow
-            if (p_sys->b_shadow)
+            if (p_sys->p_default_style->i_style_flags & STYLE_SHADOW)
             {
                 // TODO: Use CGContextSetShadowWithColor.
                 // TODO: Use user defined parrameters (color, distance, etc.)

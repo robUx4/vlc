@@ -1004,7 +1004,7 @@ static void LoadSubtitles( input_thread_t *p_input )
         if( !a )
             continue;
         char *psz_mrl;
-        if( a->psz_name[i] &&
+        if( a->psz_name[0] &&
             asprintf( &psz_mrl, "attachment://%s", a->psz_name ) >= 0 )
         {
             var_SetString( p_input, "sub-description", a->psz_description ? a->psz_description : "");
@@ -2491,10 +2491,9 @@ static void InputSourceMeta( input_thread_t *p_input,
         return;
 
     demux_meta_t *p_demux_meta =
-        vlc_custom_create( p_demux, sizeof( *p_demux_meta ), "demux meta" );
-    if( !p_demux_meta )
+        vlc_custom_create( p_input, sizeof( *p_demux_meta ), "demux meta" );
+    if( unlikely(p_demux_meta == NULL) )
         return;
-    p_demux_meta->p_demux = p_demux;
     p_demux_meta->p_item = p_input->p->p_item;
 
     module_t *p_id3 = module_need( p_demux_meta, "meta reader", NULL, false );

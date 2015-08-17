@@ -80,29 +80,6 @@ static const float f_min_window_height = 307.;
 #pragma mark -
 #pragma mark Initialization
 
-static VLCMainWindow *sharedInstance = nil;
-+ (VLCMainWindow *)sharedInstance
-{
-    return sharedInstance;
-}
-
-- (id)initWithContentRect:(NSRect)contentRect
-                styleMask:(NSUInteger)styleMask
-                  backing:(NSBackingStoreType)backingType
-                    defer:(BOOL)flag
-{
-    static dispatch_once_t pred;
-
-    dispatch_once(&pred, ^{
-        sharedInstance = [super initWithContentRect:contentRect
-                                          styleMask:styleMask
-                                            backing:backingType
-                                              defer:flag];
-    });
-
-    return sharedInstance;
-}
-
 - (BOOL)isEvent:(NSEvent *)o_event forKey:(const char *)keyString
 {
     char *key;
@@ -677,7 +654,9 @@ static VLCMainWindow *sharedInstance = nil;
     [self.controlsBar updateTimeSlider];
     [self.fspanel updatePositionAndTime];
 
-    [[[VLCMain sharedInstance] voutController] updateWindowsControlsBarWithSelector:@selector(updateTimeSlider)];
+    [[[VLCMain sharedInstance] voutController] updateControlsBarsUsingBlock:^(VLCControlsBarCommon *controlsBar) {
+        [controlsBar updateTimeSlider];
+    }];
 
     [[VLCCoreInteraction sharedInstance] updateAtoB];
 }
@@ -745,7 +724,9 @@ static VLCMainWindow *sharedInstance = nil;
 - (void)updateWindow
 {
     [self.controlsBar updateControls];
-    [[[VLCMain sharedInstance] voutController] updateWindowsControlsBarWithSelector:@selector(updateControls)];
+    [[[VLCMain sharedInstance] voutController] updateControlsBarsUsingBlock:^(VLCControlsBarCommon *controlsBar) {
+        [controlsBar updateControls];
+    }];
 
     bool b_seekable = false;
 
@@ -779,7 +760,9 @@ static VLCMainWindow *sharedInstance = nil;
     [self.controlsBar setPause];
     [self.fspanel setPause];
 
-    [[[VLCMain sharedInstance] voutController] updateWindowsControlsBarWithSelector:@selector(setPause)];
+    [[[VLCMain sharedInstance] voutController] updateControlsBarsUsingBlock:^(VLCControlsBarCommon *controlsBar) {
+        [controlsBar setPause];
+    }];
 }
 
 - (void)setPlay
@@ -787,7 +770,9 @@ static VLCMainWindow *sharedInstance = nil;
     [self.controlsBar setPlay];
     [self.fspanel setPlay];
 
-    [[[VLCMain sharedInstance] voutController] updateWindowsControlsBarWithSelector:@selector(setPlay)];
+    [[[VLCMain sharedInstance] voutController] updateControlsBarsUsingBlock:^(VLCControlsBarCommon *controlsBar) {
+        [controlsBar setPlay];
+    }];
 }
 
 - (void)updateVolumeSlider

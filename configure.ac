@@ -69,9 +69,8 @@ AM_PROG_AS
 
 AC_ARG_VAR([DESKTOP_FILE_VALIDATE], [Validator for desktop entry files])
 AC_CHECK_PROGS(DESKTOP_FILE_VALIDATE, [${DESKTOP_FILE_VALIDATE} desktop-file-validate], :)
-AC_PATH_PROG(YASM, yasm)
 AC_ARG_VAR([BUILDCC], [Build system C11 or C99 compiler command])
-AC_PATH_PROGS(BUILDCC, [c11-gcc c11 c99-gcc c99], [false])
+AC_CHECK_PROGS(BUILDCC, [c11-gcc c11 c99-gcc c99], [false])
 AS_IF([test "$BUILDCC" = "false"], [
   AC_MSG_ERROR([Cannot find native C99 compiler: please define BUILDCC.])
 ])
@@ -101,17 +100,6 @@ dnl
 HAVE_WIN64="0"
 HAVE_IOS="0"
 HAVE_OSX="0"
-
-YASMFLAGS=""
-case "${host}" in
-    i?86*)
-    YASMFLAGS="-f elf32"
-        ;;
-    x86_64*)
-    YASMFLAGS="-f elf64"
-        ;;
-esac
-
 
 case "${host_os}" in
   "")
@@ -148,7 +136,6 @@ case "${host_os}" in
     case "${host}" in
       i?86*)
         ARCH_flag="-arch i386"
-        YASMFLAGS="-f macho32"
       ;;
       ppc64*)
         ARCH_flag="-arch ppc64"
@@ -158,7 +145,6 @@ case "${host_os}" in
       ;;
       x86_64*)
         ARCH_flag="-arch x86_64"
-        YASMFLAGS="-f macho64"
       ;;
       arm*)
         ac_cv_c_bigendian="no"
@@ -269,12 +255,10 @@ case "${host_os}" in
                 HAVE_WIN64="1"
                 WINDOWS_ARCH="x64"
                 PROGRAMFILES="PROGRAMFILES64"
-                YASMFLAGS="-f win64"
             ;;
             *)
                 WINDOWS_ARCH="x86"
                 PROGRAMFILES="PROGRAMFILES"
-                YASMFLAGS="-f win32"
             ;;
         esac
         AC_SUBST(WINDOWS_ARCH)
@@ -308,8 +292,6 @@ AM_CONDITIONAL(HAVE_WIN64,   test "${HAVE_WIN64}" = "1")
 AM_CONDITIONAL(HAVE_IOS,   test "${HAVE_IOS}" = "1")
 AM_CONDITIONAL(HAVE_OSX,   test "${HAVE_OSX}" = "1")
 
-AC_SUBST(YASMFLAGS)
-
 dnl
 dnl Sadly autoconf does not think about testing foo.exe when ask to test
 dnl for program foo on win32
@@ -317,9 +299,13 @@ case "${build_os}" in
     cygwin|msys)
         ac_executable_extensions=".exe"
     ;;
+    os2*)
+        BUILDEXEEXT=".exe"
+    ;;
     *)
     ;;
 esac
+AC_SUBST(BUILDEXEEXT)
 
 dnl Android is linux, but a bit different
 AS_IF([test "$SYS" = linux],[
@@ -1532,7 +1518,7 @@ then
       AC_MSG_ERROR([Could not find lua. Lua is needed for some interfaces (rc, telnet, http) as well as many other custom scripts. Use --disable-lua to ignore this error.])
   fi
   AC_ARG_VAR([LUAC], [LUA byte compiler])
-  AC_PATH_PROGS(LUAC,[${LUAC} luac], [false])
+  AC_CHECK_PROGS(LUAC, [${LUAC} luac], [false])
   AS_IF([test "${LUAC}" = "false"], [
     AC_MSG_ERROR([Could not find the LUA byte compiler.])
   ])
@@ -3640,7 +3626,7 @@ dnl  Chromecast streaming support
 dnl
 m4_pushdef([protobuf_lite_version], 2.5.0)
 AC_ARG_VAR(PROTOC, [protobuf compiler])
-AC_PATH_PROGS(PROTOC, protoc, no)
+AC_CHECK_PROGS(PROTOC, protoc, no)
 PKG_WITH_MODULES([CHROMECAST],[protobuf-lite >= protobuf_lite_version], [
     AS_IF([test "x${PROTOC}" != "xno"], [
         build_chromecast="yes"

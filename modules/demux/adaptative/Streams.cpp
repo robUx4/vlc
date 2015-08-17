@@ -1,7 +1,7 @@
 /*
  * Streams.cpp
  *****************************************************************************
- * Copyright (C) 2014 - VideoLAN authors
+ * Copyright (C) 2014 - VideoLAN and VLC authors
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU Lesser General Public License as published
@@ -117,13 +117,6 @@ mtime_t Stream::getFirstDTS() const
     if(!output)
         return 0;
     return output->getFirstDTS();
-}
-
-int Stream::getGroup() const
-{
-    if(!output)
-        return 0;
-    return output->getGroup();
 }
 
 int Stream::esCount() const
@@ -326,7 +319,6 @@ AbstractStreamOutput::AbstractStreamOutput(demux_t *demux, const StreamFormat &f
 {
     realdemux = demux;
     pcr = VLC_TS_INVALID;
-    group = 0;
     format = format_;
 }
 
@@ -352,11 +344,6 @@ AbstractStreamOutput::~AbstractStreamOutput()
 mtime_t AbstractStreamOutput::getPCR() const
 {
     return pcr;
-}
-
-int AbstractStreamOutput::getGroup() const
-{
-    return group;
 }
 
 BaseStreamOutput::BaseStreamOutput(demux_t *demux, const StreamFormat &format, const std::string &name) :
@@ -565,6 +552,7 @@ BaseStreamOutput::Demuxed::Demuxed(es_out_id_t *id, const es_format_t *fmt)
 {
     p_queue = NULL;
     pp_queue_last = &p_queue;
+    recycle = false;
     es_id = id;
     es_format_Init(&fmtcpy, UNKNOWN_ES, 0);
     es_format_Copy(&fmtcpy, fmt);
@@ -658,6 +646,7 @@ es_out_id_t * BaseStreamOutput::esOutAdd(const es_format_t *p_fmt)
         es_format_t fmtcpy;
         es_format_Init(&fmtcpy, p_fmt->i_cat, p_fmt->i_codec);
         es_format_Copy(&fmtcpy, p_fmt);
+        fmtcpy.i_group = 0;
         if(!fmtcpy.psz_language && !language.empty())
             fmtcpy.psz_language = strdup(language.c_str());
         if(!fmtcpy.psz_description && !description.empty())
@@ -755,7 +744,7 @@ int BaseStreamOutput::esOutControl(int i_query, va_list args)
     else if( i_query == ES_OUT_SET_GROUP_PCR )
     {
         vlc_mutex_lock(&lock);
-        group = (int) va_arg( args, int );
+        static_cast<void>(va_arg( args, int ));
         pcr = (int64_t)va_arg( args, int64_t );
         if(pcr > VLC_TS_INVALID && timestamps_offset > VLC_TS_INVALID)
             pcr += (timestamps_offset - VLC_TS_0);

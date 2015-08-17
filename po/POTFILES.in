@@ -614,6 +614,8 @@ modules/gui/macosx/VideoEffects.h
 modules/gui/macosx/VideoEffects.m
 modules/gui/macosx/VideoView.h
 modules/gui/macosx/VideoView.m
+modules/gui/macosx/VLCTimeSelectionPanelController.h
+modules/gui/macosx/VLCTimeSelectionPanelController.m
 modules/gui/macosx/VLCVoutWindowController.h
 modules/gui/macosx/VLCVoutWindowController.m
 modules/gui/macosx/Windows.h
@@ -634,6 +636,7 @@ modules/gui/qt4/components/controller_widget.cpp
 modules/gui/qt4/components/controller_widget.hpp
 modules/gui/qt4/components/extended_panels.cpp
 modules/gui/qt4/components/extended_panels.hpp
+modules/gui/qt4/components/epg/EPGWidget.cpp
 modules/gui/qt4/components/info_panels.cpp
 modules/gui/qt4/components/info_panels.hpp
 modules/gui/qt4/components/info_widgets.cpp
@@ -1059,6 +1062,7 @@ modules/stream_out/stats.c
 modules/stream_out/standard.c
 modules/stream_out/transcode/transcode.c
 modules/text_renderer/freetype.c
+modules/text_renderer/nsspeechsynthesizer.m
 modules/text_renderer/quartztext.c
 modules/text_renderer/svg.c
 modules/text_renderer/tdummy.c

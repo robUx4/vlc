@@ -93,8 +93,7 @@ static int VolumeUpdated(vlc_object_t *p_this, const char *psz_var,
 {
     @autoreleasepool {
         dispatch_async(dispatch_get_main_queue(), ^{
-            VLCMainWindow *mainWindow = (__bridge VLCMainWindow*)param;
-            [mainWindow updateVolumeSlider];
+            [[[VLCMain sharedInstance] mainWindow] updateVolumeSlider];
         });
 
         return VLC_SUCCESS;
@@ -106,10 +105,10 @@ static int VolumeUpdated(vlc_object_t *p_this, const char *psz_var,
 @interface PLModel ()
 {
     playlist_t *p_playlist;
-    NSOutlineView *_outlineView;
+    __weak NSOutlineView *_outlineView;
 
     // TODO: for transition
-    VLCPlaylist *_playlist;
+    __weak VLCPlaylist *_playlist;
     NSUInteger _retainedRowSelection;
 }
 @end
@@ -133,8 +132,8 @@ static int VolumeUpdated(vlc_object_t *p_this, const char *psz_var,
         var_AddCallback(p_playlist, "random", PlaybackModeUpdated, (__bridge void *)self);
         var_AddCallback(p_playlist, "repeat", PlaybackModeUpdated, (__bridge void *)self);
         var_AddCallback(p_playlist, "loop", PlaybackModeUpdated, (__bridge void *)self);
-        var_AddCallback(p_playlist, "volume", VolumeUpdated, (__bridge void *)[[VLCMain sharedInstance] mainWindow]);
-        var_AddCallback(p_playlist, "mute", VolumeUpdated, (__bridge void *)[[VLCMain sharedInstance] mainWindow]);
+        var_AddCallback(p_playlist, "volume", VolumeUpdated, (__bridge void *)self);
+        var_AddCallback(p_playlist, "mute", VolumeUpdated, (__bridge void *)self);
 
         PL_LOCK;
         _rootItem = [[PLItem alloc] initWithPlaylistItem:root];
@@ -153,8 +152,8 @@ static int VolumeUpdated(vlc_object_t *p_this, const char *psz_var,
     var_DelCallback(p_playlist, "random", PlaybackModeUpdated, (__bridge void *)self);
     var_DelCallback(p_playlist, "repeat", PlaybackModeUpdated, (__bridge void *)self);
     var_DelCallback(p_playlist, "loop", PlaybackModeUpdated, (__bridge void *)self);
-    var_DelCallback(p_playlist, "volume", VolumeUpdated, (__bridge void *)[[VLCMain sharedInstance] mainWindow]);
-    var_DelCallback(p_playlist, "mute", VolumeUpdated, (__bridge void *)[[VLCMain sharedInstance] mainWindow]);
+    var_DelCallback(p_playlist, "volume", VolumeUpdated, (__bridge void *)self);
+    var_DelCallback(p_playlist, "mute", VolumeUpdated, (__bridge void *)self);
 }
 
 - (void)changeRootItem:(playlist_item_t *)p_root;

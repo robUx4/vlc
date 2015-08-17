@@ -215,16 +215,6 @@ mtime_t PlaylistManager::getFirstDTS() const
     return dts;
 }
 
-int PlaylistManager::getGroup() const
-{
-    std::vector<Stream *>::const_iterator it;
-    for(it=streams.begin(); it!=streams.end(); ++it)
-    {
-        return (*it)->getGroup();
-    }
-    return -1;
-}
-
 int PlaylistManager::esCount() const
 {
     int es = 0;
@@ -316,8 +306,7 @@ int PlaylistManager::doDemux(int64_t increment)
         if( i_nzpcr != VLC_TS_INVALID )
         {
             i_nzpcr += increment;
-            int group = getGroup();
-            es_out_Control(p_demux->out, ES_OUT_SET_GROUP_PCR, group, VLC_TS_0 + i_nzpcr);
+            es_out_Control(p_demux->out, ES_OUT_SET_GROUP_PCR, 0, VLC_TS_0 + i_nzpcr);
         }
         break;
     }

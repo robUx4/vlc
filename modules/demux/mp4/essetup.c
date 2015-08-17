@@ -786,15 +786,18 @@ int SetupSpuES( demux_t *p_demux, mp4_track_t *p_track, MP4_Box_t *p_sample )
         {
             p_track->fmt.i_codec = VLC_CODEC_TX3G;
 
-            text_style_t *p_style = text_style_New();
+            text_style_t *p_style = text_style_Create( STYLE_NO_DEFAULTS );
             if ( p_style )
             {
-                if ( p_text->i_font_size ) /* !WARN: % in absolute storage */
-                    p_style->i_font_size = p_text->i_font_size;
+                if ( p_text->i_font_size ) /* !WARN: in % of 5% height */
+                {
+                    p_style->f_font_relsize = p_text->i_font_size * 5 / 100;
+                }
                 if ( p_text->i_font_color )
                 {
                     p_style->i_font_color = p_text->i_font_color >> 8;
                     p_style->i_font_alpha = p_text->i_font_color & 0xFF;
+                    p_style->i_features |= (STYLE_HAS_FONT_ALPHA | STYLE_HAS_FONT_COLOR);
                 }
                 if ( p_text->i_background_color[3] >> 8 )
                 {
@@ -802,6 +805,7 @@ int SetupSpuES( demux_t *p_demux, mp4_track_t *p_track, MP4_Box_t *p_sample )
                     p_style->i_background_color |= p_text->i_background_color[1] >> 8;
                     p_style->i_background_color |= p_text->i_background_color[2] >> 8;
                     p_style->i_background_alpha = p_text->i_background_color[3] >> 8;
+                    p_style->i_features |= (STYLE_HAS_BACKGROUND_ALPHA | STYLE_HAS_BACKGROUND_COLOR);
                 }
             }
             p_track->fmt.subs.p_style = p_style;

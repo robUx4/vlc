@@ -28,6 +28,7 @@
 #include "../adaptative/playlist/BaseAdaptationSet.h"
 #include "../adaptative/playlist/SegmentList.h"
 #include "../adaptative/tools/Retrieve.hpp"
+#include "../adaptative/tools/Helper.h"
 #include "M3U8.hpp"
 #include "Tags.hpp"
 
@@ -120,6 +121,7 @@ void Parser::parseRepresentation(BaseAdaptationSet *adaptSet, const AttributesTa
     const Attribute *uriAttr = tag->getAttributeByName("URI");
     const Attribute *bwAttr = tag->getAttributeByName("BANDWIDTH");
     const Attribute *codecsAttr = tag->getAttributeByName("CODECS");
+    const Attribute *resAttr = tag->getAttributeByName("RESOLUTION");
 
     Representation *rep = new (std::nothrow) Representation(adaptSet);
     if(rep)
@@ -143,9 +145,33 @@ void Parser::parseRepresentation(BaseAdaptationSet *adaptSet, const AttributesTa
         if(bwAttr)
             rep->setBandwidth(bwAttr->decimal());
 
+        if(codecsAttr)
+        {
+            std::list<std::string> list = Helper::tokenize(codecsAttr->quotedString(), ',');
+            std::list<std::string>::const_iterator it;
+            for(it=list.begin(); it!=list.end(); ++it)
+            {
+                std::size_t pos = (*it).find_first_of('.', 0);
+                if(pos != std::string::npos)
+                    rep->addCodec((*it).substr(0, pos));
+                else
+                    rep->addCodec(*it);
+            }
+        }
+
         /* if more than 1 codec, don't probe, can't be packed audio */
-        if(codecsAttr && codecsAttr->quotedString().find(',') != std::string::npos)
+        if(rep->getCodecs().size() > 1)
             rep->setMimeType("video/mp2t");
+
+        if(resAttr)
+        {
+            std::pair<int, int> res = resAttr->getResolution();
+            if(res.first * res.second)
+            {
+                rep->setWidth(res.first);
+                rep->setHeight(res.second);
+            }
+        }
 
         parseSegments(rep, tagslist);
 

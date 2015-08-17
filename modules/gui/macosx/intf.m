@@ -40,6 +40,8 @@
 #include <vlc_keys.h>
 #include <vlc_dialog.h>
 #include <vlc_url.h>
+#include <vlc_variables.h>
+
 #include <unistd.h> /* execl() */
 
 #import "CompatibilityFixes.h"
@@ -58,6 +60,8 @@
 #import "ExtensionsManager.h"
 #import "BWQuincyManager.h"
 #import "ResumeDialogController.h"
+#import "DebugMessageVisualizer.h"
+#import "ConvertAndSave.h"
 
 #import "VideoEffects.h"
 #import "AudioEffects.h"
@@ -73,18 +77,26 @@
 /*****************************************************************************
  * OpenIntf: initialize interface
  *****************************************************************************/
+
+static intf_thread_t *p_interface_thread;
+
+intf_thread_t *getIntf()
+{
+    return p_interface_thread;
+}
+
 int OpenIntf (vlc_object_t *p_this)
 {
     @autoreleasepool {
         intf_thread_t *p_intf = (intf_thread_t*) p_this;
+        p_interface_thread = p_intf;
         msg_Dbg(p_intf, "Starting macosx interface");
 
         [VLCApplication sharedApplication];
-        [[VLCMain sharedInstance] setIntf: p_intf];
+        [VLCMain sharedInstance];
 
         [NSBundle loadNibNamed:@"MainMenu" owner:[[VLCMain sharedInstance] mainMenu]];
-
-        [VLCVoutWindowController sharedInstance];
+        [[[VLCMain sharedInstance] mainWindow] makeKeyAndOrderFront:nil];
 
         return VLC_SUCCESS;
     }
@@ -95,6 +107,9 @@ void CloseIntf (vlc_object_t *p_this)
     @autoreleasepool {
         msg_Dbg(p_this, "Closing macosx interface");
         [[VLCMain sharedInstance] applicationWillTerminate:nil];
+        [VLCMain killInstance];
+
+        p_interface_thread = nil;
     }
 }
 
@@ -138,14 +153,11 @@ static int ShowController(vlc_object_t *p_this, const char *psz_variable,
     BOOL launched;
     int items_at_launch;
 
-    BOOL nib_main_loaded;       /* main nibfile */
-    BOOL nib_open_loaded;       /* open nibfile */
     BOOL nib_about_loaded;      /* about nibfile */
-    BOOL nib_prefs_loaded;      /* preferences xibfile */
-    BOOL nib_sprefs_loaded;      /* simple preferences xibfile */
     BOOL nib_coredialogs_loaded; /* CoreDialogs nibfile */
-    BOOL nib_bookmarks_loaded;   /* Bookmarks nibfile */
     BOOL b_active_videoplayback;
+
+    NSWindowController *_mainWindowController;
 
     VLCMainMenu *_mainmenu;
     VLCPrefs *_prefs;
@@ -157,6 +169,12 @@ static int ShowController(vlc_object_t *p_this, const char *psz_variable,
     ResumeDialogController *_resume_dialog;
     VLCInputManager *_input_manager;
     VLCPlaylist *_playlist;
+    VLCDebugMessageVisualizer *_messagePanelController;
+    VLCTrackSynchronization *_trackSyncPanel;
+    VLCAudioEffects *_audioEffectsPanel;
+    VLCVideoEffects *_videoEffectsPanel;
+    VLCConvertAndSave *_convertAndSaveWindow;
+    ExtensionsManager *_extensionsManager;
 
     bool b_intf_terminating; /* Makes sure applicationWillTerminate will be called only once */
 }
@@ -171,26 +189,63 @@ static int ShowController(vlc_object_t *p_this, const char *psz_variable,
 #pragma mark -
 #pragma mark Initialization
 
-+ (VLCMain *)sharedInstance
-{
-    static VLCMain *sharedInstance = nil;
-    static dispatch_once_t pred;
+static VLCMain *sharedInstance = nil;
 
++ (VLCMain *)sharedInstance;
+{
+    static dispatch_once_t pred;
     dispatch_once(&pred, ^{
-        sharedInstance = [VLCMain new];
+        sharedInstance = [[VLCMain alloc] init];
     });
 
     return sharedInstance;
 }
 
++ (void)killInstance
+{
+    sharedInstance = nil;
+}
+
 - (id)init
 {
     self = [super init];
-
     if (self) {
-        p_intf = NULL;
+        p_intf = getIntf();
 
         [VLCApplication sharedApplication].delegate = self;
+
+        _input_manager = [[VLCInputManager alloc] initWithMain:self];
+        _extensionsManager = [[ExtensionsManager alloc] init];
+
+        _mainmenu = [[VLCMainMenu alloc] init];
+        _voutController = [[VLCVoutWindowController alloc] init];
+        _playlist = [[VLCPlaylist alloc] init];
+
+        _mainWindowController = [[NSWindowController alloc] initWithWindowNibName:@"MainWindow"];
+
+        var_Create(p_intf, "intf-change", VLC_VAR_BOOL);
+
+        var_AddCallback(p_intf->p_libvlc, "intf-toggle-fscontrol", ShowController, (__bridge void *)self);
+        var_AddCallback(p_intf->p_libvlc, "intf-show", ShowController, (__bridge void *)self);
+
+        playlist_t *p_playlist = pl_Get(p_intf);
+        if ([NSApp currentSystemPresentationOptions] & NSApplicationPresentationFullScreen)
+            var_SetBool(p_playlist, "fullscreen", YES);
+
+        _nativeFullscreenMode = var_InheritBool(p_intf, "macosx-nativefullscreenmode");
+
+        if (var_InheritInteger(p_intf, "macosx-icon-change")) {
+            /* After day 354 of the year, the usual VLC cone is replaced by another cone
+             * wearing a Father Xmas hat.
+             * Note: this icon doesn't represent an endorsement of The Coca-Cola Company.
+             */
+            NSCalendar *gregorian =
+            [[NSCalendar alloc] initWithCalendarIdentifier:NSGregorianCalendar];
+            NSUInteger dayOfYear = [gregorian ordinalityOfUnit:NSDayCalendarUnit inUnit:NSYearCalendarUnit forDate:[NSDate date]];
+
+            if (dayOfYear >= 354)
+                [[VLCApplication sharedApplication] setApplicationIconImage: [NSImage imageNamed:@"vlc-xmas"]];
+        }
 
         /* announce our launch to a potential eyetv plugin */
         [[NSDistributedNotificationCenter defaultCenter] postNotificationName: @"VLCOSXGUIInit"
@@ -198,33 +253,18 @@ static int ShowController(vlc_object_t *p_this, const char *psz_variable,
                                                                      userInfo: NULL
                                                            deliverImmediately: YES];
 
-        NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
-        NSDictionary *appDefaults = [NSDictionary dictionaryWithObject:@"NO" forKey:@"LiveUpdateTheMessagesPanel"];
-        [defaults registerDefaults:appDefaults];
-
-        _mainmenu = [[VLCMainMenu alloc] init];
-        _voutController = [[VLCVoutWindowController alloc] init];
     }
 
     return self;
 }
 
-- (void)setIntf: (intf_thread_t *)p_mainintf
+- (void)dealloc
 {
-    p_intf = p_mainintf;
-}
-
-- (intf_thread_t *)intf
-{
-    return p_intf;
+    msg_Dbg(VLCIntf, "Deinitializing VLCMain object");
 }
 
 - (void)applicationWillFinishLaunching:(NSNotification *)aNotification
 {
-    _playlist = [[VLCPlaylist alloc] init];
-    [NSBundle loadNibNamed:@"MainWindow" owner:self];
-    [[self mainWindow] makeKeyAndOrderFront:nil];
-    _open = [[VLCOpen alloc] init];
     _coreinteraction = [VLCCoreInteraction sharedInstance];
 
     playlist_t * p_playlist = pl_Get(VLCIntf);
@@ -235,46 +275,6 @@ static int ShowController(vlc_object_t *p_this, const char *psz_variable,
 #ifdef HAVE_SPARKLE
     [[SUUpdater sharedUpdater] setDelegate:self];
 #endif
-}
-
-- (void)awakeFromNib
-{
-    if (!p_intf) return;
-    var_Create(p_intf, "intf-change", VLC_VAR_BOOL);
-
-    /* Check if we already did this once */
-    if (nib_main_loaded)
-        return;
-
-    // TODO: take care of VLCIntf initialization order
-    _input_manager = [[VLCInputManager alloc] initWithMain:self];
-
-    var_AddCallback(p_intf->p_libvlc, "intf-toggle-fscontrol", ShowController, (__bridge void *)self);
-    var_AddCallback(p_intf->p_libvlc, "intf-show", ShowController, (__bridge void *)self);
-
-    playlist_t *p_playlist = pl_Get(p_intf);
-    if ([NSApp currentSystemPresentationOptions] & NSApplicationPresentationFullScreen)
-        var_SetBool(p_playlist, "fullscreen", YES);
-
-    /* load our Shared Dialogs nib */
-    [NSBundle loadNibNamed:@"SharedDialogs" owner: NSApp];
-
-    _nativeFullscreenMode = var_InheritBool(p_intf, "macosx-nativefullscreenmode");
-
-    if (config_GetInt(VLCIntf, "macosx-icon-change")) {
-        /* After day 354 of the year, the usual VLC cone is replaced by another cone
-         * wearing a Father Xmas hat.
-         * Note: this icon doesn't represent an endorsement of The Coca-Cola Company.
-         */
-        NSCalendar *gregorian =
-        [[NSCalendar alloc] initWithCalendarIdentifier:NSGregorianCalendar];
-        NSUInteger dayOfYear = [gregorian ordinalityOfUnit:NSDayCalendarUnit inUnit:NSYearCalendarUnit forDate:[NSDate date]];
-
-        if (dayOfYear >= 354)
-            [[VLCApplication sharedApplication] setApplicationIconImage: [NSImage imageNamed:@"vlc-xmas"]];
-    }
-
-    nib_main_loaded = TRUE;
 }
 
 - (void)applicationDidFinishLaunching:(NSNotification *)aNotification
@@ -304,9 +304,9 @@ static int ShowController(vlc_object_t *p_this, const char *psz_variable,
            name:NSWorkspaceWillSleepNotification object:nil];
 
     /* update the main window */
-    [o_mainwindow updateWindow];
-    [o_mainwindow updateTimeSlider];
-    [o_mainwindow updateVolumeSlider];
+    [[self mainWindow] updateWindow];
+    [[self mainWindow] updateTimeSlider];
+    [[self mainWindow] updateVolumeSlider];
 
     /* Hack: Playlist is started before the interface.
      * Thus, call additional updaters as we might miss these events if posted before
@@ -347,8 +347,8 @@ static int ShowController(vlc_object_t *p_this, const char *psz_variable,
     playlist_t * p_playlist = pl_Get(p_intf);
 
     /* save current video and audio profiles */
-    [[VLCVideoEffects sharedInstance] saveCurrentProfile];
-    [[VLCAudioEffects sharedInstance] saveCurrentProfile];
+    [[self videoEffectsPanel] saveCurrentProfile];
+    [[self audioEffectsPanel] saveCurrentProfile];
 
     /* Save some interface state in configuration, at module quit */
     config_PutInt(p_intf, "random", var_GetBool(p_playlist, "random"));
@@ -367,15 +367,8 @@ static int ShowController(vlc_object_t *p_this, const char *psz_variable,
     _voutController = nil;
     [_voutController.lock unlock];
 
-    /* unsubscribe from libvlc's debug messages */
-    vlc_LogSet(p_intf->p_libvlc, NULL, NULL);
-
     /* write cached user defaults to disk */
     [[NSUserDefaults standardUserDefaults] synchronize];
-
-    o_mainwindow = NULL;
-
-    [self setIntf:nil];
 }
 
 #pragma mark -
@@ -480,7 +473,7 @@ static int ShowController(vlc_object_t *p_this, const char *psz_variable,
 - (BOOL)applicationShouldHandleReopen:(NSApplication *)theApplication hasVisibleWindows:(BOOL)hasVisibleWindows
 {
     if (!hasVisibleWindows)
-        [o_mainwindow makeKeyAndOrderFront:self];
+        [[self mainWindow] makeKeyAndOrderFront:self];
 
     return YES;
 }
@@ -489,7 +482,7 @@ static int ShowController(vlc_object_t *p_this, const char *psz_variable,
 {
     // defer selector here (possibly another time) to ensure that keyWindow is set properly
     // (needed for NSApplicationDidBecomeActiveNotification)
-    [o_mainwindow performSelectorOnMainThread:@selector(showFullscreenController) withObject:nil waitUntilDone:NO];
+    [[self mainWindow] performSelectorOnMainThread:@selector(showFullscreenController) withObject:nil waitUntilDone:NO];
 }
 
 - (void)setActiveVideoPlayback:(BOOL)b_value
@@ -497,8 +490,8 @@ static int ShowController(vlc_object_t *p_this, const char *psz_variable,
     assert([NSThread isMainThread]);
 
     b_active_videoplayback = b_value;
-    if (o_mainwindow) {
-        [o_mainwindow setVideoplayEnabled];
+    if ([self mainWindow]) {
+        [[self mainWindow] setVideoplayEnabled];
     }
 
     // update sleep blockers
@@ -515,7 +508,7 @@ static int ShowController(vlc_object_t *p_this, const char *psz_variable,
 
 - (VLCMainWindow *)mainWindow
 {
-    return o_mainwindow;
+    return (VLCMainWindow *)[_mainWindowController window];
 }
 
 - (VLCInputManager *)inputManager
@@ -523,32 +516,71 @@ static int ShowController(vlc_object_t *p_this, const char *psz_variable,
     return _input_manager;
 }
 
+- (ExtensionsManager *)extensionsManager
+{
+    return _extensionsManager;
+}
+
+- (VLCDebugMessageVisualizer *)debugMsgPanel
+{
+    if (!_messagePanelController)
+        _messagePanelController = [[VLCDebugMessageVisualizer alloc] init];
+
+    return _messagePanelController;
+}
+
+- (VLCTrackSynchronization *)trackSyncPanel
+{
+    if (!_trackSyncPanel)
+        _trackSyncPanel = [[VLCTrackSynchronization alloc] init];
+
+    return _trackSyncPanel;
+}
+
+- (VLCAudioEffects *)audioEffectsPanel
+{
+    if (!_audioEffectsPanel)
+        _audioEffectsPanel = [[VLCAudioEffects alloc] init];
+
+    return _audioEffectsPanel;
+}
+
+- (VLCVideoEffects *)videoEffectsPanel
+{
+    if (!_videoEffectsPanel)
+        _videoEffectsPanel = [[VLCVideoEffects alloc] init];
+
+    return _videoEffectsPanel;
+}
+
 - (VLCBookmarks *)bookmarks
 {
     if (!_bookmarks)
         _bookmarks = [[VLCBookmarks alloc] init];
-
-    if (!nib_bookmarks_loaded)
-        nib_bookmarks_loaded = [NSBundle loadNibNamed:@"Bookmarks" owner:_bookmarks];
 
     return _bookmarks;
 }
 
 - (VLCOpen *)open
 {
-    if (!nib_open_loaded)
-        nib_open_loaded = [NSBundle loadNibNamed:@"Open" owner: _open];
+    if (!_open)
+        _open = [[VLCOpen alloc] init];
 
     return _open;
+}
+
+- (VLCConvertAndSave *)convertAndSaveWindow
+{
+    if (_convertAndSaveWindow == nil)
+        _convertAndSaveWindow = [[VLCConvertAndSave alloc] init];
+
+    return _convertAndSaveWindow;
 }
 
 - (VLCSimplePrefs *)simplePreferences
 {
     if (!_sprefs)
         _sprefs = [[VLCSimplePrefs alloc] init];
-
-    if (!nib_sprefs_loaded)
-        nib_sprefs_loaded = [NSBundle loadNibNamed:@"SimplePreferences" owner: _sprefs];
 
     return _sprefs;
 }
@@ -557,9 +589,6 @@ static int ShowController(vlc_object_t *p_this, const char *psz_variable,
 {
     if (!_prefs)
         _prefs = [[VLCPrefs alloc] init];
-
-    if (!nib_prefs_loaded)
-        nib_prefs_loaded = [NSBundle loadNibNamed:@"Preferences" owner: _prefs];
 
     return _prefs;
 }

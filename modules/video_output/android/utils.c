@@ -45,7 +45,7 @@ struct AWindowHandler
     native_window_api_t anw_api;
     native_window_priv_api_t anwpriv_api;
 
-    pthread_mutex_t lock;
+    vlc_mutex_t lock;
     struct {
         bool b_registered;
         struct {
@@ -502,7 +502,7 @@ AWindowHandler_new(vlc_object_t *p_obj)
     p_awh->p_jvm = p_jvm;
     p_awh->jobj = (*p_env)->NewGlobalRef(p_env, jobj);
     LoadNativeWindowAPI(p_awh);
-    pthread_mutex_init(&p_awh->lock, NULL);
+    vlc_mutex_init(&p_awh->lock);
     p_awh->event.mouse.i_action = p_awh->event.mouse.i_button =
     p_awh->event.mouse.i_x = p_awh->event.mouse.i_y = -1;
     p_awh->event.window.i_width = p_awh->event.window.i_height = -1;
@@ -514,6 +514,7 @@ static void
 AWindowHandler_releaseSurfaceEnv(AWindowHandler *p_awh, JNIEnv *p_env,
                                  enum AWindow_ID id)
 {
+    AWindowHandler_releaseANativeWindow(p_awh, id);
     if (p_awh->views[id].jsurface)
     {
         (*p_env)->DeleteGlobalRef(p_env, p_awh->views[id].jsurface);
@@ -526,9 +527,6 @@ AWindowHandler_destroy(AWindowHandler *p_awh)
 {
     JNIEnv *p_env = AWindowHandler_getEnv(p_awh);
 
-    AWindowHandler_releaseANativeWindow(p_awh, AWindow_Video);
-    AWindowHandler_releaseANativeWindow(p_awh, AWindow_Subtitles);
-
     if (p_env)
     {
         if (p_awh->event.b_registered)
@@ -538,7 +536,7 @@ AWindowHandler_destroy(AWindowHandler *p_awh)
         (*p_env)->DeleteGlobalRef(p_env, p_awh->jobj);
     }
 
-    pthread_mutex_destroy(&p_awh->lock);
+    vlc_mutex_destroy(&p_awh->lock);
 
     if (p_awh->p_anw_dl)
         dlclose(p_awh->p_anw_dl);
@@ -645,12 +643,12 @@ AndroidNativeWindow_onMouseEvent(JNIEnv* env, jobject clazz, jlong handle,
     (void) env; (void) clazz;
     AWindowHandler *p_awh = jlong_AWindowHandler(handle);
 
-    pthread_mutex_lock(&p_awh->lock);
+    vlc_mutex_lock(&p_awh->lock);
     p_awh->event.mouse.i_action = action;
     p_awh->event.mouse.i_button = button;
     p_awh->event.mouse.i_x = x;
     p_awh->event.mouse.i_y = y;
-    pthread_mutex_unlock(&p_awh->lock);
+    vlc_mutex_unlock(&p_awh->lock);
 }
 
 static void
@@ -660,10 +658,10 @@ AndroidNativeWindow_onWindowSize(JNIEnv* env, jobject clazz, jlong handle,
     (void) env; (void) clazz;
     AWindowHandler *p_awh = jlong_AWindowHandler(handle);
 
-    pthread_mutex_lock(&p_awh->lock);
+    vlc_mutex_lock(&p_awh->lock);
     p_awh->event.window.i_width = width;
     p_awh->event.window.i_height = height;
-    pthread_mutex_unlock(&p_awh->lock);
+    vlc_mutex_unlock(&p_awh->lock);
 }
 
 static bool
@@ -689,19 +687,19 @@ AWindowHandler_getMouseCoordinates(AWindowHandler *p_awh,
     if (!AWindowHandler_registerCallback(p_awh))
         return false;
 
-    pthread_mutex_lock(&p_awh->lock);
+    vlc_mutex_lock(&p_awh->lock);
     if (p_awh->event.mouse.i_action == -1
      || p_awh->event.mouse.i_button == -1
      || p_awh->event.mouse.i_x <= 0 || p_awh->event.mouse.i_y <= 0)
     {
-        pthread_mutex_unlock(&p_awh->lock);
+        vlc_mutex_unlock(&p_awh->lock);
         return false;
     }
     *p_action = p_awh->event.mouse.i_action;
     *p_button = p_awh->event.mouse.i_button;
     *p_x = p_awh->event.mouse.i_x;
     *p_y = p_awh->event.mouse.i_y;
-    pthread_mutex_unlock(&p_awh->lock);
+    vlc_mutex_unlock(&p_awh->lock);
     return true;
 }
 
@@ -712,16 +710,16 @@ AWindowHandler_getWindowSize(AWindowHandler *p_awh,
     if (!AWindowHandler_registerCallback(p_awh))
         return false;
 
-    pthread_mutex_lock(&p_awh->lock);
+    vlc_mutex_lock(&p_awh->lock);
     if (p_awh->event.window.i_width <= 0
      || p_awh->event.window.i_height <= 0)
     {
-        pthread_mutex_unlock(&p_awh->lock);
+        vlc_mutex_unlock(&p_awh->lock);
         return false;
     }
     *p_width = p_awh->event.window.i_width;
     *p_height = p_awh->event.window.i_height;
-    pthread_mutex_unlock(&p_awh->lock);
+    vlc_mutex_unlock(&p_awh->lock);
     return true;
 }
 

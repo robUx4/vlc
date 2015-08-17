@@ -133,7 +133,7 @@ static int InputEvent(vlc_object_t *p_this, const char *psz_var,
 
 @interface VLCInputManager()
 {
-    VLCMain *o_main;
+    __weak VLCMain *o_main;
 
     input_thread_t *p_current_input;
     dispatch_queue_t informInputChangedQueue;
@@ -166,7 +166,7 @@ static int InputEvent(vlc_object_t *p_this, const char *psz_var,
 
 - (void)dealloc
 {
-    intf_thread_t *p_intf = VLCIntf;
+    msg_Dbg(VLCIntf, "Deinitializing input manager");
     if (p_current_input) {
         /* continue playback where you left off */
         [[o_main playlist] storePlaybackPositionForItem:p_current_input];
@@ -176,8 +176,7 @@ static int InputEvent(vlc_object_t *p_this, const char *psz_var,
         p_current_input = NULL;
     }
 
-    if (p_intf)
-        var_DelCallback(p_intf, "input-current", InputThreadChanged, (__bridge void *)self);
+    var_DelCallback(pl_Get(VLCIntf), "input-current", InputThreadChanged, (__bridge void *)self);
 
     dispatch_release(informInputChangedQueue);
 }
@@ -230,12 +229,11 @@ static int InputEvent(vlc_object_t *p_this, const char *psz_var,
      * The serial queue ensures that changed inputs are propagated in the same order as they arrive.
      */
     dispatch_async(informInputChangedQueue, ^{
-        [[ExtensionsManager sharedInstance] inputChanged:p_input_changed];
+        [[o_main extensionsManager] inputChanged:p_input_changed];
         if (p_input_changed)
             vlc_object_release(p_input_changed);
     });
 }
-
 
 - (void)playbackStatusUpdated
 {
@@ -419,7 +417,7 @@ static int InputEvent(vlc_object_t *p_this, const char *psz_var,
 
 - (void)updateDelays
 {
-    [[VLCTrackSynchronization sharedInstance] updateValues];
+    [[[VLCMain sharedInstance] trackSyncPanel] updateValues];
 }
 
 - (void)updateMainMenu

@@ -419,6 +419,8 @@ subpicture_region_Copy
 subpicture_region_Delete
 subpicture_region_New
 text_segment_New
+text_segment_NewInheritStyle
+text_segment_Delete
 text_segment_ChainDelete
 text_segment_Copy
 vlc_tls_ClientCreate
@@ -669,8 +671,10 @@ vout_display_PlacePicture
 vout_display_SendMouseMovedDisplayCoordinates
 xml_Create
 text_style_Copy
+text_style_Create
 text_style_Delete
 text_style_Duplicate
+text_style_Merge
 text_style_New
 xml_Delete
 xml_ReaderCreate

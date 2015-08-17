@@ -67,7 +67,7 @@ enum nal_unit_type_e
 enum sei_type_e
 {
     SEI_PIC_TIMING = 1,
-    SEI_USER_DATA_REGISTERED = 4,
+    SEI_USER_DATA_REGISTERED_ITU_T_T35 = 4,
     SEI_RECOVERY_POINT = 6
 };
 
@@ -118,17 +118,17 @@ static inline void CreateDecodedNAL( uint8_t **pp_ret, int *pi_ret,
 int convert_sps_pps( decoder_t *p_dec, const uint8_t *p_buf,
                      uint32_t i_buf_size, uint8_t *p_out_buf,
                      uint32_t i_out_buf_size, uint32_t *p_sps_pps_size,
-                     uint32_t *p_nal_size);
+                     uint32_t *p_nal_length_size);
 
-/* Convert H.264 NAL format to annex b in-place */
-struct H264ConvertState {
-    uint32_t nal_len;
-    uint32_t nal_pos;
-};
-
+/* Convert avcC format to Annex B in-place */
 void convert_h264_to_annexb( uint8_t *p_buf, uint32_t i_len,
-                             size_t i_nal_size,
-                             struct H264ConvertState *state );
+                             size_t i_nal_length_size );
+
+/* Convert Annex B to avcC format in-place
+ * Returns the same p_block or a new p_block if there is not enough room to put
+ * the NAL size. In case of error, NULL is returned and p_block is released.
+ * */
+block_t *convert_annexb_to_h264( block_t *p_block, size_t i_nal_length_size );
 
 /* Get the SPS/PPS pointers from an Annex B buffer
  * Returns 0 if a SPS and/or a PPS is found */
@@ -146,8 +146,17 @@ int h264_parse_sps( const uint8_t *p_sps_buf, int i_sps_size,
 int h264_parse_pps( const uint8_t *p_pps_buf, int i_pps_size,
                     struct nal_pps *p_pps );
 
+/* Create a AVCDecoderConfigurationRecord from SPS/PPS
+ * Returns a valid block_t on success, must be freed with block_Release */
+block_t *h264_create_avcdec_config_record( size_t i_nal_length_size,
+                                           struct nal_sps *p_sps,
+                                           const uint8_t *p_sps_buf,
+                                           size_t i_sps_size,
+                                           const uint8_t *p_pps_buf,
+                                           size_t i_pps_size );
+
 /* Get level and Profile */
 bool h264_get_profile_level(const es_format_t *p_fmt, size_t *p_profile,
-                            size_t *p_level, size_t *p_nal_size);
+                            size_t *p_level, size_t *p_nal_length_size);
 
 #endif /* H264_NAL_H */
