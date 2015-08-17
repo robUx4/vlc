@@ -37,8 +37,4 @@ endif
 .iconv: iconv
 	cd $< && $(HOSTVARS) ./configure $(HOSTCONF) --disable-nls
 	cd $< && $(MAKE) install
-ifdef HAVE_VISUALSTUDIO
-	# VLC doesn't use libtool values to test linking libs
-	cp $(PREFIX)/lib/iconv.lib $(PREFIX)/lib/libiconv.a
-endif
 	touch $@

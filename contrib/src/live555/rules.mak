@@ -70,12 +70,21 @@ endif
 			&& $(MAKE) $(HOSTVARS) -C UsageEnvironment \
 			&& $(MAKE) $(HOSTVARS) -C BasicUsageEnvironment
 	mkdir -p -- "$(PREFIX)/lib" "$(PREFIX)/include"
+ifdef HAVE_VISUALSTUDIO
+	cp \
+		$</groupsock/groupsock.lib \
+		$</liveMedia/liveMedia.lib \
+		$</UsageEnvironment/UsageEnvironment.lib \
+		$</BasicUsageEnvironment/BasicUsageEnvironment.lib \
+		"$(PREFIX)/lib/"
+else
 	cp \
 		$</groupsock/libgroupsock.a \
 		$</liveMedia/libliveMedia.a \
 		$</UsageEnvironment/libUsageEnvironment.a \
 		$</BasicUsageEnvironment/libBasicUsageEnvironment.a \
 		"$(PREFIX)/lib/"
+endif
 	cp \
 		$</groupsock/include/*.hh \
 		$</groupsock/include/*.h \

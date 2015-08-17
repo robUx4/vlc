@@ -51,7 +51,4 @@ endif
 .gcrypt: libgcrypt
 	cd $< && $(HOSTVARS) CFLAGS="$(CFLAGS) $(GCRYPT_EXTRA_CFLAGS)" ./configure $(HOSTCONF) $(GCRYPT_CONF)
 	cd $< && $(MAKE) install
-ifdef HAVE_VISUALSTUDIO
-	cp $(PREFIX)/lib/gcrypt.lib $(PREFIX)/lib/libgcrypt.a
-endif
 	touch $@

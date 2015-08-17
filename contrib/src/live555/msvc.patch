@@ -2,19 +2,23 @@ diff --git a/config.mingw b/config.mingw
 index 18f0518..89aca02 100755
 --- a/config.mingw
 +++ b/config.mingw
-@@ -6,10 +6,10 @@
+@@ -6,12 +6,12 @@
  CPLUSPLUS_COMPILER =   $(CXX)
  CPLUSPLUS_FLAGS =      $(COMPILE_OPTS) -D__MINGW32__ -Wall -Wno-deprecated
  OBJ =                  o
--LINK =                 $(CXX) -o 
-+LINK =                 $(LD) -o 
+-LINK =                 $(CXX) -o
++LINK =                 $(LD) -o
  LINK_OPTS =            -L.
  CONSOLE_LINK_OPTS =    $(LINK_OPTS)
--LIBRARY_LINK =         $(LD) -o 
-+LIBRARY_LINK =         $(AR) -o 
+-LIBRARY_LINK =         $(LD) -o
++LIBRARY_LINK =         $(AR) -o
  LIBRARY_LINK_OPTS =    $(LINK_OPTS) -r -Bstatic
- LIB_SUFFIX =                   a
+-LIB_SUFFIX =                   a
++LIB_SUFFIX =                   lib
  LIBS_FOR_CONSOLE_APPLICATION = -lws2_32
+ LIBS_FOR_GUI_APPLICATION = -lws2_32
+ EXE =
+
 --- a/liveMedia/RTSPCommon.cpp
 +++ b/liveMedia/RTSPCommon.cpp
 @@ -25,6 +25,10 @@

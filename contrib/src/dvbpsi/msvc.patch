@@ -54,13 +54,3 @@
      /* nothing */
  } dvbpsi_sis_cmd_bandwidth_reservation_t;
  
---- libdvbpsi/libdvbpsi.pc.in    2015-07-30 09:17:11.460050300 +0200
-+++ libdvbpsi/libdvbpsi.pc.in.new  2015-07-30 09:17:36.729397900 +0200
-@@ -6,5 +6,5 @@
- Name: libdvbpsi
- Description: libdvbpsi is a simple library designed for decoding and generation of MPEG TS and DVB PSI tables.
- Version: @PACKAGE_VERSION@
--Libs: -L${libdir} -ldvbpsi
-+Libs: -L${libdir} dvbpsi.lib
- Cflags: -I${includedir}
-

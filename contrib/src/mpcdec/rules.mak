@@ -47,7 +47,6 @@ ifdef HAVE_VISUALSTUDIO
 	cd $< && $(HOSTVARS_CMAKE) $(CMAKE) -DSHARED=OFF .
 	cd $< && msbuild.exe -p:Configuration=$(VLC_CONFIGURATION) -m -nologo INSTALL.vcxproj
 	cd $< && cp libmpcdec/$(VLC_CONFIGURATION)/mpcdec_static.lib "$(PREFIX)/lib/mpcdec.lib"
-	cd $< && cp "$(PREFIX)/lib/mpcdec.lib" "$(PREFIX)/lib/libmpcdec.a"
 else
 	cd $< && $(HOSTVARS_PIC) $(CMAKE) -DSHARED=OFF .
 	cd $< && $(MAKE) install

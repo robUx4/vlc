@@ -15,9 +15,6 @@ $(TARBALLS)/speex-$(SPEEX_VERSION).tar.gz:
 
 speex: speex-$(SPEEX_VERSION).tar.gz .sum-speex
 	$(UNPACK)
-ifdef HAVE_VISUALSTUDIO
-	$(APPLY) $(SRC)/speex/msvc.patch
-endif
 	$(MOVE)
 
 SPEEX_CONF := --disable-binaries

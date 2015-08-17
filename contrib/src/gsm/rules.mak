@@ -21,8 +21,9 @@ endif
 	cd $< && $(HOSTVARS_PIC) $(MAKE)
 	mkdir -p "$(PREFIX)/include/gsm" "$(PREFIX)/lib"
 	cp $</inc/gsm.h "$(PREFIX)/include/gsm/"
-	cp $</lib/libgsm.a "$(PREFIX)/lib/"
 ifdef HAVE_VISUALSTUDIO
-	cp $(PREFIX)/lib/libgsm.a $(PREFIX)/lib/gsm.lib
+	cp $</lib/gsm.lib "$(PREFIX)/lib/"
+else
+	cp $</lib/libgsm.a "$(PREFIX)/lib/"
 endif
 	touch $@

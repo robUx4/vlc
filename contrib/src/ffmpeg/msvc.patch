@@ -22,3 +22,15 @@ index b10715f..3d26996 100755
  if [ -z "$CC_DEPFLAGS" ] && [ "$dep_cc" != "$cc" ]; then
      probe_cc depcc "$dep_cc"
      CCDEP=${_DEPCMD:-$DEPCMD}
+--- ffmpeg/configure    2015-08-17 09:18:14.227153000 +0200
++++ ffmpeg/configure.msvc       2015-08-17 09:20:58.307096800 +0200
+@@ -2642,6 +2642,8 @@
+         ld_default="$source_path/compat/windows/mslink"
+         nm_default="dumpbin -symbols"
+         ar_default="lib"
++        LIBPREF=""
++        LIBSUF=".lib"
+         case "$arch" in
+         arm*)
+             as_default="armasm"
+

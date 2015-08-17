@@ -17,6 +17,14 @@ ifdef HAVE_SOLARIS
 ZLIB_ECFLAGS = -fPIC -DPIC
 endif
 
+ifdef HAVE_VISUALSTUDIO
+ifeq ($(VLC_CONFIGURATION),Debug)
+STATIC_LIB=zlibstaticd
+else
+STATIC_LIB=zlibstatic
+endif
+endif
+
 $(TARBALLS)/zlib-$(ZLIB_VERSION).tar.gz:
 	$(call download,$(ZLIB_URL))
 
@@ -26,7 +34,13 @@ zlib: zlib-$(ZLIB_VERSION).tar.gz .sum-zlib
 	$(UNPACK)
 	$(MOVE)
 
-.zlib: zlib
+.zlib: zlib toolchain.cmake
+ifdef HAVE_VISUALSTUDIO
+	cd $< && $(HOSTVARS_CMAKE) $(CMAKE) -DSHARED=OFF .
+	cd $< && msbuild.exe -p:Configuration=$(VLC_CONFIGURATION) -m -nologo INSTALL.vcxproj
+	cd $< && cp "$(PREFIX)/lib/$(STATIC_LIB).lib" "$(PREFIX)/lib/z.lib"
+else
 	cd $< && $(HOSTVARS) $(ZLIB_CONFIG_VARS) CFLAGS="$(CFLAGS) $(ZLIB_ECFLAGS)" ./configure --prefix=$(PREFIX) --static
 	cd $< && $(MAKE) install
+endif
 	touch $@

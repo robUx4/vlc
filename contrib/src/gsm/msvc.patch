@@ -1,10 +1,30 @@
 --- /home/vlc/vlc/contrib/windowsphone/gsm/Makefile	2014-12-15 16:54:29.228707100 +0100
 +++ gsm/Makefile	2015-01-09 14:00:05.380843300 +0100
-@@ -270,6 +270,7 @@
- 
- .c.o:
- 		$(CC) $(CFLAGS) $?
-+		@-cp `$(BASENAME) $(shell echo $@ | sed 's/\.o/\.obj/')` $@ 
- 		@-mv `$(BASENAME) $@` $@ > /dev/null 2>&1
- 
- # Target rules
+@@ -134,7 +134,7 @@
+
+ # Targets
+
+-LIBGSM = $(LIB)/libgsm.a
++LIBGSM = $(LIB)/gsm.lib
+
+ TOAST  = $(BIN)/toast
+ UNTOAST        = $(BIN)/untoast
+@@ -253,7 +253,7 @@
+ # Install targets
+
+ GSM_INSTALL_TARGETS =  \
+-               $(GSM_INSTALL_LIB)/libgsm.a             \
++               $(GSM_INSTALL_LIB)/gsm.lib              \
+                $(GSM_INSTALL_INC)/gsm.h                \
+                $(GSM_INSTALL_MAN)/gsm.3                \
+                $(GSM_INSTALL_MAN)/gsm_explode.3        \
+@@ -389,7 +389,7 @@
+                cp $? $@
+                chmod 444 $@
+
+-$(GSM_INSTALL_LIB)/libgsm.a:   $(LIBGSM)
++$(GSM_INSTALL_LIB)/gsm.lib:    $(LIBGSM)
+                -rm $@
+                cp $? $@
+                chmod 444 $@
+
