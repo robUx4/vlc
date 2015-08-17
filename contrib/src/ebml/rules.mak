@@ -11,8 +11,8 @@ $(TARBALLS)/libebml-$(EBML_VERSION).tar.bz2:
 
 libebml: libebml-$(EBML_VERSION).tar.bz2 .sum-ebml
 	$(UNPACK)
-ifdef HAVE_VISUALSTUDIO
-	$(APPLY) $(SRC)/ebml/msvc.patch
+ifdef HAVE_WINRT
+	$(APPLY) $(SRC)/ebml/winstore.patch
 endif
 	$(MOVE)
 
