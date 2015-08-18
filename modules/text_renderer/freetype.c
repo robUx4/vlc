@@ -314,9 +314,13 @@ static int GetFontSize( filter_t *p_filter )
     filter_sys_t *p_sys = p_filter->p_sys;
     int           i_size = 0;
 
-    if( p_sys->p_default_style->i_font_size )
+    if( p_sys->p_forced_style->i_font_size )
     {
-        i_size = p_sys->p_default_style->i_font_size;
+        i_size = p_sys->p_forced_style->i_font_size;
+    }
+    else if( p_sys->p_forced_style->f_font_relsize )
+    {
+        i_size = (int) p_filter->fmt_out.video.i_height * p_sys->p_forced_style->f_font_relsize;
     }
     else if( p_sys->p_default_style->f_font_relsize )
     {
@@ -967,7 +971,7 @@ static uni_char_t* SegmentsToTextAndStyles( filter_t *p_filter, const text_segme
         }
         pp_styles = pp_styles_realloc;
         // We're actually writing to a read only object, something's wrong with the conception.
-        text_style_t *p_style = text_style_Duplicate( p_filter->p_sys->p_default_style );
+        text_style_t *p_style = text_style_Duplicate( p_filter->p_sys->p_style );
         if ( p_style == NULL )
         {
             free( pp_styles );
@@ -976,12 +980,11 @@ static uni_char_t* SegmentsToTextAndStyles( filter_t *p_filter, const text_segme
         }
 
         if( s->style )
-        {
             /* Replace defaults with segment values */
             text_style_Merge( p_style, s->style, true );
-            /* Overwrite any default or value with forced ones */
-            text_style_Merge( p_style, p_filter->p_sys->p_forced_style, true );
-        }
+
+        /* Overwrite any default or value with forced ones */
+        text_style_Merge( p_style, p_filter->p_sys->p_forced_style, true );
 
         // i_string_bytes is a number of bytes, while here we're going to assign pointer by pointer
         for ( size_t i = 0; i < i_string_bytes / sizeof( *psz_uni ); ++i )
@@ -1007,6 +1010,9 @@ static int Render( filter_t *p_filter, subpicture_region_t *p_region_out,
     if( !p_region_in )
         return VLC_EGENERIC;
 
+    /* Reset the default fontsize in case screen metrics have changed */
+    p_filter->p_sys->p_style->i_font_size = GetFontSize( p_filter );
+
     const text_style_t **pp_styles = NULL;
     size_t i_text_length = 0;
     uni_char_t *psz_text = SegmentsToTextAndStyles( p_filter, p_region_in->p_text, &i_text_length, &pp_styles );
@@ -1014,9 +1020,6 @@ static int Render( filter_t *p_filter, subpicture_region_t *p_region_out,
     {
         return VLC_EGENERIC;
     }
-
-    /* Reset the default fontsize in case screen metrics have changed */
-    p_filter->p_sys->p_style->i_font_size = GetFontSize( p_filter );
 
     /* */
     int rv = VLC_SUCCESS;
@@ -1047,7 +1050,7 @@ static int Render( filter_t *p_filter, subpicture_region_t *p_region_out,
 
         uint8_t i_background_opacity = var_InheritInteger( p_filter, "freetype-background-opacity" );
         i_background_opacity = VLC_CLIP( i_background_opacity, 0, 255 );
-        const int i_margin = i_background_opacity > 0 ? i_max_face_height / 4 : 0;
+        const int i_margin = (i_background_opacity > 0 && !p_region_in->b_gridmode) ? i_max_face_height / 4 : 0;
         for( const vlc_fourcc_t *p_chroma = p_chroma_list; *p_chroma != 0; p_chroma++ )
         {
             rv = VLC_EGENERIC;
