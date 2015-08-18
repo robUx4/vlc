@@ -20,8 +20,10 @@ endif
 ifdef HAVE_VISUALSTUDIO
 ifeq ($(VLC_CONFIGURATION),Debug)
 STATIC_LIB=zlibstaticd
+DYNAMIC_LIB=zlibd
 else
 STATIC_LIB=zlibstatic
+DYNAMIC_LIB=zlib
 endif
 endif
 
@@ -39,6 +41,7 @@ ifdef HAVE_VISUALSTUDIO
 	cd $< && $(HOSTVARS_CMAKE) $(CMAKE) -DSHARED=OFF .
 	cd $< && msbuild.exe -p:Configuration=$(VLC_CONFIGURATION) -m -nologo INSTALL.vcxproj
 	cd $< && cp "$(PREFIX)/lib/$(STATIC_LIB).lib" "$(PREFIX)/lib/z.lib"
+	cd $< && rm "$(PREFIX)/lib/$(DYNAMIC_LIB).lib"
 else
 	cd $< && $(HOSTVARS) $(ZLIB_CONFIG_VARS) CFLAGS="$(CFLAGS) $(ZLIB_ECFLAGS)" ./configure --prefix=$(PREFIX) --static
 	cd $< && $(MAKE) install
