@@ -1,0 +1,295 @@
+--- gnutls/gl/stdio.in.h	2014-04-18 19:03:19.000000000 +0200
++++ gnutls/gl/stdio.in.h.msvc	2015-08-19 09:17:16.739582400 +0200
+@@ -19,6 +19,9 @@
+ @PRAGMA_SYSTEM_HEADER@
+ #endif
+ @PRAGMA_COLUMNS@
++#ifdef _MSC_VER
++#define restrict
++#endif
+ 
+ #if defined __need_FILE || defined __need___FILE || defined _GL_ALREADY_INCLUDING_STDIO_H
+ /* Special invocation convention:
+--- gnutls/gl/string.in.h	2014-04-18 19:03:19.000000000 +0200
++++ gnutls/gl/string.in.h.msvc	2015-08-19 09:17:22.228031100 +0200
+@@ -21,6 +21,9 @@
+ @PRAGMA_SYSTEM_HEADER@
+ #endif
+ @PRAGMA_COLUMNS@
++#ifdef _MSC_VER
++#define restrict
++#endif
+ 
+ /* The include_next requires a split double-inclusion guard.  */
+ #@INCLUDE_NEXT@ @NEXT_STRING_H@
+--- gnutls/gl/sys_time.in.h	2014-04-18 19:03:19.000000000 +0200
++++ gnutls/gl/sys_time.in.h.msvc	2015-08-19 18:27:33.868989800 +0200
+@@ -30,12 +30,12 @@
+    Without this extra ifdef, the C++ gettimeofday declaration below
+    would be a forward declaration in gnulib's nested <sys/time.h>.  */
+ #if defined _CYGWIN_SYS_TIME_H || defined _SYS_TIME_H || defined _SYS_TIME_H_
+-# @INCLUDE_NEXT@ @NEXT_SYS_TIME_H@
++//# @INCLUDE_NEXT@ @NEXT_SYS_TIME_H@
+ #else
+ 
+ /* The include_next requires a split double-inclusion guard.  */
+ #if @HAVE_SYS_TIME_H@
+-# @INCLUDE_NEXT@ @NEXT_SYS_TIME_H@
++//# @INCLUDE_NEXT@ @NEXT_SYS_TIME_H@
+ #endif
+ 
+ #ifndef _@GUARD_PREFIX@_SYS_TIME_H
+--- gnutls/gl/time.in.h	2014-04-18 19:03:19.000000000 +0200
++++ gnutls/gl/time.in.h.msvc	2015-08-19 09:17:31.036503600 +0200
+@@ -19,6 +19,9 @@
+ @PRAGMA_SYSTEM_HEADER@
+ #endif
+ @PRAGMA_COLUMNS@
++#ifdef _MSC_VER
++#define restrict
++#endif
+ 
+ /* Don't get in the way of glibc when it includes time.h merely to
+    declare a few standard symbols, rather than to declare all the
+--- gnutls/gl/unistd.in.h	2014-04-18 19:03:19.000000000 +0200
++++ gnutls/gl/unistd.in.h.msvc	2015-08-19 09:28:55.511651000 +0200
+@@ -28,7 +28,7 @@
+      In this situation, the functions are not yet declared, therefore we cannot
+      provide the C++ aliases.  */
+ 
+-#@INCLUDE_NEXT@ @NEXT_UNISTD_H@
++//#@INCLUDE_NEXT@ @NEXT_UNISTD_H@
+ 
+ #else
+ /* Normal invocation convention.  */
+@@ -36,7 +36,7 @@
+ /* The include_next requires a split double-inclusion guard.  */
+ #if @HAVE_UNISTD_H@
+ # define _GL_INCLUDING_UNISTD_H
+-# @INCLUDE_NEXT@ @NEXT_UNISTD_H@
++//# @INCLUDE_NEXT@ @NEXT_UNISTD_H@
+ # undef _GL_INCLUDING_UNISTD_H
+ #endif
+ 
+--- gnutls/gl/vasnprintf.c	2014-04-18 19:03:19.000000000 +0200
++++ gnutls/gl/vasnprintf.c.msvc	2015-08-19 09:34:28.627190500 +0200
+@@ -168,7 +168,7 @@
+      size argument is >= 0x3000000.
+      Also don't use it on Linux libc5, since there snprintf with size = 1
+      writes any output without bounds, like sprintf.  */
+-# if (HAVE_DECL__SNPRINTF || HAVE_SNPRINTF) && !defined __BEOS__ && !(__GNU_LIBRARY__ == 1)
++# if (HAVE_DECL__SNPRINTF || defined(HAVE_SNPRINTF)) && !defined __BEOS__ && !(__GNU_LIBRARY__ == 1)
+ #  define USE_SNPRINTF 1
+ # else
+ #  define USE_SNPRINTF 0
+--- gnutls/lib/accelerated/Makefile.am	2014-08-10 13:50:46.000000000 +0200
++++ gnutls/lib/accelerated/Makefile.am.msvc	2015-08-19 15:13:13.257288500 +0200
+@@ -29,7 +29,7 @@
+ 	-I$(srcdir)/..
+ 
+ if ENABLE_MINITASN1
+-AM_CPPFLAGS += -I$(srcdir)/../minitasn1
++AM_CPPFLAGS += -DASN1_STATIC -I$(srcdir)/../minitasn1
+ endif
+ 
+ noinst_LTLIBRARIES = libaccelerated.la
+--- gnutls/lib/accelerated/x86/Makefile.am	2014-04-27 19:36:46.000000000 +0200
++++ gnutls/lib/accelerated/x86/Makefile.am.msvc	2015-08-19 15:13:19.691769900 +0200
+@@ -28,7 +28,7 @@
+ 	-I$(srcdir)/../
+ 
+ if ENABLE_MINITASN1
+-AM_CPPFLAGS += -I$(srcdir)/../../minitasn1
++AM_CPPFLAGS += -DASN1_STATIC -I$(srcdir)/../../minitasn1
+ endif
+ 
+ EXTRA_DIST = README license.txt files.mk
+--- gnutls/lib/algorithms/Makefile.am	2013-11-10 18:59:14.000000000 +0100
++++ gnutls/lib/algorithms/Makefile.am.msvc	2015-08-19 17:27:52.836857700 +0200
+@@ -29,7 +29,7 @@
+ 	-I$(srcdir)/../opencdk
+ 
+ if ENABLE_MINITASN1
+-AM_CPPFLAGS += -I$(srcdir)/../minitasn1
++AM_CPPFLAGS += -DASN1_STATIC -I$(srcdir)/../minitasn1
+ endif
+ 
+ noinst_LTLIBRARIES = libgnutls_alg.la
+--- gnutls/lib/auth/Makefile.am	2013-11-10 18:59:14.000000000 +0100
++++ gnutls/lib/auth/Makefile.am.msvc	2015-08-19 15:13:29.220187100 +0200
+@@ -29,7 +29,7 @@
+ 	-I$(srcdir)/../opencdk
+ 
+ if ENABLE_MINITASN1
+-AM_CPPFLAGS += -I$(srcdir)/../minitasn1
++AM_CPPFLAGS += -DASN1_STATIC -I$(srcdir)/../minitasn1
+ endif
+ 
+ noinst_LTLIBRARIES = libgnutls_auth.la
+--- gnutls/lib/ext/Makefile.am	2014-08-10 13:50:46.000000000 +0200
++++ gnutls/lib/ext/Makefile.am.msvc	2015-08-19 15:13:36.322891800 +0200
+@@ -29,7 +29,7 @@
+ 	-I$(srcdir)/../opencdk
+ 
+ if ENABLE_MINITASN1
+-AM_CPPFLAGS += -I$(srcdir)/../minitasn1
++AM_CPPFLAGS += -DASN1_STATIC -I$(srcdir)/../minitasn1
+ endif
+ 
+ noinst_LTLIBRARIES = libgnutls_ext.la
+--- gnutls/lib/extras/Makefile.am	2013-11-10 18:59:14.000000000 +0100
++++ gnutls/lib/extras/Makefile.am.msvc	2015-08-19 15:13:41.287003100 +0200
+@@ -29,7 +29,7 @@
+ 	-I$(srcdir)/../opencdk
+ 
+ if ENABLE_MINITASN1
+-AM_CPPFLAGS += -I$(srcdir)/../minitasn1
++AM_CPPFLAGS += -DASN1_STATIC -I$(srcdir)/../minitasn1
+ endif
+ 
+ noinst_LTLIBRARIES = libgnutls_extras.la
+--- gnutls/lib/gnutls_x509.c	2014-11-24 18:56:27.000000000 +0100
++++ gnutls/lib/gnutls_x509.c.msvc	2015-08-19 10:56:26.643347600 +0200
+@@ -1743,7 +1743,7 @@
+ 				  int ca_list_size)
+ {
+ 	int ret, i, j;
+-	gnutls_x509_crt_t new_list[ca_list_size];
++	gnutls_x509_crt_t *new_list = alloca(ca_list_size * sizeof(gnutls_x509_crt_t));
+ 
+ 	for (i = 0; i < ca_list_size; i++) {
+ 		ret = gnutls_x509_crt_init(&new_list[i]);
+@@ -1999,7 +1999,7 @@
+ 				int crl_list_size)
+ {
+ 	int ret, i, j;
+-	gnutls_x509_crl_t new_crl[crl_list_size];
++	gnutls_x509_crl_t *new_crl = alloca(crl_list_size * sizeof(gnutls_x509_crl_t));
+ 
+ 	for (i = 0; i < crl_list_size; i++) {
+ 		ret = gnutls_x509_crl_init(&new_crl[i]);
+--- gnutls/lib/Makefile.am	2015-08-19 17:18:53.336808500 +0200
++++ gnutls/lib/Makefile.am.msvc	2015-08-19 15:13:00.276970400 +0200
+@@ -49,7 +49,7 @@
+ endif
+ 
+ if ENABLE_MINITASN1
+-AM_CPPFLAGS += -I$(srcdir)/minitasn1
++AM_CPPFLAGS += -DASN1_STATIC -I$(srcdir)/minitasn1
+ endif
+ 
+ # Pkg-config script.
+--- gnutls/lib/minitasn1/Makefile.am	2013-11-10 18:59:14.000000000 +0100
++++ gnutls/lib/minitasn1/Makefile.am.msvc	2015-08-19 15:09:04.137334800 +0200
+@@ -20,7 +20,7 @@
+ # Software Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
+ # MA 02110-1301, USA
+ 
+-AM_CPPFLAGS = -DASN1_BUILDING		\
++AM_CPPFLAGS = -DASN1_BUILDING -DASN1_STATIC	\
+ 	-I$(srcdir)/../../gl		\
+ 	-I$(builddir)/../../gl          \
+ 	-I$(srcdir)/..
+--- gnutls/lib/nettle/Makefile.am	2014-08-10 13:50:46.000000000 +0200
++++ gnutls/lib/nettle/Makefile.am.msvc	2015-08-19 15:13:45.633595900 +0200
+@@ -32,7 +32,7 @@
+ 	-I$(srcdir)/..
+ 
+ if ENABLE_MINITASN1
+-AM_CPPFLAGS += -I$(srcdir)/../minitasn1
++AM_CPPFLAGS += -DASN1_STATIC -I$(srcdir)/../minitasn1
+ endif
+ 
+ noinst_LTLIBRARIES = libcrypto.la
+--- gnutls/lib/opencdk/Makefile.am	2013-11-10 18:59:14.000000000 +0100
++++ gnutls/lib/opencdk/Makefile.am.msvc	2015-08-19 15:13:49.672484500 +0200
+@@ -29,7 +29,7 @@
+ 	-I$(srcdir)/..
+ 
+ if ENABLE_MINITASN1
+-AM_CPPFLAGS += -I$(srcdir)/../minitasn1
++AM_CPPFLAGS += -DASN1_STATIC -I$(srcdir)/../minitasn1
+ endif
+ 
+ noinst_LTLIBRARIES = libminiopencdk.la
+--- gnutls/lib/openpgp/Makefile.am	2013-11-10 18:59:14.000000000 +0100
++++ gnutls/lib/openpgp/Makefile.am.msvc	2015-08-19 15:13:53.741781800 +0200
+@@ -29,7 +29,7 @@
+ 	-I$(srcdir)/../opencdk
+ 
+ if ENABLE_MINITASN1
+-AM_CPPFLAGS += -I$(srcdir)/../minitasn1
++AM_CPPFLAGS += -DASN1_STATIC -I$(srcdir)/../minitasn1
+ endif
+ 
+ noinst_LTLIBRARIES = libgnutls_openpgp.la
+--- gnutls/lib/x509/Makefile.am	2014-08-10 13:50:46.000000000 +0200
++++ gnutls/lib/x509/Makefile.am.msvc	2015-08-19 15:12:39.006059900 +0200
+@@ -27,7 +27,7 @@
+ 	$(P11_KIT_CFLAGS)
+ 
+ if ENABLE_MINITASN1
+-AM_CPPFLAGS += -I$(srcdir)/../minitasn1
++AM_CPPFLAGS += -DASN1_STATIC -I$(srcdir)/../minitasn1
+ endif
+ 
+ noinst_LTLIBRARIES = libgnutls_x509.la
+--- gnutls/tests/Makefile.am	2015-08-19 17:20:15.626316300 +0200
++++ gnutls/tests/Makefile.am.msvc	2015-08-19 15:14:01.663710300 +0200
+@@ -52,7 +52,7 @@
+ 	$(LIBSOCKET) $(INET_NTOP_LIB) $(INET_PTON_LIB)
+ 
+ if ENABLE_MINITASN1
+-AM_CPPFLAGS += -I$(srcdir)/../lib/minitasn1
++AM_CPPFLAGS += -DASN1_STATIC -I$(srcdir)/../lib/minitasn1
+ endif
+ 
+ noinst_LTLIBRARIES = libutils.la
+--- gnutls/gl/snprintf.c	2016-02-01 16:34:19.911165900 +0100
++++ gnutls/gl/snprintf.c.msvc	2016-02-01 16:33:56.079802800 +0100
+@@ -28,6 +28,10 @@
+ 
+ #include "vasnprintf.h"
+ 
++#if _MSC_VER >= 1900
++#define snprintf _gl_snprintf
++#endif
++
+ /* Print formatted output to string STR.  Similar to sprintf, but
+    additional length SIZE limit how much is written into STR.  Returns
+    string length of formatted string (which may be larger than SIZE).
+--- gnutls/gl/vsnprintf.c.orig	2014-04-18 19:03:19.000000000 +0200
++++ gnutls/gl/vsnprintf.c	2016-02-01 16:55:37.510240400 +0100
+@@ -30,6 +30,10 @@
+ 
+ #include "vasnprintf.h"
+ 
++#if _MSC_VER >= 1900
++#define vsnprintf _gl_vsnprintf
++#endif
++
+ /* Print formatted output to string STR.  Similar to vsprintf, but
+    additional length SIZE limit how much is written into STR.  Returns
+    string length of formatted string (which may be larger than SIZE).
+--- gnutls/lib/x509/output.c	2016-02-03 08:45:55.000000000 +0100
++++ gnutls/lib/x509/output.c.msvc	2016-05-04 16:27:58.416444800 +0200
+@@ -31,7 +31,7 @@
+ #include <gnutls_errors.h>
+ #include <extras/randomart.h>
+ 
+-#ifdef HAVE_INET_NTOP
++#if defined(HAVE_INET_NTOP) && !defined(_MSC_VER)
+ # include <arpa/inet.h>
+ #endif
+ 
+--- gnutls/lib/algorithms/ciphersuites.c	2016-07-08 17:57:43.324924100 +0200
++++ gnutls/lib/algorithms/ciphersuites.c.alloca	2016-07-08 17:57:12.036441000 +0200
+@@ -1323,7 +1323,7 @@ _gnutls_remove_unwanted_ciphersuites(gnu
+ 	    session->security_parameters.entity == GNUTLS_SERVER ? 1 : 0;
+ 	gnutls_kx_algorithm_t alg[MAX_ALGOS];
+ 	int alg_size = MAX_ALGOS;
+-	uint8_t new_list[cipher_suites_size]; /* it's safe to use that size because it's provided by _gnutls_supported_ciphersuites() */
++	uint8_t *new_list=alloca(cipher_suites_size); /* it's safe to use that size because it's provided by _gnutls_supported_ciphersuites() */
+ 	int i, new_list_size = 0;
+ 	const gnutls_cipher_suite_entry_st *entry;
+ 	const uint8_t *cp;
