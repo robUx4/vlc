@@ -40,6 +40,9 @@ ifdef HAVE_MACOSX
 	$(APPLY) $(SRC)/gnutls/gnutls-disable-getentropy-osx.patch
 endif
 	$(APPLY) $(SRC)/gnutls/gnutls-libidn.patch
+ifdef HAVE_VISUALSTUDIO
+	$(APPLY) $(SRC)/gnutls/msvc.patch
+endif
 	$(call pkg_static,"lib/gnutls.pc.in")
 	$(UPDATE_AUTOCONFIG)
 	$(MOVE)
@@ -64,6 +67,9 @@ GNUTLS_CONF := \
 GNUTLS_ENV := $(HOSTVARS)
 
 DEPS_gnutls = nettle $(DEPS_nettle)
+ifdef HAVE_VISUALSTUDIO
+DEPS_gnutls += sys_param
+endif
 
 ifdef HAVE_ANDROID
 GNUTLS_ENV += gl_cv_header_working_stdint_h=yes
