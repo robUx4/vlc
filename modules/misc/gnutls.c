@@ -442,6 +442,7 @@ success:
             goto failure;
     }
 
+#if !VLC_WINSTORE_APP
     if (dialog_Question (tls, _("Insecure site"),
         _("You attempted to reach %s. %s\n"
           "This problem may be stem from an attempt to breach your security, "
@@ -450,6 +451,7 @@ success:
                          _("Abort"), _("View certificate"), NULL,
                          vlc_gettext (msg), host) != 2)
         goto failure;
+#endif /* VLC_WINSTORE_APP */
 
     gnutls_x509_crt_t cert;
 
@@ -463,11 +465,15 @@ success:
     }
     gnutls_x509_crt_deinit (cert);
 
+#if VLC_WINSTORE_APP
+    val = 2;
+#else /* VLC_WINSTORE_APP */
     val = dialog_Question (tls, _("Insecure site"),
          _("This is the certificate presented by %s:\n%s\n\n"
            "If in doubt, abort now.\n"),
                            _("Abort"), _("Accept 24 hours"),
                            _("Accept permanently"), host, desc.data);
+#endif /* VLC_WINSTORE_APP */
     gnutls_free (desc.data);
 
     time_t expiry = 0;
