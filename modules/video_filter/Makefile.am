@@ -50,11 +50,7 @@ libpuzzle_plugin_la_LIBADD = $(LIBM)
 libripple_plugin_la_SOURCES = video_filter/ripple.c
 libripple_plugin_la_LIBADD = $(LIBM)
 librotate_plugin_la_SOURCES = video_filter/rotate.c
-if HAVE_WINSTORE
-librotate_plugin_la_SOURCES += control/motionlib.c control/motionlib.h
-else
 librotate_plugin_la_LIBADD = libvlc_motion.la $(LIBM)
-endif
 librotate_plugin_la_LDFLAGS = $(AM_LDFLAGS) -rpath '$(video_filterdir)'
 if HAVE_DARWIN
 librotate_plugin_la_LDFLAGS += -Wl,-framework,IOKit,-framework,CoreFoundation
