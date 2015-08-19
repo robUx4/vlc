@@ -1,0 +1,154 @@
+--- gnutls/gl/errno.in.h	2014-04-18 19:03:19.000000000 +0200
++++ gnutls/gl/errno.in.h.msvc	2015-08-19 09:00:13.096663700 +0200
+@@ -23,7 +23,7 @@
+ @PRAGMA_COLUMNS@
+ 
+ /* The include_next requires a split double-inclusion guard.  */
+-#@INCLUDE_NEXT@ @NEXT_ERRNO_H@
++#@INCLUDE_NEXT@ "../ucrt/errno.h"
+ 
+ #ifndef _@GUARD_PREFIX@_ERRNO_H
+ #define _@GUARD_PREFIX@_ERRNO_H
+--- gnutls/gl/stdio.in.h	2014-04-18 19:03:19.000000000 +0200
++++ gnutls/gl/stdio.in.h.msvc	2015-08-19 09:17:16.739582400 +0200
+@@ -39,7 +42,7 @@
+ #define _GL_ALREADY_INCLUDING_STDIO_H
+ 
+ /* The include_next requires a split double-inclusion guard.  */
+-#@INCLUDE_NEXT@ @NEXT_STDIO_H@
++#@INCLUDE_NEXT@ "../ucrt/stdio.h"
+ 
+ #undef _GL_ALREADY_INCLUDING_STDIO_H
+ 
+--- gnutls/gl/stdlib.in.h	2014-04-18 19:03:19.000000000 +0200
++++ gnutls/gl/stdlib.in.h.msvc	2015-08-19 09:01:02.737574600 +0200
+@@ -24,7 +24,7 @@
+ /* Special invocation conventions inside some gnulib header files,
+    and inside some glibc header files, respectively.  */
+ 
+-#@INCLUDE_NEXT@ @NEXT_STDLIB_H@
++#@INCLUDE_NEXT@ <../ucrt/stdlib.h>
+ 
+ #else
+ /* Normal invocation convention.  */
+@@ -32,7 +32,7 @@
+ #ifndef _@GUARD_PREFIX@_STDLIB_H
+ 
+ /* The include_next requires a split double-inclusion guard.  */
+-#@INCLUDE_NEXT@ @NEXT_STDLIB_H@
++#@INCLUDE_NEXT@ "../ucrt/stdlib.h"
+ 
+ #ifndef _@GUARD_PREFIX@_STDLIB_H
+ #define _@GUARD_PREFIX@_STDLIB_H
+--- gnutls/gl/string.in.h	2014-04-18 19:03:19.000000000 +0200
++++ gnutls/gl/string.in.h.msvc	2015-08-19 09:17:22.228031100 +0200
+@@ -26,7 +26,7 @@
+ #define restrict
+ #endif
+ 
+ /* The include_next requires a split double-inclusion guard.  */
+-#@INCLUDE_NEXT@ @NEXT_STRING_H@
++#@INCLUDE_NEXT@  "../ucrt/string.h"
+ 
+ #ifndef _@GUARD_PREFIX@_STRING_H
+ #define _@GUARD_PREFIX@_STRING_H
+--- gnutls/gl/sys_stat.in.h	2014-04-18 19:03:19.000000000 +0200
++++ gnutls/gl/sys_stat.in.h.msvc	2015-08-19 18:27:57.476399600 +0200
+@@ -28,7 +28,7 @@
+ #if defined __need_system_sys_stat_h
+ /* Special invocation convention.  */
+ 
+-#@INCLUDE_NEXT@ @NEXT_SYS_STAT_H@
++#@INCLUDE_NEXT@ "../ucrt/sys/stat.h"
+ 
+ #else
+ /* Normal invocation convention.  */
+@@ -43,7 +43,7 @@
+ #include <time.h>
+ 
+ /* The include_next requires a split double-inclusion guard.  */
+-#@INCLUDE_NEXT@ @NEXT_SYS_STAT_H@
++#@INCLUDE_NEXT@ "../ucrt/sys/stat.h"
+ 
+ #ifndef _@GUARD_PREFIX@_SYS_STAT_H
+ #define _@GUARD_PREFIX@_SYS_STAT_H
+--- gnutls/gl/sys_types.in.h	2014-04-18 19:03:19.000000000 +0200
++++ gnutls/gl/sys_types.in.h.msvc	2015-08-19 18:25:32.690277400 +0200
+@@ -24,7 +24,7 @@
+ 
+ /* The include_next requires a split double-inclusion guard.  */
+ # define _GL_INCLUDING_SYS_TYPES_H
+-#@INCLUDE_NEXT@ @NEXT_SYS_TYPES_H@
++#@INCLUDE_NEXT@ "../ucrt/sys/types.h"
+ # undef _GL_INCLUDING_SYS_TYPES_H
+ 
+ #ifndef _@GUARD_PREFIX@_SYS_TYPES_H
+--- gnutls/gl/tests/fcntl.in.h	2014-07-29 22:11:21.000000000 +0200
++++ gnutls/gl/tests/fcntl.in.h.msvc	2015-08-19 09:04:33.591815000 +0200
+@@ -37,7 +37,7 @@
+ #if !(defined __GLIBC__ || defined __UCLIBC__) || (defined __cplusplus && defined GNULIB_NAMESPACE && !(__GNUC__ > 4 || (__GNUC__ == 4 && __GNUC_MINOR__ >= 3)))
+ # include <sys/stat.h>
+ #endif
+-#@INCLUDE_NEXT@ @NEXT_FCNTL_H@
++#@INCLUDE_NEXT@ "../ucrt/fcntl.h"
+ 
+ #else
+ /* Normal invocation convention.  */
+@@ -57,7 +57,7 @@
+ # include <sys/stat.h>
+ #endif
+ /* The include_next requires a split double-inclusion guard.  */
+-#@INCLUDE_NEXT@ @NEXT_FCNTL_H@
++#@INCLUDE_NEXT@ "../ucrt/fcntl.h"
+ 
+ #ifndef _@GUARD_PREFIX@_FCNTL_H
+ #define _@GUARD_PREFIX@_FCNTL_H
+--- gnutls/gl/time.in.h	2014-04-18 19:03:19.000000000 +0200
++++ gnutls/gl/time.in.h.msvc	2015-08-19 09:17:31.036503600 +0200
+@@ -29,13 +32,13 @@
+      || defined __need_timespec \
+      || defined _@GUARD_PREFIX@_TIME_H)
+ 
+-# @INCLUDE_NEXT@ @NEXT_TIME_H@
++# @INCLUDE_NEXT@ "../ucrt/time.h"
+ 
+ #else
+ 
+ # define _@GUARD_PREFIX@_TIME_H
+ 
+-# @INCLUDE_NEXT@ @NEXT_TIME_H@
++# @INCLUDE_NEXT@ "../ucrt/time.h"
+ 
+ /* NetBSD 5.0 mis-defines NULL.  */
+ # include <stddef.h>
+--- gnutls/gl/wchar.in.h	2014-04-18 19:03:19.000000000 +0200
++++ gnutls/gl/wchar.in.h.msvc	2015-08-19 09:01:57.230410500 +0200
+@@ -43,7 +43,7 @@
+      the latter includes <wchar.h>.  But here, we have no way to detect whether
+      <wctype.h> is completely included or is still being included.  */
+ 
+-#@INCLUDE_NEXT@ @NEXT_WCHAR_H@
++#@INCLUDE_NEXT@ "../ucrt/wchar.h"
+ 
+ #else
+ /* Normal invocation convention.  */
+@@ -75,7 +75,7 @@
+    Some builds of uClibc lack it.  */
+ /* The include_next requires a split double-inclusion guard.  */
+ #if @HAVE_WCHAR_H@
+-# @INCLUDE_NEXT@ @NEXT_WCHAR_H@
++# @INCLUDE_NEXT@ "../ucrt/wchar.h"
+ #endif
+ 
+ #undef _GL_ALREADY_INCLUDING_WCHAR_H
+--- gnutls/gl/stddef.in.h	2015-03-23 21:57:21.000000000 +0100
++++ gnutls/gl/stddef.in.h.msvc	2016-05-04 12:21:21.834082600 +0200
+@@ -51,7 +51,7 @@
+ 
+ /* The include_next requires a split double-inclusion guard.  */
+ 
+-#  @INCLUDE_NEXT@ @NEXT_STDDEF_H@
++#  @INCLUDE_NEXT@ <../ucrt/stddef.h>
+ 
+ /* On NetBSD 5.0, the definition of NULL lacks proper parentheses.  */
+ #  if (@REPLACE_NULL@ \
