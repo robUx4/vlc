@@ -35,6 +35,14 @@ endif
 ifdef HAVE_MACOSX
 	$(APPLY) $(SRC)/gnutls/gnutls-pkgconfig-osx.patch
 endif
+ifdef HAVE_VISUALSTUDIO
+	$(APPLY) $(SRC)/gnutls/msvc.patch
+ifdef VS_IS_2013
+	$(APPLY) $(SRC)/gnutls/headers-msvc13.patch
+else
+	$(APPLY) $(SRC)/gnutls/headers-msvc15.patch
+endif
+endif
 	$(call pkg_static,"lib/gnutls.pc.in")
 	$(UPDATE_AUTOCONFIG)
 	$(MOVE)
@@ -58,6 +66,9 @@ GNUTLS_CONF := \
 GNUTLS_ENV := $(HOSTVARS)
 
 DEPS_gnutls = nettle $(DEPS_nettle)
+ifdef HAVE_VISUALSTUDIO
+DEPS_gnutls += sys_param
+endif
 
 ifdef HAVE_ANDROID
 GNUTLS_ENV += gl_cv_header_working_stdint_h=yes
