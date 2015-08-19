@@ -15,6 +15,9 @@ $(TARBALLS)/nettle-$(NETTLE_VERSION).tar.gz:
 nettle: nettle-$(NETTLE_VERSION).tar.gz .sum-nettle
 	$(UNPACK)
 	$(UPDATE_AUTOCONFIG)
+ifdef HAVE_VISUALSTUDIO
+	$(APPLY) $(SRC)/nettle/msvc.patch
+endif
 	$(MOVE)
 
 DEPS_nettle = gmp $(DEPS_gmp)
