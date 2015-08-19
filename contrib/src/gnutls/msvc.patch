@@ -1,0 +1,430 @@
+--- gnutls/extra/Makefile.am	2015-08-19 17:17:46.216956100 +0200
++++ gnutls/extra/Makefile.am.msvc	2015-08-19 15:12:48.729843500 +0200
+@@ -34,7 +34,7 @@
+ 	-I$(builddir)/../lib
+ 
+ if ENABLE_MINITASN1
+-AM_CPPFLAGS += -I$(srcdir)/../lib/minitasn1
++AM_CPPFLAGS += -DASN1_STATIC -I$(srcdir)/../lib/minitasn1
+ endif
+ 
+ SUBDIRS = includes
+--- gnutls/gl/errno.in.h	2014-04-18 19:03:19.000000000 +0200
++++ gnutls/gl/errno.in.h.msvc	2015-08-19 09:00:13.096663700 +0200
+@@ -23,7 +23,7 @@
+ @PRAGMA_COLUMNS@
+ 
+ /* The include_next requires a split double-inclusion guard.  */
+-#@INCLUDE_NEXT@ @NEXT_ERRNO_H@
++#@INCLUDE_NEXT@ <../include/errno.h>
+ 
+ #ifndef _@GUARD_PREFIX@_ERRNO_H
+ #define _@GUARD_PREFIX@_ERRNO_H
+--- gnutls/gl/signal.in.h	2014-08-10 13:50:46.000000000 +0200
++++ gnutls/gl/signal.in.h.msvc	2015-08-19 09:17:07.761421400 +0200
+@@ -19,6 +19,9 @@
+ @PRAGMA_SYSTEM_HEADER@
+ #endif
+ @PRAGMA_COLUMNS@
++#ifdef _MSC_VER
++#define restrict
++#endif
+ 
+ #if defined __need_sig_atomic_t || defined __need_sigset_t || defined _GL_ALREADY_INCLUDING_SIGNAL_H || (defined _SIGNAL_H && !defined __SIZEOF_PTHREAD_MUTEX_T)
+ /* Special invocation convention:
+@@ -48,7 +51,7 @@
+ #include <sys/types.h>
+ 
+ /* The include_next requires a split double-inclusion guard.  */
+-#@INCLUDE_NEXT@ @NEXT_SIGNAL_H@
++#@INCLUDE_NEXT@ <../include/signal.h>
+ 
+ #undef _GL_ALREADY_INCLUDING_SIGNAL_H
+ 
+--- gnutls/gl/stdio.in.h	2014-04-18 19:03:19.000000000 +0200
++++ gnutls/gl/stdio.in.h.msvc	2015-08-19 09:17:16.739582400 +0200
+@@ -19,6 +19,9 @@
+ @PRAGMA_SYSTEM_HEADER@
+ #endif
+ @PRAGMA_COLUMNS@
++#ifdef _MSC_VER
++#define restrict
++#endif
+ 
+ #if defined __need_FILE || defined __need___FILE || defined _GL_ALREADY_INCLUDING_STDIO_H
+ /* Special invocation convention:
+@@ -39,7 +42,7 @@
+ #define _GL_ALREADY_INCLUDING_STDIO_H
+ 
+ /* The include_next requires a split double-inclusion guard.  */
+-#@INCLUDE_NEXT@ @NEXT_STDIO_H@
++#@INCLUDE_NEXT@ <../include/stdio.h>
+ 
+ #undef _GL_ALREADY_INCLUDING_STDIO_H
+ 
+--- gnutls/gl/stdlib.in.h	2014-04-18 19:03:19.000000000 +0200
++++ gnutls/gl/stdlib.in.h.msvc	2015-08-19 09:01:02.737574600 +0200
+@@ -24,7 +24,7 @@
+ /* Special invocation conventions inside some gnulib header files,
+    and inside some glibc header files, respectively.  */
+ 
+-#@INCLUDE_NEXT@ @NEXT_STDLIB_H@
++//#@INCLUDE_NEXT@ <../include/stdlib.h>
+ 
+ #else
+ /* Normal invocation convention.  */
+@@ -32,7 +32,7 @@
+ #ifndef _@GUARD_PREFIX@_STDLIB_H
+ 
+ /* The include_next requires a split double-inclusion guard.  */
+-#@INCLUDE_NEXT@ @NEXT_STDLIB_H@
++#@INCLUDE_NEXT@ <../include/stdlib.h>
+ 
+ #ifndef _@GUARD_PREFIX@_STDLIB_H
+ #define _@GUARD_PREFIX@_STDLIB_H
+--- gnutls/gl/string.in.h	2014-04-18 19:03:19.000000000 +0200
++++ gnutls/gl/string.in.h.msvc	2015-08-19 09:17:22.228031100 +0200
+@@ -21,9 +21,12 @@
+ @PRAGMA_SYSTEM_HEADER@
+ #endif
+ @PRAGMA_COLUMNS@
++#ifdef _MSC_VER
++#define restrict
++#endif
+ 
+ /* The include_next requires a split double-inclusion guard.  */
+-#@INCLUDE_NEXT@ @NEXT_STRING_H@
++#@INCLUDE_NEXT@  <../include/string.h>
+ 
+ #ifndef _@GUARD_PREFIX@_STRING_H
+ #define _@GUARD_PREFIX@_STRING_H
+--- gnutls/gl/sys_stat.in.h	2014-04-18 19:03:19.000000000 +0200
++++ gnutls/gl/sys_stat.in.h.msvc	2015-08-19 18:27:57.476399600 +0200
+@@ -28,7 +28,7 @@
+ #if defined __need_system_sys_stat_h
+ /* Special invocation convention.  */
+ 
+-#@INCLUDE_NEXT@ @NEXT_SYS_STAT_H@
++#@INCLUDE_NEXT@ <../include/sys/stats.h>
+ 
+ #else
+ /* Normal invocation convention.  */
+@@ -43,7 +43,7 @@
+ #include <time.h>
+ 
+ /* The include_next requires a split double-inclusion guard.  */
+-#@INCLUDE_NEXT@ @NEXT_SYS_STAT_H@
++#@INCLUDE_NEXT@ <../include/sys/stats.h>
+ 
+ #ifndef _@GUARD_PREFIX@_SYS_STAT_H
+ #define _@GUARD_PREFIX@_SYS_STAT_H
+--- gnutls/gl/sys_time.in.h	2014-04-18 19:03:19.000000000 +0200
++++ gnutls/gl/sys_time.in.h.msvc	2015-08-19 18:27:33.868989800 +0200
+@@ -30,12 +30,12 @@
+    Without this extra ifdef, the C++ gettimeofday declaration below
+    would be a forward declaration in gnulib's nested <sys/time.h>.  */
+ #if defined _CYGWIN_SYS_TIME_H || defined _SYS_TIME_H || defined _SYS_TIME_H_
+-# @INCLUDE_NEXT@ @NEXT_SYS_TIME_H@
++//# @INCLUDE_NEXT@ @NEXT_SYS_TIME_H@
+ #else
+ 
+ /* The include_next requires a split double-inclusion guard.  */
+ #if @HAVE_SYS_TIME_H@
+-# @INCLUDE_NEXT@ @NEXT_SYS_TIME_H@
++//# @INCLUDE_NEXT@ @NEXT_SYS_TIME_H@
+ #endif
+ 
+ #ifndef _@GUARD_PREFIX@_SYS_TIME_H
+--- gnutls/gl/sys_types.in.h	2014-04-18 19:03:19.000000000 +0200
++++ gnutls/gl/sys_types.in.h.msvc	2015-08-19 18:25:32.690277400 +0200
+@@ -24,7 +24,7 @@
+ 
+ /* The include_next requires a split double-inclusion guard.  */
+ # define _GL_INCLUDING_SYS_TYPES_H
+-#@INCLUDE_NEXT@ @NEXT_SYS_TYPES_H@
++#@INCLUDE_NEXT@ <../include/sys/types.h>
+ # undef _GL_INCLUDING_SYS_TYPES_H
+ 
+ #ifndef _@GUARD_PREFIX@_SYS_TYPES_H
+--- gnutls/gl/tests/fcntl.in.h	2014-07-29 22:11:21.000000000 +0200
++++ gnutls/gl/tests/fcntl.in.h.msvc	2015-08-19 09:04:33.591815000 +0200
+@@ -37,7 +37,7 @@
+ #if !(defined __GLIBC__ || defined __UCLIBC__) || (defined __cplusplus && defined GNULIB_NAMESPACE && !(__GNUC__ > 4 || (__GNUC__ == 4 && __GNUC_MINOR__ >= 3)))
+ # include <sys/stat.h>
+ #endif
+-#@INCLUDE_NEXT@ @NEXT_FCNTL_H@
++#@INCLUDE_NEXT@ <../include/fcntl.h>
+ 
+ #else
+ /* Normal invocation convention.  */
+@@ -57,7 +57,7 @@
+ # include <sys/stat.h>
+ #endif
+ /* The include_next requires a split double-inclusion guard.  */
+-#@INCLUDE_NEXT@ @NEXT_FCNTL_H@
++#@INCLUDE_NEXT@ <../include/fcntl.h>
+ 
+ #ifndef _@GUARD_PREFIX@_FCNTL_H
+ #define _@GUARD_PREFIX@_FCNTL_H
+--- gnutls/gl/time.in.h	2014-04-18 19:03:19.000000000 +0200
++++ gnutls/gl/time.in.h.msvc	2015-08-19 09:17:31.036503600 +0200
+@@ -19,6 +19,9 @@
+ @PRAGMA_SYSTEM_HEADER@
+ #endif
+ @PRAGMA_COLUMNS@
++#ifdef _MSC_VER
++#define restrict
++#endif
+ 
+ /* Don't get in the way of glibc when it includes time.h merely to
+    declare a few standard symbols, rather than to declare all the
+@@ -29,13 +32,13 @@
+      || defined __need_timespec \
+      || defined _@GUARD_PREFIX@_TIME_H)
+ 
+-# @INCLUDE_NEXT@ @NEXT_TIME_H@
++# @INCLUDE_NEXT@ <../include/time.h>
+ 
+ #else
+ 
+ # define _@GUARD_PREFIX@_TIME_H
+ 
+-# @INCLUDE_NEXT@ @NEXT_TIME_H@
++# @INCLUDE_NEXT@ <../include/time.h>
+ 
+ /* NetBSD 5.0 mis-defines NULL.  */
+ # include <stddef.h>
+--- gnutls/gl/unistd.in.h	2014-04-18 19:03:19.000000000 +0200
++++ gnutls/gl/unistd.in.h.msvc	2015-08-19 09:28:55.511651000 +0200
+@@ -28,7 +28,7 @@
+      In this situation, the functions are not yet declared, therefore we cannot
+      provide the C++ aliases.  */
+ 
+-#@INCLUDE_NEXT@ @NEXT_UNISTD_H@
++//#@INCLUDE_NEXT@ <../include/unistd.h>
+ 
+ #else
+ /* Normal invocation convention.  */
+@@ -36,7 +36,7 @@
+ /* The include_next requires a split double-inclusion guard.  */
+ #if @HAVE_UNISTD_H@
+ # define _GL_INCLUDING_UNISTD_H
+-# @INCLUDE_NEXT@ @NEXT_UNISTD_H@
++//# @INCLUDE_NEXT@ <../include/unistd.h>
+ # undef _GL_INCLUDING_UNISTD_H
+ #endif
+ 
+--- gnutls/gl/vasnprintf.c	2014-04-18 19:03:19.000000000 +0200
++++ gnutls/gl/vasnprintf.c.msvc	2015-08-19 09:34:28.627190500 +0200
+@@ -168,7 +168,7 @@
+      size argument is >= 0x3000000.
+      Also don't use it on Linux libc5, since there snprintf with size = 1
+      writes any output without bounds, like sprintf.  */
+-# if (HAVE_DECL__SNPRINTF || HAVE_SNPRINTF) && !defined __BEOS__ && !(__GNU_LIBRARY__ == 1)
++# if (HAVE_DECL__SNPRINTF || defined(HAVE_SNPRINTF)) && !defined __BEOS__ && !(__GNU_LIBRARY__ == 1)
+ #  define USE_SNPRINTF 1
+ # else
+ #  define USE_SNPRINTF 0
+--- gnutls/gl/wchar.in.h	2014-04-18 19:03:19.000000000 +0200
++++ gnutls/gl/wchar.in.h.msvc	2015-08-19 09:01:57.230410500 +0200
+@@ -43,7 +43,7 @@
+      the latter includes <wchar.h>.  But here, we have no way to detect whether
+      <wctype.h> is completely included or is still being included.  */
+ 
+-#@INCLUDE_NEXT@ @NEXT_WCHAR_H@
++#@INCLUDE_NEXT@ <../include/wchar.h>
+ 
+ #else
+ /* Normal invocation convention.  */
+@@ -75,7 +75,7 @@
+    Some builds of uClibc lack it.  */
+ /* The include_next requires a split double-inclusion guard.  */
+ #if @HAVE_WCHAR_H@
+-# @INCLUDE_NEXT@ @NEXT_WCHAR_H@
++# @INCLUDE_NEXT@ <../include/wchar.h>
+ #endif
+ 
+ #undef _GL_ALREADY_INCLUDING_WCHAR_H
+--- gnutls/lib/accelerated/Makefile.am	2014-08-10 13:50:46.000000000 +0200
++++ gnutls/lib/accelerated/Makefile.am.msvc	2015-08-19 15:13:13.257288500 +0200
+@@ -29,7 +29,7 @@
+ 	-I$(srcdir)/..
+ 
+ if ENABLE_MINITASN1
+-AM_CPPFLAGS += -I$(srcdir)/../minitasn1
++AM_CPPFLAGS += -DASN1_STATIC -I$(srcdir)/../minitasn1
+ endif
+ 
+ noinst_LTLIBRARIES = libaccelerated.la
+--- gnutls/lib/accelerated/x86/Makefile.am	2014-04-27 19:36:46.000000000 +0200
++++ gnutls/lib/accelerated/x86/Makefile.am.msvc	2015-08-19 15:13:19.691769900 +0200
+@@ -28,7 +28,7 @@
+ 	-I$(srcdir)/../
+ 
+ if ENABLE_MINITASN1
+-AM_CPPFLAGS += -I$(srcdir)/../../minitasn1
++AM_CPPFLAGS += -DASN1_STATIC -I$(srcdir)/../../minitasn1
+ endif
+ 
+ EXTRA_DIST = README license.txt files.mk
+--- gnutls/lib/algorithms/Makefile.am	2013-11-10 18:59:14.000000000 +0100
++++ gnutls/lib/algorithms/Makefile.am.msvc	2015-08-19 17:27:52.836857700 +0200
+@@ -29,7 +29,7 @@
+ 	-I$(srcdir)/../opencdk
+ 
+ if ENABLE_MINITASN1
+-AM_CPPFLAGS += -I$(srcdir)/../minitasn1
++AM_CPPFLAGS += -DASN1_STATIC -I$(srcdir)/../minitasn1
+ endif
+ 
+ noinst_LTLIBRARIES = libgnutls_alg.la
+--- gnutls/lib/auth/Makefile.am	2013-11-10 18:59:14.000000000 +0100
++++ gnutls/lib/auth/Makefile.am.msvc	2015-08-19 15:13:29.220187100 +0200
+@@ -29,7 +29,7 @@
+ 	-I$(srcdir)/../opencdk
+ 
+ if ENABLE_MINITASN1
+-AM_CPPFLAGS += -I$(srcdir)/../minitasn1
++AM_CPPFLAGS += -DASN1_STATIC -I$(srcdir)/../minitasn1
+ endif
+ 
+ noinst_LTLIBRARIES = libgnutls_auth.la
+--- gnutls/lib/ext/Makefile.am	2014-08-10 13:50:46.000000000 +0200
++++ gnutls/lib/ext/Makefile.am.msvc	2015-08-19 15:13:36.322891800 +0200
+@@ -29,7 +29,7 @@
+ 	-I$(srcdir)/../opencdk
+ 
+ if ENABLE_MINITASN1
+-AM_CPPFLAGS += -I$(srcdir)/../minitasn1
++AM_CPPFLAGS += -DASN1_STATIC -I$(srcdir)/../minitasn1
+ endif
+ 
+ noinst_LTLIBRARIES = libgnutls_ext.la
+--- gnutls/lib/extras/Makefile.am	2013-11-10 18:59:14.000000000 +0100
++++ gnutls/lib/extras/Makefile.am.msvc	2015-08-19 15:13:41.287003100 +0200
+@@ -29,7 +29,7 @@
+ 	-I$(srcdir)/../opencdk
+ 
+ if ENABLE_MINITASN1
+-AM_CPPFLAGS += -I$(srcdir)/../minitasn1
++AM_CPPFLAGS += -DASN1_STATIC -I$(srcdir)/../minitasn1
+ endif
+ 
+ noinst_LTLIBRARIES = libgnutls_extras.la
+--- gnutls/lib/gnutls_cipher.c	2014-08-10 13:50:46.000000000 +0200
++++ gnutls/lib/gnutls_cipher.c.msvc	2015-08-19 10:34:17.940120000 +0200
+@@ -737,7 +737,7 @@
+ 		if (explicit_iv
+ 		    && _gnutls_auth_cipher_is_aead(&params->read.
+ 						   cipher_state)) {
+-			uint8_t nonce[blocksize];
++			uint8_t *nonce = alloca(blocksize);
+ 			/* Values in AEAD are pretty fixed in TLS 1.2 for 128-bit block
+ 			 */
+ 			if (unlikely
+@@ -992,7 +992,7 @@
+ 		if (explicit_iv
+ 		    && _gnutls_auth_cipher_is_aead(&params->read.
+ 						   cipher_state)) {
+-			uint8_t nonce[blocksize];
++			uint8_t *nonce = alloca(blocksize);
+ 			/* Values in AEAD are pretty fixed in TLS 1.2 for 128-bit block
+ 			 */
+ 			if (params->read.IV.data == NULL
+--- gnutls/lib/gnutls_x509.c	2014-11-24 18:56:27.000000000 +0100
++++ gnutls/lib/gnutls_x509.c.msvc	2015-08-19 10:56:26.643347600 +0200
+@@ -1743,7 +1743,7 @@
+ 				  int ca_list_size)
+ {
+ 	int ret, i, j;
+-	gnutls_x509_crt_t new_list[ca_list_size];
++	gnutls_x509_crt_t *new_list = alloca(ca_list_size * sizeof(gnutls_x509_crt_t));
+ 
+ 	for (i = 0; i < ca_list_size; i++) {
+ 		ret = gnutls_x509_crt_init(&new_list[i]);
+@@ -1999,7 +1999,7 @@
+ 				int crl_list_size)
+ {
+ 	int ret, i, j;
+-	gnutls_x509_crl_t new_crl[crl_list_size];
++	gnutls_x509_crl_t *new_crl = alloca(crl_list_size * sizeof(gnutls_x509_crl_t));
+ 
+ 	for (i = 0; i < crl_list_size; i++) {
+ 		ret = gnutls_x509_crl_init(&new_crl[i]);
+--- gnutls/lib/Makefile.am	2015-08-19 17:18:53.336808500 +0200
++++ gnutls/lib/Makefile.am.msvc	2015-08-19 15:13:00.276970400 +0200
+@@ -49,7 +49,7 @@
+ endif
+ 
+ if ENABLE_MINITASN1
+-AM_CPPFLAGS += -I$(srcdir)/minitasn1
++AM_CPPFLAGS += -DASN1_STATIC -I$(srcdir)/minitasn1
+ endif
+ 
+ # Pkg-config script.
+--- gnutls/lib/minitasn1/Makefile.am	2013-11-10 18:59:14.000000000 +0100
++++ gnutls/lib/minitasn1/Makefile.am.msvc	2015-08-19 15:09:04.137334800 +0200
+@@ -20,7 +20,7 @@
+ # Software Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
+ # MA 02110-1301, USA
+ 
+-AM_CPPFLAGS = -DASN1_BUILDING		\
++AM_CPPFLAGS = -DASN1_BUILDING -DASN1_STATIC	\
+ 	-I$(srcdir)/../../gl		\
+ 	-I$(builddir)/../../gl          \
+ 	-I$(srcdir)/..
+--- gnutls/lib/nettle/Makefile.am	2014-08-10 13:50:46.000000000 +0200
++++ gnutls/lib/nettle/Makefile.am.msvc	2015-08-19 15:13:45.633595900 +0200
+@@ -32,7 +32,7 @@
+ 	-I$(srcdir)/..
+ 
+ if ENABLE_MINITASN1
+-AM_CPPFLAGS += -I$(srcdir)/../minitasn1
++AM_CPPFLAGS += -DASN1_STATIC -I$(srcdir)/../minitasn1
+ endif
+ 
+ noinst_LTLIBRARIES = libcrypto.la
+--- gnutls/lib/opencdk/Makefile.am	2013-11-10 18:59:14.000000000 +0100
++++ gnutls/lib/opencdk/Makefile.am.msvc	2015-08-19 15:13:49.672484500 +0200
+@@ -29,7 +29,7 @@
+ 	-I$(srcdir)/..
+ 
+ if ENABLE_MINITASN1
+-AM_CPPFLAGS += -I$(srcdir)/../minitasn1
++AM_CPPFLAGS += -DASN1_STATIC -I$(srcdir)/../minitasn1
+ endif
+ 
+ noinst_LTLIBRARIES = libminiopencdk.la
+--- gnutls/lib/openpgp/Makefile.am	2013-11-10 18:59:14.000000000 +0100
++++ gnutls/lib/openpgp/Makefile.am.msvc	2015-08-19 15:13:53.741781800 +0200
+@@ -29,7 +29,7 @@
+ 	-I$(srcdir)/../opencdk
+ 
+ if ENABLE_MINITASN1
+-AM_CPPFLAGS += -I$(srcdir)/../minitasn1
++AM_CPPFLAGS += -DASN1_STATIC -I$(srcdir)/../minitasn1
+ endif
+ 
+ noinst_LTLIBRARIES = libgnutls_openpgp.la
+--- gnutls/lib/x509/Makefile.am	2014-08-10 13:50:46.000000000 +0200
++++ gnutls/lib/x509/Makefile.am.msvc	2015-08-19 15:12:39.006059900 +0200
+@@ -27,7 +27,7 @@
+ 	$(P11_KIT_CFLAGS)
+ 
+ if ENABLE_MINITASN1
+-AM_CPPFLAGS += -I$(srcdir)/../minitasn1
++AM_CPPFLAGS += -DASN1_STATIC -I$(srcdir)/../minitasn1
+ endif
+ 
+ noinst_LTLIBRARIES = libgnutls_x509.la
+--- gnutls/tests/Makefile.am	2015-08-19 17:20:15.626316300 +0200
++++ gnutls/tests/Makefile.am.msvc	2015-08-19 15:14:01.663710300 +0200
+@@ -52,7 +52,7 @@
+ 	$(LIBSOCKET) $(INET_NTOP_LIB) $(INET_PTON_LIB)
+ 
+ if ENABLE_MINITASN1
+-AM_CPPFLAGS += -I$(srcdir)/../lib/minitasn1
++AM_CPPFLAGS += -DASN1_STATIC -I$(srcdir)/../lib/minitasn1
+ endif
+ 
+ noinst_LTLIBRARIES = libutils.la

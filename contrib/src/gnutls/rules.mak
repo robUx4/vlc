@@ -25,11 +25,17 @@ endif
 ifdef HAVE_ANDROID
 	$(APPLY) $(SRC)/gnutls/no-create-time-h.patch
 endif
-	$(APPLY) $(SRC)/gnutls/gnutls-no-egd.patch
+#	$(APPLY) $(SRC)/gnutls/gnutls-no-egd.patch
 	$(APPLY) $(SRC)/gnutls/read-file-limits.h.patch
 	$(APPLY) $(SRC)/gnutls/mac-keychain-lookup.patch
 ifdef HAVE_MACOSX
 	$(APPLY) $(SRC)/gnutls/gnutls-pkgconfig-osx.patch
+endif
+ifdef HAVE_WINRT
+	$(APPLY) $(SRC)/gnutls/winstore.patch
+endif
+ifdef HAVE_VISUALSTUDIO
+	$(APPLY) $(SRC)/gnutls/msvc.patch
 endif
 	$(call pkg_static,"lib/gnutls.pc.in")
 	$(UPDATE_AUTOCONFIG)
@@ -47,9 +53,14 @@ GNUTLS_CONF := \
 	--disable-guile \
 	--disable-nls \
 	--without-libintl-prefix \
+	--disable-doc \
+	--disable-tests \
 	$(HOSTCONF)
 
 DEPS_gnutls = nettle $(DEPS_nettle)
+ifdef HAVE_VISUALSTUDIO
+DEPS_gnutls += sys_param
+endif
 
 .gnutls: gnutls
 	$(RECONF)
