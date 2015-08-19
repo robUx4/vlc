@@ -1,0 +1,80 @@
+--- nettle/Makefile.in  2015-08-18 12:00:05.909922600 +0200
++++ nettle/Makefile.in.msvc     2015-08-18 09:41:16.909659200 +0200
+@@ -22,7 +22,7 @@
+
+ PRE_CPPFLAGS = -I.
+ # FIXME: Add configuration of LIBEXT?
+-LIBTARGETS = @IF_STATIC@ libnettle.a @IF_HOGWEED@ libhogweed.a
++LIBTARGETS = @IF_STATIC@ nettle.lib @IF_HOGWEED@ hogweed.lib
+ SHLIBTARGETS = @IF_SHARED@ $(LIBNETTLE_FORLINK) @IF_HOGWEED@ $(LIBHOGWEED_FORLINK)
+
+ getopt_SOURCES = getopt.c getopt1.c
+@@ -186,12 +186,12 @@
+ hogweed_OBJS = $(hogweed_SOURCES:.c=.$(OBJEXT)) $(OPT_ASM_SOURCES:.asm=.$(OBJEXT))
+ hogweed_PURE_OBJS = $(hogweed_OBJS:.$(OBJEXT)=.p$(OBJEXT))
+
+-libnettle.a: $(nettle_OBJS)
++nettle.lib: $(nettle_OBJS)
+        -rm -f $@
+        $(AR) $(ARFLAGS) $@ $(nettle_OBJS)
+        $(RANLIB) $@
+
+-libhogweed.a: $(hogweed_OBJS)
++hogweed.lib: $(hogweed_OBJS)
+        -rm -f $@
+        $(AR) $(ARFLAGS) $@ $(hogweed_OBJS)
+        $(RANLIB) $@
+
+--- nettle/examples/Makefile.in 2015-08-18 12:00:04.836152900 +0200
++++ nettle/examples/Makefile.in.msvc    2015-08-18 11:42:09.349194200 +0200
+@@ -117,8 +117,8 @@
+        -lhogweed -lnettle $(BENCH_LIBS) $(LIBS) $(OPENSSL_LIBFLAGS) \
+        -o hogweed-benchmark$(EXEEXT)
+
+-$(TARGETS) : io.$(OBJEXT) ../libnettle.a
+-$(HOGWEED_TARGETS): ../libhogweed.a
++$(TARGETS) : io.$(OBJEXT) ../nettle.lib
++$(HOGWEED_TARGETS): ../hogweed.lib
+
+ check: $(TS_ALL)
+        LD_LIBRARY_PATH=../.lib PATH="../.lib:$$PATH" srcdir="$(srcdir)" \
+
+--- nettle/testsuite/Makefile.in        2015-08-18 12:00:02.723660000 +0200
++++ nettle/testsuite/Makefile.in.msvc   2015-08-18 11:42:10.051678900 +0200
+@@ -96,7 +96,7 @@
+ include $(srcdir)/.test-rules.make
+
+ $(TARGETS) $(EXTRA_TARGETS): testutils.$(OBJEXT) ../nettle-internal.$(OBJEXT) \
+-       ../libnettle.a @IF_HOGWEED@ ../libhogweed.a
++       ../nettle.lib @IF_HOGWEED@ ../hogweed.lib
+
+ # For use as, e.g.,
+ #
+
+--- nettle/tools/Makefile.in    2015-08-18 12:00:03.807424900 +0200
++++ nettle/tools/Makefile.in.msvc       2015-08-18 11:42:10.609587000 +0200
+@@ -34,19 +34,19 @@
+ DISTFILES = $(SOURCES) Makefile.in input.h misc.h output.h parse.h
+
+ sexp_conv_OBJS = $(sexp_conv_SOURCES:.c=.$(OBJEXT)) $(getopt_OBJS)
+-sexp-conv$(EXEEXT): $(sexp_conv_OBJS) ../libnettle.a
++sexp-conv$(EXEEXT): $(sexp_conv_OBJS) ../nettle.lib
+        $(LINK) $(sexp_conv_OBJS) -lnettle $(LIBS) -o $@
+
+-nettle-lfib-stream$(EXEEXT): nettle-lfib-stream.$(OBJEXT) ../libnettle.a
++nettle-lfib-stream$(EXEEXT): nettle-lfib-stream.$(OBJEXT) ../nettle.lib
+        $(LINK) nettle-lfib-stream.$(OBJEXT) -lnettle $(LIBS) -o $@
+
+ pkcs1_conv_OBJS = $(pkcs1_conv_SOURCES:.c=.$(OBJEXT)) $(getopt_OBJS)
+-pkcs1-conv$(EXEEXT): $(pkcs1_conv_OBJS) ../libnettle.a ../libhogweed.a
++pkcs1-conv$(EXEEXT): $(pkcs1_conv_OBJS) ../nettle.lib ../hogweed.lib
+        $(LINK) $(pkcs1_conv_OBJS) -lhogweed -lnettle $(LIBS) -o $@
+
+ # FIXME: Avoid linking with gmp
+ nettle_hash_OBJS = $(nettle_hash_SOURCES:.c=.$(OBJEXT)) $(getopt_OBJS)
+-nettle-hash$(EXEEXT): $(nettle_hash_OBJS) ../libnettle.a
++nettle-hash$(EXEEXT): $(nettle_hash_OBJS) ../nettle.lib
+        $(LINK) $(nettle_hash_OBJS) -lnettle $(LIBS) -o $@
+
+
+
