@@ -14,7 +14,13 @@ gmp: gmp-$(GMP_VERSION).tar.bz2 .sum-gmp
 	$(APPLY) $(SRC)/gmp/clang.patch
 	$(MOVE)
 
+ifdef HAVE_VISUALSTUDIO
+ifeq ($(ARCH),arm)
+GMPCONF += --disable-assembly
+endif
+endif
+
 .gmp: gmp
-	cd $< && $(HOSTVARS) ./configure $(HOSTCONF)
+	cd $< && $(HOSTVARS) ./configure $(HOSTCONF) $(GMPCONF)
 	cd $< && $(MAKE) install
 	touch $@

@@ -105,7 +105,7 @@
  /* Special invocation convention.  */
  
 -#@INCLUDE_NEXT@ @NEXT_SYS_STAT_H@
-+#@INCLUDE_NEXT@ <../include/sys/stats.h>
++#@INCLUDE_NEXT@ <../include/sys/stat.h>
  
  #else
  /* Normal invocation convention.  */
@@ -114,7 +114,7 @@
  
  /* The include_next requires a split double-inclusion guard.  */
 -#@INCLUDE_NEXT@ @NEXT_SYS_STAT_H@
-+#@INCLUDE_NEXT@ <../include/sys/stats.h>
++#@INCLUDE_NEXT@ <../include/sys/stat.h>
  
  #ifndef _@GUARD_PREFIX@_SYS_STAT_H
  #define _@GUARD_PREFIX@_SYS_STAT_H
