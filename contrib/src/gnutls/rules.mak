@@ -70,6 +70,9 @@ DEPS_gnutls = nettle $(DEPS_nettle)
 ifdef HAVE_VISUALSTUDIO
 DEPS_gnutls += sys_param
 endif
+ifeq ($(ARCH),x86_64)
+GNUTLS_CONF += --disable-hardware-acceleration
+endif
 
 ifdef HAVE_ANDROID
 GNUTLS_ENV += gl_cv_header_working_stdint_h=yes
