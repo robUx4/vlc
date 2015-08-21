@@ -21,7 +21,16 @@ nettle: nettle-$(NETTLE_VERSION).tar.gz .sum-nettle
 
 DEPS_nettle = gmp $(DEPS_gmp)
 
+ifdef HAVE_VISUALSTUDIO
+ifeq ($(ARCH),arm)
+NETTLECONF += --disable-assembler
+endif
+ifeq ($(ARCH),x86_64)
+NETTLECONF += --disable-assembler
+endif
+endif
+
 .nettle: nettle
-	cd $< && $(HOSTVARS) ./configure $(HOSTCONF)
+	cd $< && $(HOSTVARS) ./configure $(HOSTCONF) $(NETTLECONF)
 	cd $< && $(MAKE) install
 	touch $@
