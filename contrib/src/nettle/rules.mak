@@ -22,7 +22,13 @@ endif
 
 DEPS_nettle = gmp $(DEPS_gmp)
 
+ifdef HAVE_VISUALSTUDIO
+ifeq ($(ARCH),arm)
+NETTLECONF += --disable-assembler
+endif
+endif
+
 .nettle: nettle
-	cd $< && $(HOSTVARS) ./configure $(HOSTCONF)
+	cd $< && $(HOSTVARS) ./configure $(HOSTCONF) $(NETTLECONF)
 	cd $< && $(MAKE) install
 	touch $@
