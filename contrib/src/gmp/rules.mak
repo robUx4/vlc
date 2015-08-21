@@ -26,7 +26,19 @@ gmp: gmp-$(GMP_VERSION).tar.bz2 .sum-gmp
 	$(APPLY) $(SRC)/gmp/ppc64.patch
 	$(MOVE)
 
+GMP_ENV := $(HOSTVARS)
+
+ifdef HAVE_VISUALSTUDIO
+ifeq ($(ARCH),arm)
+GMPCONF += --disable-assembly
+endif
+ifeq ($(ARCH),x86_64)
+GMPCONF += --disable-assembly
+GMP_ENV += gmp_asm_syntax_testing=no
+endif
+endif
+
 .gmp: gmp
-	cd $< && $(HOSTVARS) ./configure $(HOSTCONF) $(GMP_CONF)
+	cd $< && $(GMP_ENV) ./configure $(HOSTCONF) $(GMPCONF)
 	cd $< && $(MAKE) install
 	touch $@
