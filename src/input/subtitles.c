@@ -360,8 +360,16 @@ char **subtitles_Detect( input_thread_t *p_this, char *psz_path,
                 struct stat st;
                 char *path;
 
-                if( asprintf( &path, "%s"DIR_SEP"%s", psz_dir, psz_name ) < 0 )
-                    continue;
+                if( psz_dir[0] == '\0' ) {
+                    if( asprintf( &path, "%s", psz_name ) < 0 )
+                        continue;
+                } else if( psz_dir[strlen( psz_dir ) - 1] == DIR_SEP_CHAR ) {
+                    if( asprintf( &path, "%s%s", psz_dir, psz_name ) < 0 )
+                        continue;
+                } else {
+                    if( asprintf( &path, "%s"DIR_SEP"%s", psz_dir, psz_name ) < 0 )
+                        continue;
+                }
 
                 if( strcmp( path, psz_fname )
                  && vlc_stat( path, &st ) == 0
