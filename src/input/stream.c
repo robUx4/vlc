@@ -386,7 +386,7 @@ ssize_t stream_Peek(stream_t *s, const uint8_t **restrict bufp, size_t len)
         }
 
         ssize_t ret = s->pf_read(s, peek->p_buffer, len);
-        if (ret < 0)
+        if (ret <= 0)
         {
             block_Release(peek);
             return ret;
