@@ -516,7 +516,6 @@ static picture_pool_t *Pool(vout_display_t *vd, unsigned pool_size)
 
 #ifdef HAVE_ID3D11VIDEODECODER 
     picture_t**       pictures = NULL;
-    unsigned          picture_count = 0;
     HRESULT           hr;
 
     ID3D10Multithread *pMultithread;
@@ -584,7 +583,7 @@ static picture_pool_t *Pool(vout_display_t *vd, unsigned pool_size)
 
 error:
     if (vd->sys->pool ==NULL && pictures) {
-        for (unsigned i=0;i<picture_count; ++i)
+        for (unsigned i=0;i<surface_count; ++i)
             DestroyDisplayPoolPicture(pictures[i]);
         free(pictures);
     }
