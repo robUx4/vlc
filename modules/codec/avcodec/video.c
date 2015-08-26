@@ -695,20 +695,8 @@ static picture_t *DecodeVideo( decoder_t *p_dec, block_t **pp_block )
             p_block->i_dts = VLC_TS_INVALID;
         }
 
-#if VLC_WINSTORE_APP && LIBAVCODEC_VERSION_CHECK(56, 36, 0, 36, 100)
-        if (p_context->hwaccel_context && p_context->pix_fmt == AV_PIX_FMT_D3D11VA_VLD) {
-            struct AVD3D11VAContext *d3d11va = (struct AVD3D11VAContext*)p_context->hwaccel_context;
-            WaitForSingleObjectEx(d3d11va->context_mutex, INFINITE, FALSE);
-        }
-#endif
         i_used = avcodec_decode_video2( p_context, frame, &b_gotpicture,
                                         &pkt );
-#if VLC_WINSTORE_APP && LIBAVCODEC_VERSION_CHECK(56, 36, 0, 36, 100)
-        if (p_context->hwaccel_context && p_context->pix_fmt == AV_PIX_FMT_D3D11VA_VLD) {
-            struct AVD3D11VAContext *d3d11va = (struct AVD3D11VAContext*)p_context->hwaccel_context;
-            ReleaseMutex(d3d11va->context_mutex);
-        }
-#endif
         av_free_packet( &pkt );
 
         wait_mt( p_sys );
@@ -804,12 +792,6 @@ static picture_t *DecodeVideo( decoder_t *p_dec, block_t **pp_block )
         }
 
         picture_t *p_pic = frame->opaque;
-#if VLC_WINSTORE_APP && LIBAVCODEC_VERSION_CHECK(56, 36, 0, 36, 100)
-        if (p_context->hwaccel_context && p_context->pix_fmt == AV_PIX_FMT_D3D11VA_VLD) {
-            struct AVD3D11VAContext *d3d11va = (struct AVD3D11VAContext*)p_context->hwaccel_context;
-            WaitForSingleObjectEx(d3d11va->context_mutex, INFINITE, FALSE);
-        }
-#endif
         if( p_pic == NULL )
         {
             /* Get a new picture */
@@ -830,12 +812,6 @@ static picture_t *DecodeVideo( decoder_t *p_dec, block_t **pp_block )
                 vlc_va_Extract( p_sys->p_va, p_pic, frame->data[3] );
             picture_Hold( p_pic );
         }
-#if VLC_WINSTORE_APP && LIBAVCODEC_VERSION_CHECK(56, 36, 0, 36, 100)
-        if (p_context->hwaccel_context && p_context->pix_fmt == AV_PIX_FMT_D3D11VA_VLD) {
-            struct AVD3D11VAContext *d3d11va = (struct AVD3D11VAContext*)p_context->hwaccel_context;
-            ReleaseMutex(d3d11va->context_mutex);
-        }
-#endif
 
         if( !p_dec->fmt_in.video.i_sar_num || !p_dec->fmt_in.video.i_sar_den )
         {

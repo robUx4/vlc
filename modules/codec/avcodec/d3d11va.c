@@ -248,6 +248,7 @@ static int Extract(vlc_va_t *va, picture_t *output, uint8_t *data)
     vlc_va_sys_t *sys = va->sys;
     ID3D11VideoDecoderOutputView *src = (ID3D11VideoDecoderOutputView*)(uintptr_t)data;
     vlc_va_surface_t *surface = output->context;
+    int ret = VLC_SUCCESS;
 
     if (output->format.i_chroma == VLC_CODEC_D3D11_OPAQUE)
     {
@@ -257,6 +258,11 @@ static int Extract(vlc_va_t *va, picture_t *output, uint8_t *data)
         assert(p_sys_out->texture != NULL);
         assert(p_sys_in->decoder == src);
 
+#if VLC_WINSTORE_APP && LIBAVCODEC_VERSION_CHECK(56, 36, 0, 36, 100)
+        if( sys->context_mutex > 0 ) {
+            WaitForSingleObjectEx( sys->context_mutex, INFINITE, FALSE );
+        }
+#endif
         if (sys->d3dprocessor)
         {
             // extract the decoded video to a the output Texture
@@ -274,7 +280,8 @@ static int Extract(vlc_va_t *va, picture_t *output, uint8_t *data)
                 if (FAILED(hr))
                 {
                     msg_Err(va, "Failed to create the processor output. (hr=0x%lX)", hr);
-                    return VLC_EGENERIC;
+                    ret = VLC_EGENERIC;
+                    goto done;
                 }
             }
 
@@ -289,7 +296,8 @@ static int Extract(vlc_va_t *va, picture_t *output, uint8_t *data)
             if (FAILED(hr))
             {
                 msg_Err(va, "Failed to process the video. (hr=0x%lX)", hr);
-                return VLC_EGENERIC;
+                ret = VLC_EGENERIC;
+                goto done;
             }
         }
         else
@@ -311,8 +319,15 @@ static int Extract(vlc_va_t *va, picture_t *output, uint8_t *data)
         va->sys->filter->pf_video_filter( va->sys->filter, surface->p_pic );
     } else {
         msg_Err(va, "Unsupported output picture format %08X", output->format.i_chroma );
-        return VLC_EGENERIC;
+        ret = VLC_EGENERIC;
     }
+
+done:
+#if VLC_WINSTORE_APP && LIBAVCODEC_VERSION_CHECK(56, 36, 0, 36, 100)
+    if( sys->context_mutex > 0 ) {
+        ReleaseMutex( sys->context_mutex );
+    }
+#endif
 
     return VLC_SUCCESS;
 }
