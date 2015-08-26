@@ -725,7 +725,10 @@ static void Manage(vout_display_t *vd)
         RECTHeight(size_before) != RECTHeight(sys->rect_dest_clipped))
     {
 #if defined(HAVE_ID3D11VIDEODECODER) && VLC_WINSTORE_APP
-        WaitForSingleObjectEx(sys->context_lock, INFINITE, FALSE);
+        if( sys->context_lock > 0 )
+        {
+            WaitForSingleObjectEx( sys->context_lock, INFINITE, FALSE );
+        }
 #endif
         msg_Dbg(vd, "Manage detected size change %dx%d", RECTWidth(sys->rect_dest_clipped),
                 RECTHeight(sys->rect_dest_clipped));
@@ -734,7 +737,10 @@ static void Manage(vout_display_t *vd)
 
         UpdatePicQuadPosition(vd);
 #if defined(HAVE_ID3D11VIDEODECODER) && VLC_WINSTORE_APP
-        ReleaseMutex(sys->context_lock);
+        if( sys->context_lock > 0 )
+        {
+            ReleaseMutex( sys->context_lock );
+        }
 #endif
     }
 }
@@ -746,7 +752,10 @@ static void Prepare(vout_display_t *vd, picture_t *picture, subpicture_t *subpic
 #ifdef HAVE_ID3D11VIDEODECODER 
     if (picture->format.i_chroma == VLC_CODEC_D3D11_OPAQUE) {
 #if VLC_WINSTORE_APP
-        WaitForSingleObjectEx(sys->context_lock, INFINITE, FALSE);
+        if( sys->context_lock > 0 )
+        {
+            WaitForSingleObjectEx( sys->context_lock, INFINITE, FALSE );
+        }
 #endif
         D3D11_BOX box;
         box.left = 0;
@@ -820,8 +829,9 @@ static void Display(vout_display_t *vd, picture_t *picture, subpicture_t *subpic
         /* TODO device lost */
     }
 #if defined(HAVE_ID3D11VIDEODECODER) && VLC_WINSTORE_APP
-    if (picture->format.i_chroma == VLC_CODEC_D3D11_OPAQUE)
-        ReleaseMutex(sys->context_lock);
+    if( picture->format.i_chroma == VLC_CODEC_D3D11_OPAQUE && sys->context_lock > 0) {
+        ReleaseMutex( sys->context_lock );
+    }
 #endif
 
     picture_Release(picture);
@@ -1120,18 +1130,27 @@ static int Direct3D11Open(vout_display_t *vd, video_format_t *fmt)
     UpdateRects(vd, NULL, NULL, true);
 
 #if defined(HAVE_ID3D11VIDEODECODER) && VLC_WINSTORE_APP
-    WaitForSingleObjectEx(sys->context_lock, INFINITE, FALSE);
+    if( sys->context_lock > 0 )
+    {
+        WaitForSingleObjectEx( sys->context_lock, INFINITE, FALSE );
+    }
 #endif
     if (Direct3D11CreateResources(vd, fmt)) {
 #if defined(HAVE_ID3D11VIDEODECODER) && VLC_WINSTORE_APP
-        ReleaseMutex(sys->context_lock);
+        if( sys->context_lock > 0 )
+        {
+            ReleaseMutex( sys->context_lock );
+        }
 #endif
         msg_Err(vd, "Failed to allocate resources");
         Direct3D11DestroyResources(vd);
         return VLC_EGENERIC;
     }
 #if defined(HAVE_ID3D11VIDEODECODER) && VLC_WINSTORE_APP
-    ReleaseMutex(sys->context_lock);
+    if( sys->context_lock > 0 )
+    {
+        ReleaseMutex( sys->context_lock );
+    }
 #endif
 
 #if !VLC_WINSTORE_APP
@@ -1575,8 +1594,10 @@ static void Direct3D11DestroyResources(vout_display_t *vd)
     if (sys->pSPUPixelShader)
         ID3D11VertexShader_Release(sys->pSPUPixelShader);
 #if defined(HAVE_ID3D11VIDEODECODER) && VLC_WINSTORE_APP
-    if (sys->context_lock>0)
-        CloseHandle(sys->context_lock);
+    if( sys->context_lock > 0 )
+    {
+        CloseHandle( sys->context_lock );
+    }
 #endif
 
     msg_Dbg(vd, "Direct3D11 resources destroyed");
