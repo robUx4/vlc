@@ -490,6 +490,10 @@ VLC_API bool video_format_IsSimilar( const video_format_t *, const video_format_
 VLC_API void video_format_Print( vlc_object_t *, const char *, const video_format_t * );
 
 
+#ifdef _MSC_VER
+#pragma warning(push)
+#pragma warning(disable:4061)    /* not explicitly handled by a case label */
+#endif /* _MSV_VER */
 static inline video_transform_t transform_Inverse( video_transform_t transform )
 {
     switch ( transform ) {
@@ -501,6 +505,9 @@ static inline video_transform_t transform_Inverse( video_transform_t transform )
             return transform;
     }
 }
+#ifdef _MSC_VER
+#pragma warning(pop)
+#endif /* _MSV_VER */
 /**
  * subtitles format description
  */
