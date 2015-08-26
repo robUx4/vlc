@@ -25,6 +25,8 @@
 # include "config.h"
 #endif
 
+#define DEBUG_CONTEXT_LOCK 0
+
 #if _WIN32_WINNT < 0x0600
 /* for CreateMutexEx */
 #undef _WIN32_WINNT
@@ -727,7 +729,13 @@ static void Manage(vout_display_t *vd)
 #if defined(HAVE_ID3D11VIDEODECODER) && VLC_WINSTORE_APP
         if( sys->context_lock > 0 )
         {
+#if DEBUG_CONTEXT_LOCK
+            msg_Dbg( vd, "%d Manage locking mutex %04x", GetCurrentThreadId(), sys->context_lock );
+#endif /* DEBUG_CONTEXT_LOCK */
             WaitForSingleObjectEx( sys->context_lock, INFINITE, FALSE );
+#if DEBUG_CONTEXT_LOCK
+            msg_Dbg( vd, "%d  locked %04x", GetCurrentThreadId(), sys->context_lock );
+#endif /* DEBUG_CONTEXT_LOCK */
         }
 #endif
         msg_Dbg(vd, "Manage detected size change %dx%d", RECTWidth(sys->rect_dest_clipped),
@@ -740,6 +748,9 @@ static void Manage(vout_display_t *vd)
         if( sys->context_lock > 0 )
         {
             ReleaseMutex( sys->context_lock );
+#if DEBUG_CONTEXT_LOCK
+            msg_Dbg( vd, L"%d Manage unlocked mutex %04x", GetCurrentThreadId(), sys->context_lock );
+#endif /* DEBUG_CONTEXT_LOCK */
         }
 #endif
     }
@@ -754,7 +765,13 @@ static void Prepare(vout_display_t *vd, picture_t *picture, subpicture_t *subpic
 #if VLC_WINSTORE_APP
         if( sys->context_lock > 0 )
         {
+#if DEBUG_CONTEXT_LOCK
+            msg_Dbg( vd, "%d Prepare locking %04x", GetCurrentThreadId(), sys->context_lock );
+#endif /* DEBUG_CONTEXT_LOCK */
             WaitForSingleObjectEx( sys->context_lock, INFINITE, FALSE );
+#if DEBUG_CONTEXT_LOCK
+            msg_Dbg( vd, "%d  locked %04x", GetCurrentThreadId(), sys->context_lock );
+#endif /* DEBUG_CONTEXT_LOCK */
         }
 #endif
         D3D11_BOX box;
@@ -831,6 +848,9 @@ static void Display(vout_display_t *vd, picture_t *picture, subpicture_t *subpic
 #if defined(HAVE_ID3D11VIDEODECODER) && VLC_WINSTORE_APP
     if( picture->format.i_chroma == VLC_CODEC_D3D11_OPAQUE && sys->context_lock > 0) {
         ReleaseMutex( sys->context_lock );
+#if DEBUG_CONTEXT_LOCK
+        msg_Dbg( vd, "%d Display unlocked %04x", GetCurrentThreadId(), sys->context_lock );
+#endif /* DEBUG_CONTEXT_LOCK */
     }
 #endif
 
@@ -1132,7 +1152,13 @@ static int Direct3D11Open(vout_display_t *vd, video_format_t *fmt)
 #if defined(HAVE_ID3D11VIDEODECODER) && VLC_WINSTORE_APP
     if( sys->context_lock > 0 )
     {
+#if DEBUG_CONTEXT_LOCK
+        msg_Dbg( vd, "%d Direct3D11Open locking %04x", GetCurrentThreadId(), sys->context_lock );
+#endif /* DEBUG_CONTEXT_LOCK */
         WaitForSingleObjectEx( sys->context_lock, INFINITE, FALSE );
+#if DEBUG_CONTEXT_LOCK
+        msg_Dbg( vd, "%d locked %04x", GetCurrentThreadId(), sys->context_lock );
+#endif /* DEBUG_CONTEXT_LOCK */
     }
 #endif
     if (Direct3D11CreateResources(vd, fmt)) {
@@ -1140,6 +1166,9 @@ static int Direct3D11Open(vout_display_t *vd, video_format_t *fmt)
         if( sys->context_lock > 0 )
         {
             ReleaseMutex( sys->context_lock );
+#if DEBUG_CONTEXT_LOCK
+            msg_Dbg( vd, "%d Direct3D11Open error, unlocked %04x", GetCurrentThreadId(), sys->context_lock );
+#endif /* DEBUG_CONTEXT_LOCK */
         }
 #endif
         msg_Err(vd, "Failed to allocate resources");
@@ -1150,6 +1179,9 @@ static int Direct3D11Open(vout_display_t *vd, video_format_t *fmt)
     if( sys->context_lock > 0 )
     {
         ReleaseMutex( sys->context_lock );
+#if DEBUG_CONTEXT_LOCK
+        msg_Dbg( vd, "%d Direct3D11Open ok, unlocked %04x", GetCurrentThreadId(), sys->context_lock );
+#endif /* DEBUG_CONTEXT_LOCK */
     }
 #endif
 
@@ -1601,6 +1633,9 @@ static void Direct3D11DestroyResources(vout_display_t *vd)
 #if defined(HAVE_ID3D11VIDEODECODER) && VLC_WINSTORE_APP
     if( sys->context_lock > 0 )
     {
+#if DEBUG_CONTEXT_LOCK
+        msg_Dbg( vd, "%d Destroying %04x", GetCurrentThreadId(), sys->context_lock );
+#endif /* DEBUG_CONTEXT_LOCK */
         CloseHandle( sys->context_lock );
     }
 #endif

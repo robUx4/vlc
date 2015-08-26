@@ -32,6 +32,8 @@
 # include "config.h"
 #endif
 
+#define DEBUG_CONTEXT_LOCK 0
+
 # undef WINAPI_FAMILY
 # define WINAPI_FAMILY WINAPI_FAMILY_DESKTOP_APP
 
@@ -260,7 +262,13 @@ static int Extract(vlc_va_t *va, picture_t *output, uint8_t *data)
 
 #if VLC_WINSTORE_APP && LIBAVCODEC_VERSION_CHECK(56, 36, 0, 36, 100)
         if( sys->context_mutex > 0 ) {
+#if DEBUG_CONTEXT_LOCK
+            msg_Dbg( va, "%d Extract locking %04x", GetCurrentThreadId(), sys->context_mutex );
+#endif /* DEBUG_CONTEXT_LOCK */
             WaitForSingleObjectEx( sys->context_mutex, INFINITE, FALSE );
+#if DEBUG_CONTEXT_LOCK
+            msg_Dbg( va, "%d  locked %04x", GetCurrentThreadId(), sys->context_mutex );
+#endif /* DEBUG_CONTEXT_LOCK */
         }
 #endif
         if (sys->d3dprocessor)
@@ -326,6 +334,9 @@ done:
 #if VLC_WINSTORE_APP && LIBAVCODEC_VERSION_CHECK(56, 36, 0, 36, 100)
     if( sys->context_mutex > 0 ) {
         ReleaseMutex( sys->context_mutex );
+#if DEBUG_CONTEXT_LOCK
+        msg_Dbg( va, "%d Extract unlocked %04x", GetCurrentThreadId(), sys->context_mutex );
+#endif /* DEBUG_CONTEXT_LOCK */
     }
 #endif
 
