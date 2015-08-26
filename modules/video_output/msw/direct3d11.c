@@ -550,7 +550,7 @@ static picture_pool_t *Pool(vout_display_t *vd, unsigned pool_size)
 
         hr = ID3D11Device_CreateTexture2D( vd->sys->d3ddevice, &texDesc, NULL, &picsys->texture );
         if (FAILED(hr)) {
-            msg_Err(vd, "CreateTexture2D %d failed. (hr=0x%0lx)", pool_size, hr);
+            msg_Err(vd, "CreateTexture2D %d failed on picture %d of the pool. (hr=0x%0lx)", pool_size, surface_count, hr);
             goto error;
         }
 
@@ -564,6 +564,7 @@ static picture_pool_t *Pool(vout_display_t *vd, unsigned pool_size)
         picture_t *picture = picture_NewFromResource(&vd->fmt, &resource);
         if (unlikely(picture == NULL)) {
             free(picsys);
+            msg_Err( vd, "Failed to create picture %d in the pool.", surface_count );
             goto error;
         }
 
@@ -582,10 +583,17 @@ static picture_pool_t *Pool(vout_display_t *vd, unsigned pool_size)
     vd->sys->pool = picture_pool_NewExtended( &pool_cfg );
 
 error:
-    if (vd->sys->pool ==NULL && pictures) {
+    if (vd->sys->pool == NULL && pictures) {
         for (unsigned i=0;i<surface_count; ++i)
             DestroyDisplayPoolPicture(pictures[i]);
         free(pictures);
+
+        /* create an empty pool to avoid crashing */
+        picture_pool_configuration_t pool_cfg;
+        memset( &pool_cfg, 0, sizeof( pool_cfg ) );
+        pool_cfg.picture_count = 0;
+
+        vd->sys->pool = picture_pool_NewExtended( &pool_cfg );
     }
 #endif
     return vd->sys->pool;
