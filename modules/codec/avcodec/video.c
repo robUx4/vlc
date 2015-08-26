@@ -457,11 +457,6 @@ int InitVideoDec( decoder_t *p_dec, AVCodecContext *p_context,
             break;
     }
 
-#if VLC_WINSTORE_APP
-    // not supported until DeviceContext accesses are thread safe
-    p_context->thread_type = 0;
-#endif
-
     if( p_context->thread_type & FF_THREAD_FRAME )
         p_dec->i_extra_picture_buffers = 2 * p_context->thread_count;
 #endif
