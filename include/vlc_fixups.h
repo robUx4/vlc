@@ -227,7 +227,14 @@ int timespec_get(struct timespec *, int);
 
 /* sys/time.h */
 #ifndef HAVE_GETTIMEOFDAY
+#ifdef _MSC_VER
+#pragma warning(push)
+#pragma warning(disable:4115) /* named type definition in parentheses */
+#endif /* _MSC_VER */
 int gettimeofday(struct timeval *, struct timezone *);
+#ifdef _MSC_VER
+#pragma warning(pop)
+#endif /* _MSC_VER */
 #endif
 
 /* unistd.h */
