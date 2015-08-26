@@ -31,6 +31,10 @@ FFMPEGCONF = \
 	--disable-bzlib \
 	--disable-avresample
 
+ifeq ($(VLC_CONFIGURATION),Debug)
+FFMPEGCONF += --enable-debug
+endif
+
 ifdef USE_FFMPEG
 FFMPEGCONF += \
 	--disable-swresample \
