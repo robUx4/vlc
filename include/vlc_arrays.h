@@ -291,6 +291,10 @@ static inline ssize_t vlc_array_index_of_item( const vlc_array_t *ar,
 }
 
 /* Write */
+#ifdef _MSC_VER
+#pragma warning(push)
+#pragma warning(disable:4127)
+#endif
 static inline void vlc_array_insert( vlc_array_t *ar, void *elem, int idx )
 {
     void **pp = (void **)realloc( ar->pp_elems,
@@ -306,6 +310,9 @@ static inline void vlc_array_insert( vlc_array_t *ar, void *elem, int idx )
     ar->i_count++;
     ar->pp_elems = pp;
 }
+#ifdef _MSC_VER
+#pragma warning(pop)
+#endif
 
 static inline void vlc_array_append( vlc_array_t *ar, void *elem )
 {
