@@ -334,11 +334,18 @@ vlc_array_index_of_item( vlc_array_t * p_array, void * item )
 }
 
 /* Write */
+#ifdef _MSC_VER
+#pragma warning(push)
+#pragma warning(disable:4127)
+#endif
 static inline void
 vlc_array_insert( vlc_array_t * p_array, void * p_elem, int i_index )
 {
     TAB_INSERT_CAST( (void **), p_array->i_count, p_array->pp_elems, p_elem, i_index );
 }
+#ifdef _MSC_VER
+#pragma warning(pop)
+#endif
 
 static inline void
 vlc_array_append( vlc_array_t * p_array, void * p_elem )
