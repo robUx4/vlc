@@ -529,7 +529,7 @@ VLC_USED
 static inline uint8_t clip_uint8_vlc( int32_t a )
 {
     if( a&(~255) ) return (-a)>>31;
-    else           return a;
+    else           return (uint8_t) a;
 }
 
 /** Count leading zeroes */
