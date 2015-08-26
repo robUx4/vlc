@@ -1,0 +1,73 @@
+--- ffmpeg/libavcodec/dxva2.c	2015-08-17 11:05:01.329763300 +0200
++++ ffmpeg/libavcodec/dxva2.c.log	2015-08-26 14:51:50.652477500 +0200
+@@ -30,6 +30,8 @@
+ #include "mpegvideo.h"
+ #include "dxva2_internal.h"
+ 
++#define DEBUG_CONTEXT_LOCK 0
++
+ void *ff_dxva2_get_surface(const AVFrame *frame)
+ {
+     return frame->data[3];
+@@ -123,6 +125,18 @@
+     return result;
+ }
+ 
++#if DEBUG_CONTEXT_LOCK
++static void Debug(const wchar_t *fmt, ...)
++{
++    wchar_t buf[255];
++    va_list args;
++    va_start(args, fmt);
++    vswprintf_s(buf, 255, fmt, args);
++    va_end(args);
++    OutputDebugStringW(buf);
++}
++#endif /* DEBUG_CONTEXT_LOCK */
++
+ int ff_dxva2_common_end_frame(AVCodecContext *avctx, AVFrame *frame,
+                               const void *pp, unsigned pp_size,
+                               const void *qm, unsigned qm_size,
+@@ -147,7 +161,15 @@
+ #if CONFIG_D3D11VA
+         if (avctx->pix_fmt == AV_PIX_FMT_D3D11VA_VLD) {
+             if (D3D11VA_CONTEXT(ctx)->context_mutex != INVALID_HANDLE_VALUE)
+-                WaitForSingleObjectEx(D3D11VA_CONTEXT(ctx)->context_mutex, INFINITE, FALSE);
++            {
++#if DEBUG_CONTEXT_LOCK
++                Debug(L"%d common_end_frame locking %04x\n", GetCurrentThreadId(), D3D11VA_CONTEXT(ctx)->context_mutex);
++#endif /* DEBUG_CONTEXT_LOCK */
++                WaitForSingleObjectEx(D3D11VA_CONTEXT(ctx)->context_mutex, INFINITE, FALSE); 
++#if DEBUG_CONTEXT_LOCK
++                Debug( L"%d  locked %04x\n", GetCurrentThreadId(), D3D11VA_CONTEXT( ctx )->context_mutex );
++#endif /* DEBUG_CONTEXT_LOCK */
++            }
+             hr = ID3D11VideoContext_DecoderBeginFrame(D3D11VA_CONTEXT(ctx)->video_context, D3D11VA_CONTEXT(ctx)->decoder,
+                                                       ff_dxva2_get_surface(frame),
+                                                       0, NULL);
+@@ -168,7 +190,12 @@
+ #if CONFIG_D3D11VA
+         if (avctx->pix_fmt == AV_PIX_FMT_D3D11VA_VLD)
+             if (D3D11VA_CONTEXT(ctx)->context_mutex != INVALID_HANDLE_VALUE)
++            {
++#if DEBUG_CONTEXT_LOCK
++                Debug(L"%d common_end_frame error, unlocking %04x\n", GetCurrentThreadId(), D3D11VA_CONTEXT(ctx)->context_mutex);
++#endif /* DEBUG_CONTEXT_LOCK */
+                 ReleaseMutex(D3D11VA_CONTEXT(ctx)->context_mutex);
++            }
+ #endif
+         return -1;
+     }
+@@ -272,7 +299,12 @@
+     if (avctx->pix_fmt == AV_PIX_FMT_D3D11VA_VLD) {
+         hr = ID3D11VideoContext_DecoderEndFrame(D3D11VA_CONTEXT(ctx)->video_context, D3D11VA_CONTEXT(ctx)->decoder);
+         if (D3D11VA_CONTEXT(ctx)->context_mutex != INVALID_HANDLE_VALUE)
++        {
++#if DEBUG_CONTEXT_LOCK
++            Debug(L"%d common_end_frame done, unlocking %04x\n", GetCurrentThreadId(), D3D11VA_CONTEXT(ctx)->context_mutex);
++#endif /* DEBUG_CONTEXT_LOCK */
+             ReleaseMutex(D3D11VA_CONTEXT(ctx)->context_mutex);
++        }
+     }
+ #endif
+ #if CONFIG_DXVA2
