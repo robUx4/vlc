@@ -25,7 +25,7 @@
 # include "config.h"
 #endif
 
-#define DEBUG_CONTEXT_LOCK 0
+#define DEBUG_CONTEXT_LOCK  defined(_DEBUG) && 0
 
 #if _WIN32_WINNT < 0x0600
 /* for CreateMutexEx */
