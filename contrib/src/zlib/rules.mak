@@ -37,13 +37,14 @@ zlib: zlib-$(ZLIB_VERSION).tar.gz .sum-zlib
 	$(MOVE)
 
 .zlib: zlib toolchain.cmake
+	cd $< && $(HOSTVARS) $(ZLIB_CONFIG_VARS) CFLAGS="$(CFLAGS) $(ZLIB_ECFLAGS)" ./configure --prefix=$(PREFIX) --static
 ifdef HAVE_VISUALSTUDIO
 	cd $< && $(HOSTVARS_CMAKE) $(CMAKE) -DSHARED=OFF .
 	cd $< && msbuild.exe -p:Configuration=$(VLC_CONFIGURATION) -m -nologo INSTALL.vcxproj
 	cd $< && cp "$(PREFIX)/lib/$(STATIC_LIB).lib" "$(PREFIX)/lib/z.lib"
+	cd $< && cp "zlib.pc" "$(PREFIX)/lib/pkgconfig/zlib.pc"
 	cd $< && rm "$(PREFIX)/lib/$(DYNAMIC_LIB).lib"
 else
-	cd $< && $(HOSTVARS) $(ZLIB_CONFIG_VARS) CFLAGS="$(CFLAGS) $(ZLIB_ECFLAGS)" ./configure --prefix=$(PREFIX) --static
 	cd $< && $(MAKE) install
 endif
 	touch $@
