@@ -575,6 +575,9 @@ int vlc_clone (vlc_thread_t *p_handle, void *(*entry) (void *),
 
 void vlc_join (vlc_thread_t th, void **result)
 {
+#if VLC_WINSTORE_APP
+    vlc_cancel( th );
+#endif
     do
         vlc_testcancel ();
     while (vlc_WaitForSingleObject (th->id, INFINITE) == WAIT_IO_COMPLETION);
@@ -583,9 +586,6 @@ void vlc_join (vlc_thread_t th, void **result)
         *result = th->data;
 #if VLC_WINSTORE_APP
     CloseHandle(th->wakeUp);
-#endif
-#if VLC_WINSTORE_APP
-    s_condvars[th->uid].p_wake_up = NULL;
 #endif
     CloseHandle (th->id);
     free (th);
