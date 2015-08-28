@@ -516,6 +516,7 @@ static picture_pool_t *Pool(vout_display_t *vd, unsigned pool_size)
 
 #ifdef HAVE_ID3D11VIDEODECODER 
     picture_t**       pictures = NULL;
+    unsigned          picture_count = 0;
     HRESULT           hr;
 
     ID3D10Multithread *pMultithread;
@@ -542,15 +543,14 @@ static picture_pool_t *Pool(vout_display_t *vd, unsigned pool_size)
     texDesc.BindFlags = D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE;
     texDesc.CPUAccessFlags = 0;
 
-    unsigned surface_count;
-    for (surface_count = 0; surface_count < pool_size; surface_count++) {
+    for (picture_count = 0; picture_count < pool_size; picture_count++) {
         picture_sys_t *picsys = calloc(1, sizeof(*picsys));
         if (unlikely(picsys == NULL))
             goto error;
 
         hr = ID3D11Device_CreateTexture2D( vd->sys->d3ddevice, &texDesc, NULL, &picsys->texture );
         if (FAILED(hr)) {
-            msg_Err(vd, "CreateTexture2D %d failed on picture %d of the pool. (hr=0x%0lx)", pool_size, surface_count, hr);
+            msg_Err(vd, "CreateTexture2D %d failed on picture %d of the pool. (hr=0x%0lx)", pool_size, picture_count, hr);
             goto error;
         }
 
@@ -564,11 +564,11 @@ static picture_pool_t *Pool(vout_display_t *vd, unsigned pool_size)
         picture_t *picture = picture_NewFromResource(&vd->fmt, &resource);
         if (unlikely(picture == NULL)) {
             free(picsys);
-            msg_Err( vd, "Failed to create picture %d in the pool.", surface_count );
+            msg_Err( vd, "Failed to create picture %d in the pool.", picture_count );
             goto error;
         }
 
-        pictures[surface_count] = picture;
+        pictures[picture_count] = picture;
         /* each picture_t holds a ref to the context and release it on Destroy */
         ID3D11DeviceContext_AddRef(picsys->context);
     }
@@ -584,7 +584,7 @@ static picture_pool_t *Pool(vout_display_t *vd, unsigned pool_size)
 
 error:
     if (vd->sys->pool == NULL && pictures) {
-        for (unsigned i=0;i<surface_count; ++i)
+        for (unsigned i=0;i<picture_count; ++i)
             DestroyDisplayPoolPicture(pictures[i]);
         free(pictures);
 
