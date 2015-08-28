@@ -121,8 +121,8 @@ typedef struct d3d_vertex_t {
     FLOAT       opacity;
 } d3d_vertex_t;
 
-#define RECTWidth(r)   (int)(r.right - r.left)
-#define RECTHeight(r)  (int)(r.bottom - r.top)
+#define RECTWidth(r)   (int)((r).right - (r).left)
+#define RECTHeight(r)  (int)((r).bottom - (r).top)
 
 static int  Open(vlc_object_t *);
 static void Close(vlc_object_t *object);
@@ -1837,15 +1837,14 @@ static int Direct3D11MapSubpicture(vout_display_t *vd, int *subpicture_region_co
         dst.bottom = dst.top  + scale_h * r->fmt.i_visible_height;
 
         float opacity = (float)r->i_alpha / 255.0f;
-
+        const RECT *p_viewport;
 #if VLC_WINSTORE_APP
-        UpdateQuadPosition(vd, (d3d_quad_t *)quad_picture->p_sys, &dst,
-                           sys->rect_display.right - sys->rect_display.left,
-                           sys->rect_display.bottom - sys->rect_display.top, opacity);
+        p_viewport = &sys->rect_display;
 #else
-        UpdateQuadPosition(vd, (d3d_quad_t *)quad_picture->p_sys, &dst,
-                           video.right - video.left, video.bottom - video.top, opacity);
+        p_viewport = &video;
 #endif
+        UpdateQuadPosition( vd, (d3d_quad_t *) quad_picture->p_sys, &dst,
+            RECTWidth( *p_viewport ), RECTHeight( *p_viewport ), opacity );
     }
     return VLC_SUCCESS;
 }
