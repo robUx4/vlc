@@ -50,6 +50,7 @@ static DWORD thread_key;
 struct {
     const HANDLE *p_wake_up;
     vlc_mutex_t  mutex;
+    bool         b_ended;
 } s_condvars[MAX_SIMULTANEOUS_THREADS];
 static int s_nbthreads;
 #endif
@@ -76,19 +77,31 @@ struct vlc_thread
 
 /*** Common helpers ***/
 #if VLC_WINSTORE_APP
-static bool isCancelled(void);
+static bool isCurrentCancelled(void);
 #endif
 
-static DWORD vlc_WaitForSingleObject (HANDLE handle, DWORD delay)
+static DWORD vlc_WaitForSingleObjectEx( HANDLE handle, DWORD delay, struct vlc_thread *p_th )
 {
     DWORD ret;
 #if VLC_WINSTORE_APP
+    bool b_canceled = isCurrentCancelled();
+    if( !b_canceled && p_th != NULL )
+    {
+        vlc_mutex_lock( &s_condvars[p_th->uid].mutex );
+        b_canceled = s_condvars[p_th->uid].b_ended;
+        vlc_mutex_unlock( &s_condvars[p_th->uid].mutex );
+    }
+
+    if ( b_canceled )
+        return WAIT_OBJECT_0;
+
     HANDLE wakeUp = NULL;
     struct vlc_thread *th = TlsGetValue(thread_key);
     if (th != NULL)
     {
         wakeUp = th->wakeUp;
         vlc_mutex_lock(&s_condvars[th->uid].mutex);
+        assert( s_condvars[th->uid].p_wake_up == NULL );
         s_condvars[th->uid].p_wake_up = wakeUp;
         mutex_cleanup_push(&s_condvars[th->uid].mutex);
         vlc_testcancel();
@@ -96,24 +109,75 @@ static DWORD vlc_WaitForSingleObject (HANDLE handle, DWORD delay)
         vlc_mutex_unlock(&s_condvars[th->uid].mutex);
     }
 
-    if (wakeUp == NULL)
-        ret = WaitForSingleObjectEx(handle, delay, TRUE);
+    if( wakeUp == NULL )
+    {
+        if( delay != INFINITE )
+            ret = WaitForSingleObjectEx( handle, delay, TRUE );
+        else
+        {
+            if( p_th != NULL )
+            {
+                int loop_count = 0;
+                do {
+                    DWORD new_delay = 50;
+                    if( new_delay > delay )
+                        new_delay = delay;
+                    ret = WaitForSingleObjectEx( handle, new_delay, TRUE );
+                    if( isCurrentCancelled() )
+                        ret = WAIT_IO_COMPLETION;
+                    else if( p_th != NULL )
+                    {
+                        vlc_mutex_lock( &s_condvars[p_th->uid].mutex );
+                        if( s_condvars[p_th->uid].b_ended )
+                            ret = WAIT_OBJECT_0;
+                        vlc_mutex_unlock( &s_condvars[p_th->uid].mutex );
+                    }
+                    if( delay != INFINITE )
+                        delay -= new_delay;
+                    if( ++loop_count == 100 )
+                    {
+                        ret = WAIT_OBJECT_0;
+                    }
+                } while( delay && ret == WAIT_TIMEOUT );
+            }
+            else {
+                int loop_count = 0;
+                do {
+                    DWORD new_delay = 50;
+                    if( new_delay > delay )
+                        new_delay = delay;
+                    ret = WaitForSingleObjectEx( handle, new_delay, TRUE );
+                    if( delay != INFINITE )
+                        delay -= new_delay;
+                    if( isCurrentCancelled() )
+                        ret = WAIT_IO_COMPLETION;
+                    if( ++loop_count == 100 )
+                    {
+                        ret = WAIT_OBJECT_0;
+                    }
+                } while( delay && ret == WAIT_TIMEOUT );
+            }
+        }
+    }
     else
     {
         HANDLE handles[2] = { handle, wakeUp };
-        ret = WaitForMultipleObjectsEx(2, handles, FALSE, delay, TRUE);
-        if (ret == WAIT_OBJECT_0 + 1)
+        ret = WaitForMultipleObjectsEx( 2, handles, FALSE, delay, TRUE );
+        if( ret == WAIT_OBJECT_0 + 1 )
+        {
             ret = WAIT_TIMEOUT;
+            b_canceled = true;
+        }
     }
 
-    if (th != NULL && likely(wakeUp != NULL))
+    if( likely( wakeUp != NULL ) && !b_canceled )
     {
         vlc_mutex_lock(&s_condvars[th->uid].mutex);
         s_condvars[th->uid].p_wake_up = NULL;
         vlc_mutex_unlock(&s_condvars[th->uid].mutex);
     }
 
-    if (ret == WAIT_TIMEOUT && isCancelled())
+    if (ret == WAIT_TIMEOUT && isCurrentCancelled())
         ret = WAIT_IO_COMPLETION;
 #else
     ret = WaitForSingleObjectEx (handle, delay, TRUE);
@@ -127,6 +191,11 @@ static DWORD vlc_WaitForSingleObject (HANDLE handle, DWORD delay)
     return ret;
 }
 
+static DWORD vlc_WaitForSingleObject( HANDLE handle, DWORD delay )
+{
+    return vlc_WaitForSingleObjectEx( handle, delay, NULL );
+}
+
 static DWORD vlc_Sleep (DWORD delay)
 {
     DWORD ret;
@@ -138,7 +207,7 @@ static DWORD vlc_Sleep (DWORD delay)
         ret = SleepEx (new_delay, TRUE);
         if (delay != INFINITE)
             delay -= new_delay;
-        if (isCancelled())
+        if (isCurrentCancelled())
             ret = WAIT_IO_COMPLETION;
     } while (delay && ret == 0);
 #else
@@ -484,7 +553,7 @@ retry:
 }
 
 #if VLC_WINSTORE_APP
-static bool isCancelled(void)
+static bool isCurrentCancelled( void )
 {
     struct vlc_thread *th = TlsGetValue(thread_key);
     if (th == NULL)
@@ -498,16 +567,28 @@ static unsigned __stdcall vlc_entry (void *p)
 {
     struct vlc_thread *th = p;
 
+#if VLC_WINSTORE_APP
+    assert( th->uid < MAX_SIMULTANEOUS_THREADS );
+    vlc_mutex_lock( &s_condvars[th->uid].mutex );
+    s_condvars[th->uid].b_ended = false;
+    vlc_mutex_unlock( &s_condvars[th->uid].mutex );
+#endif
+
     TlsSetValue(thread_key, th);
     th->killable = true;
     th->data = th->entry (th->data);
     TlsSetValue(thread_key, NULL);
 
 #if VLC_WINSTORE_APP
+    vlc_mutex_lock( &s_condvars[th->uid].mutex );
+    s_condvars[th->uid].b_ended = true; /* mark the thread as already dead */
     s_condvars[th->uid].p_wake_up = NULL;
+    vlc_mutex_unlock( &s_condvars[th->uid].mutex );
 #endif
-    if (th->id == NULL) /* Detached thread */
-        free(th);
+    if( th->id == NULL ) /* Detached thread */
+    {
+        free( th );
+    }
     return 0;
 }
 
@@ -527,6 +608,15 @@ static int vlc_clone_attr (vlc_thread_t *p_handle, bool detached,
 #endif
     th->cleaners = NULL;
 
+#if VLC_WINSTORE_APP
+    th->uid = atomic_fetch_add( &s_nbthreads, 1 ) % MAX_SIMULTANEOUS_THREADS;
+    th->wakeUp = CreateEvent( NULL, FALSE, FALSE, NULL );
+    if( th->wakeUp == NULL )
+    {
+        free( th );
+        return VLC_EGENERIC;
+    }
+#endif
     /* When using the MSVCRT C library you have to use the _beginthreadex
      * function instead of CreateThread, otherwise you'll end up with
      * memory leaks and the signal functions not working (see Microsoft
@@ -535,6 +625,9 @@ static int vlc_clone_attr (vlc_thread_t *p_handle, bool detached,
     if (h == 0)
     {
         int err = errno;
+#if VLC_WINSTORE_APP
+        CloseHandle( th->wakeUp );
+#endif
         free (th);
         return err;
     }
@@ -546,17 +639,6 @@ static int vlc_clone_attr (vlc_thread_t *p_handle, bool detached,
     }
     else
         th->id = (HANDLE)h;
-#if VLC_WINSTORE_APP
-    th->uid = atomic_fetch_add(&s_nbthreads, 1) % MAX_SIMULTANEOUS_THREADS;
-    th->wakeUp = CreateEvent(NULL, FALSE, FALSE, NULL);
-    if (th->wakeUp == NULL)
-    {
-        if (th->id != NULL)
-            CloseHandle(th->id);
-        free (th);
-        return VLC_EGENERIC;
-    }
-#endif
 
     if (p_handle != NULL)
         *p_handle = th;
@@ -575,12 +657,9 @@ int vlc_clone (vlc_thread_t *p_handle, void *(*entry) (void *),
 
 void vlc_join (vlc_thread_t th, void **result)
 {
-#if VLC_WINSTORE_APP
-    vlc_cancel( th );
-#endif
     do
         vlc_testcancel ();
-    while (vlc_WaitForSingleObject (th->id, INFINITE) == WAIT_IO_COMPLETION);
+    while (vlc_WaitForSingleObjectEx (th->id, INFINITE, th) == WAIT_IO_COMPLETION);
 
     if (result != NULL)
         *result = th->data;
@@ -678,7 +757,9 @@ void vlc_testcancel (void)
     th->data = NULL; /* TODO: special value? */
     TlsSetValue(thread_key, NULL);
 #if VLC_WINSTORE_APP
+    vlc_mutex_lock( &s_condvars[th->uid].mutex );
     s_condvars[th->uid].p_wake_up = NULL;
+    vlc_mutex_unlock( &s_condvars[th->uid].mutex );
 #endif
     if (th->id == NULL) /* Detached thread */
         free(th);
