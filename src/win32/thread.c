@@ -555,39 +555,39 @@ retry:
 #if VLC_WINSTORE_APP
 static bool isCurrentCancelled( void )
 {
-    struct vlc_thread *th = TlsGetValue(thread_key);
-    if (th == NULL)
+    struct vlc_thread *p_current_th = TlsGetValue(thread_key);
+    if (p_current_th == NULL)
         return false; /* Main thread - cannot be cancelled anyway */
 
-    return atomic_load(&th->killed);
+    return atomic_load(&p_current_th->killed);
 }
 #endif
 
 static unsigned __stdcall vlc_entry (void *p)
 {
-    struct vlc_thread *th = p;
+    struct vlc_thread *p_current_th = p;
 
 #if VLC_WINSTORE_APP
-    assert( th->uid < MAX_SIMULTANEOUS_THREADS );
-    vlc_mutex_lock( &s_condvars[th->uid].mutex );
-    s_condvars[th->uid].b_ended = false;
-    vlc_mutex_unlock( &s_condvars[th->uid].mutex );
+    assert( p_current_th->uid < MAX_SIMULTANEOUS_THREADS );
+    vlc_mutex_lock( &s_condvars[p_current_th->uid].mutex );
+    s_condvars[p_current_th->uid].b_ended = false;
+    vlc_mutex_unlock( &s_condvars[p_current_th->uid].mutex );
 #endif
 
-    TlsSetValue(thread_key, th);
-    th->killable = true;
-    th->data = th->entry (th->data);
+    TlsSetValue(thread_key, p_current_th);
+    p_current_th->killable = true;
+    p_current_th->data = p_current_th->entry (p_current_th->data);
     TlsSetValue(thread_key, NULL);
 
 #if VLC_WINSTORE_APP
-    vlc_mutex_lock( &s_condvars[th->uid].mutex );
-    s_condvars[th->uid].b_ended = true; /* mark the thread as already dead */
-    s_condvars[th->uid].p_wake_up = NULL;
-    vlc_mutex_unlock( &s_condvars[th->uid].mutex );
+    vlc_mutex_lock( &s_condvars[p_current_th->uid].mutex );
+    s_condvars[p_current_th->uid].b_ended = true; /* mark the thread as already dead */
+    s_condvars[p_current_th->uid].p_wake_up = NULL;
+    vlc_mutex_unlock( &s_condvars[p_current_th->uid].mutex );
 #endif
-    if( th->id == NULL ) /* Detached thread */
+    if( p_current_th->id == NULL ) /* Detached thread */
     {
-        free( th );
+        free( p_current_th );
     }
     return 0;
 }
@@ -715,54 +715,60 @@ void vlc_cancel (vlc_thread_t th)
 
 int vlc_savecancel (void)
 {
-    struct vlc_thread *th = TlsGetValue(thread_key);
-    if (th == NULL)
+    struct vlc_thread *p_current_th = TlsGetValue(thread_key);
+    if (p_current_th == NULL)
         return false; /* Main thread - cannot be cancelled anyway */
 
-    int state = th->killable;
-    th->killable = false;
+    int state = p_current_th->killable;
+    p_current_th->killable = false;
     return state;
 }
 
 void vlc_restorecancel (int state)
 {
-    struct vlc_thread *th = TlsGetValue(thread_key);
+    struct vlc_thread *p_current_th = TlsGetValue(thread_key);
     assert (state == false || state == true);
 
-    if (th == NULL)
+    if (p_current_th == NULL)
         return; /* Main thread - cannot be cancelled anyway */
 
-    assert (!th->killable);
-    th->killable = state != 0;
+    assert (!p_current_th->killable);
+    p_current_th->killable = state != 0;
 }
 
 void vlc_testcancel (void)
 {
-    struct vlc_thread *th = TlsGetValue(thread_key);
-    if (th == NULL)
+    struct vlc_thread *p_current_th = TlsGetValue(thread_key);
+    if( p_current_th == NULL )
         return; /* Main thread - cannot be cancelled anyway */
-    if (!th->killable)
+    if( !p_current_th->killable )
         return;
 #if !VLC_WINSTORE_APP
-    if (likely(!th->killed))
+    if( likely( !p_current_th->killed ) )
         return;
 #else
-    if (!atomic_load(&th->killed))
+    if( !atomic_load( &p_current_th->killed ) )
         return;
 #endif
 
-    for (vlc_cleanup_t *p = th->cleaners; p != NULL; p = p->next)
-        p->proc (p->data);
+    for( vlc_cleanup_t *p = p_current_th->cleaners; p != NULL; p = p->next )
+        p->proc( p->data );
 
-    th->data = NULL; /* TODO: special value? */
+    p_current_th->data = NULL; /* TODO: special value? */
     TlsSetValue(thread_key, NULL);
 #if VLC_WINSTORE_APP
-    vlc_mutex_lock( &s_condvars[th->uid].mutex );
-    s_condvars[th->uid].p_wake_up = NULL;
-    vlc_mutex_unlock( &s_condvars[th->uid].mutex );
+    vlc_mutex_lock( &s_condvars[p_current_th->uid].mutex );
+    if( s_condvars[p_current_th->uid].p_wake_up )
+    {
+        SetEvent( s_condvars[p_current_th->uid].p_wake_up = NULL );
+        s_condvars[p_current_th->uid].p_wake_up = NULL;
+    }
+    vlc_mutex_unlock( &s_condvars[p_current_th->uid].mutex );
 #endif
-    if (th->id == NULL) /* Detached thread */
-        free(th);
+    if (p_current_th->id == NULL) /* Detached thread */
+    {
+        free( p_current_th );
+    }
     _endthreadex(0);
 }
 
@@ -772,8 +778,8 @@ void vlc_control_cancel (int cmd, ...)
      * need to lock anything. */
     va_list ap;
 
-    struct vlc_thread *th = TlsGetValue(thread_key);
-    if (th == NULL)
+    struct vlc_thread *p_current_th = TlsGetValue(thread_key);
+    if (p_current_th == NULL)
         return; /* Main thread - cannot be cancelled anyway */
 
     va_start (ap, cmd);
@@ -784,14 +790,14 @@ void vlc_control_cancel (int cmd, ...)
             /* cleaner is a pointer to the caller stack, no need to allocate
              * and copy anything. As a nice side effect, this cannot fail. */
             vlc_cleanup_t *cleaner = va_arg (ap, vlc_cleanup_t *);
-            cleaner->next = th->cleaners;
-            th->cleaners = cleaner;
+            cleaner->next = p_current_th->cleaners;
+            p_current_th->cleaners = cleaner;
             break;
         }
 
         case VLC_CLEANUP_POP:
         {
-            th->cleaners = th->cleaners->next;
+            p_current_th->cleaners = p_current_th->cleaners->next;
             break;
         }
     }
