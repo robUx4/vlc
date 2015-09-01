@@ -84,97 +84,69 @@ static DWORD vlc_WaitForSingleObjectEx( HANDLE handle, DWORD delay, struct vlc_t
 {
     DWORD ret;
 #if VLC_WINSTORE_APP
-    bool b_canceled = isCurrentCancelled();
-    if( !b_canceled && p_th != NULL )
+    if( p_th != NULL )
     {
+        /* if the thread we're waiting for has been killed, consider it's triggered */
         vlc_mutex_lock( &s_condvars[p_th->uid].mutex );
-        b_canceled = s_condvars[p_th->uid].b_ended;
+        bool b_canceled = s_condvars[p_th->uid].b_ended;
         vlc_mutex_unlock( &s_condvars[p_th->uid].mutex );
+        if( b_canceled )
+            return WAIT_OBJECT_0;
     }
 
-    if ( b_canceled )
-        return WAIT_OBJECT_0;
+    /* if we're canceled, assume we received an exit APC */
+    if( isCurrentCancelled() )
+        return WAIT_IO_COMPLETION;
 
     HANDLE wakeUp = NULL;
-    struct vlc_thread *th = TlsGetValue(thread_key);
-    if (th != NULL)
+    struct vlc_thread *p_current_th = TlsGetValue( thread_key );
+    if( p_current_th != NULL )
     {
-        wakeUp = th->wakeUp;
-        vlc_mutex_lock(&s_condvars[th->uid].mutex);
-        assert( s_condvars[th->uid].p_wake_up == NULL );
-        s_condvars[th->uid].p_wake_up = wakeUp;
-        mutex_cleanup_push(&s_condvars[th->uid].mutex);
-        vlc_testcancel();
-        vlc_cleanup_pop();
-        vlc_mutex_unlock(&s_condvars[th->uid].mutex);
+        wakeUp = p_current_th->wakeUp;
+        assert( wakeUp != NULL );
+        vlc_mutex_lock( &s_condvars[p_current_th->uid].mutex );
+        assert( s_condvars[p_current_th->uid].p_wake_up == NULL );
+        s_condvars[p_current_th->uid].p_wake_up = wakeUp;
+        vlc_mutex_unlock( &s_condvars[p_current_th->uid].mutex );
     }
 
-    if( wakeUp == NULL )
+    if( wakeUp != NULL )
     {
-        if( delay != INFINITE )
-            ret = WaitForSingleObjectEx( handle, delay, TRUE );
-        else
-        {
-            if( p_th != NULL )
-            {
-                int loop_count = 0;
-                do {
-                    DWORD new_delay = 50;
-                    if( new_delay > delay )
-                        new_delay = delay;
-                    ret = WaitForSingleObjectEx( handle, new_delay, TRUE );
-                    if( isCurrentCancelled() )
-                        ret = WAIT_IO_COMPLETION;
-                    else if( p_th != NULL )
-                    {
-                        vlc_mutex_lock( &s_condvars[p_th->uid].mutex );
-                        if( s_condvars[p_th->uid].b_ended )
-                            ret = WAIT_OBJECT_0;
-                        vlc_mutex_unlock( &s_condvars[p_th->uid].mutex );
-                    }
-                    if( delay != INFINITE )
-                        delay -= new_delay;
-                    if( ++loop_count == 100 )
-                    {
-                        ret = WAIT_OBJECT_0;
-                    }
-                } while( delay && ret == WAIT_TIMEOUT );
-            }
-            else {
-                int loop_count = 0;
-                do {
-                    DWORD new_delay = 50;
-                    if( new_delay > delay )
-                        new_delay = delay;
-                    ret = WaitForSingleObjectEx( handle, new_delay, TRUE );
-                    if( delay != INFINITE )
-                        delay -= new_delay;
-                    if( isCurrentCancelled() )
-                        ret = WAIT_IO_COMPLETION;
-                    if( ++loop_count == 100 )
-                    {
-                        ret = WAIT_OBJECT_0;
-                    }
-                } while( delay && ret == WAIT_TIMEOUT );
-            }
-        }
-    }
-    else
-    {
+        /* clean way to exit when a fake exit APC is queued */
         HANDLE handles[2] = { handle, wakeUp };
         ret = WaitForMultipleObjectsEx( 2, handles, FALSE, delay, TRUE );
         if( ret == WAIT_OBJECT_0 + 1 )
-        {
-            ret = WAIT_TIMEOUT;
-            b_canceled = true;
-        }
-    }
+            ret = WAIT_IO_COMPLETION;
 
-    if( likely( wakeUp != NULL ) && !b_canceled )
+        vlc_mutex_lock( &s_condvars[p_current_th->uid].mutex );
+        s_condvars[p_current_th->uid].p_wake_up = NULL;
+        vlc_mutex_unlock( &s_condvars[p_current_th->uid].mutex );
+    }
+    else
     {
-        vlc_mutex_lock(&s_condvars[th->uid].mutex);
-        s_condvars[th->uid].p_wake_up = NULL;
-        vlc_mutex_unlock(&s_condvars[th->uid].mutex);
+        /* poll every 50ms to see if a fake APC has been queued */
+        int loop_count = 0;
+        do {
+            DWORD new_delay = 50;
+            if( new_delay > delay )
+                new_delay = delay;
+            ret = WaitForSingleObjectEx( handle, new_delay, TRUE );
+            if( p_th != NULL )
+            {
+                vlc_mutex_lock( &s_condvars[p_th->uid].mutex );
+                if( s_condvars[p_th->uid].b_ended )
+                    ret = WAIT_OBJECT_0;
+                else if ( atomic_load( &p_th->killed ) )
+                    ret = WAIT_IO_COMPLETION;
+                vlc_mutex_unlock( &s_condvars[p_th->uid].mutex );
+            }
+            if( delay != INFINITE )
+                delay -= new_delay;
+            if( ++loop_count == 1000 )
+            {
+                ret = WAIT_IO_COMPLETION;
+            }
+        } while( delay && ret == WAIT_TIMEOUT );
     }
 
     if (ret == WAIT_TIMEOUT && isCurrentCancelled())
@@ -559,7 +531,7 @@ static bool isCurrentCancelled( void )
     if (p_current_th == NULL)
         return false; /* Main thread - cannot be cancelled anyway */
 
-    return atomic_load(&p_current_th->killed);
+    return p_current_th->killable && atomic_load(&p_current_th->killed);
 }
 #endif
 
