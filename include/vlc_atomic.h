@@ -471,7 +471,7 @@ static inline void vlc_atomic_store_float(vlc_atomic_float *atom, float f)
 {
     union { float f; uint32_t i; } u;
     u.f = f;
-    atomic_store(atom, (short) u.i);
+    atomic_store(atom, u.i);
 }
 
 # else /* C++ */
