@@ -29,6 +29,9 @@
 # include "config.h"
 #endif
 
+#define LOG_COND    0
+#define LOG_THREAD  0
+
 #include <vlc_common.h>
 #include <vlc_atomic.h>
 
@@ -80,6 +83,16 @@ struct vlc_thread
 static bool isCurrentCancelled(void);
 #endif
 
+static void Debug( const wchar_t *fmt, ... )
+{
+    wchar_t buf[255];
+    va_list args;
+    va_start( args, fmt );
+    vswprintf_s( buf, 255, fmt, args );
+    va_end( args );
+    OutputDebugStringW( buf );
+}
+
 static DWORD vlc_WaitForSingleObjectEx( HANDLE handle, DWORD delay, struct vlc_thread *p_th )
 {
     DWORD ret;
@@ -125,6 +138,15 @@ static DWORD vlc_WaitForSingleObjectEx( HANDLE handle, DWORD delay, struct vlc_t
     else
     {
         /* poll every 50ms to see if a fake APC has been queued */
+#ifndef NDEBUG
+        if( delay == INFINITE )
+        {
+            if( p_th != NULL )
+                Debug( L"WARNING infinite waiting on thread %p %d/0x%x from thread %d!\n", p_th, handle, handle, GetCurrentThreadId() );
+            else
+                Debug( L"WARNING infinite waiting on handle %d/0x%x from thread %d!\n", handle, handle, GetCurrentThreadId() );
+        }
+#endif
         int loop_count = 0;
         do {
             DWORD new_delay = 50;
@@ -144,6 +166,15 @@ static DWORD vlc_WaitForSingleObjectEx( HANDLE handle, DWORD delay, struct vlc_t
                 delay -= new_delay;
             if( ++loop_count == 1000 )
             {
+#ifndef NDEBUG
+                if( delay == INFINITE )
+                {
+                    if( p_th != NULL )
+                        Debug( L"WARNING deadlock detected waiting on thread %p %d/0x%x from thread %d, stop waiting!\n", p_th, handle, handle, GetCurrentThreadId() );
+                    else
+                        Debug( L"WARNING deadlock detected waiting on handle %d/0x%x from thread %d, stop waiting!\n", handle, handle, GetCurrentThreadId() );
+                }
+#endif
                 ret = WAIT_IO_COMPLETION;
             }
         } while( delay && ret == WAIT_TIMEOUT );
@@ -305,6 +336,9 @@ void vlc_cond_init_daytime (vlc_cond_t *p_condvar)
 
 void vlc_cond_destroy(vlc_cond_t *wait)
 {
+#if LOG_COND
+    Debug( L"cond_destroy sema 0x%x\n", wait->semaphore );
+#endif
     CloseHandle(wait->semaphore);
 }
 
@@ -326,6 +360,9 @@ static LONG InterlockedDecrementNonZero(LONG volatile *dst)
 
 void vlc_cond_signal(vlc_cond_t *wait)
 {
+#if LOG_COND
+    Debug( L"cond_signal sema 0x%x from thread %d\n", wait->semaphore, GetCurrentThreadId() );
+#endif
     if (wait->semaphore == NULL)
         return;
 
@@ -335,6 +372,9 @@ void vlc_cond_signal(vlc_cond_t *wait)
 
 void vlc_cond_broadcast(vlc_cond_t *wait)
 {
+#if LOG_COND
+    Debug( L"cond_broadcast sema 0x%x from thread %d\n", wait->semaphore, GetCurrentThreadId() );
+#endif
     if (wait->semaphore == NULL)
         return;
 
@@ -370,6 +410,9 @@ static DWORD vlc_cond_wait_delay(vlc_cond_t *wait, vlc_mutex_t *lock,
 
 void vlc_cond_wait(vlc_cond_t *wait, vlc_mutex_t *lock)
 {
+#if LOG_COND
+    Debug( L"cond_wait sema 0x%x\n", wait->semaphore );
+#endif
     vlc_cond_wait_delay(wait, lock, INFINITE);
 }
 
@@ -377,6 +420,9 @@ int vlc_cond_timedwait(vlc_cond_t *wait, vlc_mutex_t *lock, mtime_t deadline)
 {
     mtime_t total;
 
+#if LOG_COND
+    Debug( L"cond_timedwait sema 0x%x\n", wait->semaphore );
+#endif
     switch (wait->clock)
     {
         case VLC_CLOCK_REALTIME: /* FIXME? sub-second precision */
@@ -540,6 +586,9 @@ static unsigned __stdcall vlc_entry (void *p)
     struct vlc_thread *p_current_th = p;
 
 #if VLC_WINSTORE_APP
+#if LOG_THREAD
+    Debug( L"starting thread %p %d\n", p_current_th, GetCurrentThreadId() );
+#endif
     assert( p_current_th->uid < MAX_SIMULTANEOUS_THREADS );
     vlc_mutex_lock( &s_condvars[p_current_th->uid].mutex );
     s_condvars[p_current_th->uid].b_ended = false;
@@ -557,8 +606,14 @@ static unsigned __stdcall vlc_entry (void *p)
     s_condvars[p_current_th->uid].p_wake_up = NULL;
     vlc_mutex_unlock( &s_condvars[p_current_th->uid].mutex );
 #endif
+#if LOG_THREAD
+    Debug( L"ending thread %p %d\n", p_current_th, GetCurrentThreadId() );
+#endif /* LOG_THREAD */
     if( p_current_th->id == NULL ) /* Detached thread */
     {
+#if LOG_THREAD
+        Debug( L"destroying vlc_thread %p\n", p_current_th );
+#endif /* LOG_THREAD */
         free( p_current_th );
     }
     return 0;
@@ -585,9 +640,15 @@ static int vlc_clone_attr (vlc_thread_t *p_handle, bool detached,
     th->wakeUp = CreateEvent( NULL, FALSE, FALSE, NULL );
     if( th->wakeUp == NULL )
     {
+#if LOG_THREAD
+        Debug( L"can't create a wakeup event for vlc_thread %p\n", th );
+#endif /* LOG_THREAD */
         free( th );
         return VLC_EGENERIC;
     }
+#if LOG_THREAD
+    Debug( L"vlc_clone_attr %p\n", th );
+#endif /* LOG_THREAD */
 #endif
     /* When using the MSVCRT C library you have to use the _beginthreadex
      * function instead of CreateThread, otherwise you'll end up with
@@ -597,6 +658,9 @@ static int vlc_clone_attr (vlc_thread_t *p_handle, bool detached,
     if (h == 0)
     {
         int err = errno;
+#if LOG_THREAD
+        Debug( L"can't start vlc_thread %p\n", th);
+#endif /* LOG_THREAD */
 #if VLC_WINSTORE_APP
         CloseHandle( th->wakeUp );
 #endif
@@ -612,6 +676,9 @@ static int vlc_clone_attr (vlc_thread_t *p_handle, bool detached,
     else
         th->id = (HANDLE)h;
 
+#if LOG_THREAD
+    Debug( L"vlc_clone_attr created %p %d/0x%x\n", th, th->id, th->id );
+#endif /* LOG_THREAD */
     if (p_handle != NULL)
         *p_handle = th;
 
@@ -629,6 +696,9 @@ int vlc_clone (vlc_thread_t *p_handle, void *(*entry) (void *),
 
 void vlc_join (vlc_thread_t th, void **result)
 {
+#if LOG_THREAD
+    Debug( L"vlc_join vlc_thread %p\n", th );
+#endif /* LOG_THREAD */
     do
         vlc_testcancel ();
     while (vlc_WaitForSingleObjectEx (th->id, INFINITE, th) == WAIT_IO_COMPLETION);
@@ -639,6 +709,9 @@ void vlc_join (vlc_thread_t th, void **result)
     CloseHandle(th->wakeUp);
 #endif
     CloseHandle (th->id);
+#if LOG_THREAD
+    Debug( L"destroying joined vlc_thread %p\n", th );
+#endif /* LOG_THREAD */
     free (th);
 }
 
@@ -677,6 +750,9 @@ void vlc_cancel (vlc_thread_t th)
 #if !VLC_WINSTORE_APP
     QueueUserAPC (vlc_cancel_self, th->id, (uintptr_t)th);
 #else
+#if LOG_THREAD
+    Debug( L"vlc_cancel thread %p %d/0x%x from thread %d\n", th, th->id, th->id, GetCurrentThreadId() );
+#endif /* LOG_THREAD */
     vlc_mutex_lock(&s_condvars[th->uid].mutex);
     atomic_store (&th->killed, true);
     if (s_condvars[th->uid].p_wake_up != NULL)
@@ -723,6 +799,10 @@ void vlc_testcancel (void)
         return;
 #endif
 
+#if LOG_THREAD
+    Debug( L"killing thread %d\n", GetCurrentThreadId() );
+#endif /* LOG_THREAD */
+
     for( vlc_cleanup_t *p = p_current_th->cleaners; p != NULL; p = p->next )
         p->proc( p->data );
 
@@ -739,6 +819,9 @@ void vlc_testcancel (void)
 #endif
     if (p_current_th->id == NULL) /* Detached thread */
     {
+#if LOG_THREAD
+        Debug( L"destroying canceled vlc_thread %p\n", p_current_th );
+#endif /* LOG_THREAD */
         free( p_current_th );
     }
     _endthreadex(0);
