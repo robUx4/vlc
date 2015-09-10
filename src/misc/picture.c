@@ -153,6 +153,7 @@ int picture_Setup( picture_t *p_picture, const video_format_t *restrict fmt )
     video_format_Setup( &p_picture->format, fmt->i_chroma, fmt->i_width, fmt->i_height,
                         fmt->i_visible_width, fmt->i_visible_height,
                         fmt->i_sar_num, fmt->i_sar_den );
+    video_format_CopyCrop( &p_picture->format, fmt );
 
     const vlc_chroma_description_t *p_dsc =
         vlc_fourcc_GetChromaDescription( p_picture->format.i_chroma );
@@ -185,9 +186,9 @@ int picture_Setup( picture_t *p_picture, const video_format_t *restrict fmt )
         plane_t *p = &p_picture->p[i];
 
         p->i_lines         = (i_height_aligned + i_height_extra ) * p_dsc->p[i].h.num / p_dsc->p[i].h.den;
-        p->i_visible_lines = fmt->i_visible_height * p_dsc->p[i].h.num / p_dsc->p[i].h.den;
+        p->i_visible_lines = (fmt->i_y_offset + fmt->i_visible_height) * p_dsc->p[i].h.num / p_dsc->p[i].h.den;
         p->i_pitch         = i_width_aligned * p_dsc->p[i].w.num / p_dsc->p[i].w.den * p_dsc->pixel_size;
-        p->i_visible_pitch = fmt->i_visible_width * p_dsc->p[i].w.num / p_dsc->p[i].w.den * p_dsc->pixel_size;
+        p->i_visible_pitch = (fmt->i_x_offset + fmt->i_visible_width) * p_dsc->p[i].w.num / p_dsc->p[i].w.den * p_dsc->pixel_size;
         p->i_pixel_pitch   = p_dsc->pixel_size;
 
         assert( (p->i_pitch % 16) == 0 );
