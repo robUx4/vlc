@@ -1220,20 +1220,6 @@ static void UpdatePicQuadPosition(vout_display_t *vd)
     vout_display_sys_t *sys = vd->sys;
     int i_width  = RECTWidth(sys->rect_dest_clipped);
     int i_height = RECTHeight(sys->rect_dest_clipped);
-#if VLC_WINSTORE_APP
-    UINT dataSize = sizeof(i_width);
-    HRESULT hr = IDXGISwapChain_GetPrivateData(sys->dxgiswapChain, &GUID_SWAPCHAIN_WIDTH, &dataSize, &i_width);
-    if (FAILED(hr)) {
-        msg_Err(vd, "Can't get swapchain width, size %d. (hr=0x%lX)", hr, dataSize);
-        return;
-    }
-    dataSize = sizeof(i_height);
-    hr = IDXGISwapChain_GetPrivateData(sys->dxgiswapChain, &GUID_SWAPCHAIN_HEIGHT, &dataSize, &i_height);
-    if (FAILED(hr)) {
-        msg_Err(vd, "Can't get swapchain height, size %d. (hr=0x%lX)", hr, dataSize);
-        return;
-    }
-#endif
 
     int i_top = sys->rect_src_clipped.top * i_height;
     i_top /= vd->source.i_visible_height;
@@ -1248,6 +1234,10 @@ static void UpdatePicQuadPosition(vout_display_t *vd)
     sys->picQuad.cropViewport.MaxDepth = 1.0f;
     sys->picQuad.cropViewport.TopLeftX = -i_left;
     sys->picQuad.cropViewport.TopLeftY = -i_top;
+
+#ifndef NDEBUG
+    msg_Dbg(vd, "picQuad position (%.02f,%.02f) %.02fx%.02f", sys->picQuad.cropViewport.TopLeftX, sys->picQuad.cropViewport.TopLeftY, sys->picQuad.cropViewport.Width, sys->picQuad.cropViewport.Height );
+#endif
 }
 
 /* TODO : handle errors better
@@ -1843,7 +1833,7 @@ static int Direct3D11MapSubpicture(vout_display_t *vd, int *subpicture_region_co
         quad->cropViewport.Height = (FLOAT) r->fmt.i_visible_height * RECTWidth(sys->rect_dest) / subpicture->i_original_picture_width;
         quad->cropViewport.MinDepth = 0.0f;
         quad->cropViewport.MaxDepth = 1.0f;
-        quad->cropViewport.TopLeftX = r->i_x * RECTHeight(sys->rect_dest) / subpicture->i_original_picture_height;;
+        quad->cropViewport.TopLeftX = r->i_x * RECTHeight(sys->rect_dest) / subpicture->i_original_picture_height;
         quad->cropViewport.TopLeftY = r->i_y * RECTWidth(sys->rect_dest) / subpicture->i_original_picture_width;
 
         UpdateQuadOpacity(vd, quad, r->i_alpha / 255.0f );
