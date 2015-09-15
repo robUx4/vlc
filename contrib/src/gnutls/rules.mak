@@ -28,11 +28,9 @@ endif
 #	$(APPLY) $(SRC)/gnutls/gnutls-no-egd.patch
 	$(APPLY) $(SRC)/gnutls/read-file-limits.h.patch
 	$(APPLY) $(SRC)/gnutls/mac-keychain-lookup.patch
+	$(APPLY) $(SRC)/gnutls/winstore.patch
 ifdef HAVE_MACOSX
 	$(APPLY) $(SRC)/gnutls/gnutls-pkgconfig-osx.patch
-endif
-ifdef HAVE_WINRT
-	$(APPLY) $(SRC)/gnutls/winstore.patch
 endif
 ifdef HAVE_VISUALSTUDIO
 	$(APPLY) $(SRC)/gnutls/msvc.patch

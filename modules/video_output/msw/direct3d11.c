@@ -27,16 +27,17 @@
 
 #define DEBUG_CONTEXT_LOCK  defined(_DEBUG) && 0
 
-#if _WIN32_WINNT < 0x0600
+#if _WIN32_WINNT < 0x0600 && defined(HAVE_ID3D11VIDEODECODER) && VLC_WINSTORE_APP
 /* for CreateMutexEx */
 #undef _WIN32_WINNT
 #define _WIN32_WINNT 0x601
 #endif /* _WIN32_WINNT */
 
-#include <assert.h>
 #include <vlc_common.h>
 #include <vlc_plugin.h>
 #include <vlc_vout_display.h>
+
+#include <assert.h>
 
 #define COBJMACROS
 #define INITGUID
@@ -582,7 +583,7 @@ static picture_pool_t *Pool(vout_display_t *vd, unsigned pool_size)
     vd->sys->pool = picture_pool_NewExtended( &pool_cfg );
 
 error:
-    if (vd->sys->pool == NULL && pictures) {
+    if (vd->sys->pool ==NULL && pictures) {
         for (unsigned i=0;i<picture_count; ++i)
             DestroyDisplayPoolPicture(pictures[i]);
         free(pictures);
@@ -1252,7 +1253,7 @@ static int Direct3D11CreateResources(vout_display_t *vd, video_format_t *fmt)
     hr = ID3D11Device_CheckFeatureSupport( sys->d3ddevice, D3D11_FEATURE_THREADING, &threading, sizeof( threading ) );
     if( FAILED( hr ) || !threading.DriverConcurrentCreates )
     {
-        sys->context_lock = CreateMutexEx( NULL, TEXT( "D3DDeviceContextMutex" ), 0, SYNCHRONIZE );
+        sys->context_lock = CreateMutexEx( NULL, NULL, 0, SYNCHRONIZE );
         ID3D11Device_SetPrivateData( sys->d3ddevice, &GUID_CONTEXT_MUTEX, sizeof( sys->context_lock ), &sys->context_lock );
     }
 #endif

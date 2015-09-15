@@ -223,7 +223,7 @@ VLC_API ssize_t net_vaPrintf( vlc_object_t *p_this, int fd, const char *psz_fmt,
 # undef gai_strerror
 # ifdef UNICODE
 #   include <vlc_charset.h>
-#   define gai_strerror(a) FromWide(gai_strerrorW)
+#   define gai_strerror(a) FromWide(gai_strerrorW(a))
 # else
 #   define gai_strerror gai_strerrorA
 # endif

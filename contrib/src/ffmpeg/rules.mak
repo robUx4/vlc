@@ -207,7 +207,6 @@ ifeq ($(VLC_CONFIGURATION),Debug)
 	$(APPLY) $(SRC)/ffmpeg/debug_lock.patch
 endif
 endif
-
 	$(APPLY) $(SRC)/ffmpeg/0001-d3d11va-WindowsPhone-requires-a-mutex-around-ID3D11V.patch
 	$(MOVE)
 

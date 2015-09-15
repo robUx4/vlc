@@ -40,10 +40,6 @@
 #include <libavutil/mem.h>
 #include <libavutil/pixdesc.h>
 
-#if VLC_WINSTORE_APP
-#include <libavcodec/d3d11va.h>
-#endif
-
 #include "avcodec.h"
 #include "va.h"
 
