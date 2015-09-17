@@ -3,7 +3,7 @@ PROTOBUF_VERSION := 2.6.1
 PROTOBUF_URL := https://github.com/google/protobuf/releases/download/v$(PROTOBUF_VERSION)/protobuf-$(PROTOBUF_VERSION).tar.gz
 
 PKGS += protobuf
-ifeq ($(call need_pkg,"protobuf"),)
+ifeq ($(call need_pkg,"protobuf-devel"),)
 PKGS_FOUND += protobuf
 endif
 
