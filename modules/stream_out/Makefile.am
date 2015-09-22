@@ -85,6 +85,10 @@ libstream_out_chromecast_plugin_la_SOURCES = stream_out/chromecast/cast_channel.
 nodist_libstream_out_chromecast_plugin_la_SOURCES = stream_out/chromecast/cast_channel.pb.cc
 libstream_out_chromecast_plugin_la_CPPFLAGS = $(AM_CPPFLAGS) -Istream_out/chromecast $(CHROMECAST_CFLAGS)
 libstream_out_chromecast_plugin_la_LIBADD = $(CHROMECAST_LIBS) $(SOCKET_LIBS)
+if HAVE_MICRODNS
+libstream_out_chromecast_plugin_la_CPPFLAGS += $(MICRODNS_CFLAGS)
+libstream_out_chromecast_plugin_la_LIBADD += $(MICRODNS_LIBS)
+endif
 CLEANFILES += $(nodist_libstream_out_chromecast_plugin_la_SOURCES)
 
 if BUILD_CHROMECAST
