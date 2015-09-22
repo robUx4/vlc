@@ -3657,6 +3657,12 @@ AM_CONDITIONAL([BUILD_CHROMECAST], [test "${build_chromecast}" = "yes"])
 m4_popdef([protobuf_lite_version])
 
 dnl
+dnl microdns for Chromecast
+dnl
+PKG_WITH_MODULES([MICRODNS], [microdns], [have_microdns="yes" AC_DEFINE([HAVE_MICRODNS], [1], [The microdns library is present])])
+AM_CONDITIONAL(HAVE_MICRODNS, [test "${have_microdns}" = "yes"])
+
+dnl
 dnl  Interface plugins
 dnl
 
