@@ -5,6 +5,7 @@
  *
  * Authors: Adrien Maglo <magsoft@videolan.org>
  *          Jean-Baptiste Kempf <jb@videolan.org>
+ *          Steve Lhomme <robux4@videolabs.io>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU Lesser General Public License as published by
@@ -39,6 +40,7 @@
 #include <vlc_tls.h>
 #include <vlc_url.h>
 #include <vlc_threads.h>
+#include <vlc_atomic.h>
 
 #include <cerrno>
 
@@ -50,6 +52,12 @@
 #include "cast_channel.pb.h"
 
 #include "../../misc/webservices/json.h"
+
+#ifdef HAVE_MICRODNS
+# include <microdns/microdns.h>
+
+static const char MDNS_CHROMECAST[] = "._googlecast._tcp.local";
+#endif
 
 // Status
 enum
@@ -68,11 +76,17 @@ enum
 struct sout_stream_sys_t
 {
     sout_stream_sys_t()
-        : p_tls(NULL), i_requestId(0),
+        : devicePort(8009)
+          ,p_tls(NULL), i_requestId(0),
           i_status(CHROMECAST_DISCONNECTED), p_out(NULL)
+#ifdef HAVE_MICRODNS
+          ,microdns_ctx(NULL)
+#endif
     {
     }
 
+    uint16_t    devicePort;
+    std::string deviceIP;
     std::string serverIP;
 
     int i_sock_fd;
@@ -86,17 +100,20 @@ struct sout_stream_sys_t
 
     std::queue<castchannel::CastMessage> messagesToSend;
 
-    int i_status;
+    std::atomic_int i_status;
     vlc_mutex_t lock;
-    vlc_cond_t loadCommandCond;
 
     sout_stream_t *p_out;
+#ifdef HAVE_MICRODNS
+    struct mdns_ctx *microdns_ctx;
+    mtime_t i_timeout;
+    std::string nameChromecast; /* name we're looking for */
+#endif
 };
 
 // Media player Chromecast app id
 #define APP_ID "CC1AD845" // Default media player
 
-#define CHROMECAST_CONTROL_PORT 8009
 #define HTTP_PORT               8010
 
 #define SOUT_CFG_PREFIX "sout-chromecast-"
@@ -114,7 +131,7 @@ struct sout_stream_sys_t
 static int Open(vlc_object_t *);
 static void Close(vlc_object_t *);
 static void Clean(sout_stream_t *p_stream);
-static int connectChromecast(sout_stream_t *p_stream, char *psz_ipChromecast);
+static int connectChromecast(sout_stream_t *p_stream);
 static void disconnectChromecast(sout_stream_t *p_stream);
 static int sendMessages(sout_stream_t *p_stream);
 
@@ -130,7 +147,7 @@ static void msgStatus(sout_stream_t *p_stream);
 static void *chromecastThread(void *data);
 
 static const char *const ppsz_sout_options[] = {
-    "ip", "http-port", "mux", "mime", NULL
+    "ip", "target", "http-port", "mux", "mime", NULL
 };
 
 /*****************************************************************************
@@ -139,6 +156,8 @@ static const char *const ppsz_sout_options[] = {
 
 #define IP_TEXT N_("Chromecast IP address")
 #define IP_LONGTEXT N_("This sets the IP adress of the Chromecast receiver.")
+#define TARGET_TEXT N_("Chromecast Name")
+#define TARGET_LONGTEXT N_("This sets the name of the Chromecast receiver.")
 #define HTTP_PORT_TEXT N_("HTTP port")
 #define HTTP_PORT_LONGTEXT N_("This sets the HTTP port of the server " \
                               "used to stream the media to the Chromecast.")
@@ -158,6 +177,7 @@ vlc_module_begin ()
     set_callbacks(Open, Close)
 
     add_string(SOUT_CFG_PREFIX "ip", "", IP_TEXT, IP_LONGTEXT, false)
+    add_string(SOUT_CFG_PREFIX "target", "", TARGET_TEXT, TARGET_LONGTEXT, false)
     add_integer(SOUT_CFG_PREFIX "http-port", HTTP_PORT, HTTP_PORT_TEXT, HTTP_PORT_LONGTEXT, false)
     add_string(SOUT_CFG_PREFIX "mux", "mp4stream", MUX_TEXT, MUX_LONGTEXT, false)
     add_string(SOUT_CFG_PREFIX "mime", "video/mp4", MIME_TEXT, MIME_LONGTEXT, false)
@@ -207,31 +227,29 @@ static int Open(vlc_object_t *p_this)
     config_ChainParse(p_stream, SOUT_CFG_PREFIX, ppsz_sout_options, p_stream->p_cfg);
 
     char *psz_ipChromecast = var_GetNonEmptyString(p_stream, SOUT_CFG_PREFIX "ip");
-    if (psz_ipChromecast == NULL)
+    if (psz_ipChromecast != NULL)
     {
-        msg_Err(p_stream, "No Chromecast receiver IP provided");
+        p_sys->deviceIP = psz_ipChromecast;
+        free(psz_ipChromecast);
+    }
+    else
+#ifdef HAVE_MICRODNS
+    if (mdns_init(&p_sys->microdns_ctx, MDNS_ADDR_IPV4, MDNS_PORT) >= 0)
+    {
+        char *psz_nameChromecast = var_GetNonEmptyString(p_stream, SOUT_CFG_PREFIX "target");
+        if (psz_nameChromecast != NULL)
+        {
+            p_sys->nameChromecast = psz_nameChromecast;
+            free(psz_nameChromecast);
+        }
+    }
+    if (p_sys->microdns_ctx == NULL && p_sys->deviceIP.empty())
+#endif /* HAVE_MICRODNS */
+    {
+        msg_Err(p_stream, "No Chromecast receiver IP/Name provided");
         Clean(p_stream);
         return VLC_EGENERIC;
     }
-
-    p_sys->i_sock_fd = connectChromecast(p_stream, psz_ipChromecast);
-    free(psz_ipChromecast);
-    if (p_sys->i_sock_fd < 0)
-    {
-        msg_Err(p_stream, "Could not connect the Chromecast");
-        Clean(p_stream);
-        return VLC_EGENERIC;
-    }
-    p_sys->i_status = CHROMECAST_TLS_CONNECTED;
-
-    char psz_localIP[NI_MAXNUMERICHOST];
-    if (net_GetSockAddress(p_sys->i_sock_fd, psz_localIP, NULL))
-    {
-        msg_Err(p_this, "Cannot get local IP address");
-        Clean(p_stream);
-        return VLC_EGENERIC;
-    }
-    p_sys->serverIP = psz_localIP;
 
     char *psz_mux = var_GetNonEmptyString(p_stream, SOUT_CFG_PREFIX "mux");
     if (psz_mux == NULL)
@@ -259,7 +277,6 @@ static int Open(vlc_object_t *p_this)
     }
 
     vlc_mutex_init(&p_sys->lock);
-    vlc_cond_init(&p_sys->loadCommandCond);
 
     // Start the Chromecast event thread.
     if (vlc_clone(&p_sys->chromecastThread, chromecastThread, p_stream,
@@ -269,32 +286,6 @@ static int Open(vlc_object_t *p_this)
         Clean(p_stream);
         return VLC_EGENERIC;
     }
-
-    /* Ugly part:
-     * We want to be sure that the Chromecast receives the first data packet sent by
-     * the HTTP server. */
-
-    // Lock the sout thread until we have sent the media loading command to the Chromecast.
-    int i_ret = 0;
-    const mtime_t deadline = mdate() + 6 * CLOCK_FREQ;
-    vlc_mutex_lock(&p_sys->lock);
-    while (p_sys->i_status != CHROMECAST_MEDIA_LOAD_SENT)
-    {
-        i_ret = vlc_cond_timedwait(&p_sys->loadCommandCond, &p_sys->lock, deadline);
-        if (i_ret == ETIMEDOUT)
-        {
-            msg_Err(p_stream, "Timeout reached before sending the media loading command");
-            vlc_mutex_unlock(&p_sys->lock);
-            vlc_cancel(p_sys->chromecastThread);
-            Clean(p_stream);
-            return VLC_EGENERIC;
-        }
-    }
-    vlc_mutex_unlock(&p_sys->lock);
-
-    /* Even uglier: sleep more to let to the Chromecast initiate the connection
-     * to the http server. */
-    msleep(2 * CLOCK_FREQ);
 
     // Set the sout callbacks.
     p_stream->pf_add    = Add;
@@ -346,11 +337,14 @@ static void Clean(sout_stream_t *p_stream)
     if (p_sys->p_out)
     {
         vlc_mutex_destroy(&p_sys->lock);
-        vlc_cond_destroy(&p_sys->loadCommandCond);
         sout_StreamChainDelete(p_sys->p_out, p_sys->p_out);
     }
 
     disconnectChromecast(p_stream);
+
+#ifdef HAVE_MICRODNS
+    mdns_cleanup(p_sys->microdns_ctx);
+#endif
 
     delete p_sys;
 }
@@ -361,10 +355,10 @@ static void Clean(sout_stream_t *p_stream)
  * @param p_stream the sout_stream_t structure
  * @return the opened socket file descriptor or -1 on error
  */
-static int connectChromecast(sout_stream_t *p_stream, char *psz_ipChromecast)
+static int connectChromecast(sout_stream_t *p_stream)
 {
     sout_stream_sys_t *p_sys = p_stream->p_sys;
-    int fd = net_ConnectTCP(p_stream, psz_ipChromecast, CHROMECAST_CONTROL_PORT);
+    int fd = net_ConnectTCP(p_stream, p_sys->deviceIP.c_str(), p_sys->devicePort);
     if (fd < 0)
         return -1;
 
@@ -375,7 +369,7 @@ static int connectChromecast(sout_stream_t *p_stream, char *psz_ipChromecast)
         return -1;
     }
 
-    p_sys->p_tls = vlc_tls_ClientSessionCreate(p_sys->p_creds, fd, psz_ipChromecast,
+    p_sys->p_tls = vlc_tls_ClientSessionCreate(p_sys->p_creds, fd, p_sys->deviceIP.c_str(),
                                                "tcps", NULL, NULL);
 
     if (p_sys->p_tls == NULL)
@@ -601,7 +595,6 @@ static int processMessage(sout_stream_t *p_stream, const castchannel::CastMessag
         }
         else
         {
-            vlc_mutex_locker locker(&p_sys->lock);
             p_sys->i_status = CHROMECAST_AUTHENTICATED;
             msgConnect(p_stream, "receiver-0");
             msgLaunch(p_stream);
@@ -662,7 +655,6 @@ static int processMessage(sout_stream_t *p_stream, const castchannel::CastMessag
                     msgConnect(p_stream, p_sys->appTransportId);
                     msgLoad(p_stream);
                     p_sys->i_status = CHROMECAST_MEDIA_LOAD_SENT;
-                    vlc_cond_signal(&p_sys->loadCommandCond);
                 }
             }
             else
@@ -707,9 +699,7 @@ static int processMessage(sout_stream_t *p_stream, const castchannel::CastMessag
         {
             msg_Err(p_stream, "Media load failed");
             msgClose(p_stream, p_sys->appTransportId);
-            vlc_mutex_lock(&p_sys->lock);
             p_sys->i_status = CHROMECAST_CONNECTION_DEAD;
-            vlc_mutex_unlock(&p_sys->lock);
         }
         else
         {
@@ -729,9 +719,7 @@ static int processMessage(sout_stream_t *p_stream, const castchannel::CastMessag
         if (type == "CLOSE")
         {
             msg_Warn(p_stream, "received close message");
-            vlc_mutex_lock(&p_sys->lock);
             p_sys->i_status = CHROMECAST_CONNECTION_DEAD;
-            vlc_mutex_unlock(&p_sys->lock);
         }
         else
         {
@@ -900,6 +888,54 @@ static void msgLoad(sout_stream_t *p_stream)
 }
 
 
+#ifdef HAVE_MICRODNS
+static bool mdnsShouldStop(void *p_callback_cookie)
+{
+    sout_stream_t* p_stream = (sout_stream_t*)p_callback_cookie;
+    sout_stream_sys_t* p_sys = p_stream->p_sys;
+
+    return !p_sys->deviceIP.empty() || mdate() > p_sys->i_timeout;
+}
+
+static void mdnsCallback(void *p_callback_cookie, int i_status, const struct rr_entry *p_entry)
+{
+    sout_stream_t* p_stream = (sout_stream_t*)p_callback_cookie;
+    sout_stream_sys_t* p_sys = p_stream->p_sys;
+
+    if (i_status < 0)
+    {
+        char err_str[128];
+        if (mdns_strerror(i_status, err_str, sizeof(err_str)) == 0)
+            msg_Dbg(p_stream, "mDNS lookup error: %s", err_str);
+    }
+    else if (p_entry != NULL && p_entry->next != NULL)
+    {
+        std::string deviceName = p_entry->next->name;
+        if (deviceName.length() >= strlen(MDNS_CHROMECAST))
+        {
+            std::string serviceName = deviceName.substr(deviceName.length() - strlen(MDNS_CHROMECAST));
+            deviceName = deviceName.substr(0, deviceName.length() - strlen(MDNS_CHROMECAST));
+            if (serviceName == MDNS_CHROMECAST &&
+                    (p_sys->nameChromecast.empty() ||
+                     !strncasecmp(deviceName.c_str(), p_sys->nameChromecast.c_str(), p_sys->nameChromecast.length())))
+            {
+                while (p_entry != NULL)
+                {
+                    if (p_entry->type == RR_A)
+                        p_sys->deviceIP = p_entry->data.A.addr_str;
+                    else if (p_entry->type == RR_AAAA)
+                        p_sys->deviceIP = p_entry->data.AAAA.addr_str;
+                    else if (p_entry->type == RR_SRV)
+                        p_sys->devicePort = p_entry->data.SRV.port;
+                    p_entry = p_entry->next;
+                }
+                msg_Dbg(p_stream, "Found %s:%d for target %s", p_sys->deviceIP.c_str(), p_sys->devicePort, deviceName.c_str());
+            }
+        }
+    }
+}
+#endif /* HAVE_MICRODNS */
+
 /*****************************************************************************
  * Chromecast thread
  *****************************************************************************/
@@ -916,6 +952,50 @@ static void* chromecastThread(void* p_data)
 
     int i_waitdelay = PING_WAIT_TIME;
     int i_retries = PING_WAIT_RETRIES;
+
+#ifdef HAVE_MICRODNS
+    if (p_sys->microdns_ctx != NULL)
+    {
+        int err;
+        p_sys->i_timeout = mdate() + 5 * CLOCK_FREQ;
+        if ((err = mdns_listen(p_sys->microdns_ctx, MDNS_CHROMECAST+1, 2, &mdnsShouldStop, &mdnsCallback, p_stream)) < 0)
+        {
+            char err_str[128];
+            if (mdns_strerror(err, err_str, sizeof(err_str)) == 0)
+                msg_Err(p_stream, "Failed to look for the target Name: %s", err_str);
+            p_sys->i_status = CHROMECAST_CONNECTION_DEAD;
+            vlc_restorecancel(canc);
+            return NULL;
+        }
+    }
+#endif /* HAVE_MICRODNS */
+
+    p_sys->i_sock_fd = connectChromecast(p_stream);
+    if (p_sys->i_sock_fd < 0)
+    {
+        msg_Err(p_stream, "Could not connect the Chromecast");
+        p_sys->i_status = CHROMECAST_CONNECTION_DEAD;
+        vlc_restorecancel(canc);
+        return NULL;
+    }
+
+    char psz_localIP[NI_MAXNUMERICHOST];
+    if (net_GetSockAddress(p_sys->i_sock_fd, psz_localIP, NULL))
+    {
+        msg_Err(p_stream, "Cannot get local IP address");
+        p_sys->i_status = CHROMECAST_CONNECTION_DEAD;
+        vlc_restorecancel(canc);
+        return NULL;
+    }
+    p_sys->serverIP = psz_localIP;
+
+    p_sys->i_status = CHROMECAST_TLS_CONNECTED;
+
+    /* Ugly part:
+     * We want to be sure that the Chromecast receives the first data packet sent by
+     * the HTTP server. */
+
+    mtime_t deadline = mdate() + 6 * CLOCK_FREQ;
 
     msgAuth(p_stream);
     sendMessages(p_stream);
@@ -939,7 +1019,6 @@ static void* chromecastThread(void* p_data)
 #endif
         {
             msg_Err(p_stream, "The connection to the Chromecast died.");
-            vlc_mutex_locker locker(&p_sys->lock);
             p_sys->i_status = CHROMECAST_CONNECTION_DEAD;
             break;
         }
@@ -968,9 +1047,16 @@ static void* chromecastThread(void* p_data)
 #endif
             {
                 msg_Err(p_stream, "The connection to the Chromecast died.");
-                vlc_mutex_locker locker(&p_sys->lock);
                 p_sys->i_status = CHROMECAST_CONNECTION_DEAD;
             }
+        }
+
+        if (p_sys->i_status == CHROMECAST_MEDIA_LOAD_SENT)
+            deadline = 0;
+        else if (mdate() > deadline)
+        {
+            msg_Err(p_stream, "Timeout reached before sending the media loading command");
+            p_sys->i_status = CHROMECAST_CONNECTION_DEAD;
         }
 
         vlc_mutex_lock(&p_sys->lock);
