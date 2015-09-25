@@ -416,6 +416,10 @@ static int sendMessage(sout_stream_t *p_stream, castchannel::CastMessage &msg)
     if (p_data == NULL)
         return -1;
 
+#ifndef NDEBUG
+    msg_Dbg(p_stream, "sendMessage: %s payload:%s", msg.namespace_().c_str(), msg.payload_utf8().c_str());
+#endif
+
     memcpy(p_data, &i_sizeNetwork, PACKET_HEADER_LEN);
     msg.SerializeWithCachedSizesToArray((uint8_t *)(p_data + PACKET_HEADER_LEN));
 
@@ -577,6 +581,10 @@ static int processMessage(sout_stream_t *p_stream, const castchannel::CastMessag
     int i_ret = 0;
     sout_stream_sys_t *p_sys = p_stream->p_sys;
     std::string namespace_ = msg.namespace_();
+
+#ifndef NDEBUG
+    msg_Dbg(p_stream,"processMessage: %s payload:%s", namespace_.c_str(), msg.payload_utf8().c_str());
+#endif
 
     if (namespace_ == "urn:x-cast:com.google.cast.tp.deviceauth")
     {
