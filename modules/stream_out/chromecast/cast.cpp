@@ -112,7 +112,7 @@ struct sout_stream_sys_t
 };
 
 // Media player Chromecast app id
-#define APP_ID "CC1AD845" // Default media player
+#define APP_ID "CC1AD845" // Default media player aka DEFAULT_MEDIA_RECEIVER_APPLICATION_ID
 
 #define HTTP_PORT               8010
 
@@ -124,6 +124,12 @@ struct sout_stream_sys_t
 /* deadline regarding pong we expect after pinging the receiver */
 #define PONG_WAIT_TIME 500
 #define PONG_WAIT_RETRIES 2
+
+static const char NAMESPACE_DEVICEAUTH[] = "urn:x-cast:com.google.cast.tp.deviceauth";
+static const char NAMESPACE_CONNECTION[] = "urn:x-cast:com.google.cast.tp.connection";
+static const char NAMESPACE_HEARTBEAT[]  = "urn:x-cast:com.google.cast.tp.heartbeat";
+static const char NAMESPACE_RECEIVER[]   = "urn:x-cast:com.google.cast.receiver";
+static const char NAMESPACE_MEDIA[]      = "urn:x-cast:com.google.cast.media";
 
 /*****************************************************************************
  * Local prototypes
@@ -586,7 +592,7 @@ static int processMessage(sout_stream_t *p_stream, const castchannel::CastMessag
     msg_Dbg(p_stream,"processMessage: %s payload:%s", namespace_.c_str(), msg.payload_utf8().c_str());
 #endif
 
-    if (namespace_ == "urn:x-cast:com.google.cast.tp.deviceauth")
+    if (namespace_ == NAMESPACE_DEVICEAUTH)
     {
         castchannel::DeviceAuthMessage authMessage;
         authMessage.ParseFromString(msg.payload_binary());
@@ -608,7 +614,7 @@ static int processMessage(sout_stream_t *p_stream, const castchannel::CastMessag
             msgLaunch(p_stream);
         }
     }
-    else if (namespace_ == "urn:x-cast:com.google.cast.tp.heartbeat")
+    else if (namespace_ == NAMESPACE_HEARTBEAT)
     {
         json_value *p_data = json_parse(msg.payload_utf8().c_str());
         std::string type((*p_data)["type"]);
@@ -630,7 +636,7 @@ static int processMessage(sout_stream_t *p_stream, const castchannel::CastMessag
 
         json_value_free(p_data);
     }
-    else if (namespace_ == "urn:x-cast:com.google.cast.receiver")
+    else if (namespace_ == NAMESPACE_RECEIVER)
     {
         json_value *p_data = json_parse(msg.payload_utf8().c_str());
         std::string type((*p_data)["type"]);
@@ -692,7 +698,7 @@ static int processMessage(sout_stream_t *p_stream, const castchannel::CastMessag
 
         json_value_free(p_data);
     }
-    else if (namespace_ == "urn:x-cast:com.google.cast.media")
+    else if (namespace_ == NAMESPACE_MEDIA)
     {
         json_value *p_data = json_parse(msg.payload_utf8().c_str());
         std::string type((*p_data)["type"]);
@@ -718,7 +724,7 @@ static int processMessage(sout_stream_t *p_stream, const castchannel::CastMessag
 
         json_value_free(p_data);
     }
-    else if (namespace_ == "urn:x-cast:com.google.cast.tp.connection")
+    else if (namespace_ == NAMESPACE_CONNECTION)
     {
         json_value *p_data = json_parse(msg.payload_utf8().c_str());
         std::string type((*p_data)["type"]);
@@ -787,7 +793,7 @@ static void msgAuth(sout_stream_t *p_stream)
     std::string authMessageString;
     authMessage.SerializeToString(&authMessageString);
 
-    castchannel::CastMessage msg = buildMessage("urn:x-cast:com.google.cast.tp.deviceauth",
+    castchannel::CastMessage msg = buildMessage(NAMESPACE_DEVICEAUTH,
         castchannel::CastMessage_PayloadType_BINARY, authMessageString);
 
     p_sys->messagesToSend.push(msg);
@@ -799,7 +805,7 @@ static void msgPing(sout_stream_t *p_stream)
     sout_stream_sys_t *p_sys = p_stream->p_sys;
 
     std::string s("{\"type\":\"PING\"}");
-    castchannel::CastMessage msg = buildMessage("urn:x-cast:com.google.cast.tp.heartbeat",
+    castchannel::CastMessage msg = buildMessage(NAMESPACE_HEARTBEAT,
         castchannel::CastMessage_PayloadType_STRING, s);
 
     p_sys->messagesToSend.push(msg);
@@ -811,7 +817,7 @@ static void msgPong(sout_stream_t *p_stream)
     sout_stream_sys_t *p_sys = p_stream->p_sys;
 
     std::string s("{\"type\":\"PONG\"}");
-    castchannel::CastMessage msg = buildMessage("urn:x-cast:com.google.cast.tp.heartbeat",
+    castchannel::CastMessage msg = buildMessage(NAMESPACE_HEARTBEAT,
         castchannel::CastMessage_PayloadType_STRING, s);
 
     p_sys->messagesToSend.push(msg);
@@ -823,7 +829,7 @@ static void msgConnect(sout_stream_t *p_stream, std::string destinationId)
     sout_stream_sys_t *p_sys = p_stream->p_sys;
 
     std::string s("{\"type\":\"CONNECT\"}");
-    castchannel::CastMessage msg = buildMessage("urn:x-cast:com.google.cast.tp.connection",
+    castchannel::CastMessage msg = buildMessage(NAMESPACE_CONNECTION,
         castchannel::CastMessage_PayloadType_STRING, s, destinationId);
 
     p_sys->messagesToSend.push(msg);
@@ -835,7 +841,7 @@ static void msgClose(sout_stream_t *p_stream, std::string destinationId)
     sout_stream_sys_t *p_sys = p_stream->p_sys;
 
     std::string s("{\"type\":\"CLOSE\"}");
-    castchannel::CastMessage msg = buildMessage("urn:x-cast:com.google.cast.tp.connection",
+    castchannel::CastMessage msg = buildMessage(NAMESPACE_CONNECTION,
         castchannel::CastMessage_PayloadType_STRING, s, destinationId);
 
     p_sys->messagesToSend.push(msg);
@@ -848,7 +854,7 @@ static void msgStatus(sout_stream_t *p_stream)
     std::stringstream ss;
     ss << "{\"type\":\"GET_STATUS\"}";
 
-    castchannel::CastMessage msg = buildMessage("urn:x-cast:com.google.cast.receiver",
+    castchannel::CastMessage msg = buildMessage(NAMESPACE_RECEIVER,
         castchannel::CastMessage_PayloadType_STRING, ss.str());
 
     p_sys->messagesToSend.push(msg);
@@ -863,7 +869,7 @@ static void msgLaunch(sout_stream_t *p_stream)
        <<  "\"appId\":\"" << APP_ID << "\","
        <<  "\"requestId\":" << p_stream->p_sys->i_requestId++ << "}";
 
-    castchannel::CastMessage msg = buildMessage("urn:x-cast:com.google.cast.receiver",
+    castchannel::CastMessage msg = buildMessage(NAMESPACE_RECEIVER,
         castchannel::CastMessage_PayloadType_STRING, ss.str());
 
     p_sys->messagesToSend.push(msg);
@@ -889,7 +895,7 @@ static void msgLoad(sout_stream_t *p_stream)
 
     free(psz_mime);
 
-    castchannel::CastMessage msg = buildMessage("urn:x-cast:com.google.cast.media",
+    castchannel::CastMessage msg = buildMessage(NAMESPACE_MEDIA,
         castchannel::CastMessage_PayloadType_STRING, ss.str(), p_sys->appTransportId);
 
     p_sys->messagesToSend.push(msg);
