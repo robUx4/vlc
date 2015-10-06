@@ -91,6 +91,7 @@ enum access_out_query_e
 {
     ACCESS_OUT_CONTROLS_PACE, /* arg1=bool *, can fail (assume true) */
     ACCESS_OUT_CAN_SEEK, /* arg1=bool *, can fail (assume false) */
+    ACCESS_OUT_SET_BUFFERSIZE , /* arg1=size_t */
 };
 
 VLC_API sout_access_out_t * sout_AccessOutNew( vlc_object_t *, const char *psz_access, const char *psz_name ) VLC_USED;
@@ -197,7 +198,7 @@ struct sout_stream_t
     sout_instance_t   *p_sout;
 
     char              *psz_name;
-    config_chain_t        *p_cfg;
+    config_chain_t    *p_cfg;
     sout_stream_t     *p_next;
 
     /* add, remove a stream */

@@ -586,6 +586,14 @@ esac
 
 AH_BOTTOM([#include <vlc_fixups.h>])
 
+dnl  Win32
+AC_CHECK_HEADERS([iphlpapi.h],[have_iphlpapi="yes"], [have_iphlpapi="no"],[
+#include <winsock2.h>
+# if _WIN32_WINNT < 0x600
+#  error Needs vista+
+# endif
+])
+
 dnl Check for struct pollfd
 AC_CHECK_TYPES([struct pollfd],,,
 [#include <sys/types.h>
@@ -593,6 +601,9 @@ AC_CHECK_TYPES([struct pollfd],,,
 # include <poll.h>
 #elif defined (_WIN32)
 # include <winsock2.h>
+# ifdef HAVE_IPHLPAPI_H
+#  include <iphlpapi.h>
+# endif
 #endif
 ])
 
@@ -605,7 +616,11 @@ AC_SEARCH_LIBS(connect, [socket], [
   ])
 ], [
   AS_IF([test "${SYS}" = "mingw32"], [
-    SOCKET_LIBS="-lws2_32"
+    AS_IF([test "$have_iphlpapi" = "yes"], [
+      SOCKET_LIBS="-lws2_32 -liphlpapi"
+    ],[
+      SOCKET_LIBS="-lws2_32"
+    ])
   ])
 ])
 
@@ -1658,7 +1673,7 @@ You can get an updated one from http://www.live555.com/liveMedia .])
       other_libs_pic="-lgroupsock_pic -lBasicUsageEnvironment_pic -lUsageEnvironment_pic"
       AS_IF([test "${SYS}" = "mingw32"], [
         # add ws2_32 for closesocket, select, recv
-        other_libs="$other_libs -lws2_32"
+        other_libs="$other_libs $SOCKET_LIBS"
       ])
 
       dnl We need to check for pic because live555 don't provide shared libs

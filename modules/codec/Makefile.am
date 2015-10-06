@@ -307,7 +307,7 @@ if ENABLE_SOUT
 libavcodec_plugin_la_SOURCES += codec/avcodec/encoder.c
 endif
 libavcodec_plugin_la_CFLAGS = $(AVCODEC_CFLAGS) $(AM_CFLAGS)
-libavcodec_plugin_la_LIBADD = $(AVCODEC_LIBS) $(LIBM)
+libavcodec_plugin_la_LIBADD = $(AVCODEC_LIBS) $(LIBM) -lpthread
 libavcodec_plugin_la_LDFLAGS = $(AM_LDFLAGS) $(SYMBOLIC_LDFLAGS)
 
 if MERGE_FFMPEG
@@ -483,7 +483,7 @@ libvpx_plugin_la_SOURCES = codec/vpx.c
 libvpx_plugin_la_CPPFLAGS = $(AM_CPPFLAGS)
 libvpx_plugin_la_CFLAGS = $(AM_CFLAGS) $(VPX_CFLAGS) $(CPPFLAGS_vpx)
 libvpx_plugin_la_LDFLAGS = $(AM_LDFLAGS) -rpath '$(codecdir)'
-libvpx_plugin_la_LIBADD = $(VPX_LIBS)
+libvpx_plugin_la_LIBADD = $(VPX_LIBS) $(LIBPTHREAD)
 EXTRA_LTLIBRARIES += libvpx_plugin.la
 codec_LTLIBRARIES += $(LTLIBvpx)
 

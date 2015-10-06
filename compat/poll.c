@@ -108,9 +108,15 @@ int (poll) (struct pollfd *fds, unsigned nfds, int timeout)
 #else
 # include <windows.h>
 # include <winsock2.h>
+# ifdef HAVE_IPHLPAPI_H
+#  include <iphlpapi.h>
+# endif /* HAVE_IPHLPAPI_H */
 
 int poll(struct pollfd *fds, unsigned nfds, int timeout)
 {
+#if 1 && defined(HAVE_IPHLPAPI_H)
+    return WSAPoll(fds,nfds,timeout);
+#else
     DWORD to = (timeout >= 0) ? (DWORD)timeout : INFINITE;
 
     if (nfds == 0)
@@ -250,5 +256,6 @@ int poll(struct pollfd *fds, unsigned nfds, int timeout)
         return -1;
     }
     return count;
+#endif
 }
 #endif

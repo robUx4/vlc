@@ -103,6 +103,10 @@ typedef struct httpd_message_t
     int     i_body;
     uint8_t *p_body;
 
+    /* signal when body sent */
+    vlc_mutex_t *p_sent_lock;
+    vlc_cond_t  *p_sent_cond;
+
 } httpd_message_t;
 
 typedef struct httpd_url_t      httpd_url_t;
@@ -144,6 +148,7 @@ VLC_API void httpd_StreamDelete( httpd_stream_t * );
 VLC_API int httpd_StreamHeader( httpd_stream_t *, uint8_t *p_data, int i_data );
 VLC_API int httpd_StreamSend( httpd_stream_t *, const block_t *p_block );
 VLC_API int httpd_StreamSetHTTPHeaders(httpd_stream_t *, httpd_header *, size_t);
+VLC_API void httpd_StreamBlockingSize(httpd_stream_t *, size_t);
 
 /* Msg functions facilities */
 VLC_API void httpd_MsgAdd( httpd_message_t *, const char *psz_name, const char *psz_value, ... ) VLC_FORMAT( 3, 4 );

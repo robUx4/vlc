@@ -90,7 +90,7 @@ vlc_module_begin ()
     set_shortname( N_("Standard"))
     set_description( N_("Standard stream output") )
     set_capability( "sout stream", 50 )
-    add_shortcut( "standard", "std", "file", "http", "udp" )
+    add_shortcut( "standard", "std", "file", "http", "udp", "simplehttpd" )
     set_category( CAT_SOUT )
     set_subcategory( SUBCAT_SOUT_STREAM )
 

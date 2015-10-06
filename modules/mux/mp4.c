@@ -2899,6 +2899,14 @@ static void WriteFragments(sout_mux_t *p_mux, bool b_flush)
     size_t i_mdat_size = 0;
     bool b_has_samples = false;
 
+#if 1 && !defined(NDEBUG)
+    wchar_t dbg[256];
+    wsprintf(dbg,L"%d mp4:WriteFragments flush:", mdate() * 1000 / CLOCK_FREQ);
+    OutputDebugString(dbg);
+    wsprintf(dbg,L"%d\n", b_flush);
+    OutputDebugString(dbg);
+#endif
+
     for (unsigned int i = 0; i < p_sys->i_nb_streams; i++)
     {
         const mp4_stream_t *p_stream = p_sys->pp_streams[i];
@@ -2931,11 +2939,13 @@ static void WriteFragments(sout_mux_t *p_mux, bool b_flush)
 
     if (moof)
     {
-        msg_Dbg(p_mux, "writing moof @ %"PRId64, p_sys->i_pos);
+        sout_AccessOutControl(p_mux->p_access, ACCESS_OUT_SET_BUFFERSIZE, moof->b->i_buffer + 8 + i_mdat_size);
+
+        //msg_Dbg(p_mux, "writing moof @ %"PRId64, p_sys->i_pos);
         p_sys->i_pos += moof->b->i_buffer;
         assert(moof->b->i_flags & BLOCK_FLAG_TYPE_I); /* http sout */
         box_send(p_mux, moof);
-        msg_Dbg(p_mux, "writing mdat @ %"PRId64, p_sys->i_pos);
+        //msg_Dbg(p_mux, "writing mdat @ %"PRId64, p_sys->i_pos);
         WriteFragmentMDAT(p_mux, i_mdat_size);
 
         /* update iframe point */
