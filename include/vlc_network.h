@@ -37,6 +37,9 @@
 #   include <io.h>
 #   include <winsock2.h>
 #   include <ws2tcpip.h>
+#   ifdef HAVE_IPHLPAPI_H
+#     include <iphlpapi.h>
+#   endif /* HAVE_IPHLPAPI_H */
 #   define net_errno (WSAGetLastError())
 
 struct iovec
