@@ -97,6 +97,7 @@ struct sout_stream_sys_t
 
     unsigned i_requestId;
     std::string appTransportId;
+    char *psz_mime;
 
     std::queue<castchannel::CastMessage> messagesToSend;
 
@@ -257,6 +258,13 @@ static int Open(vlc_object_t *p_this)
         return VLC_EGENERIC;
     }
 
+    p_sys->psz_mime = var_GetNonEmptyString(p_stream, SOUT_CFG_PREFIX "mime");
+    if (p_sys->psz_mime == NULL)
+    {
+        Clean(p_stream);
+        return VLC_EGENERIC;
+    }
+
     char *psz_mux = var_GetNonEmptyString(p_stream, SOUT_CFG_PREFIX "mux");
     if (psz_mux == NULL)
     {
@@ -264,9 +272,9 @@ static int Open(vlc_object_t *p_this)
         return VLC_EGENERIC;
     }
     char *psz_chain = NULL;
-    int i_bytes = asprintf(&psz_chain, "http{dst=:%u/stream,mux=%s}",
+    int i_bytes = asprintf(&psz_chain, "http{dst=:%u/stream,mux=%s,access=http{mime=%s}}",
                            (unsigned)var_InheritInteger(p_stream, SOUT_CFG_PREFIX"http-port"),
-                           psz_mux);
+                           psz_mux, p_sys->psz_mime);
     free(psz_mux);
     if (i_bytes < 0)
     {
@@ -351,7 +359,7 @@ static void Clean(sout_stream_t *p_stream)
 #ifdef HAVE_MICRODNS
     mdns_cleanup(p_sys->microdns_ctx);
 #endif
-
+    free(p_sys->psz_mime);
     delete p_sys;
 }
 
@@ -880,20 +888,14 @@ static void msgLoad(sout_stream_t *p_stream)
 {
     sout_stream_sys_t *p_sys = p_stream->p_sys;
 
-    char *psz_mime = var_GetNonEmptyString(p_stream, SOUT_CFG_PREFIX "mime");
-    if (psz_mime == NULL)
-        return;
-
     std::stringstream ss;
     ss << "{\"type\":\"LOAD\","
        <<  "\"media\":{\"contentId\":\"http://" << p_sys->serverIP << ":"
            << var_InheritInteger(p_stream, SOUT_CFG_PREFIX"http-port")
            << "/stream\","
        <<             "\"streamType\":\"LIVE\","
-       <<             "\"contentType\":\"" << std::string(psz_mime) << "\"},"
+       <<             "\"contentType\":\"" << p_sys->psz_mime << "\"},"
        <<  "\"requestId\":" << p_stream->p_sys->i_requestId++ << "}";
-
-    free(psz_mime);
 
     castchannel::CastMessage msg = buildMessage(NAMESPACE_MEDIA,
         castchannel::CastMessage_PayloadType_STRING, ss.str(), p_sys->appTransportId);
