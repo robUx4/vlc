@@ -403,6 +403,8 @@ int OpenDemux( vlc_object_t *p_this )
 
             fmt.video.i_width = cc->width;
             fmt.video.i_height = cc->height;
+            fmt.video.i_visible_width = fmt.video.i_width;
+            fmt.video.i_visible_height = fmt.video.i_height;
 
             get_rotation(&fmt, s);
 
@@ -739,7 +741,7 @@ static int Demux( demux_t *p_demux )
     if( p_sys->ic->start_time != (int64_t)AV_NOPTS_VALUE )
     {
         q = lldiv( p_sys->ic->start_time, AV_TIME_BASE);
-        i_start_time = q.quot * (int64_t)1000000 + q.rem * (int64_t)1000000 / AV_TIME_BASE;
+        i_start_time = q.quot * CLOCK_FREQ + q.rem * CLOCK_FREQ / AV_TIME_BASE;
     }
     else
         i_start_time = 0;
@@ -749,8 +751,8 @@ static int Demux( demux_t *p_demux )
     else
     {
         q = lldiv( pkt.dts, p_stream->time_base.den );
-        p_frame->i_dts = q.quot * (int64_t)1000000 *
-            p_stream->time_base.num + q.rem * (int64_t)1000000 *
+        p_frame->i_dts = q.quot * CLOCK_FREQ *
+            p_stream->time_base.num + q.rem * CLOCK_FREQ *
             p_stream->time_base.num /
             p_stream->time_base.den - i_start_time + VLC_TS_0;
     }
@@ -760,13 +762,13 @@ static int Demux( demux_t *p_demux )
     else
     {
         q = lldiv( pkt.pts, p_stream->time_base.den );
-        p_frame->i_pts = q.quot * (int64_t)1000000 *
-            p_stream->time_base.num + q.rem * (int64_t)1000000 *
+        p_frame->i_pts = q.quot * CLOCK_FREQ *
+            p_stream->time_base.num + q.rem * CLOCK_FREQ *
             p_stream->time_base.num /
             p_stream->time_base.den - i_start_time + VLC_TS_0;
     }
     if( pkt.duration > 0 && p_frame->i_length <= 0 )
-        p_frame->i_length = pkt.duration * INT64_C(1000000) *
+        p_frame->i_length = pkt.duration * CLOCK_FREQ *
             p_stream->time_base.num /
             p_stream->time_base.den;
 

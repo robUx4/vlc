@@ -307,8 +307,9 @@ libadaptative_plugin_la_SOURCES = \
     demux/adaptative/plumbing/FakeESOut.hpp \
     demux/adaptative/plumbing/FakeESOutID.cpp \
     demux/adaptative/plumbing/FakeESOutID.hpp \
-    demux/adaptative/plumbing/StreamOutput.cpp \
-    demux/adaptative/plumbing/StreamOutput.hpp \
+    demux/adaptative/plumbing/SourceStream.cpp \
+    demux/adaptative/plumbing/SourceStream.hpp \
+    demux/adaptative/ChunksSource.hpp \
     demux/adaptative/PlaylistManager.cpp \
     demux/adaptative/PlaylistManager.h \
     demux/adaptative/SegmentTracker.cpp \
@@ -319,6 +320,7 @@ libadaptative_plugin_la_SOURCES = \
     demux/adaptative/Streams.hpp \
     demux/adaptative/StreamsType.hpp \
     demux/adaptative/Time.hpp \
+    demux/adaptative/tools/Debug.hpp \
     demux/adaptative/tools/Helper.cpp \
     demux/adaptative/tools/Helper.h \
     demux/adaptative/tools/Properties.hpp \
@@ -360,6 +362,8 @@ libadaptative_dash_SOURCES = \
     demux/dash/xml/Node.h \
     demux/dash/DASHManager.cpp \
     demux/dash/DASHManager.h \
+    demux/dash/DASHStream.cpp \
+    demux/dash/DASHStream.hpp \
     demux/dash/DASHStreamFormat.hpp
 
 libadaptative_hls_SOURCES = \

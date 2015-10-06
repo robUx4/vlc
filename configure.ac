@@ -336,6 +336,24 @@ AS_IF([test "$SYS" = linux],[
 ])
 AM_CONDITIONAL(HAVE_ANDROID, test "${HAVE_ANDROID}" = "1")
 
+dnl Tizen (minimum SDK version: 2.3)
+AS_IF([test "$SYS" = linux],[
+    AC_MSG_CHECKING([for Tizen])
+    AC_TRY_COMPILE([#include <tizen.h>
+#if !defined(TIZEN_SDK_MAJOR) && !defined(TIZEN_SDK_MINOR)
+# error Not Tizen
+#endif
+#if TIZEN_SDK_MAJOR < 2 || (TIZEN_SDK_MAJOR == 2 && TIZEN_SDK_MINOR < 3)
+# error Tizen SDK too old
+#endif
+    ],[],[
+      HAVE_TIZEN="1"
+      AC_MSG_RESULT([yes])
+    ],[
+      AC_MSG_RESULT([no])
+    ])
+])
+AM_CONDITIONAL(HAVE_TIZEN, test "${HAVE_TIZEN}" = "1")
 
 dnl
 dnl  Check for the contrib directory
@@ -1738,7 +1756,7 @@ AS_IF([test "${enable_dvdnav}" != "no"], [
 dnl
 dnl  Blu-ray Disc Support with libbluray
 dnl
-PKG_ENABLE_MODULES_VLC([BLURAY], [libbluray], [libbluray >= 0.5.0], (libbluray for Blu-ray disc support ) )
+PKG_ENABLE_MODULES_VLC([BLURAY], [libbluray], [libbluray >= 0.6.2], (libbluray for Blu-ray disc support ) )
 
 dnl
 dnl  OpenCV wrapper and example filters
@@ -3606,6 +3624,22 @@ if test "${HAVE_ANDROID}" = "1"; then
         [ VLC_ADD_PLUGIN([opensles_android]) ],
         [ AC_MSG_ERROR([cannot find OpenSLES headers])] )
   fi
+fi
+
+dnl
+dnl  Tizen audio
+dnl
+AC_ARG_ENABLE(tizen_audio,
+  [AS_HELP_STRING([--enable-tizen-audio],
+    [Tizen audio module (default enabled on Tizen)])],, [
+  AS_IF([test "$HAVE_TIZEN" = "1"], [
+    enable_tizen_audio="yes"
+  ])
+])
+if test "${enable_tizen_audio}" = "yes"; then
+  AC_CHECK_HEADERS(audio_io.h,
+    [ VLC_ADD_PLUGIN([tizen_audio]) ],
+    [ AC_MSG_ERROR([cannot find Tizen audio_io headers])] )
 fi
 
 dnl

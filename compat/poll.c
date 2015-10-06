@@ -108,154 +108,161 @@ int (poll) (struct pollfd *fds, unsigned nfds, int timeout)
 #else
 # include <windows.h>
 # include <winsock2.h>
-# ifdef HAVE_IPHLPAPI_H
-#  include <iphlpapi.h>
-# endif /* HAVE_IPHLPAPI_H */
+
+static int wait_ms(int timeout_ms);
+static long tvdiff(struct timeval newer, struct timeval older);
+static struct timeval tvnow(void);
 
 int poll(struct pollfd *fds, unsigned nfds, int timeout)
 {
-#if 1 && defined(HAVE_IPHLPAPI_H)
-    return WSAPoll(fds,nfds,timeout);
-#else
-    DWORD to = (timeout >= 0) ? (DWORD)timeout : INFINITE;
+    struct timeval pending_tv;
+    struct timeval *ptimeout;
+    fd_set fds_read;
+    fd_set fds_write;
+    fd_set fds_err;
+    SOCKET maxfd;
 
-    if (nfds == 0)
-    {    /* WSAWaitForMultipleEvents() does not allow zero events */
-        if (SleepEx(to, TRUE))
-        {
-            errno = EINTR;
-            return -1;
+    struct timeval initial_tv = {0, 0};
+    BOOL fds_none = TRUE;
+    unsigned int i;
+    int pending_ms = 0;
+    int error;
+    int r;
+
+    if (fds) {
+        for (i = 0; i < nfds; i++) {
+            if (fds[i].fd != INVALID_SOCKET) {
+                fds_none = FALSE;
+                break;
+            }
         }
-        return 0;
+    }
+    if (fds_none) {
+        return wait_ms(timeout);
     }
 
-    WSAEVENT *evts = malloc(nfds * sizeof (WSAEVENT));
-    if (evts == NULL)
-        return -1; /* ENOMEM */
+    if (timeout > 0) {
+        pending_ms = timeout;
+        initial_tv = tvnow();
+    }
 
-    DWORD ret = WSA_WAIT_FAILED;
-    for (unsigned i = 0; i < nfds; i++)
-    {
-        SOCKET fd = fds[i].fd;
-        long mask = FD_CLOSE;
-        fd_set rdset, wrset, exset;
+    FD_ZERO(&fds_read);
+    FD_ZERO(&fds_write);
+    FD_ZERO(&fds_err);
+    maxfd = INVALID_SOCKET;
 
-        FD_ZERO(&rdset);
-        FD_ZERO(&wrset);
-        FD_ZERO(&exset);
-        FD_SET(fd, &exset);
-
-        if (fds[i].events & POLLRDNORM)
-        {
-            mask |= FD_READ | FD_ACCEPT;
-            FD_SET(fd, &rdset);
-        }
-        if (fds[i].events & POLLWRNORM)
-        {
-            mask |= FD_WRITE | FD_CONNECT;
-            FD_SET(fd, &wrset);
-        }
-        if (fds[i].events & POLLPRI)
-            mask |= FD_OOB;
-
+    for (i = 0; i < nfds; i++) {
         fds[i].revents = 0;
-
-        evts[i] = WSACreateEvent();
-        if (evts[i] == WSA_INVALID_EVENT)
-        {
-            while (i > 0)
-                WSACloseEvent(evts[--i]);
-            free(evts);
-            errno = ENOMEM;
-            return -1;
+        if (fds[i].fd == INVALID_SOCKET)
+            continue;
+        if (fds[i].events & (POLLIN|POLLOUT|POLLPRI|POLLRDNORM|POLLWRNORM|POLLRDBAND)) {
+            if (fds[i].fd > maxfd)
+                maxfd = fds[i].fd;
+            if (fds[i].events & (POLLRDNORM|POLLIN))
+                FD_SET(fds[i].fd, &fds_read);
+            if (fds[i].events & (POLLWRNORM|POLLOUT))
+                FD_SET(fds[i].fd, &fds_write);
+            if (fds[i].events & (POLLRDBAND|POLLPRI))
+                FD_SET(fds[i].fd, &fds_err);
         }
-
-        if (WSAEventSelect(fds[i].fd, evts[i], mask)
-         && WSAGetLastError() == WSAENOTSOCK)
-            fds[i].revents |= POLLNVAL;
-
-        struct timeval tv = { 0, 0 };
-        /* By its horrible design, WSAEnumNetworkEvents() only enumerates
-         * events that were not already signaled (i.e. it is edge-triggered).
-         * WSAPoll() would be better in this respect, but worse in others.
-         * So use WSAEnumNetworkEvents() after manually checking for pending
-         * events. */
-        if (select(0, &rdset, &wrset, &exset, &tv) > 0)
-        {
-            if (FD_ISSET(fd, &rdset))
-                fds[i].revents |= fds[i].events & POLLRDNORM;
-            if (FD_ISSET(fd, &wrset))
-                fds[i].revents |= fds[i].events & POLLWRNORM;
-            if (FD_ISSET(fd, &exset))
-                /* To add pain to injury, POLLERR and POLLPRI cannot be
-                 * distinguished here. */
-                fds[i].revents |= POLLERR | (fds[i].events & POLLPRI);
-        }
-
-        if (fds[i].revents != 0 && ret == WSA_WAIT_FAILED)
-            ret = WSA_WAIT_EVENT_0 + i;
     }
 
-    if (ret == WSA_WAIT_FAILED)
-        ret = WSAWaitForMultipleEvents(nfds, evts, FALSE, to, TRUE);
-
-    unsigned count = 0;
-    for (unsigned i = 0; i < nfds; i++)
-    {
-        WSANETWORKEVENTS ne;
-
-        if (WSAEnumNetworkEvents(fds[i].fd, evts[i], &ne))
-            memset(&ne, 0, sizeof (ne));
-        WSAEventSelect(fds[i].fd, evts[i], 0);
-        WSACloseEvent(evts[i]);
-
-        if (ne.lNetworkEvents & FD_CONNECT)
-        {
-            fds[i].revents |= POLLWRNORM;
-            if (ne.iErrorCode[FD_CONNECT_BIT] != 0)
-                fds[i].revents |= POLLERR;
-        }
-        if (ne.lNetworkEvents & FD_CLOSE)
-        {
-            fds[i].revents |= (fds[i].events & POLLRDNORM) | POLLHUP;
-            if (ne.iErrorCode[FD_CLOSE_BIT] != 0)
-                fds[i].revents |= POLLERR;
-        }
-        if (ne.lNetworkEvents & FD_ACCEPT)
-        {
-            fds[i].revents |= POLLRDNORM;
-            if (ne.iErrorCode[FD_ACCEPT_BIT] != 0)
-                fds[i].revents |= POLLERR;
-        }
-        if (ne.lNetworkEvents & FD_OOB)
-        {
-            fds[i].revents |= POLLPRI;
-            if (ne.iErrorCode[FD_OOB_BIT] != 0)
-                fds[i].revents |= POLLERR;
-        }
-        if (ne.lNetworkEvents & FD_READ)
-        {
-            fds[i].revents |= POLLRDNORM;
-            if (ne.iErrorCode[FD_READ_BIT] != 0)
-                fds[i].revents |= POLLERR;
-        }
-        if (ne.lNetworkEvents & FD_WRITE)
-        {
-            fds[i].revents |= POLLWRNORM;
-            if (ne.iErrorCode[FD_WRITE_BIT] != 0)
-                fds[i].revents |= POLLERR;
-        }
-        count += fds[i].revents != 0;
+    /* WinSock select() can't handle zero events. */
+    if (!fds_read.fd_count && !fds_write.fd_count && !fds_err.fd_count) {
+        return wait_ms(timeout);
     }
 
-    free(evts);
+    ptimeout = (timeout < 0) ? NULL : &pending_tv;
 
-    if (count == 0 && ret == WSA_WAIT_IO_COMPLETION)
-    {
-        errno = EINTR;
+    do {
+        if (timeout > 0) {
+            pending_tv.tv_sec = pending_ms / 1000;
+            pending_tv.tv_usec = (pending_ms % 1000) * 1000;
+        }
+        else if (!timeout) {
+            pending_tv.tv_sec = 0;
+            pending_tv.tv_usec = 0;
+        }
+        r = select(maxfd + 1,
+                   /* WinSock select() can't handle fd_sets with zero bits set, so
+                      don't give it such arguments.
+                   */
+                   fds_read.fd_count ? &fds_read : NULL,
+                   fds_write.fd_count ? &fds_write : NULL,
+                   fds_err.fd_count ? &fds_err : NULL,
+                   ptimeout);
+        if (r != -1)
+            break;
+        error = WSAGetLastError();
+        if (error && error != EINTR)
+            break;
+        if (timeout > 0) {
+            pending_ms = timeout - (int)tvdiff(tvnow(), initial_tv);
+            if (pending_ms <= 0) {
+                r = 0;  /* Simulate a "call timed out" case */
+                break;
+            }
+        }
+    } while (r == -1);
+
+    if (r < 0)
         return -1;
+    if (r == 0)
+        return 0;
+
+    r = 0;
+    for (i = 0; i < nfds; i++) {
+        fds[i].revents = 0;
+        if (fds[i].fd == INVALID_SOCKET)
+            continue;
+        if (FD_ISSET(fds[i].fd, &fds_read))
+            fds[i].revents |= POLLIN;
+        if (FD_ISSET(fds[i].fd, &fds_write))
+            fds[i].revents |= POLLOUT;
+        if (FD_ISSET(fds[i].fd, &fds_err))
+            fds[i].revents |= POLLPRI;
+        if (fds[i].revents != 0)
+            r++;
     }
-    return count;
+
+    return r;
+}
+
+static int wait_ms(int timeout)
+{
+    int r = 0;
+    if (timeout < 0)
+    {
+        WSASetLastError( EINVAL );
+        r = -1;
+    }
+    else if (timeout > 0 && SleepEx( timeout, TRUE ))
+    {
+        WSASetLastError( EINTR );
+        r = -1;
+    }
+    return r;
+}
+
+static long tvdiff(struct timeval newer, struct timeval older)
+{
+    return (newer.tv_sec-older.tv_sec)*1000 + (long)(newer.tv_usec-older.tv_usec)/1000;
+}
+
+static struct timeval tvnow(void)
+{
+    struct timeval now;
+#if !defined(_WIN32_WINNT) || !defined(_WIN32_WINNT_VISTA) || \
+    (_WIN32_WINNT < _WIN32_WINNT_VISTA)
+    DWORD milliseconds = GetTickCount();
+    now.tv_sec = milliseconds / 1000;
+    now.tv_usec = (milliseconds % 1000) * 1000;
+#else
+    ULONGLONG milliseconds = GetTickCount64();
+    now.tv_sec = (long) (milliseconds / 1000);
+    now.tv_usec = (long) (milliseconds % 1000) * 1000;
 #endif
+
+    return now;
 }
 #endif

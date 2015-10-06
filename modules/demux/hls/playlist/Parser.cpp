@@ -179,6 +179,7 @@ void M3U8Parser::parseSegments(vlc_object_t *p_obj, Representation *rep, const s
     stime_t totalduration = 0;
     stime_t nzStartTime = 0;
     uint64_t sequenceNumber = 0;
+    bool discontinuity = false;
     std::size_t prevbyterangeoffset = 0;
     const SingleValueTag *ctx_byterange = NULL;
     SegmentEncryption encryption;
@@ -243,6 +244,12 @@ void M3U8Parser::parseSegments(vlc_object_t *p_obj, Representation *rep, const s
                     ctx_byterange = NULL;
                 }
 
+                if(discontinuity)
+                {
+                    segment->discontinuity = true;
+                    discontinuity = false;
+                }
+
                 if(encryption.method != SegmentEncryption::NONE)
                     segment->setEncryption(encryption);
             }
@@ -266,8 +273,14 @@ void M3U8Parser::parseSegments(vlc_object_t *p_obj, Representation *rep, const s
                     encryption.method = SegmentEncryption::AES_128;
                     encryption.key.clear();
                     uint8_t *p_data;
-                    const uint64_t read = Retrieve::HTTP(p_obj, keytag->getAttributeByName("URI")->quotedString(),
-                                                         (void **) &p_data);
+
+                    Url keyurl(keytag->getAttributeByName("URI")->quotedString());
+                    if(!keyurl.hasScheme())
+                    {
+                        keyurl.prepend(Helper::getDirectoryPath(rep->getPlaylistUrl().toString()).append("/"));
+                    }
+
+                    const uint64_t read = Retrieve::HTTP(p_obj, keyurl.toString(), (void **) &p_data);
                     if(p_data)
                     {
                         if(read == 16)
@@ -293,6 +306,10 @@ void M3U8Parser::parseSegments(vlc_object_t *p_obj, Representation *rep, const s
                 }
             }
             break;
+
+            case Tag::EXTXDISCONTINUITY:
+                discontinuity  = true;
+                break;
 
             case Tag::EXTXENDLIST:
                 rep->b_live = false;

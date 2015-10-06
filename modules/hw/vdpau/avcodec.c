@@ -140,43 +140,13 @@ static int Copy(vlc_va_t *va, picture_t *pic, uint8_t *data)
     return VLC_SUCCESS;
 }
 
-static int Setup(vlc_va_t *va, AVCodecContext *avctx, vlc_fourcc_t *chromap)
-{
-    vlc_va_sys_t *sys = va->sys;
-    VdpChromaType type;
-    uint32_t width, height;
-
-    if (av_vdpau_get_surface_parameters(avctx, &type, &width, &height))
-        return VLC_EGENERIC;
-
-    assert(type == sys->type);
-    if (sys->width != width || sys->height != height)
-        return VLC_EGENERIC;
-
-    switch (sys->type)
-    {
-        case VDP_CHROMA_TYPE_420:
-            *chromap = VLC_CODEC_VDPAU_VIDEO_420;
-            break;
-        case VDP_CHROMA_TYPE_422:
-            *chromap = VLC_CODEC_VDPAU_VIDEO_422;
-            break;
-        case VDP_CHROMA_TYPE_444:
-            *chromap = VLC_CODEC_VDPAU_VIDEO_444;
-            break;
-        default:
-            vlc_assert_unreachable();
-    }
-
-    return VLC_SUCCESS;
-}
-
 static int Open(vlc_va_t *va, AVCodecContext *avctx, enum PixelFormat pix_fmt,
                 const es_format_t *fmt, picture_sys_t *p_sys)
 {
     if (pix_fmt != AV_PIX_FMT_VDPAU)
         return VLC_EGENERIC;
 
+    (void) fmt;
     (void) p_sys;
     void *func;
     VdpStatus err;
@@ -258,8 +228,6 @@ static int Open(vlc_va_t *va, AVCodecContext *avctx, enum PixelFormat pix_fmt,
 
     if (av_vdpau_bind_context(avctx, sys->device, func, flags))
         goto error;
-
-    (void) fmt;
 #else
     AVVDPAUContext *hwctx = av_vdpau_alloc_context();
     if (unlikely(hwctx == NULL))
@@ -288,10 +256,10 @@ static int Open(vlc_va_t *va, AVCodecContext *avctx, enum PixelFormat pix_fmt,
         goto error;
     }
     msg_Dbg(va, "video surface limits: %"PRIu32"x%"PRIu32, w, h);
-    if (w < fmt->video.i_width || h < fmt->video.i_height)
+    if (w < avctx->coded_width || h < avctx->coded_height)
     {
-        msg_Err(va, "video surface above limits: %ux%u",
-                fmt->video.i_width, fmt->video.i_height);
+        msg_Err(va, "video surface above limits: %dx%d",
+                avctx->coded_width, avctx->coded_height);
         goto error;
     }
 
@@ -305,10 +273,10 @@ static int Open(vlc_va_t *va, AVCodecContext *avctx, enum PixelFormat pix_fmt,
     }
     msg_Dbg(va, "decoder profile limits: level %"PRIu32" mb %"PRIu32" "
             "%"PRIu32"x%"PRIu32, l, mb, w, h);
-    if ((int)l < level || w < fmt->video.i_width || h < fmt->video.i_height)
+    if ((int)l < level || w < avctx->coded_width || h < avctx->coded_height)
     {
-        msg_Err(va, "decoder profile above limits: level %d %ux%u",
-                level, fmt->video.i_width, fmt->video.i_height);
+        msg_Err(va, "decoder profile above limits: level %d %dx%d",
+                level, avctx->coded_width, avctx->coded_height);
         goto error;
     }
 
@@ -347,7 +315,6 @@ static int Open(vlc_va_t *va, AVCodecContext *avctx, enum PixelFormat pix_fmt,
         infos = "VDPAU";
 
     va->description = infos;
-    va->setup = Setup;
     va->get = Lock;
     va->release = NULL;
     va->extract = Copy;

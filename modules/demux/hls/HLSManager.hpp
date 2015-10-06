@@ -32,7 +32,7 @@ namespace hls
     {
         public:
             HLSManager( demux_t *, playlist::M3U8 *,
-                        AbstractStreamOutputFactory *,
+                        AbstractStreamFactory *,
                         logic::AbstractAdaptationLogic::LogicType type );
             virtual ~HLSManager();
             virtual AbstractAdaptationLogic *createLogic(AbstractAdaptationLogic::LogicType);

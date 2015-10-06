@@ -76,7 +76,6 @@ decoder_GetDisplayDate
 decoder_GetDisplayRate
 decoder_GetInputAttachments
 decoder_NewAudioBuffer
-decoder_NewPicture
 decoder_NewSubpicture
 decoder_SynchroChoose
 decoder_SynchroDate
@@ -89,8 +88,10 @@ decoder_SynchroReset
 decoder_SynchroTrash
 decode_URI
 decode_URI_duplicate
+demux_Delete
 demux_PacketizerDestroy
 demux_PacketizerNew
+demux_New
 demux_vaControlHelper
 dialog_ExtensionUpdate
 dialog_Login
@@ -313,6 +314,7 @@ picture_pool_New
 picture_pool_NewExtended
 picture_pool_NewFromFormat
 picture_pool_Reserve
+picture_pool_Wait
 picture_Reset
 picture_Setup
 plane_CopyPixels
@@ -395,6 +397,7 @@ spu_RegisterChannel
 spu_ClearChannel
 stream_Block
 stream_Control
+stream_CustomNew
 stream_Delete
 stream_DemuxNew
 stream_DemuxSend

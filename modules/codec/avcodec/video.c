@@ -199,17 +199,6 @@ static int lavc_UpdateVideoFormat( decoder_t *p_dec, AVCodecContext *p_context,
     return decoder_UpdateVideoFormat( p_dec );
 }
 
-/* Returns a new picture buffer */
-static inline picture_t *ffmpeg_NewPictBuf( decoder_t *p_dec,
-                                            AVCodecContext *p_context )
-{
-    bool hwaccel = p_dec->p_sys->p_va != NULL;
-
-    if (lavc_UpdateVideoFormat(p_dec, p_context, hwaccel))
-        return NULL;
-    return decoder_NewPicture( p_dec );
-}
-
 /**
  * Copies a picture from the libavcodec-allocate buffer to a picture_t.
  * This is used when not in direct rendering mode.
@@ -398,18 +387,9 @@ int InitVideoDec( decoder_t *p_dec, AVCodecContext *p_context,
         p_sys->b_direct_rendering = true;
     }
 
-    /* libavcodec doesn't properly release old pictures when frames are skipped */
-    //if( p_sys->b_hurry_up ) p_sys->b_direct_rendering = false;
-    if( p_sys->b_direct_rendering )
-    {
-        msg_Dbg( p_dec, "trying to use direct rendering" );
-        p_context->flags |= CODEC_FLAG_EMU_EDGE;
-    }
-    else
-    {
-        msg_Dbg( p_dec, "direct rendering is disabled" );
-    }
-
+#if !LIBAVCODEC_VERSION_CHECK(55, 32, 1, 48, 102)
+    p_context->flags |= CODEC_FLAG_EMU_EDGE;
+#endif
     p_context->get_format = ffmpeg_GetFormat;
     /* Always use our get_buffer wrapper so we can calculate the
      * PTS correctly */
@@ -781,10 +761,13 @@ static picture_t *DecodeVideo( decoder_t *p_dec, block_t **pp_block )
 
         picture_t *p_pic = frame->opaque;
         if( p_pic == NULL )
-        {
-            /* Get a new picture */
-            if( p_sys->p_va == NULL )
-                p_pic = ffmpeg_NewPictBuf( p_dec, p_context );
+        {   /* When direct rendering is not used, get_format() and get_buffer()
+             * might not be called. The output video format must be set here
+             * then picture buffer can be allocated. */
+            if (p_sys->p_va == NULL
+             && lavc_UpdateVideoFormat(p_dec, p_context, false) == 0)
+                p_pic = decoder_GetPicture(p_dec);
+
             if( !p_pic )
             {
                 av_frame_free(&frame);
@@ -1061,24 +1044,26 @@ static int lavc_GetFrame(struct AVCodecContext *ctx, AVFrame *frame, int flags)
     frame->opaque = NULL;
 
     wait_mt(sys);
-    if (sys->p_va != NULL)
-    {   /* TODO: Move this to get_format(). We are screwed if it fails here. */
-        if (vlc_va_Setup(sys->p_va, ctx, &dec->fmt_out.video.i_chroma))
+    if (sys->p_va == NULL)
+    {
+        if (!sys->b_direct_rendering)
         {
             post_mt(sys);
-            msg_Err(dec, "hardware acceleration setup failed");
+            return avcodec_default_get_buffer2(ctx, frame, flags);
+        }
+
+        /* Most unaccelerated decoders do not call get_format(), so we need to
+         * update the output video format here. The MT semaphore must be held
+         * to protect p_dec->fmt_out. */
+        if (lavc_UpdateVideoFormat(dec, ctx, false))
+        {
+            post_mt(sys);
             return -1;
         }
     }
-    else if (!sys->b_direct_rendering)
-    {
-        post_mt(sys);
-        return avcodec_default_get_buffer2(ctx, frame, flags);
-    }
-
-    /* The semaphore protects updates to fmt_out */
-    pic = ffmpeg_NewPictBuf(dec, ctx);
     post_mt(sys);
+
+    pic = decoder_GetPicture(dec);
     if (pic == NULL)
         return -1;
 
@@ -1134,10 +1119,16 @@ static enum PixelFormat ffmpeg_GetFormat( AVCodecContext *p_context,
         p_dec->fmt_out.video.i_chroma = vlc_va_GetChroma(hwfmt, swfmt);
         if (p_dec->fmt_out.video.i_chroma == 0)
             continue; /* Unknown brand of hardware acceleration */
+        if (p_context->width == 0 || p_context->height == 0)
+        {   /* should never happen */
+            msg_Err(p_dec, "unspecified video dimensions");
+            continue;
+        }
         if (lavc_UpdateVideoFormat(p_dec, p_context, true))
             continue; /* Unsupported brand of hardware acceleration */
+        post_mt(p_sys);
 
-        picture_t *test_pic = decoder_NewPicture(p_dec);
+        picture_t *test_pic = decoder_GetPicture(p_dec);
         assert(!test_pic || test_pic->format.i_chroma == p_dec->fmt_out.video.i_chroma);
         vlc_va_t *va = vlc_va_New(VLC_OBJECT(p_dec), p_context, hwfmt,
                                   &p_dec->fmt_in,
@@ -1145,27 +1136,14 @@ static enum PixelFormat ffmpeg_GetFormat( AVCodecContext *p_context,
         if (test_pic)
             picture_Release(test_pic);
         if (va == NULL)
-            continue; /* Unsupported codec profile or such */
-
-        /* We try to call vlc_va_Setup when possible to detect errors when
-         * possible (later is too late) */
-        if( p_context->width > 0 && p_context->height > 0
-         && vlc_va_Setup(va, p_context, &p_dec->fmt_out.video.i_chroma))
         {
-            msg_Err( p_dec, "acceleration setup failure" );
-            vlc_va_Delete(va, p_context);
-            continue;
+            wait_mt(p_sys);
+            continue; /* Unsupported codec profile or such */
         }
-
-        post_mt(p_sys);
 
         if (va->description != NULL)
             msg_Info(p_dec, "Using %s for hardware decoding", va->description);
 
-        /* FIXME this will disable direct rendering
-         * even if a new pixel format is renegotiated
-         */
-        p_sys->b_direct_rendering = false;
         p_sys->p_va = va;
         p_context->draw_horiz_band = NULL;
         return pi_fmt[i];

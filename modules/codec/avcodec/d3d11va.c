@@ -144,16 +144,11 @@ static void SetupAVCodecContext(vlc_va_t *);
 static picture_t *DxAllocPicture(vlc_va_t *, const video_format_t *, unsigned index);
 
 /* */
-static int Setup(vlc_va_t *va, AVCodecContext *avctx, vlc_fourcc_t *chroma)
+static void Setup(vlc_va_t *va, vlc_fourcc_t *chroma)
 {
     vlc_va_sys_t *sys = va->sys;
-    if (directx_va_Setup(va, &sys->dx_sys, avctx, chroma)!=VLC_SUCCESS)
-        return VLC_EGENERIC;
 
-    avctx->hwaccel_context = &sys->hw;
     *chroma = sys->filter == NULL ? VLC_CODEC_D3D11_OPAQUE : VLC_CODEC_YV12;
-
-    return VLC_SUCCESS;
 }
 
 void SetupAVCodecContext(vlc_va_t *va)
@@ -360,6 +355,12 @@ static int Open(vlc_va_t *va, AVCodecContext *ctx, enum PixelFormat pix_fmt,
         if (sys->filter == NULL)
             goto error;
     }
+
+    err = directx_va_Setup(va, &sys->dx_sys, ctx);
+    if (err != VLC_SUCCESS)
+        goto error;
+
+    ctx->hwaccel_context = &sys->hw;
 
     /* TODO print the hardware name/vendor for debugging purposes */
     va->description = DxDescribe(dx_sys);

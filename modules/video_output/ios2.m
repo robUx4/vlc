@@ -139,6 +139,7 @@ static void OpenglESSwap(vlc_gl_t *);
 
 static picture_pool_t *ZeroCopyPicturePool(vout_display_t *, unsigned);
 static void DestroyZeroCopyPoolPicture(picture_t *);
+static void ZeroCopyClean(vout_display_t *vd, picture_t *pic, subpicture_t *subpicture);
 static void ZeroCopyDisplay(vout_display_t *, picture_t *, subpicture_t *);
 
 /**
@@ -183,6 +184,8 @@ vlc_module_end ()
 - (void)createBuffers;
 - (void)destroyBuffers;
 - (void)resetBuffers;
+
+- (void)reshape;
 
 - (void)setupZeroCopyGL;
 - (void)displayPixelBuffer:(CVPixelBufferRef)pixelBuffer;
@@ -303,7 +306,7 @@ static int Open(vlc_object_t *this)
 
         if (sys->zero_copy) {
             vd->pool = ZeroCopyPicturePool;
-            vd->prepare = NULL;
+            vd->prepare = ZeroCopyClean;
             vd->display = ZeroCopyDisplay;
         } else {
             vd->pool = PicturePool;
@@ -328,9 +331,7 @@ static int Open(vlc_object_t *this)
                                                  selector:@selector(applicationStateChanged:)
                                                      name:UIApplicationDidBecomeActiveNotification
                                                    object:nil];
-        [sys->glESView performSelectorOnMainThread:@selector(reshape)
-                                        withObject:nil
-                                     waitUntilDone:YES];
+        [sys->glESView reshape];
         return VLC_SUCCESS;
         
     bailout:
@@ -367,6 +368,7 @@ void Close (vlc_object_t *this)
 
         [sys->glESView release];
 
+        /* when using the traditional pipeline, the cross-platform code will free the the pool */
         if (sys->zero_copy) {
             if (sys->picturePool)
                 picture_pool_Release(sys->picturePool);
@@ -564,6 +566,13 @@ static void DestroyZeroCopyPoolPicture(picture_t *picture)
     free(picture);
 }
 
+static void ZeroCopyClean(vout_display_t *vd, picture_t *pic, subpicture_t *subpicture)
+{
+    vout_display_sys_t *sys = vd->sys;
+    if (likely([sys->glESView isAppActive]))
+        [sys->glESView resetBuffers];
+}
+
 static void ZeroCopyDisplay(vout_display_t *vd, picture_t *pic, subpicture_t *subpicture)
 {
     vout_display_sys_t *sys = vd->sys;
@@ -608,34 +617,26 @@ static void ZeroCopyDisplay(vout_display_t *vd, picture_t *pic, subpicture_t *su
     if (unlikely(!_appActive))
         return nil;
 
-    CAEAGLLayer * layer = (CAEAGLLayer *)self.layer;
-    layer.drawableProperties = [NSDictionary dictionaryWithObject:kEAGLColorFormatRGBA8 forKey: kEAGLDrawablePropertyColorFormat];
-    layer.opaque = YES;
+    _eaglContext = [[EAGLContext alloc] initWithAPI:kEAGLRenderingAPIOpenGLES2];
 
-    /* a client app may have already created a rendering context,
-     * so re-use it if it is valid */
-    EAGLContext *existingContext = [EAGLContext currentContext];
-    if (existingContext) {
-        if ([existingContext API] == kEAGLRenderingAPIOpenGLES2)
-             _eaglContext = [EAGLContext currentContext];
-    }
-
-    if (!_eaglContext)
-        _eaglContext = [[EAGLContext alloc] initWithAPI:kEAGLRenderingAPIOpenGLES2];
     if (unlikely(!_eaglContext))
         return nil;
     if (unlikely(![EAGLContext setCurrentContext:_eaglContext]))
         return nil;
 
+    CAEAGLLayer *layer = (CAEAGLLayer *)self.layer;
+    layer.drawableProperties = [NSDictionary dictionaryWithObject:kEAGLColorFormatRGBA8 forKey: kEAGLDrawablePropertyColorFormat];
+    layer.opaque = YES;
+
     _voutDisplay = vd;
 
+    [self createBuffers];
     if (zero_copy) {
         _preferredConversion = kColorConversion709;
         [self setupZeroCopyGL];
-    } else
-        [self performSelectorOnMainThread:@selector(createBuffers) withObject:nil waitUntilDone:YES];
+    }
 
-    [self performSelectorOnMainThread:@selector(reshape) withObject:nil waitUntilDone:NO];
+    [self reshape];
     [self setAutoresizingMask: UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight];
 
     _zeroCopy = zero_copy;
@@ -691,6 +692,7 @@ static void ZeroCopyDisplay(vout_display_t *vd, picture_t *pic, subpicture_t *su
 - (void)destroyBuffers
 {
     /* re-set current context */
+    EAGLContext *previousContext = [EAGLContext currentContext];
     [EAGLContext setCurrentContext:_eaglContext];
 
     /* clear frame buffer */
@@ -700,35 +702,33 @@ static void ZeroCopyDisplay(vout_display_t *vd, picture_t *pic, subpicture_t *su
     /* clear render buffer */
     glDeleteRenderbuffers(1, &_renderBuffer);
     _renderBuffer = 0;
+    [EAGLContext setCurrentContext:previousContext];
 }
 
 - (void)resetBuffers
 {
-    if (_bufferNeedReset) {
+    if (unlikely(_bufferNeedReset)) {
+        EAGLContext *previousContext = [EAGLContext currentContext];
+        [EAGLContext setCurrentContext:_eaglContext];
+
         [self destroyBuffers];
         [self createBuffers];
         _bufferNeedReset = NO;
+
+        [EAGLContext setCurrentContext:previousContext];
     }
 }
 
 - (void)layoutSubviews
 {
     [self reshape];
-    if (_zeroCopy) {
-        /* we don't have a clean event for 0-copy, so destory and re-create right here */
-        [self destroyBuffers];
-        [self createBuffers];
-    } else {
-        /* this method is called as soon as we are resized.
-         * so set a variable to re-create our buffers on the next clean event */
-        _bufferNeedReset = YES;
-    }
+
+    _bufferNeedReset = YES;
 }
 
 - (void)reshape
 {
-    assert([[NSThread currentThread] isMainThread]);
-
+    EAGLContext *previousContext = [EAGLContext currentContext];
     [EAGLContext setCurrentContext:_eaglContext];
 
     CGSize viewSize = [self bounds].size;
@@ -752,6 +752,7 @@ static void ZeroCopyDisplay(vout_display_t *vd, picture_t *pic, subpicture_t *su
 
     // x / y are top left corner, but we need the lower left one
     glViewport(place.x, place.y, place.width, place.height);
+    [EAGLContext setCurrentContext:previousContext];
 }
 
 - (void)tapRecognized:(UITapGestureRecognizer *)tapRecognizer
@@ -797,6 +798,10 @@ static void ZeroCopyDisplay(vout_display_t *vd, picture_t *pic, subpicture_t *su
 
 - (void)displayPixelBuffer:(CVPixelBufferRef)pixelBuffer
 {
+    /* the currently current context may not be ours, so cache it and restore it later */
+    EAGLContext *previousContext = [EAGLContext currentContext];
+    [EAGLContext setCurrentContext:_eaglContext];
+
     CVReturn err;
     if (pixelBuffer != NULL) {
         int frameWidth = (int)CVPixelBufferGetWidth(pixelBuffer);
@@ -805,7 +810,7 @@ static void ZeroCopyDisplay(vout_display_t *vd, picture_t *pic, subpicture_t *su
         if (!_videoTextureCache) {
             if (_voutDisplay)
                 msg_Err(_voutDisplay, "No video texture cache");
-            return;
+            goto done;
         }
 
         [self cleanUpTextures];
@@ -934,12 +939,18 @@ static void ZeroCopyDisplay(vout_display_t *vd, picture_t *pic, subpicture_t *su
 
     glBindRenderbuffer(GL_RENDERBUFFER, _renderBuffer);
     [_eaglContext presentRenderbuffer:GL_RENDERBUFFER];
+
+    glFlush();
+
+done:
+    /* restore previous eagl context which we cached on entry */
+    [EAGLContext setCurrentContext:previousContext];
 }
 
 - (void)setupZeroCopyGL
 {
+    EAGLContext *previousContext = [EAGLContext currentContext];
     [EAGLContext setCurrentContext:_eaglContext];
-    [self createBuffers];
     [self loadShaders];
 
     glUseProgram(self.shaderProgram);
@@ -959,9 +970,9 @@ static void ZeroCopyDisplay(vout_display_t *vd, picture_t *pic, subpicture_t *su
         if (err != noErr) {
             if (_voutDisplay)
                 msg_Err(_voutDisplay, "Error at CVOpenGLESTextureCacheCreate %d", err);
-            return;
         }
     }
+    [EAGLContext setCurrentContext:previousContext];
 }
 
 - (void)cleanUpTextures

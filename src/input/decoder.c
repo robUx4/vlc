@@ -480,18 +480,7 @@ static picture_t *vout_new_buffer( decoder_t *p_dec )
 {
     decoder_owner_sys_t *p_owner = p_dec->p_owner;
 
-    for( ;; )
-    {
-        if( DecoderIsFlushing( p_dec ) || p_dec->b_error )
-            return NULL;
-
-        picture_t *p_picture = vout_GetPicture( p_owner->p_vout );
-        if( p_picture )
-            return p_picture;
-
-        /* FIXME add a vout_WaitPictureAvailable (timedwait) */
-        msleep( VOUT_OUTMEM_SLEEP );
-    }
+    return vout_GetPicture( p_owner->p_vout );
 }
 
 static subpicture_t *spu_new_buffer( decoder_t *p_dec,
@@ -584,17 +573,6 @@ static int DecoderGetDisplayRate( decoder_t *p_dec )
 /*****************************************************************************
  * Public functions
  *****************************************************************************/
-picture_t *decoder_NewPicture( decoder_t *p_decoder )
-{
-    if( decoder_UpdateVideoFormat( p_decoder ) )
-        return NULL;
-
-    picture_t *p_picture = p_decoder->pf_vout_buffer_new( p_decoder );
-    if( !p_picture )
-        msg_Warn( p_decoder, "can't get output picture" );
-    return p_picture;
-}
-
 block_t *decoder_NewAudioBuffer( decoder_t *dec, int samples )
 {
     if( decoder_UpdateAudioFormat( dec ) )

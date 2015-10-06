@@ -319,6 +319,9 @@ libavcodec_plugin_la_SOURCES += demux/avformat/mux.c
 endif
 libavcodec_plugin_la_CFLAGS += -DMERGE_FFMPEG
 endif
+if HAVE_DARWIN
+libavcodec_plugin_la_LDFLAGS += -Wl,-framework,Foundation -Wl,-framework,Security,-framework,CoreFoundation
+endif
 if HAVE_AVCODEC
 codec_LTLIBRARIES += libavcodec_plugin.la
 endif
@@ -367,7 +370,6 @@ endif
 
 libvda_plugin_la_SOURCES = \
 	video_chroma/copy.c video_chroma/copy.h \
-	packetizer/h264_nal.c packetizer/h264_nal.h \
 	codec/avcodec/vda.c
 libvda_plugin_la_CFLAGS = $(AM_CFLAGS) $(AVCODEC_CFLAGS)
 libvda_plugin_la_LDFLAGS = -Wl,-framework,CoreFoundation,-framework,VideoDecodeAcceleration,-framework,QuartzCore
