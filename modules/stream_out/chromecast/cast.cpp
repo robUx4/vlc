@@ -159,8 +159,13 @@ vlc_module_begin ()
 
     add_string(SOUT_CFG_PREFIX "ip", "", IP_TEXT, IP_LONGTEXT, false)
     add_integer(SOUT_CFG_PREFIX "http-port", HTTP_PORT, HTTP_PORT_TEXT, HTTP_PORT_LONGTEXT, false)
+#if 0
     add_string(SOUT_CFG_PREFIX "mux", "mp4stream", MUX_TEXT, MUX_LONGTEXT, false)
     add_string(SOUT_CFG_PREFIX "mime", "video/mp4", MIME_TEXT, MIME_LONGTEXT, false)
+#else
+    add_string(SOUT_CFG_PREFIX "mux", "avformat{mux=matroska}", MUX_TEXT, MUX_LONGTEXT, false)
+    add_string(SOUT_CFG_PREFIX "mime", "video/x-matroska", MIME_TEXT, MIME_LONGTEXT, false)
+#endif
 
 vlc_module_end ()
 
@@ -616,6 +621,7 @@ static int processMessage(sout_stream_t *p_stream, const castchannel::CastMessag
         {
             msg_Dbg(p_stream, "PING received from the Chromecast");
             msgPong(p_stream);
+	    msgStatus(p_stream);
         }
         else if (type == "PONG")
         {
