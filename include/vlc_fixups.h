@@ -323,9 +323,7 @@ struct if_nameindex
     char    *if_name;
 };
 # ifndef HAVE_IF_NAMETOINDEX
-#  ifndef HAVE_IPHLPAPI_H
-#   define if_nametoindex(name)   atoi(name)
-#  endif
+#  define if_nametoindex(name)   atoi(name)
 # endif
 # define if_nameindex()         (errno = ENOBUFS, NULL)
 # define if_freenameindex(list) (void)0
