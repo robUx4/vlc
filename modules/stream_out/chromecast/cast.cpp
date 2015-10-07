@@ -40,8 +40,6 @@
 #include <vlc_tls.h>
 #include <vlc_url.h>
 #include <vlc_threads.h>
-#include <vlc_atomic.h>
-#include <vlc_block.h>
 
 #include <cerrno>
 
@@ -102,7 +100,7 @@ struct sout_stream_sys_t
 
     std::queue<castchannel::CastMessage> messagesToSend;
 
-    std::atomic_int i_status;
+    int i_status;
     vlc_mutex_t lock;
     vlc_cond_t loadCommandCond;
 
@@ -225,6 +223,7 @@ static int Send(sout_stream_t *p_stream, sout_stream_id_sys_t *id,
     OutputDebugString(dbg);
 #endif
 
+#if 0
     vlc_mutex_lock(&p_sys->lock);
     while (p_sys->i_status != CHROMECAST_MEDIA_LOAD_SENT && p_sys->i_status != CHROMECAST_CONNECTION_DEAD)
     {
@@ -241,7 +240,7 @@ static int Send(sout_stream_t *p_stream, sout_stream_id_sys_t *id,
         return VLC_EGENERIC;
     }
     vlc_mutex_unlock(&p_sys->lock);
-
+#endif
 
     return p_sys->p_out->pf_send(p_sys->p_out, id, p_buffer);
 }
@@ -331,6 +330,32 @@ static int Open(vlc_object_t *p_this)
         Clean(p_stream);
         return VLC_EGENERIC;
     }
+
+    /* Ugly part:
+     * We want to be sure that the Chromecast receives the first data packet sent by
+     * the HTTP server. */
+
+    // Lock the sout thread until we have sent the media loading command to the Chromecast.
+    int i_ret = 0;
+    const mtime_t deadline = mdate() + 6 * CLOCK_FREQ;
+    vlc_mutex_lock(&p_sys->lock);
+    while (p_sys->i_status != CHROMECAST_MEDIA_LOAD_SENT)
+    {
+        i_ret = vlc_cond_timedwait(&p_sys->loadCommandCond, &p_sys->lock, deadline);
+        if (i_ret == ETIMEDOUT)
+        {
+            msg_Err(p_stream, "Timeout reached before sending the media loading command");
+            vlc_mutex_unlock(&p_sys->lock);
+            vlc_cancel(p_sys->chromecastThread);
+            Clean(p_stream);
+            return VLC_EGENERIC;
+        }
+    }
+    vlc_mutex_unlock(&p_sys->lock);
+
+    /* Even uglier: sleep more to let to the Chromecast initiate the connection
+     * to the http server. */
+//    msleep(2 * CLOCK_FREQ);
 
     // Set the sout callbacks.
     p_stream->pf_add    = Add;
@@ -649,6 +674,7 @@ static int processMessage(sout_stream_t *p_stream, const castchannel::CastMessag
         }
         else
         {
+            vlc_mutex_locker locker(&p_sys->lock);
             p_sys->i_status = CHROMECAST_AUTHENTICATED;
             msgConnect(p_stream, "receiver-0");
             msgLaunch(p_stream);
