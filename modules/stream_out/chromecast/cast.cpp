@@ -104,7 +104,7 @@ struct sout_stream_sys_t
 
     std::atomic_int i_status;
     vlc_mutex_t lock;
-    vlc_cond_t  cond_remote_ready;
+    vlc_cond_t loadCommandCond;
 
     sout_stream_t *p_out;
 #ifdef HAVE_MICRODNS
@@ -229,9 +229,7 @@ static int Send(sout_stream_t *p_stream, sout_stream_id_sys_t *id,
     while (p_sys->i_status != CHROMECAST_MEDIA_LOAD_SENT && p_sys->i_status != CHROMECAST_CONNECTION_DEAD)
     {
         mutex_cleanup_push(&p_sys->lock); // release the mutex in case of cancellation
-
-        vlc_cond_wait(&p_sys->cond_remote_ready, &p_sys->lock);
-
+        vlc_cond_wait(&p_sys->loadCommandCond, &p_sys->lock);
         vlc_cleanup_pop();
     }
 #if 0 && !defined(NDEBUG)
@@ -323,7 +321,7 @@ static int Open(vlc_object_t *p_this)
     /* TODO find out which port is opened */
 
     vlc_mutex_init(&p_sys->lock);
-    vlc_cond_init(&p_sys->cond_remote_ready);
+    vlc_cond_init(&p_sys->loadCommandCond);
 
     // Start the Chromecast event thread.
     if (vlc_clone(&p_sys->chromecastThread, chromecastThread, p_stream,
@@ -333,8 +331,6 @@ static int Open(vlc_object_t *p_this)
         Clean(p_stream);
         return VLC_EGENERIC;
     }
-
-    p_stream->pace_nocontrol = false;
 
     // Set the sout callbacks.
     p_stream->pf_add    = Add;
@@ -385,8 +381,8 @@ static void Clean(sout_stream_t *p_stream)
 
     if (p_sys->p_out)
     {
-        vlc_cond_destroy(&p_sys->cond_remote_ready);
         vlc_mutex_destroy(&p_sys->lock);
+        vlc_cond_destroy(&p_sys->loadCommandCond);
         sout_StreamChainDelete(p_sys->p_out, p_sys->p_out);
     }
 
@@ -713,7 +709,7 @@ static int processMessage(sout_stream_t *p_stream, const castchannel::CastMessag
                     msgConnect(p_stream, p_sys->appTransportId);
                     msgLoad(p_stream);
                     p_sys->i_status = CHROMECAST_MEDIA_LOAD_SENT;
-                    vlc_cond_signal(&p_sys->cond_remote_ready);
+                    vlc_cond_signal(&p_sys->loadCommandCond);
                 }
             }
             else
@@ -726,7 +722,7 @@ static int processMessage(sout_stream_t *p_stream, const castchannel::CastMessag
                     msg_Warn(p_stream, "app is no longer present. closing");
                     msgClose(p_stream, p_sys->appTransportId);
                     p_sys->i_status = CHROMECAST_CONNECTION_DEAD;
-                    vlc_cond_signal(&p_sys->cond_remote_ready);
+                    vlc_cond_signal(&p_sys->loadCommandCond);
                     // ft
                 default:
                     break;
@@ -761,7 +757,7 @@ static int processMessage(sout_stream_t *p_stream, const castchannel::CastMessag
             msgClose(p_stream, p_sys->appTransportId);
             vlc_mutex_lock(&p_sys->lock);
             p_sys->i_status = CHROMECAST_CONNECTION_DEAD;
-            vlc_cond_signal(&p_sys->cond_remote_ready);
+            vlc_cond_signal(&p_sys->loadCommandCond);
             vlc_mutex_unlock(&p_sys->lock);
         }
         else
@@ -784,7 +780,7 @@ static int processMessage(sout_stream_t *p_stream, const castchannel::CastMessag
             msg_Warn(p_stream, "received close message");
             vlc_mutex_lock(&p_sys->lock);
             p_sys->i_status = CHROMECAST_CONNECTION_DEAD;
-            vlc_cond_signal(&p_sys->cond_remote_ready);
+            vlc_cond_signal(&p_sys->loadCommandCond);
             vlc_mutex_unlock(&p_sys->lock);
         }
         else
@@ -1025,7 +1021,7 @@ static void* chromecastThread(void* p_data)
                 msg_Err(p_stream, "Failed to look for the target Name: %s", err_str);
             vlc_mutex_lock(&p_sys->lock);
             p_sys->i_status = CHROMECAST_CONNECTION_DEAD;
-            vlc_cond_signal(&p_sys->cond_remote_ready);
+            vlc_cond_signal(&p_sys->loadCommandCond);
             vlc_mutex_unlock(&p_sys->lock);
             vlc_restorecancel(canc);
             return NULL;
@@ -1039,7 +1035,7 @@ static void* chromecastThread(void* p_data)
         msg_Err(p_stream, "Could not connect the Chromecast");
         vlc_mutex_lock(&p_sys->lock);
         p_sys->i_status = CHROMECAST_CONNECTION_DEAD;
-        vlc_cond_signal(&p_sys->cond_remote_ready);
+        vlc_cond_signal(&p_sys->loadCommandCond);
         vlc_mutex_unlock(&p_sys->lock);
         vlc_restorecancel(canc);
         return NULL;
@@ -1051,7 +1047,7 @@ static void* chromecastThread(void* p_data)
         msg_Err(p_stream, "Cannot get local IP address");
         vlc_mutex_lock(&p_sys->lock);
         p_sys->i_status = CHROMECAST_CONNECTION_DEAD;
-        vlc_cond_signal(&p_sys->cond_remote_ready);
+        vlc_cond_signal(&p_sys->loadCommandCond);
         vlc_mutex_unlock(&p_sys->lock);
         vlc_restorecancel(canc);
         return NULL;
@@ -1088,10 +1084,9 @@ static void* chromecastThread(void* p_data)
 #endif
         {
             msg_Err(p_stream, "The connection to the Chromecast died.");
-            vlc_mutex_lock(&p_sys->lock);
+            vlc_mutex_locker locker(&p_sys->lock);
             p_sys->i_status = CHROMECAST_CONNECTION_DEAD;
-            vlc_cond_signal(&p_sys->cond_remote_ready);
-            vlc_mutex_unlock(&p_sys->lock);
+            vlc_cond_signal(&p_sys->loadCommandCond);
             break;
         }
 
@@ -1119,10 +1114,9 @@ static void* chromecastThread(void* p_data)
 #endif
             {
                 msg_Err(p_stream, "The connection to the Chromecast died.");
-                vlc_mutex_lock(&p_sys->lock);
+                vlc_mutex_locker locker(&p_sys->lock);
                 p_sys->i_status = CHROMECAST_CONNECTION_DEAD;
-                vlc_cond_signal(&p_sys->cond_remote_ready);
-                vlc_mutex_unlock(&p_sys->lock);
+                vlc_cond_signal(&p_sys->loadCommandCond);
             }
         }
 
@@ -1131,10 +1125,9 @@ static void* chromecastThread(void* p_data)
         else if (mdate() > deadline)
         {
             msg_Err(p_stream, "Timeout reached before sending the media loading command");
-            vlc_mutex_lock(&p_sys->lock);
+            vlc_mutex_locker locker(&p_sys->lock);
             p_sys->i_status = CHROMECAST_CONNECTION_DEAD;
-            vlc_cond_signal(&p_sys->cond_remote_ready);
-            vlc_mutex_unlock(&p_sys->lock);
+            vlc_cond_signal(&p_sys->loadCommandCond);
         }
 
         if ( p_sys->i_status == CHROMECAST_CONNECTION_DEAD )
