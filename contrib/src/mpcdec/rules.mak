@@ -43,9 +43,15 @@ endif
 	touch $@
 
 .mpcdec: musepack toolchain.cmake
-	cd $< && $(HOSTVARS_PIC) $(CMAKE) -DSHARED=OFF .
+	cd $< && $(HOSTVARS_CMAKE) $(CMAKE) -DSHARED=OFF .
+ifdef HAVE_VISUALSTUDIO
+	cd $< && msbuild.exe -p:Configuration=$(VLC_CONFIGURATION) -m -nologo INSTALL.vcxproj
+	mkdir -p -- "$(PREFIX)/lib"
+	cd $< && cp libmpcdec/$(VLC_CONFIGURATION)/mpcdec_static.lib "$(PREFIX)/lib/mpcdec.lib"
+else
 	cd $< && $(MAKE) install
 	mkdir -p -- "$(PREFIX)/lib"
 	# Use globbing to work around cmake's change of destination file
 	cd $< && cp libmpcdec/*mpcdec_static.* "$(PREFIX)/lib/libmpcdec.a"
+endif
 	touch $@
