@@ -480,6 +480,8 @@ endif
 endif
 	echo "set(CMAKE_C_COMPILER $(CC))" >> $@
 	echo "set(CMAKE_CXX_COMPILER $(CXX))" >> $@
+	echo "set(CMAKE_LINKER $(LD))" >> $@
+	echo "set(CMAKE_SYSTEM_PROCESSOR $(VLC_ARCH))" >> $@
 	echo "set(CMAKE_FIND_ROOT_PATH $(PREFIX))" >> $@
 	echo "set(CMAKE_FIND_ROOT_PATH_MODE_PROGRAM NEVER)" >> $@
 	echo "set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY)" >> $@
