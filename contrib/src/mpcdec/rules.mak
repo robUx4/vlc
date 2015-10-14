@@ -30,6 +30,7 @@ musepack: musepack_src_r$(MUSE_REV).tar.gz .sum-mpcdec
 	$(APPLY) $(SRC)/mpcdec/musepack-no-binaries.patch
 ifdef HAVE_VISUALSTUDIO
 	$(APPLY) $(SRC)/mpcdec/musepack-asinh-msvc.patch
+	$(APPLY) $(SRC)/mpcdec/autotools.patch
 endif
 	sed -i.orig \
 		-e 's,^add_subdirectory(mpcgain),,g' \
@@ -42,15 +43,9 @@ endif
 	mv $@_src_r$(MUSE_REV) $@
 	touch $@
 
-.mpcdec: musepack toolchain.cmake
-ifdef HAVE_VISUALSTUDIO	
-	cd $< && $(HOSTVARS_CMAKE) $(CMAKE) -DSHARED=OFF .
-	cd $< && msbuild.exe -p:Configuration=$(VLC_CONFIGURATION) -m -nologo INSTALL.vcxproj
-	cd $< && cp libmpcdec/$(VLC_CONFIGURATION)/mpcdec_static.lib "$(PREFIX)/lib/mpcdec.lib"
-else
-	cd $< && $(HOSTVARS_PIC) $(CMAKE) -DSHARED=OFF .
-	cd $< && $(MAKE) install
-	mkdir -p -- "$(PREFIX)/lib"
-	cd $< && cp libmpcdec/libmpcdec_static.a "$(PREFIX)/lib/libmpcdec.a"
-endif
+.mpcdec: musepack
+	cd $< && mkdir -p m4
+	$(RECONF)
+	cd $< && $(HOSTVARS) ./configure $(HOSTCONF)
+	cd $< && $(MAKE) -C libmpcdec install
 	touch $@
