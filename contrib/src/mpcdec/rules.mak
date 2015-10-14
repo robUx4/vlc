@@ -47,5 +47,9 @@ endif
 	cd $< && $(MAKE) install
 	mkdir -p -- "$(PREFIX)/lib"
 	# Use globbing to work around cmake's change of destination file
+ifdef HAVE_VISUALSTUDIO
+	cd $< && cp libmpcdec/*mpcdec_static.* "$(PREFIX)/lib/mpcdec.lib"
+else
 	cd $< && cp libmpcdec/*mpcdec_static.* "$(PREFIX)/lib/libmpcdec.a"
+endif
 	touch $@
