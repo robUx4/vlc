@@ -68,7 +68,7 @@ cmake: cmake-$(CMAKE_VERSION).tar.gz
 	$(MOVE)
 
 .cmake: cmake
-	(cd $<; ./configure --prefix=$(PREFIX) && $(MAKE) && $(MAKE) install)
+	(cd $<; ./configure --prefix=$(PREFIX) --parallel=`nproc` && $(MAKE) && $(MAKE) install)
 	touch $@
 
 CLEAN_FILE += .cmake
