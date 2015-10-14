@@ -1,36 +1,112 @@
-From 975eee36b493520d26f73c1e6cfaf53bf49f2e99 Mon Sep 17 00:00:00 2001
+From 2ff176ddce313845264c014b3aa8fff20c6bd33f Mon Sep 17 00:00:00 2001
 From: Steve Lhomme <robux4@gmail.com>
 Date: Tue, 30 Jun 2015 11:05:50 +0200
 Subject: [PATCH] d3d11va: WindowsPhone requires a mutex around
  ID3D11VideoContext
 
+--
+now with an allocation function for the structure
 ---
- libavcodec/d3d11va.h |  5 +++++
+ libavcodec/Makefile  |  2 +-
+ libavcodec/d3d11va.c | 33 +++++++++++++++++++++++++++++++++
+ libavcodec/d3d11va.h | 17 +++++++++++++++--
  libavcodec/dxva2.c   | 15 +++++++++++++--
- libavcodec/version.h |  4 ++--
- 3 files changed, 20 insertions(+), 4 deletions(-)
+ libavcodec/version.h |  2 +-
+ 5 files changed, 63 insertions(+), 6 deletions(-)
+ create mode 100644 libavcodec/d3d11va.c
 
+diff --git a/libavcodec/Makefile b/libavcodec/Makefile
+index 5cdef9c..f163a79 100644
+--- a/libavcodec/Makefile
++++ b/libavcodec/Makefile
+@@ -581,7 +581,7 @@ OBJS-$(CONFIG_ADPCM_YAMAHA_DECODER)       += adpcm.o adpcm_data.o
+ OBJS-$(CONFIG_ADPCM_YAMAHA_ENCODER)       += adpcmenc.o adpcm_data.o
+ 
+ # hardware accelerators
+-OBJS-$(CONFIG_D3D11VA)                    += dxva2.o
++OBJS-$(CONFIG_D3D11VA)                    += d3d11va.o dxva2.o
+ OBJS-$(CONFIG_DXVA2)                      += dxva2.o
+ OBJS-$(CONFIG_VAAPI)                      += vaapi.o
+ OBJS-$(CONFIG_VDA)                        += vda.o
+diff --git a/libavcodec/d3d11va.c b/libavcodec/d3d11va.c
+new file mode 100644
+index 0000000..d24730a
+--- /dev/null
++++ b/libavcodec/d3d11va.c
+@@ -0,0 +1,33 @@
++/*
++ * Direct3D11 HW acceleration
++ *
++ * copyright (c) 2015 Steve Lhomme
++ *
++ * This file is part of Libav.
++ *
++ * Libav is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU Lesser General Public
++ * License as published by the Free Software Foundation; either
++ * version 2.1 of the License, or (at your option) any later version.
++ *
++ * Libav is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++ * Lesser General Public License for more details.
++ *
++ * You should have received a copy of the GNU Lesser General Public
++ * License along with Libav; if not, write to the Free Software
++ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
++ */
++
++#include "config.h"
++#include "libavutil/mem.h"
++
++#include "d3d11va.h"
++
++AVD3D11VAContext *av_d3d11va_alloc_context(void)
++{
++    AVD3D11VAContext* res = av_mallocz(sizeof(AVD3D11VAContext));
++    res->context_mutex = INVALID_HANDLE_VALUE;
++    return res;
++}
 diff --git a/libavcodec/d3d11va.h b/libavcodec/d3d11va.h
-index f5777c2..1316d47 100644
+index f5777c2..df06275 100644
 --- a/libavcodec/d3d11va.h
 +++ b/libavcodec/d3d11va.h
-@@ -89,6 +89,11 @@ struct AVD3D11VAContext {
+@@ -54,7 +54,7 @@
+  *
+  * The application must make it available as AVCodecContext.hwaccel_context.
+  */
+-struct AVD3D11VAContext {
++typedef struct AVD3D11VAContext {
+     /**
+      * D3D11 decoder object
+      */
+@@ -89,7 +89,20 @@ struct AVD3D11VAContext {
       * Private to the Libav AVHWAccel implementation
       */
      unsigned report_id;
+-};
 +
 +    /**
 +      * Mutex to access video_context
 +      */
 +    HANDLE  context_mutex;
- };
++} AVD3D11VAContext;
++
++/**
++ * Allocate an AVD3D11VAContext.
++ *
++ * @return Newly-allocated AVD3D11VAContext or NULL on failure.
++ */
++AVD3D11VAContext *av_d3d11va_alloc_context(void);
++
  
  /**
+  * @}
 diff --git a/libavcodec/dxva2.c b/libavcodec/dxva2.c
-index d4ac98d..ca22de0 100644
+index 6a7dd53..8b0e686 100644
 --- a/libavcodec/dxva2.c
 +++ b/libavcodec/dxva2.c
-@@ -145,10 +145,13 @@ int ff_dxva2_common_end_frame(AVCodecContext *avctx, AVFrame *frame,
+@@ -144,10 +144,13 @@ int ff_dxva2_common_end_frame(AVCodecContext *avctx, AVFrame *frame,
  
      do {
  #if CONFIG_D3D11VA
@@ -45,7 +121,7 @@ index d4ac98d..ca22de0 100644
  #endif
  #if CONFIG_DXVA2
          if (avctx->pix_fmt == AV_PIX_FMT_DXVA2_VLD)
-@@ -162,6 +165,11 @@ int ff_dxva2_common_end_frame(AVCodecContext *avctx, AVFrame *frame,
+@@ -161,6 +164,11 @@ int ff_dxva2_common_end_frame(AVCodecContext *avctx, AVFrame *frame,
  
      if (FAILED(hr)) {
          av_log(avctx, AV_LOG_ERROR, "Failed to begin frame: 0x%lx\n", hr);
@@ -57,7 +133,7 @@ index d4ac98d..ca22de0 100644
          return -1;
      }
  
-@@ -261,8 +269,11 @@ int ff_dxva2_common_end_frame(AVCodecContext *avctx, AVFrame *frame,
+@@ -260,8 +268,11 @@ int ff_dxva2_common_end_frame(AVCodecContext *avctx, AVFrame *frame,
  
  end:
  #if CONFIG_D3D11VA
@@ -71,20 +147,18 @@ index d4ac98d..ca22de0 100644
  #if CONFIG_DXVA2
      if (avctx->pix_fmt == AV_PIX_FMT_DXVA2_VLD)
 diff --git a/libavcodec/version.h b/libavcodec/version.h
-index 94cc775..d74a861 100644
+index 45b99ca..ecd6e1d 100644
 --- a/libavcodec/version.h
 +++ b/libavcodec/version.h
-@@ -29,8 +29,8 @@
+@@ -29,7 +29,7 @@
  #include "libavutil/version.h"
  
  #define LIBAVCODEC_VERSION_MAJOR 56
 -#define LIBAVCODEC_VERSION_MINOR 35
--#define LIBAVCODEC_VERSION_MICRO  1
 +#define LIBAVCODEC_VERSION_MINOR 36
-+#define LIBAVCODEC_VERSION_MICRO  0
+ #define LIBAVCODEC_VERSION_MICRO  1
  
  #define LIBAVCODEC_VERSION_INT  AV_VERSION_INT(LIBAVCODEC_VERSION_MAJOR, \
-                                                LIBAVCODEC_VERSION_MINOR, \
 -- 
 1.9.5.msysgit.1
 
