@@ -17,13 +17,4 @@
        return new MP4::File(fileName, readAudioProperties, audioPropertiesStyle);
      if(ext == "WMA" || ext == "ASF")
        return new ASF::File(fileName, readAudioProperties, audioPropertiesStyle);
-@@ -340,7 +341,7 @@
-         return new Ogg::Opus::File(ioStream, readAudioProperties, audioPropertiesStyle);
-       if(ext == "TTA")
-         return new TrueAudio::File(ioStream, readAudioProperties, audioPropertiesStyle);
--      if(ext == "M4A" || ext == "M4R" || ext == "M4B" || ext == "M4P" || ext == "MP4" || ext == "3G2")
-+      if(ext == "M4A" || ext == "M4R" || ext == "M4B" || ext == "M4P" || ext == "MP4" || ext == "3G2" || ext == "M4V")
-         return new MP4::File(ioStream, readAudioProperties, audioPropertiesStyle);
-       if(ext == "WMA" || ext == "ASF")
-         return new ASF::File(ioStream, readAudioProperties, audioPropertiesStyle);
 

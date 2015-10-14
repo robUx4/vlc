@@ -1,107 +1,115 @@
+From 247bbf395f26a07b5daf4fc165881550382358ec Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Hugo=20Beauz=C3=A9e-Luyssen?= <hugo@beauzee.fr>
+Date: Tue, 28 Apr 2015 11:56:07 +0200
+Subject: [PATCH] FileRef: Allow an IOStream to be used
+
+---
+ taglib/fileref.cpp     | 48 ++++++++++++++++++++++++++++++++----------------
+ taglib/fileref.h       | 16 +++++++++++++++-
+ tests/test_fileref.cpp | 12 ++++++++++++
+ 3 files changed, 59 insertions(+), 17 deletions(-)
+
 diff --git a/taglib/fileref.cpp b/taglib/fileref.cpp
-index 2b5d5f2..04d9a56 100644
+index 2b5d5f2..c2cd31d 100644
 --- a/taglib/fileref.cpp
 +++ b/taglib/fileref.cpp
-@@ -83,6 +83,11 @@ FileRef::FileRef()
+@@ -54,6 +54,10 @@
+ 
+ using namespace TagLib;
+ 
++template <typename T>
++static File* createInternal(T arg, const String& filename, bool readAudioProperties,
++                            AudioProperties::ReadStyle audioPropertiesStyle);
++
+ class FileRef::FileRefPrivate : public RefCounter
+ {
+ public:
+@@ -83,6 +87,17 @@ FileRef::FileRef(FileName fileName, bool readAudioProperties,
    d = new FileRefPrivate(create(fileName, readAudioProperties, audioPropertiesStyle));
  }
-
+ 
 +FileRef::FileRef(IOStream* stream, bool readAudioProperties, AudioProperties::ReadStyle audioPropertiesStyle)
 +{
-+  d = new FileRefPrivate(create(stream, readAudioProperties, audioPropertiesStyle));
++  d = new FileRefPrivate(createInternal(stream, 
++#ifdef _WIN32
++  stream->name().toString()
++#else
++  stream->name()
++#endif
++  , readAudioProperties, audioPropertiesStyle));
 +}
 +
  FileRef::FileRef(File *file)
  {
    d = new FileRefPrivate(file);
-@@ -284,3 +289,77 @@ File *FileRef::create(FileName fileName, bool readAudioProperties,
+@@ -213,24 +228,25 @@ File *FileRef::create(FileName fileName, bool readAudioProperties,
+       return file;
+   }
  
-   return 0;
- }
-+
-+File *FileRef::create(IOStream* ioStream, bool readAudioProperties, AudioProperties::ReadStyle audioPropertiesStyle)
-+{
-+    // Ok, this is really dumb for now, but it works for testing.
-+
-+    String ext;
-+    {
-+  #ifdef _WIN32
-+
-+      String s = ioStream->name().toString();
-+
-+  #else
-+
-+      String s = ioStream->name();
-+
-+   #endif
-+
-+      const int pos = s.rfind(".");
-+      if(pos != -1)
-+        ext = s.substr(pos + 1).upper();
-+    }
-+
-+    // If this list is updated, the method defaultFileExtensions() should also be
-+    // updated.  However at some point that list should be created at the same time
-+    // that a default file type resolver is created.
-+
-+    if(!ext.isEmpty()) {
-+      if(ext == "MP3")
-+        return new MPEG::File(ioStream, ID3v2::FrameFactory::instance(), readAudioProperties, audioPropertiesStyle);
-+      if(ext == "OGG")
-+        return new Ogg::Vorbis::File(ioStream, readAudioProperties, audioPropertiesStyle);
-+      if(ext == "OGA") {
-+        /* .oga can be any audio in the Ogg container. First try FLAC, then Vorbis. */
-+        File *file = new Ogg::FLAC::File(ioStream, readAudioProperties, audioPropertiesStyle);
-+        if (file->isValid())
-+          return file;
-+        delete file;
-+        return new Ogg::Vorbis::File(ioStream, readAudioProperties, audioPropertiesStyle);
-+      }
-+      if(ext == "FLAC")
-+        return new FLAC::File(ioStream, ID3v2::FrameFactory::instance(), readAudioProperties, audioPropertiesStyle);
-+      if(ext == "MPC")
-+        return new MPC::File(ioStream, readAudioProperties, audioPropertiesStyle);
-+      if(ext == "WV")
-+        return new WavPack::File(ioStream, readAudioProperties, audioPropertiesStyle);
-+      if(ext == "SPX")
-+        return new Ogg::Speex::File(ioStream, readAudioProperties, audioPropertiesStyle);
-+      if(ext == "OPUS")
-+        return new Ogg::Opus::File(ioStream, readAudioProperties, audioPropertiesStyle);
-+      if(ext == "TTA")
-+        return new TrueAudio::File(ioStream, readAudioProperties, audioPropertiesStyle);
-+      if(ext == "M4A" || ext == "M4R" || ext == "M4B" || ext == "M4P" || ext == "MP4" || ext == "3G2")
-+        return new MP4::File(ioStream, readAudioProperties, audioPropertiesStyle);
-+      if(ext == "WMA" || ext == "ASF")
-+        return new ASF::File(ioStream, readAudioProperties, audioPropertiesStyle);
-+      if(ext == "AIF" || ext == "AIFF" || ext == "AFC" || ext == "AIFC")
-+        return new RIFF::AIFF::File(ioStream, readAudioProperties, audioPropertiesStyle);
-+      if(ext == "WAV")
-+        return new RIFF::WAV::File(ioStream, readAudioProperties, audioPropertiesStyle);
-+      if(ext == "APE")
-+        return new APE::File(ioStream, readAudioProperties, audioPropertiesStyle);
-+      // module, nst and wow are possible but uncommon extensions
-+      if(ext == "MOD" || ext == "MODULE" || ext == "NST" || ext == "WOW")
-+        return new Mod::File(ioStream, readAudioProperties, audioPropertiesStyle);
-+      if(ext == "S3M")
-+        return new S3M::File(ioStream, readAudioProperties, audioPropertiesStyle);
-+      if(ext == "IT")
-+        return new IT::File(ioStream, readAudioProperties, audioPropertiesStyle);
-+      if(ext == "XM")
-+        return new XM::File(ioStream, readAudioProperties, audioPropertiesStyle);
-+    }
-+
-+    return 0;
+-  // Ok, this is really dumb for now, but it works for testing.
+-
+-  String ext;
+-  {
++  return createInternal(fileName,
+ #ifdef _WIN32
+-
+-    String s = fileName.toString();
+-
++  fileName.toString()
+ #else
++  fileName
++#endif
++  , readAudioProperties, audioPropertiesStyle);
 +}
-
+ 
+-    String s = fileName;
+-
+- #endif
++template <typename T>
++static File* createInternal(T fileName, const String& s, bool readAudioProperties,
++                            AudioProperties::ReadStyle audioPropertiesStyle)
++{
++  // Ok, this is really dumb for now, but it works for testing.
+ 
+-    const int pos = s.rfind(".");
+-    if(pos != -1)
+-      ext = s.substr(pos + 1).upper();
+-  }
++  String ext;
++  const int pos = s.rfind(".");
++  if(pos != -1)
++    ext = s.substr(pos + 1).upper();
+ 
+   // If this list is updated, the method defaultFileExtensions() should also be
+   // updated.  However at some point that list should be created at the same time
+@@ -238,7 +254,7 @@ File *FileRef::create(FileName fileName, bool readAudioProperties,
+ 
+   if(!ext.isEmpty()) {
+     if(ext == "MP3")
+-      return new MPEG::File(fileName, readAudioProperties, audioPropertiesStyle);
++      return new MPEG::File(fileName, ID3v2::FrameFactory::instance(), readAudioProperties, audioPropertiesStyle);
+     if(ext == "OGG")
+       return new Ogg::Vorbis::File(fileName, readAudioProperties, audioPropertiesStyle);
+     if(ext == "OGA") {
+@@ -250,7 +266,7 @@ File *FileRef::create(FileName fileName, bool readAudioProperties,
+       return new Ogg::Vorbis::File(fileName, readAudioProperties, audioPropertiesStyle);
+     }
+     if(ext == "FLAC")
+-      return new FLAC::File(fileName, readAudioProperties, audioPropertiesStyle);
++      return new FLAC::File(fileName, ID3v2::FrameFactory::instance(), readAudioProperties, audioPropertiesStyle);
+     if(ext == "MPC")
+       return new MPC::File(fileName, readAudioProperties, audioPropertiesStyle);
+     if(ext == "WV")
 diff --git a/taglib/fileref.h b/taglib/fileref.h
-index 0f0c21a..3ba03af 100644
+index 1e96522..abeb0af 100644
 --- a/taglib/fileref.h
 +++ b/taglib/fileref.h
-@@ -128,6 +128,20 @@ namespace TagLib {
+@@ -128,7 +128,21 @@ namespace TagLib {
                       audioPropertiesStyle = AudioProperties::Average);
  
      /*!
-+     * Create a FileRef from an opened \a IOStream.  If \a readAudioProperties is true then
+-     * Construct a FileRef using \a file.  The FileRef now takes ownership of the
++     * Construct a FileRef from an opened \a IOStream.  If \a readAudioProperties is true then
 +     * the audio properties will be read using \a audioPropertiesStyle.  If
 +     * \a readAudioProperties is false then \a audioPropertiesStyle will be
 +     * ignored.
@@ -115,16 +123,40 @@ index 0f0c21a..3ba03af 100644
 +                     audioPropertiesStyle = AudioProperties::Average);
 +
 +    /*!
-      * Contruct a FileRef using \a file.  The FileRef now takes ownership of the
++     * Contruct a FileRef using \a file.  The FileRef now takes ownership of the
       * pointer and will delete the File when it passes out of scope.
       */
-@@ -252,6 +266,9 @@ namespace TagLib {
-                         bool readAudioProperties = true,
-                         AudioProperties::ReadStyle audioPropertiesStyle = AudioProperties::Average);
+     explicit FileRef(File *file);
+diff --git a/tests/test_fileref.cpp b/tests/test_fileref.cpp
+index f13eafa..a51b868 100644
+--- a/tests/test_fileref.cpp
++++ b/tests/test_fileref.cpp
+@@ -6,6 +6,7 @@
+ #include <vorbisfile.h>
+ #include <cppunit/extensions/HelperMacros.h>
+ #include "utils.h"
++#include <tfilestream.h>
  
-+    static File *create(IOStream* ioStream,
-+                        bool readAudioProperties = true,
-+                        AudioProperties::ReadStyle audioPropertiesStyle = AudioProperties::Average);
+ using namespace std;
+ using namespace TagLib;
+@@ -74,6 +75,17 @@ public:
+     CPPUNIT_ASSERT_EQUAL(f->tag()->track(), TagLib::uint(7));
+     CPPUNIT_ASSERT_EQUAL(f->tag()->year(), TagLib::uint(2080));
+     delete f;
++
++    FileStream fs(newname.c_str());
++    f = new FileRef(&fs);
++    CPPUNIT_ASSERT(!f->isNull());
++    CPPUNIT_ASSERT_EQUAL(f->tag()->artist(), String("ttest artist"));
++    CPPUNIT_ASSERT_EQUAL(f->tag()->title(), String("ytest title"));
++    CPPUNIT_ASSERT_EQUAL(f->tag()->genre(), String("uTest!"));
++    CPPUNIT_ASSERT_EQUAL(f->tag()->album(), String("ialbummmm"));
++    CPPUNIT_ASSERT_EQUAL(f->tag()->track(), TagLib::uint(7));
++    CPPUNIT_ASSERT_EQUAL(f->tag()->year(), TagLib::uint(2080));
++    delete f;
+   }
  
-   private:
-     class FileRefPrivate;
+   void testMusepack()
+-- 
+1.9.5.msysgit.1
+
