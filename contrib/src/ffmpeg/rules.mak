@@ -9,7 +9,7 @@ HASH=HEAD
 FFMPEG_SNAPURL := http://git.videolan.org/?p=ffmpeg.git;a=snapshot;h=$(HASH);sf=tgz
 FFMPEG_GITURL := git://git.videolan.org/ffmpeg.git
 else
-HASH=HEAD
+HASH=c457bdebe7af643b380aa0f6add3cb4335d218dc
 FFMPEG_SNAPURL := http://git.libav.org/?p=libav.git;a=snapshot;h=$(HASH);sf=tgz
 FFMPEG_GITURL := git://git.libav.org/libav.git
 endif
@@ -202,12 +202,12 @@ ifdef HAVE_VISUALSTUDIO
 	$(APPLY) $(SRC)/ffmpeg/msvc.patch
 	$(APPLY) $(SRC)/ffmpeg/near_field.patch
 endif
+	$(APPLY) $(SRC)/ffmpeg/0001-d3d11va-WindowsPhone-requires-a-mutex-around-ID3D11V.patch
 ifdef HAVE_WINRT
 ifeq ($(VLC_CONFIGURATION),Debug)
 	$(APPLY) $(SRC)/ffmpeg/debug_lock.patch
 endif
 endif
-	$(APPLY) $(SRC)/ffmpeg/0001-d3d11va-WindowsPhone-requires-a-mutex-around-ID3D11V.patch
 	$(MOVE)
 
 .ffmpeg: ffmpeg
