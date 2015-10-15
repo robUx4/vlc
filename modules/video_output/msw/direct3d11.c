@@ -830,6 +830,9 @@ static void Display(vout_display_t *vd, picture_t *picture, subpicture_t *subpic
 
     ID3D11DeviceContext_ClearDepthStencilView(sys->d3dcontext, sys->d3ddepthStencilView, D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0);
 
+    if (picture->format.i_chroma != VLC_CODEC_D3D11_OPAQUE)
+        Direct3D11UnmapTexture(picture);
+
     /* Render the quad */
     DisplayD3DPicture(sys, &sys->picQuad);
 
@@ -1513,7 +1516,7 @@ static int Direct3D11CreatePool(vout_display_t *vd, video_format_t *fmt)
     pool_cfg.picture_count = 1;
     pool_cfg.picture       = &picture;
     pool_cfg.lock          = Direct3D11MapTexture;
-    pool_cfg.unlock        = Direct3D11UnmapTexture;
+    //pool_cfg.unlock        = Direct3D11UnmapTexture;
 
     sys->pool = picture_pool_NewExtended(&pool_cfg);
     if (!sys->pool) {
