@@ -299,7 +299,7 @@ static int Open(vlc_object_t *p_this)
         return VLC_EGENERIC;
     }
     char *psz_chain = NULL;
-    int i_bytes = asprintf(&psz_chain, "http{dst=:%u/stream,mux=%s,access=http{ratecontrol=1,mime=%s}}",
+    int i_bytes = asprintf(&psz_chain, "standard{dst=:%u/stream,mux=%s,access=simplehttpd{mime=%s}}",
                            (unsigned)var_InheritInteger(p_stream, SOUT_CFG_PREFIX"http-port"),
                            psz_mux, p_sys->psz_mime);
     free(psz_mux);
