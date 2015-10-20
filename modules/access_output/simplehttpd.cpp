@@ -40,12 +40,13 @@
 #include <vlc_common.h>
 #include <vlc_plugin.h>
 #include <vlc_sout.h>
+#include <vlc_network.h>
 #include <vlc_block.h>
 #include <vlc_fs.h>
 #include <vlc_strings.h>
 #include <vlc_charset.h>
 #include <vlc_mime.h>
-#include <vlc_httpd.h>
+#include <vlc_httpd.h> /* TODO remove */
 
 /*****************************************************************************
  * Module descriptor
@@ -69,8 +70,6 @@ vlc_module_begin ()
     set_subcategory( SUBCAT_SOUT_ACO )
     add_string( SOUT_CFG_PREFIX "mime", "",
                 MIME_TEXT, MIME_LONGTEXT, true )
-    add_bool( SOUT_CFG_PREFIX "ratecontrol", false,
-              RATECONTROL_TEXT, RATECONTROL_TEXT, true )
     set_callbacks( Open, Close )
 vlc_module_end ()
 
@@ -79,7 +78,7 @@ vlc_module_end ()
  * Exported prototypes
  *****************************************************************************/
 static const char *const ppsz_sout_options[] = {
-    "mime", "ratecontrol",
+    "mime",
     NULL
 };
 
@@ -89,10 +88,10 @@ static int Control( sout_access_out_t *, int, va_list );
 
 struct sout_access_out_sys_t
 {
+    int             *pi_listen_fd;
     httpd_host_t    *p_httpd_host;
     httpd_file_t    *p_httpd_file;
     char            *psz_mime;
-    bool             b_ratecontrol;
 };
 
 static int FileCallback( httpd_file_sys_t *p_this, httpd_file_t *p_httpd_file, uint8_t *psz_request, uint8_t **pp_data, int *pi_data )
@@ -126,6 +125,9 @@ static int Open( vlc_object_t *p_this )
 
     config_ChainParse( p_access, SOUT_CFG_PREFIX, ppsz_sout_options, p_access->p_cfg );
 
+    char *hostname = var_InheritString(p_this, SOUT_CFG_PREFIX "host");
+    int bind_port = var_InheritInteger(p_this, SOUT_CFG_PREFIX "port");
+
     const char *path = p_access->psz_path;
     path += strcspn( path, "/" );
     if( path > p_access->psz_path )
@@ -139,33 +141,21 @@ static int Open( vlc_object_t *p_this )
             msg_Warn( p_access, "\"%.*s\" HTTP host might be ignored in "
                       "multiple-host configurations, use at your own risks.",
                       len, p_access->psz_path );
-            msg_Info( p_access, "Consider passing --http-host=IP on the "
+            msg_Info( p_access, "Consider passing --simplehttpd-host=IP on the "
                                 "command line instead." );
 
             char host[len + 1];
             strncpy( host, p_access->psz_path, len );
             host[len] = '\0';
 
-            var_Create( p_access, "http-host", VLC_VAR_STRING );
-            var_SetString( p_access, "http-host", host );
+            var_Create( p_access, "host", VLC_VAR_STRING );
+            var_SetString( p_access, "host", host );
         }
         if( port != NULL )
         {
-            /* int len = path - ++port;
-            msg_Info( p_access, "Consider passing --%s-port=%.*s on the "
-                                "command line instead.",
-                      strcasecmp( p_access->psz_access, "https" )
-                      ? "http" : "https", len, port ); */
             port++;
 
-            int bind_port = atoi( port );
-            if( bind_port > 0 )
-            {
-                const char *var = strcasecmp( p_access->psz_access, "simplehttpds" )
-                                  ? "http-port" : "https-port";
-                var_Create( p_access, var, VLC_VAR_INTEGER );
-                var_SetInteger( p_access, var, bind_port );
-            }
+            bind_port = atoi( port );
         }
     }
     if( !*path )
@@ -183,11 +173,9 @@ static int Open( vlc_object_t *p_this )
     if (p_sys->psz_mime == NULL)
         p_sys->psz_mime = xstrdup(vlc_mime_Ext2Mime(path));
 
-    p_sys->b_ratecontrol = var_GetBool( p_access, SOUT_CFG_PREFIX "ratecontrol") ;
-
-    p_sys->p_httpd_host = vlc_http_HostNew( VLC_OBJECT(p_access) );
-    if ( unlikely( p_sys->p_httpd_host==NULL ) )
-    {
+    p_sys->pi_listen_fd = net_ListenTCP(p_access, hostname, bind_port);
+    if (!p_sys->pi_listen_fd) {
+        msg_Err(p_access, "cannot create socket(s) for HTTP host");
         free( p_sys );
         return VLC_ENOMEM;
     }
@@ -197,7 +185,8 @@ static int Open( vlc_object_t *p_this )
     if ( p_sys->p_httpd_file == NULL )
     {
         msg_Err( p_access, "cannot add stream %s", p_access->psz_access );
-        httpd_HostDelete( p_sys->p_httpd_host );
+        //httpd_HostDelete( p_sys->p_httpd_host );
+        net_ListenClose(p_sys->pi_listen_fd);
 
         free( p_sys );
         return VLC_EGENERIC;
@@ -220,7 +209,8 @@ static void Close( vlc_object_t * p_this )
     sout_access_out_t *p_access = (sout_access_out_t*)p_this;
     sout_access_out_sys_t *p_sys = p_access->p_sys;
     httpd_FileDelete( p_sys->p_httpd_file );
-    httpd_HostDelete( p_sys->p_httpd_host );
+    //httpd_HostDelete( p_sys->p_httpd_host );
+    net_ListenClose(p_sys->pi_listen_fd);
     free( p_sys->psz_mime );
     free( p_sys );
     msg_Dbg( p_access, "simplehttpd access output closed" );
@@ -235,7 +225,7 @@ static int Control( sout_access_out_t *p_access, int i_query, va_list args )
         case ACCESS_OUT_CONTROLS_PACE:
         {
             bool *pb = va_arg( args, bool * );
-            *pb = !p_sys->b_ratecontrol;
+            *pb = true;
             break;
         }
 
