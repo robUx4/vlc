@@ -85,13 +85,38 @@ static const char *const ppsz_sout_options[] = {
 static ssize_t Write( sout_access_out_t *, block_t * );
 static int Seek ( sout_access_out_t *, off_t  );
 static int Control( sout_access_out_t *, int, va_list );
+static void* httpd_HostThread(void *);
+
+enum http_state {
+    STATE_LISTEN,
+    STATE_READ_METHOD,
+    STATE_READ_HEADERS,
+    STATE_SEND_RESPONSE,
+    STATE_SEND_BODY,
+    STATE_DEAD,
+};
 
 struct sout_access_out_sys_t
 {
+    sout_access_out_sys_t()
+        :pi_listen_fd(NULL)
+        ,i_socket(-1)
+        ,psz_mime(NULL)
+        ,state(STATE_LISTEN)
+        ,i_version(-1)
+    {}
+
     int             *pi_listen_fd;
-    httpd_host_t    *p_httpd_host;
-    httpd_file_t    *p_httpd_file;
-    char            *psz_mime;
+    int             i_socket;
+    vlc_thread_t    thread;
+    //httpd_host_t    *p_httpd_host;
+    //httpd_file_t    *p_httpd_file;
+    //httpd_message_t  query;  /* client -> httpd */
+    char            *psz_mime; /* TODO replace with a std::string */
+    enum http_state  state;
+
+    std::string http_url;
+    int i_version;
 };
 
 static int FileCallback( httpd_file_sys_t *p_this, httpd_file_t *p_httpd_file, uint8_t *psz_request, uint8_t **pp_data, int *pi_data )
@@ -161,7 +186,8 @@ static int Open( vlc_object_t *p_this )
     if( !*path )
         path = "/";
 
-    if( unlikely( !( p_sys = (sout_access_out_sys_t *) calloc ( 1, sizeof( *p_sys ) ) ) ) )
+    p_sys = new(std::nothrow) sout_access_out_sys_t;
+    if (unlikely(p_sys == NULL))
         return VLC_ENOMEM;
 
     p_sys->psz_mime = var_GetNonEmptyString( p_access, SOUT_CFG_PREFIX "mime" );
@@ -180,14 +206,14 @@ static int Open( vlc_object_t *p_this )
         return VLC_ENOMEM;
     }
 
-    p_sys->p_httpd_file =
-        httpd_FileNew( p_sys->p_httpd_host, path, p_sys->psz_mime, NULL, NULL, FileCallback, (httpd_file_sys_t*) p_access );
-    if ( p_sys->p_httpd_file == NULL )
-    {
-        msg_Err( p_access, "cannot add stream %s", p_access->psz_access );
-        //httpd_HostDelete( p_sys->p_httpd_host );
-        net_ListenClose(p_sys->pi_listen_fd);
+    p_sys->i_socket = -1;
+    p_sys->state = STATE_LISTEN;
 
+    /* start the server thread */
+    if (vlc_clone(&p_sys->thread, httpd_HostThread, p_this,
+                   VLC_THREAD_PRIORITY_LOW)) {
+        msg_Err(p_this, "cannot spawn http host thread");
+        net_ListenClose(p_sys->pi_listen_fd);
         free( p_sys );
         return VLC_EGENERIC;
     }
@@ -208,11 +234,15 @@ static void Close( vlc_object_t * p_this )
 {
     sout_access_out_t *p_access = (sout_access_out_t*)p_this;
     sout_access_out_sys_t *p_sys = p_access->p_sys;
-    httpd_FileDelete( p_sys->p_httpd_file );
-    //httpd_HostDelete( p_sys->p_httpd_host );
+
     net_ListenClose(p_sys->pi_listen_fd);
+    net_Close(p_sys->i_socket);
+
+    vlc_cancel(p_sys->thread);
+    vlc_join(p_sys->thread, NULL);
+
     free( p_sys->psz_mime );
-    free( p_sys );
+    delete p_sys;
     msg_Dbg( p_access, "simplehttpd access output closed" );
 }
 
@@ -275,4 +305,136 @@ static int Seek( sout_access_out_t *p_access, off_t i_pos )
     (void) i_pos;
     msg_Err( p_access, "simplehttpd sout access cannot seek" );
     return -1;
+}
+
+void* httpd_HostThread(void *p_this)
+{
+    sout_access_out_t     *p_access = (sout_access_out_t*)p_this;
+    sout_access_out_sys_t *p_sys = p_access->p_sys;
+
+    /* loop between HTTP states */
+    for (;;) {
+        switch (p_sys->state)
+        {
+        case STATE_LISTEN:
+            p_sys->i_socket = net_Accept(VLC_OBJECT(p_access), p_sys->pi_listen_fd);
+            net_ListenClose(p_sys->pi_listen_fd);
+            p_sys->pi_listen_fd = NULL;
+            if (p_sys->i_socket < 0)
+            {
+                msg_Err(p_access, "failed to get a client socket");
+                p_sys->state = STATE_DEAD;
+            }
+            else
+            {
+                p_sys->state = STATE_READ_METHOD;
+            }
+            break;
+
+        case STATE_READ_METHOD:
+            {
+                std::stringstream line;
+                for (;;) {
+                    unsigned char c;
+                    if (net_Read(VLC_OBJECT(p_access),p_sys->i_socket, &c, 1) != 1)
+                    {
+                        msg_Err(p_access, "failed to get the client request");
+                        p_sys->state = STATE_DEAD;
+                        break;
+                    }
+                    if (line.str().empty()) {
+                        if (!strchr("\r\n\t ", c)) {
+                            line << c; /* TODO try/catch OOM */
+                        }
+                    } else {
+                        if (c == '\n') {
+                            /* Request line is now complete */
+                            std::string xtract;
+                            std::getline(line, xtract, ' ');
+                            if (xtract.empty()) { /* no URI: evil guy */
+                                msg_Err(p_access, "unsupported empty HTTP method");
+                                p_sys->state = STATE_DEAD;
+                                break;
+                            }
+                            std::string http_method = xtract;
+
+                            do
+                                std::getline(line, xtract, ' '); /* skips extra spaces */
+                            while (xtract.empty());
+                            p_sys->http_url = xtract;
+
+                            std::getline(line, xtract, ' ');
+
+                            if (xtract.length() >= 7 && !memcmp(xtract.c_str(), "HTTP/1.", 7)) {
+                                p_sys->i_version = atoi(xtract.c_str() + 7);
+                            } else if (!memcmp(xtract.c_str(), "HTTP/", 5)) {
+                                const uint8_t sorry[] =
+                                    "HTTP/1.1 505 Unknown HTTP version\r\n\r\n";
+                                /* TODO httpd_NetSend(cl, sorry, sizeof(sorry) - 1); */
+                                msg_Err(p_access, "unsupported HTTP version %s", xtract.c_str()+5);
+                                p_sys->state = STATE_SEND_RESPONSE;
+                            } else { /* yet another foreign protocol */
+                                msg_Err(p_access, "unsupported protocol %s", xtract.c_str());
+                                p_sys->state = STATE_DEAD;
+                            }
+
+                            if (http_method != "GET") {
+                                msg_Err(p_access, "unsupported HTTP method %s", line.str().c_str());
+                                p_sys->state = STATE_DEAD;
+                            } else {
+                                p_sys->state = STATE_READ_HEADERS;
+                            }
+
+                            break;
+                        }
+                        line << c; /* TODO try/catch OOM */
+                    }
+                }
+            }
+            break;
+
+        case STATE_READ_HEADERS:
+        {
+            std::stringstream line;
+            for (;;) {
+                unsigned char c;
+                if (net_Read(VLC_OBJECT(p_access),p_sys->i_socket, &c, 1) != 1)
+                {
+                    msg_Err(p_access, "failed to get the client request");
+                    p_sys->state = STATE_DEAD;
+                    break;
+                }
+                if (line.str().empty()) {
+                    if (c == '\n') {
+                        p_sys->state = STATE_SEND_RESPONSE;
+                        break;
+                    }
+                    if (!strchr("\r\t ", c)) {
+                        line << c; /* TODO try/catch OOM */
+                    }
+                } else {
+                    if (c == '\n') {
+                        /* Header line is now complete */
+                        std::string ll = line.str();
+                        msg_Dbg(p_access, "header line not handled: %s", ll.c_str());
+                        break;
+                    }
+                    line << c; /* TODO try/catch OOM */
+                }
+            }
+        }
+            break;
+
+        case STATE_SEND_RESPONSE:
+            msleep(100000); /* TODO */
+            break;
+
+        case STATE_SEND_BODY:
+            msleep(100000); /* TODO */
+            break;
+
+        case STATE_DEAD:
+            return NULL;
+        }
+    }
 }
