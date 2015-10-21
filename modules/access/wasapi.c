@@ -38,6 +38,14 @@
 #include <mmdeviceapi.h>
 #include <audioclient.h>
 
+#define KS_IID(name) const static GUID IID_##name =  { STATICGUIDOF(name) };
+
+KS_IID(KSDATAFORMAT_SUBTYPE_PCM)
+KS_IID(KSDATAFORMAT_SUBTYPE_IEEE_FLOAT)
+KS_IID(KSDATAFORMAT_SUBTYPE_ALAW)
+KS_IID(KSDATAFORMAT_SUBTYPE_MULAW)
+KS_IID(KSDATAFORMAT_SUBTYPE_ADPCM)
+
 static LARGE_INTEGER freq; /* performance counters frequency */
 
 BOOL WINAPI DllMain(HINSTANCE, DWORD, LPVOID); /* avoid warning */
@@ -146,7 +154,7 @@ static int vlc_FromWave(const WAVEFORMATEX *restrict wf,
     fmt->i_original_channels = fmt->i_physical_channels;
     assert(popcount(wfe->dwChannelMask) == wf->nChannels);
 
-    if (IsEqualIID(&wfe->SubFormat, &KSDATAFORMAT_SUBTYPE_PCM))
+    if (IsEqualIID(&wfe->SubFormat, &IID_KSDATAFORMAT_SUBTYPE_PCM))
     {
         switch (wf->wBitsPerSample)
         {
@@ -189,7 +197,7 @@ static int vlc_FromWave(const WAVEFORMATEX *restrict wf,
                 return -1;
         }
     }
-    else if (IsEqualIID(&wfe->SubFormat, &KSDATAFORMAT_SUBTYPE_IEEE_FLOAT))
+    else if (IsEqualIID(&wfe->SubFormat, &IID_KSDATAFORMAT_SUBTYPE_IEEE_FLOAT))
     {
         if (wf->wBitsPerSample != wfe->Samples.wValidBitsPerSample)
             return -1;
@@ -206,12 +214,12 @@ static int vlc_FromWave(const WAVEFORMATEX *restrict wf,
                 return -1;
         }
     }
-    /*else if (IsEqualIID(&wfe->Subformat, &KSDATAFORMAT_SUBTYPE_DRM)) {} */
-    else if (IsEqualIID(&wfe->SubFormat, &KSDATAFORMAT_SUBTYPE_ALAW))
+    /*else if (IsEqualIID(&wfe->Subformat, &IID_KSDATAFORMAT_SUBTYPE_DRM)) {} */
+    else if (IsEqualIID(&wfe->SubFormat, &IID_KSDATAFORMAT_SUBTYPE_ALAW))
         fmt->i_format = VLC_CODEC_ALAW;
-    else if (IsEqualIID(&wfe->SubFormat, &KSDATAFORMAT_SUBTYPE_MULAW))
+    else if (IsEqualIID(&wfe->SubFormat, &IID_KSDATAFORMAT_SUBTYPE_MULAW))
         fmt->i_format = VLC_CODEC_MULAW;
-    else if (IsEqualIID(&wfe->SubFormat, &KSDATAFORMAT_SUBTYPE_ADPCM))
+    else if (IsEqualIID(&wfe->SubFormat, &IID_KSDATAFORMAT_SUBTYPE_ADPCM))
         fmt->i_format = VLC_CODEC_ADPCM_MS;
     else
         return -1;
