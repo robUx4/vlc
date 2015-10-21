@@ -104,6 +104,8 @@ struct sout_access_out_sys_t
         ,psz_mime(NULL)
         ,state(STATE_LISTEN)
         ,i_version(-1)
+        ,i_status(500)
+        ,status_text("Server Error")
     {}
 
     int             *pi_listen_fd;
@@ -117,6 +119,8 @@ struct sout_access_out_sys_t
 
     std::string http_url;
     int i_version;
+    int i_status;
+    std::string status_text;
 };
 
 static int FileCallback( httpd_file_sys_t *p_this, httpd_file_t *p_httpd_file, uint8_t *psz_request, uint8_t **pp_data, int *pi_data )
@@ -368,9 +372,8 @@ void* httpd_HostThread(void *p_this)
                             if (xtract.length() >= 7 && !memcmp(xtract.c_str(), "HTTP/1.", 7)) {
                                 p_sys->i_version = atoi(xtract.c_str() + 7);
                             } else if (!memcmp(xtract.c_str(), "HTTP/", 5)) {
-                                const uint8_t sorry[] =
-                                    "HTTP/1.1 505 Unknown HTTP version\r\n\r\n";
-                                /* TODO httpd_NetSend(cl, sorry, sizeof(sorry) - 1); */
+                                p_sys->status_text = "Unknown HTTP version";
+                                p_sys->i_status = 505;
                                 msg_Err(p_access, "unsupported HTTP version %s", xtract.c_str()+5);
                                 p_sys->state = STATE_SEND_RESPONSE;
                             } else { /* yet another foreign protocol */
@@ -407,6 +410,8 @@ void* httpd_HostThread(void *p_this)
                 if (line.str().empty()) {
                     if (c == '\n') {
                         p_sys->state = STATE_SEND_RESPONSE;
+                        p_sys->status_text = "OK";
+                        p_sys->i_status = 200;
                         break;
                     }
                     if (!strchr("\r\t ", c)) {
@@ -426,7 +431,19 @@ void* httpd_HostThread(void *p_this)
             break;
 
         case STATE_SEND_RESPONSE:
-            msleep(100000); /* TODO */
+        {
+            std::stringstream response;
+            response << "HTTP/1.0 " << p_sys->i_status << ' ' << p_sys->status_text << '\r' << '\n';
+            response << "Content-Type: " << p_sys->psz_mime << '\r' << '\n';
+            response << "Cache-Control: no-cache" << '\r' << '\n';
+            response << '\r' << '\n';
+
+            std::string str = response.str();
+            if (net_Write(VLC_OBJECT(p_access),p_sys->i_socket,str.c_str(), str.length())==str.length())
+                p_sys->state = STATE_SEND_BODY;
+            else
+                p_sys->state = STATE_DEAD;
+        }
             break;
 
         case STATE_SEND_BODY:
