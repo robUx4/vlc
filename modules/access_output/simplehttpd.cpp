@@ -110,6 +110,8 @@ struct sout_access_out_sys_t
     int             *pi_listen_fd;
     int             i_socket;
     vlc_thread_t    thread;
+    vlc_mutex_t     lock;
+    vlc_cond_t      wait;
     enum http_state  state;
 
     std::string     mime;
@@ -181,19 +183,21 @@ static int Open( vlc_object_t *p_this )
     p_sys->pi_listen_fd = net_ListenTCP(p_access, hostname, bind_port);
     if (!p_sys->pi_listen_fd) {
         msg_Err(p_access, "cannot create socket(s) for HTTP host");
-        free( p_sys );
+        delete p_sys;
         return VLC_ENOMEM;
     }
 
-    p_sys->i_socket = -1;
-    p_sys->state = STATE_LISTEN;
+    vlc_mutex_init( &p_sys->lock );
+    vlc_cond_init( &p_sys->wait );
 
     /* start the server thread */
     if (vlc_clone(&p_sys->thread, httpd_HostThread, p_this,
                    VLC_THREAD_PRIORITY_LOW)) {
         msg_Err(p_this, "cannot spawn http host thread");
         net_ListenClose(p_sys->pi_listen_fd);
-        free( p_sys );
+        vlc_cond_destroy( &p_sys->wait );
+        vlc_mutex_destroy( &p_sys->lock );
+        delete p_sys;
         return VLC_EGENERIC;
     }
 
@@ -219,6 +223,9 @@ static void Close( vlc_object_t * p_this )
 
     vlc_cancel(p_sys->thread);
     vlc_join(p_sys->thread, NULL);
+
+    vlc_cond_destroy( &p_sys->wait );
+    vlc_mutex_destroy( &p_sys->lock );
 
     delete p_sys;
     msg_Dbg( p_access, "simplehttpd access output closed" );
@@ -250,28 +257,47 @@ static ssize_t Write( sout_access_out_t *p_access, block_t *p_buffer )
 {
     size_t i_write = 0;
     sout_access_out_sys_t *p_sys = p_access->p_sys;
-    block_t *p_temp;
+
+    // wait until we can write the body to the network
+    vlc_mutex_lock( &p_sys->lock );
+    mutex_cleanup_push( &p_sys->lock );
+
+    while (p_sys->state != STATE_SEND_BODY && p_sys->state != STATE_DEAD)
+        vlc_cond_wait( &p_sys->wait, &p_sys->lock );
+
+    vlc_cleanup_pop();
+
+    if (p_sys->state == STATE_DEAD)
+    {
+        vlc_mutex_unlock( &p_sys->lock );
+        return -1;
+    }
+    vlc_mutex_unlock( &p_sys->lock );
+
     while( p_buffer )
     {
-        if( ( p_buffer->i_flags & BLOCK_FLAG_HEADER ) )
+        ssize_t val = net_Write(VLC_OBJECT(p_access), p_sys->i_socket,
+                                p_buffer->p_buffer, p_buffer->i_buffer);
+        if (val <= 0)
         {
-            ssize_t writevalue = 0; //writeSegment( p_access );
-            if( unlikely( writevalue < 0 ) )
-            {
-                block_ChainRelease ( p_buffer );
-                return -1;
-            }
-            i_write += writevalue;
+            block_ChainRelease (p_buffer);
+            msg_Err( p_access, "cannot write: %s", vlc_strerror_c(errno) );
+            return -1;
         }
 
-        p_temp = p_buffer->p_next;
-        p_buffer->p_next = NULL;
-        //block_ChainAppend( &p_sys->block_buffer, p_buffer );
-        p_buffer = p_temp;
+        if ((size_t)val >= p_buffer->i_buffer)
+        {
+            block_t *p_next = p_buffer->p_next;
+            block_Release (p_buffer);
+            p_buffer = p_next;
+        }
+        else
+        {
+            p_buffer->p_buffer += val;
+            p_buffer->i_buffer -= val;
+        }
+        i_write += val;
     }
-
-    msleep(100000);
-
     return i_write;
 }
 
@@ -422,11 +448,11 @@ void* httpd_HostThread(void *p_this)
             break;
 
         case STATE_SEND_BODY:
-            msleep(100000); /* TODO */
-            break;
-
         case STATE_DEAD:
-            return NULL;
+            vlc_mutex_lock( &p_sys->lock );
+            vlc_cond_signal( &p_sys->wait );
+            vlc_mutex_unlock( &p_sys->lock );
+            return NULL; /* we don't need the thread anymore */
         }
     }
 }
