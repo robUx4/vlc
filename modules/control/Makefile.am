@@ -69,3 +69,19 @@ if !HAVE_WINSTORE
 control_LTLIBRARIES += libwin_hotkeys_plugin.la libwin_msg_plugin.la
 endif
 endif
+
+libctrl_chromecast_plugin_la_SOURCES = control/chromecast/cast_channel.proto control/chromecast/chromecast.cpp \
+                                misc/webservices/json.h misc/webservices/json.c
+nodist_libctrl_chromecast_plugin_la_SOURCES = control/chromecast/cast_channel.pb.cc
+libctrl_chromecast_plugin_la_CPPFLAGS = $(AM_CPPFLAGS) -Icontrol/chromecast $(CHROMECAST_CFLAGS)
+libctrl_chromecast_plugin_la_LIBADD = $(CHROMECAST_LIBS) $(SOCKET_LIBS)
+if HAVE_MICRODNS
+libctrl_chromecast_plugin_la_CPPFLAGS += $(MICRODNS_CFLAGS)
+libctrl_chromecast_plugin_la_LIBADD += $(MICRODNS_LIBS)
+endif
+CLEANFILES += $(nodist_libctrl_chromecast_plugin_la_SOURCES)
+
+if BUILD_CHROMECAST
+BUILT_SOURCES += control/chromecast/cast_channel.pb.h
+control_LTLIBRARIES += libctrl_chromecast_plugin.la
+endif
