@@ -91,7 +91,7 @@ enum http_state {
     STATE_LISTEN,
     STATE_READ_METHOD,
     STATE_READ_HEADERS,
-    STATE_SEND_RESPONSE,
+    STATE_SEND_HEADER,
     STATE_SEND_BODY,
     STATE_DEAD,
 };
@@ -101,7 +101,6 @@ struct sout_access_out_sys_t
     sout_access_out_sys_t()
         :pi_listen_fd(NULL)
         ,i_socket(-1)
-        ,psz_mime(NULL)
         ,state(STATE_LISTEN)
         ,i_version(-1)
         ,i_status(500)
@@ -111,38 +110,14 @@ struct sout_access_out_sys_t
     int             *pi_listen_fd;
     int             i_socket;
     vlc_thread_t    thread;
-    //httpd_host_t    *p_httpd_host;
-    //httpd_file_t    *p_httpd_file;
-    //httpd_message_t  query;  /* client -> httpd */
-    char            *psz_mime; /* TODO replace with a std::string */
     enum http_state  state;
 
-    std::string http_url;
+    std::string     mime;
+    std::string     http_url;
     int i_version;
     int i_status;
     std::string status_text;
 };
-
-static int FileCallback( httpd_file_sys_t *p_this, httpd_file_t *p_httpd_file, uint8_t *psz_request, uint8_t **pp_data, int *pi_data )
-{
-    return VLC_SUCCESS;
-}
-
-static int HandlerCallback( httpd_handler_sys_t *p_this, httpd_handler_t *p_httpd_handler, char *psz_url,
-                            uint8_t *psz_request, int i_type, uint8_t *p_in, int i_in,
-                            char *psz_remote_addr, char *psz_remote_host,
-                            uint8_t **pp_data, int *pi_data )
-{
-    sout_access_out_t *p_access = (sout_access_out_t*)p_this;
-    sout_access_out_sys_t *p_sys = p_access->p_sys;
-
-    *pi_data = asprintf((char**)pp_data, "HTTP/1.1 200 OK\r\n" \
-                           "Content-Type: %s\r\n" \
-                           "\r\n",
-                           p_sys->psz_mime);
-
-    return VLC_SUCCESS;
-}
 
 /*****************************************************************************
  * Open: open the file
@@ -194,14 +169,14 @@ static int Open( vlc_object_t *p_this )
     if (unlikely(p_sys == NULL))
         return VLC_ENOMEM;
 
-    p_sys->psz_mime = var_GetNonEmptyString( p_access, SOUT_CFG_PREFIX "mime" );
-    if (p_sys->psz_mime && p_sys->psz_mime[0] == '\0')
+    char *psz_mime = var_GetNonEmptyString( p_access, SOUT_CFG_PREFIX "mime" );
+    if (psz_mime != NULL)
     {
-        free(p_sys->psz_mime);
-        p_sys->psz_mime = NULL;
+        p_sys->mime = psz_mime;
+        free(psz_mime);
     }
-    if (p_sys->psz_mime == NULL)
-        p_sys->psz_mime = xstrdup(vlc_mime_Ext2Mime(path));
+    if (p_sys->mime.empty())
+        p_sys->mime = vlc_mime_Ext2Mime(path);
 
     p_sys->pi_listen_fd = net_ListenTCP(p_access, hostname, bind_port);
     if (!p_sys->pi_listen_fd) {
@@ -245,7 +220,6 @@ static void Close( vlc_object_t * p_this )
     vlc_cancel(p_sys->thread);
     vlc_join(p_sys->thread, NULL);
 
-    free( p_sys->psz_mime );
     delete p_sys;
     msg_Dbg( p_access, "simplehttpd access output closed" );
 }
@@ -375,7 +349,7 @@ void* httpd_HostThread(void *p_this)
                                 p_sys->status_text = "Unknown HTTP version";
                                 p_sys->i_status = 505;
                                 msg_Err(p_access, "unsupported HTTP version %s", xtract.c_str()+5);
-                                p_sys->state = STATE_SEND_RESPONSE;
+                                p_sys->state = STATE_SEND_HEADER;
                             } else { /* yet another foreign protocol */
                                 msg_Err(p_access, "unsupported protocol %s", xtract.c_str());
                                 p_sys->state = STATE_DEAD;
@@ -409,7 +383,7 @@ void* httpd_HostThread(void *p_this)
                 }
                 if (line.str().empty()) {
                     if (c == '\n') {
-                        p_sys->state = STATE_SEND_RESPONSE;
+                        p_sys->state = STATE_SEND_HEADER;
                         p_sys->status_text = "OK";
                         p_sys->i_status = 200;
                         break;
@@ -421,7 +395,7 @@ void* httpd_HostThread(void *p_this)
                     if (c == '\n') {
                         /* Header line is now complete */
                         std::string ll = line.str();
-                        msg_Dbg(p_access, "header line not handled: %s", ll.c_str());
+                        msg_Dbg(p_access, "discarded header line: %s", ll.c_str());
                         break;
                     }
                     line << c; /* TODO try/catch OOM */
@@ -430,11 +404,11 @@ void* httpd_HostThread(void *p_this)
         }
             break;
 
-        case STATE_SEND_RESPONSE:
+        case STATE_SEND_HEADER:
         {
             std::stringstream response;
             response << "HTTP/1.0 " << p_sys->i_status << ' ' << p_sys->status_text << '\r' << '\n';
-            response << "Content-Type: " << p_sys->psz_mime << '\r' << '\n';
+            response << "Content-Type: " << p_sys->mime << '\r' << '\n';
             response << "Cache-Control: no-cache" << '\r' << '\n';
             response << '\r' << '\n';
 
