@@ -407,9 +407,10 @@ void* httpd_HostThread(void *p_this)
         case STATE_SEND_HEADER:
         {
             std::stringstream response;
-            response << "HTTP/1.0 " << p_sys->i_status << ' ' << p_sys->status_text << '\r' << '\n';
+            response << "HTTP/1.1 " << p_sys->i_status << ' ' << p_sys->status_text << '\r' << '\n';
             response << "Content-Type: " << p_sys->mime << '\r' << '\n';
             response << "Cache-Control: no-cache" << '\r' << '\n';
+            response << "Connection: close" << '\r' << '\n';
             response << '\r' << '\n';
 
             std::string str = response.str();
