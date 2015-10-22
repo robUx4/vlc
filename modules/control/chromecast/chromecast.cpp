@@ -735,14 +735,14 @@ static int processMessage(intf_thread_t *p_intf, const castchannel::CastMessage 
         if (type == "MEDIA_STATUS")
         {
             json_value status = (*p_data)["status"];
-            msg_Dbg(p_intf, "Player state: %s sessionId:%s",
+            msg_Dbg(p_intf, "Player state: %s sessionId:%d",
                     status[0]["playerState"].operator const char *(),
-                    status[0]["mediaSessionId"].operator const char *());
+                    (json_int_t) status[0]["mediaSessionId"]);
 
             vlc_mutex_locker locker(&p_sys->lock);
-            std::string mediaSessionId = std::string(status[0]["mediaSessionId"]);
+            std::string mediaSessionId = std::to_string((json_int_t) status[0]["mediaSessionId"]);
             assert(p_sys->mediaSessionId.empty() || p_sys->mediaSessionId == mediaSessionId);
-            p_sys->mediaSessionId == mediaSessionId;
+            p_sys->mediaSessionId = mediaSessionId;
             if (p_sys->play_status == PLAYER_LOAD_SENT)
                 SendPlayerState(p_intf);
         }
@@ -922,7 +922,7 @@ static void msgPlayerLoad(intf_thread_t *p_intf)
 
     std::stringstream ss;
     ss << "{\"type\":\"LOAD\","
-//       <<  "\"autoplay\":\"false\","
+       <<  "\"autoplay\":\"false\","
        <<  "\"media\":{\"contentId\":\"http://" << p_sys->serverIP << ":"
            << var_InheritInteger(p_intf, CONTROL_CFG_PREFIX "http-port")
            << "/stream\","
