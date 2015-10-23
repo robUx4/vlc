@@ -41,6 +41,7 @@
 #include <vlc_input.h>
 #include <vlc_network.h>
 #include <vlc_tls.h>
+#include <vlc_interrupt.h>
 
 #include <cassert>
 #include <sstream>
@@ -139,13 +140,16 @@ struct intf_sys_t
         ,conn_status(CHROMECAST_DISCONNECTED)
         ,play_status(PLAYER_IDLE)
         ,i_requestId(0)
-    {}
+    {
+        p_interrupt = vlc_interrupt_create();
+    }
 
     ~intf_sys_t()
     {
 #ifdef HAVE_MICRODNS
         mdns_cleanup(microdns_ctx);
 #endif
+        vlc_interrupt_destroy(p_interrupt);
     }
 
     input_thread_t *p_input;
@@ -170,6 +174,7 @@ struct intf_sys_t
     enum connection_status conn_status;
     enum player_status     play_status;
 
+    vlc_interrupt_t *p_interrupt;
     vlc_mutex_t  lock;
     vlc_cond_t   loadCommandCond; /* TODO not needed anymore ? */
     vlc_thread_t chromecastThread;
@@ -323,6 +328,11 @@ static void SendPlayerState(intf_thread_t *p_intf)
     if (p_sys->conn_status != CHROMECAST_APP_STARTED)
         return;
 
+    if (!p_sys->p_input)
+        return;
+
+    assert(!p_sys->p_input->b_preparsing);
+
     switch( var_GetInteger( p_sys->p_input, "state" ) )
     {
     case OPENING_S:
@@ -379,7 +389,7 @@ static int InputEvent( vlc_object_t *p_this, char const *psz_var,
     {
     case INPUT_EVENT_STATE:
         {
-            msg_Warn(p_this, "playback state changed %d", var_GetInteger( p_input, "state" ));
+            msg_Info(p_this, "playback state changed %d", var_GetInteger( p_input, "state" ));
             vlc_mutex_locker locker(&p_sys->lock);
             SendPlayerState(p_intf);
         }
@@ -702,11 +712,7 @@ static int processMessage(intf_thread_t *p_intf, const castchannel::CastMessage 
                 {
                     p_sys->conn_status = CHROMECAST_APP_STARTED;
                     msgConnect(p_intf, p_sys->appTransportId);
-#if 1
                     SendPlayerState(p_intf);
-#else
-                    msgPlayerLoad(p_intf);
-#endif
                     vlc_cond_signal(&p_sys->loadCommandCond);
                 }
             }
@@ -1064,6 +1070,8 @@ static void* chromecastThread(void* p_this)
 
     int i_waitdelay = PING_WAIT_TIME;
     int i_retries = PING_WAIT_RETRIES;
+
+    vlc_interrupt_set(p_sys->p_interrupt);
 
 #ifdef HAVE_MICRODNS
     if (p_sys->microdns_ctx != NULL)
