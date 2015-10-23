@@ -204,7 +204,6 @@ static int Open( vlc_object_t *p_this )
     p_access->p_sys = p_sys;
 
     p_access->pf_write = Write;
-    p_access->pf_seek  = Seek;
     p_access->pf_control = Control;
 
     return VLC_SUCCESS;
@@ -241,6 +240,13 @@ static int Control( sout_access_out_t *p_access, int i_query, va_list args )
         {
             bool *pb = va_arg( args, bool * );
             *pb = true;
+            break;
+        }
+
+        case ACCESS_OUT_CAN_SEEK:
+        {
+            bool *pb = va_arg( args, bool * );
+            *pb = false;
             break;
         }
 
@@ -299,16 +305,6 @@ static ssize_t Write( sout_access_out_t *p_access, block_t *p_buffer )
         i_write += val;
     }
     return i_write;
-}
-
-/*****************************************************************************
- * Seek: seek to a specific location in a file
- *****************************************************************************/
-static int Seek( sout_access_out_t *p_access, off_t i_pos )
-{
-    (void) i_pos;
-    msg_Err( p_access, "simplehttpd sout access cannot seek" );
-    return -1;
 }
 
 void* httpd_HostThread(void *p_this)
