@@ -305,19 +305,28 @@ static int PlaylistEvent( vlc_object_t *p_this, char const *psz_var,
     VLC_UNUSED(p_this);
     VLC_UNUSED(psz_var);
 
-    if (p_sys->p_input != p_input)
+    if( p_input != NULL )
     {
-        if( p_sys->p_input != NULL )
-        {
-            assert( p_sys->p_input == oldval.p_address );
-            var_DelCallback( p_sys->p_input, "intf-event", InputEvent, p_intf );
-        }
-
-        p_sys->p_input = p_input;
-
-        if( p_input != NULL )
-            var_AddCallback( p_input, "intf-event", InputEvent, p_intf );
+        var_AddCallback( p_input, "intf-event", InputEvent, p_intf );
+        std::stringstream ss;
+        ss << "#standard{dst=:" << HTTP_PORT << "/stream"
+           << ",mux=avformat{mux=matroska}"
+           << ",access=simplehttpd{mime=" << p_sys->mime << "}}";
+        var_SetString( p_input, "sout", ss.str().c_str() );
     }
+
+    vlc_mutex_locker locker(&p_sys->lock);
+    assert(p_sys->p_input != p_input);
+
+    msg_Dbg(p_intf, "PlaylistEvent input changed");
+
+    if( p_sys->p_input != NULL )
+    {
+        assert( p_sys->p_input == oldval.p_address );
+        var_DelCallback( p_sys->p_input, "intf-event", InputEvent, p_intf );
+    }
+
+    p_sys->p_input = p_input;
 
     return VLC_SUCCESS;
 }
