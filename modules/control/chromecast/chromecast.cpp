@@ -271,6 +271,9 @@ void Close(vlc_object_t *p_this)
     intf_thread_t *p_intf = reinterpret_cast<intf_thread_t*>(p_this);
     intf_sys_t *p_sys = p_intf->p_sys;
 
+    if (!p_sys->appTransportId.empty())
+        msgClose(p_intf, p_sys->appTransportId);
+
     var_DelCallback( pl_Get(p_intf), "input-current", PlaylistEvent, p_intf );
 
     if( p_sys->p_input != NULL )
@@ -281,6 +284,8 @@ void Close(vlc_object_t *p_this)
 
     vlc_mutex_destroy(&p_sys->lock);
     vlc_cond_destroy(&p_sys->loadCommandCond);
+
+    disconnectChromecast(p_intf);
 
     delete p_sys;
 }
@@ -326,7 +331,6 @@ static void SendPlayerState(intf_thread_t *p_intf)
             p_sys->mediaSessionId = "";
         }
         msgPlayerLoad(p_intf);
-        //msgPlayerStatus(p_intf);
         p_sys->play_status = PLAYER_LOAD_SENT;
         break;
     case PLAYING_S:
@@ -345,6 +349,12 @@ static void SendPlayerState(intf_thread_t *p_intf)
         } else if (p_sys->play_status == PLAYER_IDLE) {
             msgPlayerLoad(p_intf);
             p_sys->play_status = PLAYER_LOAD_SENT;
+        }
+        break;
+    case END_S:
+        if (!p_sys->mediaSessionId.empty()) {
+            msgPlayerStop(p_intf);
+            p_sys->play_status = PLAYER_IDLE;
         }
         break;
     default:
@@ -708,7 +718,8 @@ static int processMessage(intf_thread_t *p_intf, const castchannel::CastMessage 
                 case CHROMECAST_APP_STARTED:
                     msg_Warn(p_intf, "app is no longer present. closing");
                     msgClose(p_intf, p_sys->appTransportId);
-                    p_sys->conn_status = CHROMECAST_DEAD;
+                    p_sys->appTransportId = "";
+                    p_sys->conn_status = CHROMECAST_TLS_CONNECTED;
                     vlc_cond_signal(&p_sys->loadCommandCond);
                     // ft
                 default:
@@ -749,9 +760,10 @@ static int processMessage(intf_thread_t *p_intf, const castchannel::CastMessage 
         else if (type == "LOAD_FAILED")
         {
             msg_Err(p_intf, "Media load failed");
-            msgClose(p_intf, p_sys->appTransportId);
             vlc_mutex_locker locker(&p_sys->lock);
-            p_sys->conn_status = CHROMECAST_APP_STARTED;
+            msgClose(p_intf, p_sys->appTransportId);
+            p_sys->appTransportId = "";
+            p_sys->conn_status = CHROMECAST_TLS_CONNECTED;
             vlc_cond_signal(&p_sys->loadCommandCond);
         }
         else
