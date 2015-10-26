@@ -816,8 +816,6 @@ static int InitSout( input_thread_t * p_input )
     if( p_input->b_preparsing )
         return VLC_SUCCESS;
 
-    msleep(10000);
-
     /* Find a usable sout and attach it to p_input */
     char *psz = var_GetNonEmptyString( p_input, "sout" );
     if( psz && strncasecmp( p_input->p->p_item->psz_uri, "vlc:", 4 ) )
