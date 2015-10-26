@@ -305,16 +305,6 @@ static int PlaylistEvent( vlc_object_t *p_this, char const *psz_var,
     VLC_UNUSED(p_this);
     VLC_UNUSED(psz_var);
 
-    if( p_input != NULL )
-    {
-        var_AddCallback( p_input, "intf-event", InputEvent, p_intf );
-        std::stringstream ss;
-        ss << "#standard{dst=:" << HTTP_PORT << "/stream"
-           << ",mux=avformat{mux=matroska}"
-           << ",access=simplehttpd{mime=" << p_sys->mime << "}}";
-        var_SetString( p_input, "sout", ss.str().c_str() );
-    }
-
     vlc_mutex_locker locker(&p_sys->lock);
     assert(p_sys->p_input != p_input);
 
@@ -327,6 +317,17 @@ static int PlaylistEvent( vlc_object_t *p_this, char const *psz_var,
     }
 
     p_sys->p_input = p_input;
+
+    if( p_input != NULL )
+    {
+        var_AddCallback( p_input, "intf-event", InputEvent, p_intf );
+
+        std::stringstream ss;
+        ss << "#standard{dst=:" << var_InheritInteger(p_intf, CONTROL_CFG_PREFIX "http-port") << "/stream"
+           << ",mux=avformat{mux=matroska}"
+           << ",access=simplehttpd{mime=" << p_sys->mime << "}}";
+        var_SetString( p_input, "sout", ss.str().c_str() );
+    }
 
     return VLC_SUCCESS;
 }
@@ -398,7 +399,7 @@ static int InputEvent( vlc_object_t *p_this, char const *psz_var,
     {
     case INPUT_EVENT_STATE:
         {
-            msg_Info(p_this, "playback state changed %d", var_GetInteger( p_input, "state" ));
+            msg_Info(p_this, "playback state changed %d", (int)var_GetInteger( p_input, "state" ));
             vlc_mutex_locker locker(&p_sys->lock);
             SendPlayerState(p_intf);
         }
@@ -411,7 +412,7 @@ static int InputEvent( vlc_object_t *p_this, char const *psz_var,
 
 /**
  * @brief Connect to the Chromecast
- * @param p_intf the sout_stream_t structure
+ * @param p_intf the intf_thread_t structure
  * @return the opened socket file descriptor or -1 on error
  */
 static int connectChromecast(intf_thread_t *p_intf)
@@ -460,7 +461,7 @@ static void disconnectChromecast(intf_thread_t *p_intf)
 
 /**
  * @brief Send a message to the Chromecast
- * @param p_intf the sout_stream_t structure
+ * @param p_intf the intf_thread_t structure
  * @param msg the CastMessage to send
  * @return the number of bytes sent or -1 on error
  */
@@ -491,7 +492,7 @@ static int sendMessage(intf_thread_t *p_intf, castchannel::CastMessage &msg)
 
 /**
  * @brief Send all the messages in the pending queue to the Chromecast
- * @param p_intf the sout_stream_t structure
+ * @param p_intf the intf_thread_t structure
  * @param msg the CastMessage to send
  * @return the number of bytes sent or -1 on error
  */
@@ -518,7 +519,7 @@ static int sendMessages(intf_thread_t *p_intf)
 
 /**
  * @brief Receive a data packet from the Chromecast
- * @param p_intf the sout_stream_t structure
+ * @param p_intf the intf_thread_t structure
  * @param b_msgReceived returns true if a message has been entirely received else false
  * @param i_payloadSize returns the payload size of the message received
  * @return the number of bytes received of -1 on error
@@ -631,7 +632,7 @@ extern "C" int recvPacket(intf_thread_t *p_intf, bool &b_msgReceived,
 
 /**
  * @brief Process a message received from the Chromecast
- * @param p_intf the sout_stream_t structure
+ * @param p_intf the intf_thread_t structure
  * @param msg the CastMessage to process
  * @return 0 if the message has been successfuly processed else -1
  */
@@ -763,7 +764,7 @@ static int processMessage(intf_thread_t *p_intf, const castchannel::CastMessage 
             json_value status = (*p_data)["status"];
             msg_Dbg(p_intf, "Player state: %s sessionId:%d",
                     status[0]["playerState"].operator const char *(),
-                    (json_int_t) status[0]["mediaSessionId"]);
+                    (int)(json_int_t) status[0]["mediaSessionId"]);
 
             vlc_mutex_locker locker(&p_sys->lock);
             std::string mediaSessionId = std::to_string((json_int_t) status[0]["mediaSessionId"]);
@@ -1155,7 +1156,7 @@ static void* chromecastThread(void* p_this)
         if ((i_ret < 0 && errno != EAGAIN) || i_ret == 0)
 #endif
         {
-            msg_Err(p_intf, "The connection to the Chromecast died.");
+            msg_Err(p_intf, "The connection to the Chromecast died (receiving).");
             vlc_mutex_locker locker(&p_sys->lock);
             p_sys->conn_status = CHROMECAST_DEAD;
             vlc_cond_signal(&p_sys->loadCommandCond);
@@ -1185,7 +1186,7 @@ static void* chromecastThread(void* p_this)
             if ((i_ret < 0 && errno != EAGAIN) || i_ret == 0)
 #endif
             {
-                msg_Err(p_intf, "The connection to the Chromecast died.");
+                msg_Err(p_intf, "The connection to the Chromecast died (sending).");
                 vlc_mutex_locker locker(&p_sys->lock);
                 p_sys->conn_status = CHROMECAST_DEAD;
                 vlc_cond_signal(&p_sys->loadCommandCond);
