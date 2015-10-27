@@ -39,6 +39,7 @@ libass: libass-$(ASS_VERSION).tar.gz .sum-ass
 	$(UNPACK)
 	$(APPLY) $(SRC)/ass/ass-macosx.patch
 	$(APPLY) $(SRC)/ass/ass-solaris.patch
+	$(APPLY) $(SRC)/ass/e572a26.patch
 	$(UPDATE_AUTOCONFIG)
 	$(MOVE)
 
@@ -49,7 +50,7 @@ ASS_CONF=--disable-enca
 ifneq ($(WITH_FONTCONFIG), 0)
 DEPS_ass += fontconfig $(DEPS_fontconfig)
 else
-ASS_CONF += --disable-fontconfig
+ASS_CONF += --disable-fontconfig --disable-require-system-font-provider
 endif
 
 ifneq ($(WITH_HARFBUZZ), 0)

@@ -27,6 +27,7 @@
 #endif
 
 #include <vlc_common.h>
+#include <vlc_atomic.h>
 #include <vlc_plugin.h>
 #include <vlc_codec.h>
 #include <vlc_threads.h>
@@ -454,7 +455,6 @@ static int send_output_buffer(decoder_t *dec)
 
     if (sys->output_pool) {
         mmal_buffer_header_reset(buffer);
-        buffer->user_data = picture;
         buffer->alloc_size = sys->output->buffer_size;
         if (buffer_size < sys->output->buffer_size) {
             msg_Err(dec, "Retrieved picture with too small data block (%d < %d)",
@@ -474,6 +474,7 @@ static int send_output_buffer(decoder_t *dec)
         }
         buffer->data = p_sys->buffer->data;
     }
+    buffer->user_data = picture;
     buffer->cmd = 0;
 
     status = mmal_port_send_buffer(sys->output, buffer);

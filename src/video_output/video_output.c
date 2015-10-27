@@ -964,22 +964,22 @@ static int ThreadDisplayRenderPicture(vout_thread_t *vout, bool is_forced)
     if (sys->display.use_dr) {
         vout_display_Prepare(vd, todisplay, subpic);
     } else {
-        sys->display.filtered = vout_FilterDisplay(vd, todisplay);
-        if (sys->display.filtered) {
-            if (!do_dr_spu && !do_early_spu && vout->p->spu_blend && subpic)
-                picture_BlendSubpicture(sys->display.filtered, vout->p->spu_blend, subpic);
-            vout_display_Prepare(vd, sys->display.filtered, do_dr_spu ? subpic : NULL);
-        }
-        if (!do_dr_spu && subpic)
-        {
-            subpicture_Delete(subpic);
-            subpic = NULL;
-        }
-        if (!sys->display.filtered)
+        todisplay = vout_FilterDisplay(vd, todisplay);
+        if (todisplay == NULL)
         {
             if (subpic != NULL)
                 subpicture_Delete(subpic);
             return VLC_EGENERIC;
+        }
+
+        if (!do_dr_spu && !do_early_spu && vout->p->spu_blend && subpic)
+            picture_BlendSubpicture(todisplay, vout->p->spu_blend, subpic);
+        vout_display_Prepare(vd, todisplay, do_dr_spu ? subpic : NULL);
+
+        if (!do_dr_spu && subpic)
+        {
+            subpicture_Delete(subpic);
+            subpic = NULL;
         }
     }
 
@@ -1004,11 +1004,7 @@ static int ThreadDisplayRenderPicture(vout_thread_t *vout, bool is_forced)
 
     /* Display the direct buffer returned by vout_RenderPicture */
     vout->p->displayed.date = mdate();
-    vout_display_Display(vd,
-                         sys->display.filtered ? sys->display.filtered
-                                                : todisplay,
-                         subpic);
-    sys->display.filtered = NULL;
+    vout_display_Display(vd, todisplay, subpic);
 
     vout_statistic_AddDisplayed(&vout->p->statistic, 1);
 

@@ -77,6 +77,9 @@ static int Control( demux_t* p_demux, int i_query, va_list args )
 
     switch( i_query )
     {
+        case DEMUX_CAN_SEEK:
+            *va_arg( args, bool * ) = true;
+            return VLC_SUCCESS;
         case DEMUX_GET_TIME:
             pi64 = (int64_t*)va_arg( args, int64_t * );
             if( p_sys->i_subtitle < p_sys->i_subtitles )
@@ -204,21 +207,23 @@ static int ReadTTML( demux_t* p_demux )
     const char* psz_name;
     int i_max_sub = 0;
     int i_type;
-    
+
     do
     {
         i_type = xml_ReaderNextNode( p_sys->p_reader, &psz_name );
+        if( i_type <= XML_READER_NONE )
+            break;
 
         if ( i_type == XML_READER_STARTELEM && ( !strcasecmp( psz_name, "head" ) || !strcasecmp( psz_name, "tt:head" ) ) )
         {
             p_sys->b_has_head = true;
         }
-        else if ( i_type == XML_READER_STARTELEM && ( !strcasecmp( psz_name, "p" ) || !strcasecmp( psz_name, "tt:p" ) ) ) 
+        else if ( i_type == XML_READER_STARTELEM && ( !strcasecmp( psz_name, "p" ) || !strcasecmp( psz_name, "tt:p" ) ) )
         {
             char* psz_text = NULL;
             char* psz_begin = NULL;
             char* psz_end = NULL;
-            
+
             if( asprintf ( &psz_text, "<%s", psz_name ) < 0 )
                 return VLC_ENOMEM;
             const char* psz_attr_value = NULL;
@@ -262,7 +267,7 @@ static int ReadTTML( demux_t* p_demux )
                     }
                 }
                 subtitle_t *p_subtitle = &p_sys->subtitle[p_sys->i_subtitles];
-                
+
                 Convert_time( &p_subtitle->i_start, psz_begin );
                 Convert_time( &p_subtitle->i_stop, psz_end );
                 free( psz_begin );
@@ -270,7 +275,9 @@ static int ReadTTML( demux_t* p_demux )
 
                 i_type = xml_ReaderNextNode( p_sys->p_reader, &psz_name );
 
-                while ( i_type != XML_READER_ENDELEM || ( strcmp( psz_name, "p" ) && strcmp( psz_name, "tt:p" ) ) )
+                while ( i_type > XML_READER_NONE && ( i_type != XML_READER_ENDELEM
+                        || ( strcmp( psz_name, "p" ) && strcmp( psz_name, "tt:p" ) ) )
+                      )
                 {
                     if ( i_type == XML_READER_TEXT && psz_name != NULL )
                     {
@@ -285,7 +292,7 @@ static int ReadTTML( demux_t* p_demux )
                             return VLC_ENOMEM;
                         psz_attr_name = xml_ReaderNextAttr( p_sys->p_reader, &psz_attr_value );
                         while ( psz_attr_name && psz_attr_value )
-                        {   
+                        {
                             psz_text = Append( psz_text, " %s=\"%s\"", psz_attr_name, psz_attr_value );
                             if ( unlikely( psz_text == NULL ) )
                                 return VLC_ENOMEM;
@@ -297,7 +304,7 @@ static int ReadTTML( demux_t* p_demux )
                             if ( unlikely( psz_text == NULL ) )
                                 return VLC_ENOMEM;
                         }
-                        else 
+                        else
                         {
                             psz_text = Append( psz_text, ">" );
                             if ( unlikely( psz_text == NULL ) )
@@ -334,7 +341,7 @@ static int Demux( demux_t* p_demux )
     demux_sys_t* p_sys = p_demux->p_sys;
     if( p_sys->i_subtitle >= p_sys->i_subtitles )
         return 0;
-    
+
     while ( p_sys->i_subtitle < p_sys->i_subtitles &&
             p_sys->subtitle[p_sys->i_subtitle].i_start < p_sys->i_next_demux_time )
     {
@@ -478,15 +485,7 @@ static int Open( vlc_object_t* p_this )
         stream_Delete( p_probestream );
         return VLC_EGENERIC;
     }
-    p_sys->p_reader = xml_ReaderCreate( p_sys->p_xml, p_demux->s );
-    if ( !p_sys->p_reader )
-    {
-        Close( p_demux );
-        stream_Delete( p_probestream );
-        return VLC_EGENERIC;
-    }
-
-    p_sys->p_reader = xml_ReaderReset( p_sys->p_reader, p_probestream );
+    p_sys->p_reader = xml_ReaderCreate( p_sys->p_xml, p_probestream );
     if ( !p_sys->p_reader )
     {
         Close( p_demux );
@@ -502,15 +501,14 @@ static int Open( vlc_object_t* p_this )
         stream_Delete( p_probestream );
         return VLC_EGENERIC;
     }
+
     p_sys->p_reader = xml_ReaderReset( p_sys->p_reader, p_demux->s );
+    stream_Delete( p_probestream );
     if ( !p_sys->p_reader )
     {
         Close( p_demux );
-        stream_Delete( p_probestream );
         return VLC_EGENERIC;
     }
-    stream_Delete( p_probestream );
-
 
     if ( ReadTTML( p_demux ) != VLC_SUCCESS )
     {

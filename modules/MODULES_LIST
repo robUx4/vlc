@@ -134,6 +134,7 @@ $Id$
  * equalizer: a equalizer audio filter
  * erase: Logo erase video filter
  * es: input module for MPEG ES decapsulation
+ * evas: EFL Evas video output with Tizen TBM Surface support
  * export: playlist export module
  * extract: Extract RGB components video filter
  * faad: AAC decoder using libfaad2
@@ -319,6 +320,7 @@ $Id$
  * rv32: RV32 image format conversion module
  * samplerate: Secret Rabbit Code (libsamplerate) audio resampler
  * sap: Interface module to read SAP/SDP announcements
+ * sapi: Windows Text to Speech Synthetizer using the SAPI 5.1 API
  * scale: Images rescaler
  * scaletempo: Scale audio tempo in sync with playback rate
  * scene: scene video filter

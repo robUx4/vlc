@@ -1,7 +1,7 @@
 /*****************************************************************************
  * freetype.c : Put text on the video, using freetype2
  *****************************************************************************
- * Copyright (C) 2002 - 2012 VLC authors and VideoLAN
+ * Copyright (C) 2002 - 2015 VLC authors and VideoLAN
  * $Id$
  *
  * Authors: Sigmund Augdal Helberg <dnumgis@videolan.org>
@@ -37,18 +37,10 @@
 
 #include <vlc_common.h>
 #include <vlc_plugin.h>
-#include <vlc_stream.h>                        /* stream_MemoryNew */
-#include <vlc_input.h>                         /* vlc_input_attachment_* */
-#include <vlc_dialog.h>                        /* FcCache dialog */
+#include <vlc_input.h>                             /* vlc_input_attachment_* */
 #include <vlc_filter.h>                                      /* filter_sys_t */
 #include <vlc_text_style.h>                                   /* text_style_t*/
 #include <vlc_charset.h>
-
-/* Freetype */
-#include <ft2build.h>
-#include FT_FREETYPE_H
-#include FT_GLYPH_H
-#include FT_STROKER_H
 
 /* apple stuff */
 #ifdef __APPLE__
@@ -67,6 +59,11 @@
 
 /* FontConfig */
 #ifdef HAVE_FONTCONFIG
+# define HAVE_GET_FONT_BY_FAMILY_NAME
+#endif
+
+/* Android */
+#ifdef __ANDROID__
 # define HAVE_GET_FONT_BY_FAMILY_NAME
 #endif
 
@@ -280,6 +277,8 @@ static int LoadFontsFromAttachments( filter_t *p_filter )
     filter_sys_t         *p_sys = p_filter->p_sys;
     input_attachment_t  **pp_attachments;
     int                   i_attachments_cnt;
+    FT_Face               p_face = NULL;
+    char                 *psz_lc = NULL;
 
     if( filter_GetInputAttachments( p_filter, &pp_attachments, &i_attachments_cnt ) )
         return VLC_EGENERIC;
@@ -287,9 +286,15 @@ static int LoadFontsFromAttachments( filter_t *p_filter )
     p_sys->i_font_attachments = 0;
     p_sys->pp_font_attachments = malloc( i_attachments_cnt * sizeof(*p_sys->pp_font_attachments));
     if( !p_sys->pp_font_attachments )
+    {
+        for( int i = 0; i < i_attachments_cnt; ++i )
+            vlc_input_attachment_Delete( pp_attachments[ i ] );
+        free( pp_attachments );
         return VLC_ENOMEM;
+    }
 
-    for( int k = 0; k < i_attachments_cnt; k++ )
+    int k = 0;
+    for( ; k < i_attachments_cnt; k++ )
     {
         input_attachment_t *p_attach = pp_attachments[k];
 
@@ -298,15 +303,99 @@ static int LoadFontsFromAttachments( filter_t *p_filter )
             p_attach->i_data > 0 && p_attach->p_data )
         {
             p_sys->pp_font_attachments[ p_sys->i_font_attachments++ ] = p_attach;
+
+            int i_font_idx = 0;
+
+            while( 0 == FT_New_Memory_Face( p_sys->p_library,
+                                            p_attach->p_data,
+                                            p_attach->i_data,
+                                            i_font_idx,
+                                            &p_face ))
+            {
+
+                bool b_bold = p_face->style_flags & FT_STYLE_FLAG_BOLD;
+                bool b_italic = p_face->style_flags & FT_STYLE_FLAG_ITALIC;
+
+                if( p_face->family_name )
+                    psz_lc = ToLower( p_face->family_name );
+                else
+                    if( asprintf( &psz_lc, FB_NAME"-%02d",
+                                  p_sys->i_fallback_counter++ ) < 0 )
+                        psz_lc = NULL;
+
+                if( unlikely( !psz_lc ) )
+                    goto error;
+
+                vlc_family_t *p_family =
+                    vlc_dictionary_value_for_key( &p_sys->family_map, psz_lc );
+
+                if( p_family == kVLCDictionaryNotFound )
+                {
+                    p_family = NewFamily( p_filter, psz_lc, &p_sys->p_families,
+                                          &p_sys->family_map, psz_lc );
+
+                    if( unlikely( !p_family ) )
+                        goto error;
+                }
+
+                free( psz_lc );
+                psz_lc = NULL;
+
+                char *psz_fontfile;
+                if( asprintf( &psz_fontfile, ":/%d",
+                              p_sys->i_font_attachments - 1 ) < 0
+                 || !NewFont( psz_fontfile, i_font_idx, b_bold, b_italic, p_family ) )
+                    goto error;
+
+                FT_Done_Face( p_face );
+                p_face = NULL;
+
+                i_font_idx++;
+            }
         }
         else
         {
             vlc_input_attachment_Delete( p_attach );
         }
     }
+
     free( pp_attachments );
 
+    /* Add font attachments to the "attachments" fallback list */
+    vlc_family_t *p_attachments = NULL;
+
+    for( vlc_family_t *p_family = p_sys->p_families; p_family;
+         p_family = p_family->p_next )
+    {
+        vlc_family_t *p_temp = NewFamily( p_filter, p_family->psz_name, &p_attachments,
+                                          NULL, NULL );
+        if( unlikely( !p_temp ) )
+        {
+            if( p_attachments )
+                FreeFamilies( p_attachments, NULL );
+            return VLC_ENOMEM;
+        }
+        else
+            p_temp->p_fonts = p_family->p_fonts;
+    }
+
+    if( p_attachments )
+        vlc_dictionary_insert( &p_sys->fallback_map, FB_LIST_ATTACHMENTS, p_attachments );
+
     return VLC_SUCCESS;
+
+error:
+    if( p_face )
+        FT_Done_Face( p_face );
+
+    if( psz_lc )
+        free( psz_lc );
+
+    for( int i = k + 1; i < i_attachments_cnt; ++i )
+        vlc_input_attachment_Delete( pp_attachments[ i ] );
+
+    free( pp_attachments );
+    return VLC_ENOMEM;
 }
 
 /*****************************************************************************
@@ -891,11 +980,10 @@ static void FreeStylesArray( text_style_t **pp_styles, size_t i_styles )
 }
 
 static uni_char_t* SegmentsToTextAndStyles( filter_t *p_filter, const text_segment_t *p_segment, size_t *pi_string_length,
-                                            text_style_t ***ppp_styles, size_t *pi_styles, bool b_grid )
+                                            text_style_t ***ppp_styles, size_t *pi_styles )
 {
     text_style_t **pp_styles = NULL;
     uni_char_t *psz_uni = NULL;
-    const int i_scale = ( b_grid ) ? 100 : var_InheritInteger( p_filter, "sub-text-scale");
     size_t i_size = 0;
     size_t i_nb_char = 0;
     *pi_styles = 0;
@@ -951,12 +1039,6 @@ static uni_char_t* SegmentsToTextAndStyles( filter_t *p_filter, const text_segme
         /* Overwrite any default or value with forced ones */
         text_style_Merge( p_style, p_filter->p_sys->p_forced_style, true );
 
-        if( i_scale != 100 )
-        {
-            p_style->i_font_size = p_style->i_font_size * i_scale / 100;
-            p_style->f_font_relsize = p_style->f_font_relsize * i_scale / 100;
-        }
-
         // i_string_bytes is a number of bytes, while here we're going to assign pointer by pointer
         for ( size_t i = 0; i < i_string_bytes / sizeof( *psz_uni ); ++i )
             pp_styles[i_nb_char + i] = p_style;
@@ -981,11 +1063,25 @@ static int Render( filter_t *p_filter, subpicture_region_t *p_region_out,
     if( !p_region_in )
         return VLC_EGENERIC;
 
+    filter_sys_t *p_sys = p_filter->p_sys;
+    bool b_grid = p_region_in->b_gridmode;
+    p_sys->i_scale = ( b_grid ) ? 100 : var_InheritInteger( p_filter, "sub-text-scale");
+
+    /*
+     * Update the default face to reflect changes in video size or text scaling
+     */
+    p_sys->p_face = SelectAndLoadFace( p_filter, p_sys->p_default_style, 0 );
+    if( !p_sys->p_face )
+    {
+        msg_Err( p_filter, "Render(): Error loading default face" );
+        return VLC_EGENERIC;
+    }
+
     text_style_t **pp_styles = NULL;
     size_t i_text_length = 0;
     size_t i_styles = 0;
     uni_char_t *psz_text = SegmentsToTextAndStyles( p_filter, p_region_in->p_text, &i_text_length,
-                                                    &pp_styles, &i_styles, p_region_in->b_gridmode );
+                                                    &pp_styles, &i_styles );
     if( !psz_text || !pp_styles )
     {
         return VLC_EGENERIC;
@@ -1065,100 +1161,58 @@ static int Render( filter_t *p_filter, subpicture_region_t *p_region_out,
     return rv;
 }
 
+static void FreeFace( void *p_face, void *p_obj )
+{
+    VLC_UNUSED( p_obj );
+
+    FT_Done_Face( ( FT_Face ) p_face );
+}
+
 /*****************************************************************************
  * Create: allocates osd-text video thread output method
  *****************************************************************************
  * This function allocates and initializes a Clone vout method.
  *****************************************************************************/
-static int Init_FT( vlc_object_t *p_this,
-                    const char *psz_fontfile,
-                    const int fontindex )
-{
-    filter_t      *p_filter = (filter_t *)p_this;
-    filter_sys_t  *p_sys = p_filter->p_sys;
-
-    /* */
-    int i_error = FT_Init_FreeType( &p_sys->p_library );
-    if( i_error )
-    {
-        msg_Err( p_filter, "couldn't initialize freetype" );
-        goto error;
-    }
-
-    i_error = FT_New_Face( p_sys->p_library, psz_fontfile ? psz_fontfile : "",
-                           fontindex, &p_sys->p_face );
-
-    if( i_error == FT_Err_Unknown_File_Format )
-    {
-        msg_Err( p_filter, "file %s have unknown format",
-                 psz_fontfile ? psz_fontfile : "(null)" );
-        goto error;
-    }
-    else if( i_error )
-    {
-        msg_Err( p_filter, "failed to load font file %s",
-                 psz_fontfile ? psz_fontfile : "(null)" );
-        goto error;
-    }
-
-    i_error = FT_Select_Charmap( p_sys->p_face, ft_encoding_unicode );
-    if( i_error )
-    {
-        msg_Err( p_filter, "font has no unicode translation table" );
-        goto error;
-    }
-
-    if( FT_Set_Pixel_Sizes( p_sys->p_face, 0, STYLE_DEFAULT_FONT_SIZE ) )
-    {
-        msg_Err( p_filter, "couldn't set font size to %d", STYLE_DEFAULT_FONT_SIZE );
-        goto error;
-    }
-
-    i_error = FT_Stroker_New( p_sys->p_library, &p_sys->p_stroker );
-    if( i_error )
-        msg_Err( p_filter, "Failed to create stroker for outlining" );
-
-    return VLC_SUCCESS;
-
-error:
-    if( p_sys->p_face ) FT_Done_Face( p_sys->p_face );
-    if( p_sys->p_library ) FT_Done_FreeType( p_sys->p_library );
-
-    return VLC_EGENERIC;
-}
-
 static int Create( vlc_object_t *p_this )
 {
-    filter_t      *p_filter = (filter_t *)p_this;
-    filter_sys_t  *p_sys;
-    char          *psz_fontfile   = NULL;
-    char          *psz_monofontfile   = NULL;
-    int            fontindex = 0, monofontindex = 0;
+    filter_t      *p_filter         = ( filter_t * ) p_this;
+    filter_sys_t  *p_sys            = NULL;
 
     /* Allocate structure */
-    p_filter->p_sys = p_sys = malloc( sizeof(*p_sys) );
+    p_filter->p_sys = p_sys = calloc( 1, sizeof( *p_sys ) );
     if( !p_sys )
         return VLC_ENOMEM;
 
-    p_sys->p_face           = 0;
-    p_sys->p_library        = 0;
+    /* Init Freetype and its stroker */
+    if( FT_Init_FreeType( &p_sys->p_library ) )
+    {
+        msg_Err( p_filter, "Failed to initialize FreeType" );
+        free( p_sys );
+        return VLC_EGENERIC;
+    }
+
+    if( FT_Stroker_New( p_sys->p_library, &p_sys->p_stroker ) )
+    {
+        msg_Err( p_filter, "Failed to create stroker for outlining" );
+        p_sys->p_stroker = NULL;
+    }
+
+    /* Dictionnaries for fonts and families */
+    vlc_dictionary_init( &p_sys->face_map, 50 );
+    vlc_dictionary_init( &p_sys->family_map, 50 );
+    vlc_dictionary_init( &p_sys->fallback_map, 20 );
+
+    p_sys->i_scale = 100;
 
     /* default style to apply to uncomplete segmeents styles */
     p_sys->p_default_style = text_style_Create( STYLE_FULLY_SET );
     if(unlikely(!p_sys->p_default_style))
-    {
-        free(p_sys);
-        return VLC_ENOMEM;
-    }
+        goto error;
 
     /* empty style for style overriding cases */
     p_sys->p_forced_style = text_style_Create( STYLE_NO_DEFAULTS );
     if(unlikely(!p_sys->p_forced_style))
-    {
-        text_style_Delete( p_sys->p_default_style );
-        free(p_sys);
-        return VLC_ENOMEM;
-    }
+        goto error;
 
     /* fills default and forced style */
     FillDefaultStyles( p_filter );
@@ -1171,12 +1225,12 @@ static int Create( vlc_object_t *p_this )
      */
 
     double f_outline_thickness = var_InheritInteger( p_filter, "freetype-outline-thickness" ) / 100.0;
-    f_outline_thickness = VLC_CLIP( f_outline_thickness, 0.0, 0.5 );
-    float f_shadow_angle = var_InheritFloat( p_filter, "freetype-shadow-angle" );
-    float f_shadow_distance = var_InheritFloat( p_filter, "freetype-shadow-distance" );
-    f_shadow_distance = VLC_CLIP( f_shadow_distance, 0, 1 );
-    p_sys->f_shadow_vector_x = f_shadow_distance * cosf((float)(2. * M_PI) * f_shadow_angle / 360);
-    p_sys->f_shadow_vector_y = f_shadow_distance * sinf((float)(2. * M_PI) * f_shadow_angle / 360);
+    f_outline_thickness        = VLC_CLIP( f_outline_thickness, 0.0, 0.5 );
+    float f_shadow_angle       = var_InheritFloat( p_filter, "freetype-shadow-angle" );
+    float f_shadow_distance    = var_InheritFloat( p_filter, "freetype-shadow-distance" );
+    f_shadow_distance          = VLC_CLIP( f_shadow_distance, 0, 1 );
+    p_sys->f_shadow_vector_x   = f_shadow_distance * cosf((float)(2. * M_PI) * f_shadow_angle / 360);
+    p_sys->f_shadow_vector_y   = f_shadow_distance * sinf((float)(2. * M_PI) * f_shadow_angle / 360);
 
     /* Set default psz_fontname */
     if( !p_sys->p_default_style->psz_fontname || !*p_sys->p_default_style->psz_fontname )
@@ -1200,77 +1254,50 @@ static int Create( vlc_object_t *p_this )
 #endif
     }
 
+    if( LoadFontsFromAttachments( p_filter ) == VLC_ENOMEM )
+        goto error;
+
 #ifdef HAVE_FONTCONFIG
-    p_sys->pf_select = FontConfig_Select;
-    FontConfig_BuildCache( p_filter );
+    p_sys->pf_select = Generic_Select;
+    p_sys->pf_get_family = FontConfig_GetFamily;
+    p_sys->pf_get_fallbacks = FontConfig_GetFallbacks;
+    FontConfig_Prepare( p_filter );
 #elif defined( __APPLE__ )
 #if !TARGET_OS_IPHONE
     p_sys->pf_select = MacLegacy_Select;
 #endif
 #elif defined( _WIN32 ) && defined( HAVE_GET_FONT_BY_FAMILY_NAME )
-    p_sys->pf_select = Win32_Select;
+    const char *const ppsz_win32_default[] =
+        { "Tahoma", "FangSong", "SimHei", "KaiTi" };
+    p_sys->pf_get_family = Win32_GetFamily;
+    p_sys->pf_get_fallbacks = Win32_GetFallbacks;
+    p_sys->pf_select = Generic_Select;
+    InitDefaultList( p_filter, ppsz_win32_default,
+                     sizeof( ppsz_win32_default ) / sizeof( *ppsz_win32_default ) );
+#elif defined( __ANDROID__ )
+    p_sys->pf_get_family = Android_GetFamily;
+    p_sys->pf_get_fallbacks = Android_GetFallbacks;
+    p_sys->pf_select = Generic_Select;
+
+    Android_Prepare( p_filter );
 #else
     p_sys->pf_select = Dummy_Select;
 #endif
 
-    /* */
-    psz_fontfile = p_sys->pf_select( p_filter, p_sys->p_default_style->psz_fontname,
-                                     false, false, p_sys->p_default_style->i_font_size, &fontindex );
-    psz_monofontfile = p_sys->pf_select( p_filter, p_sys->p_default_style->psz_monofontname,
-                                         false, false, p_sys->p_default_style->i_font_size,
-                                          &monofontindex );
-    msg_Dbg( p_filter, "Using %s as font from file %s",
-             p_sys->p_default_style->psz_fontname, psz_fontfile );
-    msg_Dbg( p_filter, "Using %s as mono-font from file %s",
-             p_sys->p_default_style->psz_monofontname, psz_monofontfile );
-
-    /* If nothing is found, use the default family */
-    if( !psz_fontfile )
-        psz_fontfile = File_Select( p_sys->p_default_style->psz_fontname );
-    if( !psz_monofontfile )
-        psz_monofontfile = File_Select( p_sys->p_default_style->psz_monofontname );
-
-    if( Init_FT( p_this, psz_fontfile, fontindex ) != VLC_SUCCESS )
+    p_sys->p_face = SelectAndLoadFace( p_filter, p_sys->p_default_style, 0 );
+    if( !p_sys->p_face )
+    {
+        msg_Err( p_filter, "Error loading default face" );
         goto error;
-
-    int i_faces_size = 20;
-    p_sys->faces_cache.p_faces = malloc( i_faces_size * sizeof( *p_sys->faces_cache.p_faces ) );
-    p_sys->faces_cache.p_styles = malloc( i_faces_size * sizeof( *p_sys->faces_cache.p_styles ) );
-    p_sys->faces_cache.i_cache_size = i_faces_size;
-    p_sys->faces_cache.i_faces_count = 0;
-
-    p_sys->pp_font_attachments = NULL;
-    p_sys->i_font_attachments = 0;
+    }
 
     p_filter->pf_render = Render;
-
-    LoadFontsFromAttachments( p_filter );
-
-    free( psz_fontfile );
-    free( psz_monofontfile );
 
     return VLC_SUCCESS;
 
 error:
-    free( psz_fontfile );
-    free( psz_monofontfile );
-    text_style_Delete( p_sys->p_default_style );
-    text_style_Delete( p_sys->p_forced_style );
-    free( p_sys );
+    Destroy( VLC_OBJECT(p_filter) );
     return VLC_EGENERIC;
-}
-
-
-static void Destroy_FT( vlc_object_t *p_this )
-{
-    filter_t *p_filter = (filter_t *)p_this;
-    filter_sys_t *p_sys = p_filter->p_sys;
-
-    if( p_sys->p_stroker )
-        FT_Stroker_Done( p_sys->p_stroker );
-
-    FT_Done_Face( p_sys->p_face );
-    FT_Done_FreeType( p_sys->p_library );
 }
 
 /*****************************************************************************
@@ -1283,15 +1310,22 @@ static void Destroy( vlc_object_t *p_this )
     filter_t *p_filter = (filter_t *)p_this;
     filter_sys_t *p_sys = p_filter->p_sys;
 
-    faces_cache_t *p_cache = &p_sys->faces_cache;
-    for( int i = 0; i < p_cache->i_faces_count; ++i )
-    {
-        FT_Done_Face( p_cache->p_faces[ i ] );
-        free( p_cache->p_styles[ i ].psz_fontname );
-    }
-    free( p_sys->faces_cache.p_faces );
-    free( p_sys->faces_cache.p_styles );
+#if 0
+    msg_Dbg( p_filter, "------------------" );
+    msg_Dbg( p_filter, "p_sys->p_families:" );
+    msg_Dbg( p_filter, "------------------" );
+    DumpFamily( p_filter, p_sys->p_families, true, -1 );
+    msg_Dbg( p_filter, "-----------------" );
+    msg_Dbg( p_filter, "p_sys->family_map" );
+    msg_Dbg( p_filter, "-----------------" );
+    DumpDictionary( p_filter, &p_sys->family_map, false, 1 );
+    msg_Dbg( p_filter, "-------------------" );
+    msg_Dbg( p_filter, "p_sys->fallback_map" );
+    msg_Dbg( p_filter, "-------------------" );
+    DumpDictionary( p_filter, &p_sys->fallback_map, true, -1 );
+#endif
 
+    /* Attachments */
     if( p_sys->pp_font_attachments )
     {
         for( int k = 0; k < p_sys->i_font_attachments; k++ )
@@ -1300,180 +1334,23 @@ static void Destroy( vlc_object_t *p_this )
         free( p_sys->pp_font_attachments );
     }
 
+    /* Text styles */
     text_style_Delete( p_sys->p_default_style );
     text_style_Delete( p_sys->p_forced_style );
 
-    Destroy_FT( p_this );
+    /* Fonts dicts */
+    vlc_dictionary_clear( &p_sys->fallback_map, FreeFamilies, p_filter );
+    vlc_dictionary_clear( &p_sys->face_map, FreeFace, p_filter );
+    vlc_dictionary_clear( &p_sys->family_map, NULL, NULL );
+    if( p_sys->p_families )
+        FreeFamiliesAndFonts( p_sys->p_families );
+
+    /* Freetype */
+    if( p_sys->p_stroker )
+        FT_Stroker_Done( p_sys->p_stroker );
+
+    FT_Done_FreeType( p_sys->p_library );
+
     free( p_sys );
 }
 
-/* Face loading */
-bool FaceStyleEquals( const text_style_t *p_style1,
-                             const text_style_t *p_style2 )
-{
-    if( !p_style1 || !p_style2 )
-        return false;
-    if( p_style1 == p_style2 )
-        return true;
-
-    const int i_style_mask = STYLE_BOLD | STYLE_ITALIC;
-    return (p_style1->i_style_flags & i_style_mask) == (p_style2->i_style_flags & i_style_mask) &&
-           !strcmp( p_style1->psz_fontname, p_style2->psz_fontname );
-}
-
-static FT_Face LoadEmbeddedFace( filter_sys_t *p_sys, const char *psz_fontname,
-                                 const text_style_t *p_style )
-{
-    for( int k = 0; k < p_sys->i_font_attachments; k++ )
-    {
-        input_attachment_t *p_attach   = p_sys->pp_font_attachments[k];
-        int                 i_font_idx = 0;
-        FT_Face             p_face = NULL;
-
-        while( 0 == FT_New_Memory_Face( p_sys->p_library,
-                                        p_attach->p_data,
-                                        p_attach->i_data,
-                                        i_font_idx,
-                                        &p_face ))
-        {
-            if( p_face )
-            {
-                int i_style_received = ((p_face->style_flags & FT_STYLE_FLAG_BOLD)    ? STYLE_BOLD   : 0) |
-                                       ((p_face->style_flags & FT_STYLE_FLAG_ITALIC ) ? STYLE_ITALIC : 0);
-                if( p_face->family_name != NULL
-                 && !strcasecmp( p_face->family_name, psz_fontname )
-                 && (p_style->i_style_flags & (STYLE_BOLD | STYLE_ITALIC))
-                                                          == i_style_received )
-                    return p_face;
-
-                FT_Done_Face( p_face );
-            }
-            i_font_idx++;
-        }
-    }
-    return NULL;
-}
-
-int ConvertToLiveSize( filter_t *p_filter, const text_style_t *p_style )
-{
-    int i_font_size = STYLE_DEFAULT_FONT_SIZE;
-    if( p_style->i_font_size )
-    {
-        i_font_size = p_style->i_font_size;
-    }
-    else if ( p_style->f_font_relsize )
-    {
-        i_font_size = (int) p_filter->fmt_out.video.i_height * p_style->f_font_relsize;
-    }
-    return i_font_size;
-}
-
-FT_Face LoadFace( filter_t *p_filter,
-                  const text_style_t *p_style, int i_font_size )
-{
-    filter_sys_t *p_sys = p_filter->p_sys;
-
-    faces_cache_t *p_cache = &p_sys->faces_cache;
-    for( int i = 0; i < p_cache->i_faces_count; ++i )
-        if( FaceStyleEquals( &p_cache->p_styles[ i ], p_style )
-         && p_cache->p_styles[ i ].i_font_size == i_font_size
-         && !( ( p_cache->p_styles[ i ].i_style_flags ^ p_style->i_style_flags ) & STYLE_HALFWIDTH ) )
-            return p_cache->p_faces[ i ];
-
-    const char *psz_fontname = (p_style->i_style_flags & STYLE_MONOSPACED)
-                               ? p_style->psz_monofontname : p_style->psz_fontname;
-
-    /* Look for a match amongst our attachments first */
-    FT_Face p_face = LoadEmbeddedFace( p_sys, psz_fontname, p_style );
-
-    /* Load system wide font otheriwse */
-    if( !p_face )
-    {
-        int  i_idx = 0;
-        char *psz_fontfile = NULL;
-        if( p_sys->pf_select )
-            psz_fontfile = p_sys->pf_select( p_filter,
-                                             psz_fontname,
-                                             (p_style->i_style_flags & STYLE_BOLD) != 0,
-                                             (p_style->i_style_flags & STYLE_ITALIC) != 0,
-                                             -1,
-                                             &i_idx );
-        else
-            psz_fontfile = NULL;
-
-        if( !psz_fontfile )
-            return NULL;
-
-        if( *psz_fontfile == '\0' )
-        {
-            msg_Warn( p_filter,
-                      "We were not able to find a matching font: \"%s\" (%s %s),"
-                      " so using default font",
-                      psz_fontname,
-                      (p_style->i_style_flags & STYLE_BOLD)   ? "Bold" : "",
-                      (p_style->i_style_flags & STYLE_ITALIC) ? "Italic" : "" );
-            p_face = NULL;
-        }
-        else
-        {
-            if( FT_New_Face( p_sys->p_library, psz_fontfile, i_idx, &p_face ) )
-                p_face = NULL;
-        }
-        free( psz_fontfile );
-    }
-    if( !p_face )
-        return NULL;
-
-    if( FT_Select_Charmap( p_face, ft_encoding_unicode ) )
-    {
-        /* We've loaded a font face which is unhelpful for actually
-         * rendering text - fallback to the default one.
-         */
-        FT_Done_Face( p_face );
-        return NULL;
-    }
-
-    int i_font_width = p_style->i_style_flags & STYLE_HALFWIDTH
-                     ? i_font_size / 2 : i_font_size;
-
-    if( FT_Set_Pixel_Sizes( p_face, i_font_width, i_font_size ) )
-    {
-        msg_Err( p_filter,
-                 "Failed to set font size to %d", i_font_size );
-        FT_Done_Face( p_face );
-        return NULL;
-    }
-
-    if( p_cache->i_faces_count == p_cache->i_cache_size )
-    {
-        FT_Face *p_new_faces =
-                realloc( p_cache->p_faces, p_cache->i_cache_size * 2 * sizeof( *p_cache->p_faces ) );
-        if( !p_new_faces )
-        {
-            FT_Done_Face( p_face );
-            return NULL;
-        }
-
-        p_cache->p_faces = p_new_faces;
-
-        text_style_t *p_new_styles =
-                realloc( p_cache->p_styles, p_cache->i_cache_size * 2 * sizeof( *p_cache->p_styles ) ) ;
-        if( !p_new_styles )
-        {
-            FT_Done_Face( p_face );
-            return NULL;
-        }
-
-        p_cache->p_styles = p_new_styles;
-        p_cache->i_cache_size *= 2;
-    }
-
-    text_style_t *p_face_style = p_cache->p_styles + p_cache->i_faces_count;
-    p_face_style->i_font_size = i_font_size;
-    p_face_style->i_style_flags = p_style->i_style_flags;
-    p_face_style->psz_fontname = strdup( psz_fontname );
-    p_cache->p_faces[ p_cache->i_faces_count ] = p_face;
-    ++p_cache->i_faces_count;
-
-    return p_face;
-}

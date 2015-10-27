@@ -193,6 +193,7 @@ demux_LTLIBRARIES += $(LTLIBmkv)
 EXTRA_LTLIBRARIES += libmkv_plugin.la
 
 libmp4_plugin_la_SOURCES = demux/mp4/mp4.c demux/mp4/mp4.h \
+                           demux/mp4/fragments.c demux/mp4/fragments.h \
                            demux/mp4/libmp4.c demux/mp4/libmp4.h \
                            demux/mp4/id3genres.h demux/mp4/languages.h \
                            demux/asf/asfpacket.c demux/asf/asfpacket.h \
@@ -318,7 +319,6 @@ libadaptative_plugin_la_SOURCES = \
     demux/adaptative/StreamFormat.hpp \
     demux/adaptative/Streams.cpp \
     demux/adaptative/Streams.hpp \
-    demux/adaptative/StreamsType.hpp \
     demux/adaptative/Time.hpp \
     demux/adaptative/tools/Debug.hpp \
     demux/adaptative/tools/Helper.cpp \

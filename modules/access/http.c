@@ -189,10 +189,6 @@ struct access_sys_t
 };
 
 /* */
-static int OpenRedirected( vlc_object_t *p_this, const char *psz_url,
-                           unsigned i_redirect );
-
-/* */
 static ssize_t Read( access_t *, uint8_t *, size_t );
 static ssize_t ReadCompressed( access_t *, uint8_t *, size_t );
 static int Seek( access_t *, uint64_t );
@@ -216,29 +212,15 @@ static vlc_http_cookie_jar_t *GetCookieJar( vlc_object_t *p_this );
 static int Open( vlc_object_t *p_this )
 {
     access_t *p_access = (access_t*)p_this;
+    const char *psz_url = p_access->psz_url;
+    char *psz;
 
-    return OpenRedirected( p_this, p_access->psz_url, 5 );
-}
+    access_sys_t *p_sys = malloc( sizeof(*p_sys) );
+    if( unlikely(p_sys == NULL) )
+        return VLC_ENOMEM;
 
-/**
- * Open the given url with limited redirects
- * @param p_this: the vlc object
- * @i_redirect: number of redirections remaining
- * @return vlc error codes
- */
-static int OpenRedirected( vlc_object_t *p_this, const char *psz_url,
-                           unsigned i_redirect )
-{
-    access_t     *p_access = (access_t*)p_this;
-    access_sys_t *p_sys;
-    char         *psz;
-
-    /* Set up p_access */
-    STANDARD_READ_ACCESS_INIT;
-#ifdef HAVE_ZLIB_H
-    p_access->pf_read = ReadCompressed;
-#endif
     p_sys->fd = -1;
+    p_sys->b_error = false;
     p_sys->b_proxy = false;
     p_sys->psz_proxy_passbuf = NULL;
     p_sys->i_version = 1;
@@ -253,6 +235,7 @@ static int OpenRedirected( vlc_object_t *p_this, const char *psz_url,
     p_sys->b_pace_control = true;
 #ifdef HAVE_ZLIB_H
     p_sys->b_compressed = false;
+    memset( &p_sys->inflate.stream, 0, sizeof(p_sys->inflate.stream) );
     /* 15 is the max windowBits, +32 to enable optional gzip decoding */
     if( inflateInit2( &p_sys->inflate.stream, 32+15 ) != Z_OK )
         msg_Warn( p_access, "Error during zlib initialisation: %s",
@@ -261,6 +244,7 @@ static int OpenRedirected( vlc_object_t *p_this, const char *psz_url,
         msg_Warn( p_access, "Your zlib was compiled without gzip support." );
     p_sys->inflate.p_buffer = NULL;
 #endif
+    p_sys->p_creds = NULL;
     p_sys->p_tls = NULL;
     p_sys->i_icy_meta = 0;
     p_sys->i_icy_offset = 0;
@@ -393,6 +377,7 @@ static int OpenRedirected( vlc_object_t *p_this, const char *psz_url,
     p_sys->b_reconnect = var_InheritBool( p_access, "http-reconnect" );
     p_sys->b_continuous = var_InheritBool( p_access, "http-continuous" );
 
+    p_access->p_sys = p_sys;
 connect:
     /* Connect */
     switch( Connect( p_access, 0 ) )
@@ -457,27 +442,13 @@ connect:
           p_sys->i_code == 303 || p_sys->i_code == 307 ) &&
         p_sys->psz_location && *p_sys->psz_location )
     {
-        msg_Dbg( p_access, "redirection to %s", p_sys->psz_location );
-
-        /* Check the number of redirection already done */
-        if( i_redirect == 0 )
-        {
-            msg_Err( p_access, "Too many redirection: break potential infinite"
-                     "loop" );
-            goto error;
-        }
-
-        if( strncmp( p_sys->psz_location, "http://", 7 )
-         && strncmp( p_sys->psz_location, "https://", 8 ) )
-        {   /* Do not accept redirection outside of HTTP */
-            msg_Err( p_access, "unsupported redirection ignored" );
-            goto error;
-        }
+        p_access->psz_url = p_sys->psz_location;
 
         /* Clean up current Open() run */
         vlc_UrlClean( &p_sys->url );
         http_auth_Reset( &p_sys->auth );
-        vlc_UrlClean( &p_sys->proxy );
+        if( p_sys->b_proxy )
+            vlc_UrlClean( &p_sys->proxy );
         free( p_sys->psz_proxy_passbuf );
         http_auth_Reset( &p_sys->proxy_auth );
         free( p_sys->psz_mime );
@@ -490,13 +461,8 @@ connect:
 #ifdef HAVE_ZLIB_H
         inflateEnd( &p_sys->inflate.stream );
 #endif
-        char *psz_location = p_sys->psz_location;
         free( p_sys );
-
-        /* Do new Open() run with new data */
-        int ret = OpenRedirected( p_this, psz_location, i_redirect - 1 );
-        free( psz_location );
-        return ret;
+        return VLC_ACCESS_REDIRECT;
     }
 
     if( p_sys->b_mms )
@@ -507,11 +473,21 @@ connect:
 
     if( p_sys->b_reconnect ) msg_Dbg( p_access, "auto re-connect enabled" );
 
+    /* Set up p_access */
+#ifdef HAVE_ZLIB_H
+    p_access->pf_read = ReadCompressed;
+#else
+    p_access->pf_read = Read;
+#endif
+    p_access->pf_control = Control;
+    p_access->pf_seek = Seek;
+
     return VLC_SUCCESS;
 
 error:
     vlc_UrlClean( &p_sys->url );
-    vlc_UrlClean( &p_sys->proxy );
+    if( p_sys->b_proxy )
+        vlc_UrlClean( &p_sys->proxy );
     free( p_sys->psz_proxy_passbuf );
     free( p_sys->psz_mime );
     free( p_sys->psz_pragma );
@@ -539,7 +515,8 @@ static void Close( vlc_object_t *p_this )
 
     vlc_UrlClean( &p_sys->url );
     http_auth_Reset( &p_sys->auth );
-    vlc_UrlClean( &p_sys->proxy );
+    if( p_sys->b_proxy )
+        vlc_UrlClean( &p_sys->proxy );
     http_auth_Reset( &p_sys->proxy_auth );
 
     free( p_sys->psz_mime );
@@ -1151,7 +1128,8 @@ static int Request( access_t *p_access, uint64_t i_tell )
         AuthReply( p_access, "", &p_sys->url, &p_sys->auth );
 
     /* Proxy Authentication */
-    if( p_sys->proxy.psz_username && p_sys->proxy.psz_password )
+    if( p_sys->b_proxy && p_sys->proxy.psz_username != NULL
+     && p_sys->proxy.psz_password != NULL )
         AuthReply( p_access, "Proxy-", &p_sys->proxy, &p_sys->proxy_auth );
 
     /* ICY meta data request */

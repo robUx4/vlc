@@ -589,12 +589,12 @@ modules/gui/macosx/open.h
 modules/gui/macosx/open.m
 modules/gui/macosx/output.h
 modules/gui/macosx/output.m
-modules/gui/macosx/playlist.h
-modules/gui/macosx/playlist.m
-modules/gui/macosx/playlistinfo.h
-modules/gui/macosx/playlistinfo.m
-modules/gui/macosx/playlistview.h
-modules/gui/macosx/playlistview.m
+modules/gui/macosx/VLCPlaylist.h
+modules/gui/macosx/VLCPlaylist.m
+modules/gui/macosx/VLCPlaylistInfo.h
+modules/gui/macosx/VLCPlaylistInfo.m
+modules/gui/macosx/VLCPlaylistView.h
+modules/gui/macosx/VLCPlaylistView.m
 modules/gui/macosx/prefs.h
 modules/gui/macosx/prefs.m
 modules/gui/macosx/prefs_widgets.h
@@ -1005,7 +1005,7 @@ modules/mux/mpeg/ts.c
 modules/mux/mpjpeg.c
 modules/mux/ogg.c
 modules/mux/wav.c
-modules/notify/growl.m
+modules/notify/osx_notifications.m
 modules/notify/notify.c
 modules/packetizer/avparser.h
 modules/packetizer/copy.c
@@ -1063,6 +1063,7 @@ modules/stream_out/transcode/transcode.c
 modules/text_renderer/freetype.c
 modules/text_renderer/nsspeechsynthesizer.m
 modules/text_renderer/quartztext.c
+modules/text_renderer/sapi.cpp
 modules/text_renderer/svg.c
 modules/text_renderer/tdummy.c
 modules/text_renderer/win32text.c
@@ -1156,6 +1157,7 @@ modules/video_output/caopengllayer.m
 modules/video_output/decklink.cpp
 modules/video_output/directfb.c
 modules/video_output/drawable.c
+modules/video_output/evas.c
 modules/video_output/egl.c
 modules/video_output/fb.c
 modules/video_output/gl.c

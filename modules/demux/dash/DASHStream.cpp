@@ -45,10 +45,26 @@ AbstractDemuxer * DASHStream::createDemux(const StreamFormat &format)
             ret = new Demuxer(p_realdemux, "ts", fakeesout->getEsOut(), demuxersource);
             break;
 
+        case DASHStreamFormat::WEBVTT:
+            ret = new SlaveDemuxer(p_realdemux, "subtitle", fakeesout->getEsOut(), demuxersource);
+            break;
+
+        case DASHStreamFormat::TTML:
+            ret = new SlaveDemuxer(p_realdemux, "ttml", fakeesout->getEsOut(), demuxersource);
+            break;
+
         default:
         case StreamFormat::UNSUPPORTED:
             break;
     }
+
+    if(ret && !ret->create())
+    {
+        delete ret;
+        ret = NULL;
+    }
+    else fakeesout->commandsqueue.Commit();
+
     return ret;
 }
 

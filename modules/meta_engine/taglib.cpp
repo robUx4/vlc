@@ -114,17 +114,24 @@ vlc_module_end ()
 
 using namespace TagLib;
 
-static void ExtractTrackNumberValues( vlc_meta_t* p_meta, const char *psz_value )
+static int ExtractCoupleNumberValues( vlc_meta_t* p_meta, const char *psz_value,
+        vlc_meta_type_t first, vlc_meta_type_t second)
 {
     unsigned int i_trknum, i_trktot;
-    if( sscanf( psz_value, "%u/%u", &i_trknum, &i_trktot ) == 2 )
+
+    int i_ret = sscanf( psz_value, "%u/%u", &i_trknum, &i_trktot );
+    char psz_trck[11];
+    if( i_ret >= 1 )
     {
-        char psz_trck[11];
         snprintf( psz_trck, sizeof( psz_trck ), "%u", i_trknum );
-        vlc_meta_SetTrackNum( p_meta, psz_trck );
-        snprintf( psz_trck, sizeof( psz_trck ), "%u", i_trktot );
-        vlc_meta_Set( p_meta, vlc_meta_TrackTotal, psz_trck );
+        vlc_meta_Set( p_meta, first, psz_trck );
     }
+    if( i_ret == 2)
+    {
+        snprintf( psz_trck, sizeof( psz_trck ), "%u", i_trktot );
+        vlc_meta_Set( p_meta, second, psz_trck );
+    }
+    return i_ret;
 }
 
 /**
@@ -214,7 +221,8 @@ static void ReadMetaFromAPE( APE::Tag* tag, demux_meta_t* p_demux_meta, vlc_meta
     iter = fields.find( "TRACK" );
     if( iter != fields.end() && !iter->second.isEmpty() )
     {
-        ExtractTrackNumberValues( p_meta, iter->second.toString().toCString( true ) );
+        ExtractCoupleNumberValues( p_meta, iter->second.toString().toCString( true ),
+                vlc_meta_TrackNumber, vlc_meta_TrackTotal );
         fields.erase( iter );
     }
 
@@ -375,7 +383,6 @@ static void ReadMetaFromId3v2( ID3v2::Tag* tag, demux_meta_t* p_demux_meta, vlc_
     SET( "TLAN", Language );
     SET( "TPUB", Publisher );
     SET( "TPE2", AlbumArtist );
-    SET( "TPOS", DiscNumber );
 
 #undef SET
 
@@ -383,7 +390,16 @@ static void ReadMetaFromId3v2( ID3v2::Tag* tag, demux_meta_t* p_demux_meta, vlc_
     list = tag->frameListMap()["TRCK"];
     if( !list.isEmpty() )
     {
-        ExtractTrackNumberValues( p_meta, (*list.begin())->toString().toCString( true ) );
+        ExtractCoupleNumberValues( p_meta, (*list.begin())->toString().toCString( true ),
+                vlc_meta_TrackNumber, vlc_meta_TrackTotal );
+    }
+
+    /* */
+    list = tag->frameListMap()["TPOS"];
+    if( !list.isEmpty() )
+    {
+        ExtractCoupleNumberValues( p_meta, (*list.begin())->toString().toCString( true ),
+                vlc_meta_DiscNumber, vlc_meta_DiscTotal );
     }
 
     /* Preferred type of image
@@ -532,21 +548,9 @@ static void ReadMetaFromXiph( Ogg::XiphComment* tag, demux_meta_t* p_demux_meta,
     list = tag->fieldListMap()["TRACKNUMBER"];
     if( !list.isEmpty() )
     {
-        const char *psz_value;
-        unsigned short u_track;
-        unsigned short u_total;
-        psz_value = (*list.begin()).toCString( true );
-        if( sscanf( psz_value, "%hu/%hu", &u_track, &u_total ) == 2)
-        {
-            char str[6];
-            snprintf(str, 6, "%u", u_track);
-            vlc_meta_SetTrackNum( p_meta, str);
-            snprintf(str, 6, "%u", u_total);
-            vlc_meta_SetTrackTotal( p_meta, str);
-            hasTrackTotal = true;
-        }
-        else
-            vlc_meta_SetTrackNum( p_meta, psz_value);
+        int i_values = ExtractCoupleNumberValues( p_meta, (*list.begin()).toCString( true ),
+                 vlc_meta_TrackNumber, vlc_meta_TrackTotal );
+        hasTrackTotal = i_values == 2;
     }
     if( !hasTrackTotal )
     {

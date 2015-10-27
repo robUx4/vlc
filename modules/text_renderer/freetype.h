@@ -28,52 +28,23 @@
 #ifndef VLC_FREETYPE_H
 #define VLC_FREETYPE_H
 
-#include <vlc_text_style.h>                                   /* text_style_t*/
+#ifdef HAVE_CONFIG_H
+# include "config.h"
+#endif
 
-typedef struct faces_cache_t
-{
-    FT_Face        *p_faces;
-    text_style_t   *p_styles;
-    int            i_faces_count;
-    int            i_cache_size;
-} faces_cache_t;
+#include <vlc_text_style.h>                             /* text_style_t */
+#include <vlc_arrays.h>                                 /* vlc_dictionary_t */
 
-/*****************************************************************************
- * filter_sys_t: freetype local data
- *****************************************************************************
- * This structure is part of the video output thread descriptor.
- * It describes the freetype specific properties of an output thread.
- *****************************************************************************/
-struct filter_sys_t
-{
-    FT_Library     p_library;   /* handle to library     */
-    FT_Face        p_face;      /* handle to face object */
-    FT_Stroker     p_stroker;   /* handle to path stroker object */
+#include <ft2build.h>
+#include FT_FREETYPE_H
+#include FT_GLYPH_H
+#include FT_STROKER_H
 
-    text_style_t  *p_default_style;
-    text_style_t  *p_forced_style;/* Renderer overridings */
-
-    /* More styles... */
-    float          f_shadow_vector_x;
-    float          f_shadow_vector_y;
-
-    /* Attachments */
-    input_attachment_t **pp_font_attachments;
-    int                  i_font_attachments;
-
-    /* Font faces cache */
-    faces_cache_t  faces_cache;
-
-    char * (*pf_select) (filter_t *, const char* family,
-                               bool bold, bool italic, int size,
-                               int *index);
-
-};
-
+/* Consistency between Freetype versions and platforms */
 #define FT_FLOOR(X)     ((X & -64) >> 6)
 #define FT_CEIL(X)      (((X + 63) & -64) >> 6)
 #ifndef FT_MulFix
- #define FT_MulFix(v, s) (((v)*(s))>>16)
+# define FT_MulFix(v, s) (((v)*(s))>>16)
 #endif
 
 #ifdef __OS2__
@@ -88,11 +59,85 @@ typedef uint32_t uni_char_t;
 # endif
 #endif
 
+/*****************************************************************************
+ * filter_sys_t: freetype local data
+ *****************************************************************************
+ * This structure is part of the video output thread descriptor.
+ * It describes the freetype specific properties of an output thread.
+ *****************************************************************************/
+typedef struct vlc_family_t vlc_family_t;
+struct filter_sys_t
+{
+    FT_Library     p_library;   /* handle to library     */
+    FT_Face        p_face;      /* handle to face object */
+    FT_Stroker     p_stroker;   /* handle to path stroker object */
 
-FT_Face LoadFace( filter_t *p_filter, const text_style_t *p_style, int );
-int ConvertToLiveSize( filter_t *p_filter, const text_style_t *p_style );
+    text_style_t  *p_default_style;
+    text_style_t  *p_forced_style;  /* Renderer overridings */
 
-bool FaceStyleEquals( const text_style_t *p_style1,
-                      const text_style_t *p_style2 );
+    /* More styles... */
+    float          f_shadow_vector_x;
+    float          f_shadow_vector_y;
+
+    /* Attachments */
+    input_attachment_t **pp_font_attachments;
+    int                  i_font_attachments;
+
+    /*
+     * This is the master family list. It owns the lists of vlc_font_t's
+     * and should be freed using FreeFamiliesAndFonts()
+     */
+    vlc_family_t      *p_families;
+
+    /*
+     * This maps a family name to a vlc_family_t within the master list
+     */
+    vlc_dictionary_t  family_map;
+
+    /*
+     * This maps a family name to a fallback list of vlc_family_t's.
+     * Fallback lists only reference the lists of vlc_font_t's within the
+     * master list, so they should be freed using FreeFamilies()
+     */
+    vlc_dictionary_t  fallback_map;
+
+    /* Font face cache */
+    vlc_dictionary_t  face_map;
+
+    int               i_fallback_counter;
+    int               i_scale;
+
+    /**
+     * Select a font, based on the family, the styles and the codepoint
+     */
+    char * (*pf_select) (filter_t *, const char* family,
+                         bool bold, bool italic,
+                         int *index, uni_char_t codepoint);
+
+    /**
+     * Get a pointer to the vlc_family_t in the master list that matches psz_family.
+     * Add this family to the list if it hasn't been added yet.
+     */
+    const vlc_family_t * (*pf_get_family) ( filter_t *p_filter, const char *psz_family );
+
+    /**
+     * Get the fallback list for psz_family from the system and cache
+     * it in fallback_map.
+     * On Windows fallback lists are populated progressively as required
+     * using Uniscribe, so we need the codepoint here.
+     */
+    vlc_family_t * (*pf_get_fallbacks) ( filter_t *p_filter, const char *psz_family,
+                                         uni_char_t codepoint );
+};
+
+/**
+ * Selects and loads the right font
+ *
+ * \param p_filter the Freetype module [IN]
+ * \param p_style the requested style (fonts can be different for italic or bold) [IN]
+ * \param codepoint the codepoint needed [IN]
+ */
+FT_Face SelectAndLoadFace( filter_t *p_filter, const text_style_t *p_style,
+                           uni_char_t codepoint );
 
 #endif

@@ -143,6 +143,7 @@ nobase_vlclib_DATA = \
 	lua/playlist/pinkbike.luac \
 	lua/playlist/pluzz.luac \
 	lua/playlist/rockbox_fm_presets.luac \
+	lua/playlist/satip.luac \
 	lua/playlist/soundcloud.luac \
 	lua/playlist/vimeo.luac \
 	lua/playlist/youtube.luac \
@@ -168,7 +169,7 @@ nobase_doc_DATA = \
 	lua/meta/reader/README.txt \
 	lua/meta/reader/filename.lua \
 	lua/playlist/README.txt \
-	lua/playlist/soundcloud.lua \
+	lua/playlist/liveleak.lua \
 	lua/playlist/youtube.lua \
 	lua/sd/README.txt \
 	lua/sd/icecast.lua \
@@ -237,6 +238,7 @@ EXTRA_DIST += \
 	lua/playlist/pinkbike.lua \
 	lua/playlist/pluzz.lua \
 	lua/playlist/rockbox_fm_presets.lua \
+	lua/playlist/satip.lua \
 	lua/playlist/soundcloud.lua \
 	lua/playlist/vimeo.lua \
 	lua/playlist/youtube.lua \

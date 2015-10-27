@@ -123,6 +123,7 @@ struct vout_display_sys_t
     buffer_bounds *p_sub_buffer_bounds;
     bool b_sub_pic_locked;
     int64_t i_sub_last_order;
+    ARect sub_last_region;
 
     bool b_has_subpictures;
 
@@ -927,7 +928,7 @@ static void SubtitleGetDirtyBounds(vout_display_t *vd,
     if (!sys->p_sub_buffer_bounds
      || sys->p_sub_buffer_bounds[i].p_pixels == NULL) {
         buffer_bounds *p_bb = realloc(sys->p_sub_buffer_bounds,
-                                      (i + 2) * sizeof(buffer_bounds)); 
+                                      (i + 2) * sizeof(buffer_bounds));
         if (p_bb) {
             sys->p_sub_buffer_bounds = p_bb;
             sys->p_sub_buffer_bounds[i].p_pixels = sys->p_sub_pic->p[0].p_pixels;
@@ -946,11 +947,16 @@ static void SubpicturePrepare(vout_display_t *vd, subpicture_t *subpicture)
     vout_display_sys_t *sys = vd->sys;
     ARect memset_bounds;
 
+    SubtitleRegionToBounds(subpicture, &memset_bounds);
+
     if( subpicture )
     {
-        if( subpicture->i_order == sys->i_sub_last_order )
+        if( subpicture->i_order == sys->i_sub_last_order
+         && memcmp( &memset_bounds, &sys->sub_last_region, sizeof(ARect) ) == 0 )
             return;
+
         sys->i_sub_last_order = subpicture->i_order;
+        sys->sub_last_region = memset_bounds;
     }
 
     if (AndroidWindow_LockPicture(sys, sys->p_sub_window, sys->p_sub_pic) != 0)

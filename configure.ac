@@ -339,15 +339,12 @@ AM_CONDITIONAL(HAVE_ANDROID, test "${HAVE_ANDROID}" = "1")
 dnl Tizen (minimum SDK version: 2.3)
 AS_IF([test "$SYS" = linux],[
     AC_MSG_CHECKING([for Tizen])
-    AC_TRY_COMPILE([#include <tizen.h>
-#if !defined(TIZEN_SDK_MAJOR) && !defined(TIZEN_SDK_MINOR)
-# error Not Tizen
-#endif
-#if TIZEN_SDK_MAJOR < 2 || (TIZEN_SDK_MAJOR == 2 && TIZEN_SDK_MINOR < 3)
-# error Tizen SDK too old
-#endif
-    ],[],[
+    AC_PREPROC_IFELSE([AC_LANG_PROGRAM(
+        [[#include <tizen.h>
+        ]],[[;]])
+    ],[
       HAVE_TIZEN="1"
+      AC_DEFINE([HAVE_TIZEN_SDK], [1], [Define to 1 if vlc is built against Tizen SDK])
       AC_MSG_RESULT([yes])
     ],[
       AC_MSG_RESULT([no])
@@ -567,7 +564,7 @@ need_libc=false
 dnl Check for usual libc functions
 AC_CHECK_DECLS([nanosleep],,,[#include <time.h>])
 AC_CHECK_FUNCS([daemon fcntl fstatvfs fork getenv getpwuid_r isatty lstat memalign mkostemp mmap open_memstream openat pread posix_fadvise posix_madvise setlocale stricmp strnicmp strptime uselocale pthread_cond_timedwait_monotonic_np pthread_condattr_setclock])
-AC_REPLACE_FUNCS([atof atoll dirfd fdopendir ffsll flockfile fsync getdelim getpid lldiv nrand48 poll posix_memalign rewind setenv strcasecmp strcasestr strdup strlcpy strndup strnlen strsep strtof strtok_r strtoll swab tdestroy strverscmp])
+AC_REPLACE_FUNCS([atof atoll dirfd fdopendir ffsll flockfile fsync getdelim getpid lldiv nrand48 poll posix_memalign rewind setenv strcasecmp strcasestr strdup strlcpy strndup strnlen strnstr strsep strtof strtok_r strtoll swab tdestroy strverscmp])
 AC_CHECK_FUNCS(fdatasync,,
   [AC_DEFINE(fdatasync, fsync, [Alias fdatasync() to fsync() if missing.])
 ])
@@ -3250,6 +3247,14 @@ AM_CONDITIONAL([HAVE_FONTCONFIG], [test "${have_fontconfig}" = "yes"])
 AM_CONDITIONAL([HAVE_FRIBIDI], [test "${have_fribidi}" = "yes"])
 AM_CONDITIONAL([HAVE_HARFBUZZ], [test "${have_harfbuzz}" = "yes"])
 
+dnl
+dnl SAPI (text to Speech renderer for Windows)
+dnl
+AC_CHECK_HEADERS(sapi.h, [
+              have_sapi="yes"
+            ],[AC_MSG_WARN([sapi.h not found. Text to Speech renderer for Windows disabled])])
+
+AM_CONDITIONAL([HAVE_SAPI], [test "${have_sapi}" = "yes"])
 
 dnl
 dnl  QuartzText vout module (iOS/Mac OS)
@@ -3457,6 +3462,25 @@ if test "${enable_mmal}" != "no"; then
   VLC_RESTORE_FLAGS
 fi
 AM_CONDITIONAL([HAVE_MMAL], [test "${have_mmal}" = "yes"])
+
+dnl
+dnl evas plugin
+dnl
+AC_ARG_ENABLE(evas,
+  [AS_HELP_STRING([--enable-evas],
+    [use evas output module (default disabled)])])
+have_evas="no"
+AS_IF([test "${enable_evas}" = "yes"], [
+  PKG_CHECK_MODULES(EVAS, [evas >= 1.15.99 ecore >= 1.15.99], [
+      have_evas="yes"
+      AC_DEFINE([HAVE_EVAS], [1], [Define to 1 if evas is enabled.])
+    ],[
+    AS_IF([test "x${enable_evas}" != "x"], [
+      AC_MSG_ERROR([$EVAS_PKG_ERRORS. libevas and libecore 1.15.99 or later required.])
+    ])
+  ])
+])
+AM_CONDITIONAL([HAVE_EVAS], [test "${have_evas}" = "yes"])
 
 dnl
 dnl  Audio plugins
@@ -3716,6 +3740,16 @@ AS_IF([test "${enable_qt}" != "no"], [
       PKG_CHECK_MODULES([QTX11], [Qt5X11Extras], [
           VLC_ADD_LIBS([qt4],[${QTX11_LIBS}])
           VLC_ADD_CXXFLAGS([qt4],[${QTX11_CFLAGS} -DQT5_HAS_X11])
+          PKG_CHECK_MODULES([XI], [xi], [
+            VLC_ADD_LIBS([qt4], [${XI_LIBS}])
+            VLC_ADD_CXXFLAGS([qt4], [${XI_CFLAGS} -DHAVE_XI])
+          ], [
+            PKG_CHECK_EXISTS([Qt5Gui >= 5.5], [
+              AC_MSG_ERROR([${XI_PKG_ERRORS}.])
+            ], [
+              AC_MSG_WARN([${XI_PKG_ERRORS}.])
+            ])
+          ])
       ],[
           AC_MSG_WARN([Not building Qt Interface with X11 helpers.])
       ])
@@ -4058,17 +4092,17 @@ then
 fi
 
 dnl
-dnl Growl notification plugin
+dnl OS X notification plugin
 dnl
-AC_ARG_ENABLE(growl,
-  [  --enable-growl          growl notification plugin (default disabled)],,
-  [enable_growl=no])
-AS_IF([test "${enable_growl}" != "no"], [
+AC_ARG_ENABLE(osx_notifications,
+  [  --enable-osx-notifications          osx notification plugin (default disabled)],,
+  [enable_osx_notifications=no])
+AS_IF([test "${enable_osx_notifications}" != "no"], [
     AC_CHECK_HEADERS(${CONTRIB_DIR}/Growl.framework/Versions/A/Headers/Growl.h, [
-      VLC_ADD_PLUGIN([growl])
-      VLC_ADD_LIBS([growl], [-F${CONTRIB_DIR} -Wl,-framework,Growl,-framework,Foundation])
-      VLC_ADD_OBJCFLAGS([growl], [-F${CONTRIB_DIR}])
-      VLC_ADD_OBJCFLAGS([growl], [-fobjc-exceptions] )
+      VLC_ADD_PLUGIN([osx_notifications])
+      VLC_ADD_LIBS([osx_notifications], [-F${CONTRIB_DIR} -Wl,-framework,Growl,-framework,Foundation])
+      VLC_ADD_OBJCFLAGS([osx_notifications], [-F${CONTRIB_DIR}])
+      VLC_ADD_OBJCFLAGS([osx_notifications], [-fobjc-exceptions] )
     ])
   ]
 )

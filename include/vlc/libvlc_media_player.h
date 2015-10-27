@@ -552,6 +552,19 @@ LIBVLC_API void libvlc_media_player_set_android_context( libvlc_media_player_t *
                                                          void *p_awindow_handler );
 
 /**
+ * Set the EFL Evas Object.
+ *
+ * \version LibVLC 3.0.0 and later.
+ *
+ * \param p_mi the media player
+ * \param p_evas_object a valid EFL Evas Object (Evas_Object)
+ * \return -1 if an error was detected, 0 otherwise.
+ */
+LIBVLC_API int libvlc_media_player_set_evas_object( libvlc_media_player_t *p_mi,
+                                                    void *p_evas_object );
+
+
+/**
  * Callback prototype for audio playback.
  * \param data data pointer as passed to libvlc_audio_set_callbacks() [IN]
  * \param samples pointer to the first audio sample to play back [IN]
@@ -846,9 +859,16 @@ LIBVLC_API libvlc_state_t libvlc_media_player_get_state( libvlc_media_player_t *
 /**
  * Get movie fps rate
  *
+ * This function is provided for backward compatibility. It cannot deal with
+ * multiple video tracks. In LibVLC versions prior to 3.0, it would also fail
+ * if the file format did not convey the frame rate explicitly.
+ *
+ * \deprecated Consider using libvlc_media_tracks_get() instead.
+ *
  * \param p_mi the Media Player
  * \return frames per second (fps) for this playing movie, or 0 if unspecified
  */
+LIBVLC_DEPRECATED
 LIBVLC_API float libvlc_media_player_get_fps( libvlc_media_player_t *p_mi );
 
 /** end bug */

@@ -52,7 +52,7 @@ enum access_query_e
     ACCESS_GET_SEEKPOINT,   /* arg1=unsigned * res=can fail */
 
     /* Meta data */
-    ACCESS_GET_META,        /* arg1= vlc_meta_t ** res=can fail */
+    ACCESS_GET_META,        /* arg1= vlc_meta_t * res=can fail */
     ACCESS_GET_CONTENT_TYPE,/* arg1=char **ppsz_content_type res=can fail */
 
     ACCESS_GET_SIGNAL,      /* arg1=double *pf_quality, arg2=double *pf_strength   res=can fail */
@@ -112,6 +112,15 @@ struct access_t
     /* Weak link to parent input */
     input_thread_t *p_input;
 };
+
+/**
+ * Special redirection error code.
+ *
+ * In case of redirection, the access open function should clean up (as in
+ * normal failure case), store the heap-allocated redirection URL in
+ * access_t.psz_url, and return this value.
+ */
+#define VLC_ACCESS_REDIRECT VLC_ETIMEOUT
 
 /**
  * Opens a new read-only byte stream.

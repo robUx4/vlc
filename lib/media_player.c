@@ -263,7 +263,7 @@ input_event_changed( vlc_object_t * p_this, char const * psz_cmd,
                      vlc_value_t oldval, vlc_value_t newval,
                      void * p_userdata )
 {
-    VLC_UNUSED(oldval);
+    VLC_UNUSED(oldval); VLC_UNUSED(psz_cmd);
     input_thread_t * p_input = (input_thread_t *)p_this;
     libvlc_media_player_t * p_mi = p_userdata;
     libvlc_event_t event;
@@ -583,6 +583,9 @@ libvlc_media_player_new( libvlc_instance_t *instance )
 #ifdef __ANDROID__
     var_Create (mp, "android-jvm", VLC_VAR_ADDRESS);
     var_Create (mp, "drawable-androidwindow", VLC_VAR_ADDRESS);
+#endif
+#ifdef HAVE_EVAS
+    var_Create (mp, "drawable-evasobject", VLC_VAR_ADDRESS);
 #endif
 
     var_Create (mp, "keyboard-events", VLC_VAR_BOOL);
@@ -1051,7 +1054,11 @@ void libvlc_media_player_set_nsobject( libvlc_media_player_t *p_mi,
     var_SetString (p_mi, "window", "");
     var_SetAddress (p_mi, "drawable-nsobject", drawable);
 #else
-    (void) p_mi; (void)drawable;
+    (void)drawable;
+    libvlc_printerr ("can't set nsobject: APPLE build required");
+    assert(false);
+    var_SetString (p_mi, "vout", "none");
+    var_SetString (p_mi, "window", "none");
 #endif
 }
 
@@ -1064,6 +1071,7 @@ void * libvlc_media_player_get_nsobject( libvlc_media_player_t *p_mi )
 #ifdef __APPLE__
     return var_GetAddress (p_mi, "drawable-nsobject");
 #else
+    (void) p_mi;
     return NULL;
 #endif
 }
@@ -1074,7 +1082,11 @@ void * libvlc_media_player_get_nsobject( libvlc_media_player_t *p_mi )
 void libvlc_media_player_set_agl( libvlc_media_player_t *p_mi,
                                   uint32_t drawable )
 {
-    (void) p_mi; (void)drawable;
+    (void)drawable;
+    libvlc_printerr ("can't set agl: use libvlc_media_player_set_nsobject instead");
+    assert(false);
+    var_SetString (p_mi, "vout", "none");
+    var_SetString (p_mi, "window", "none");
 }
 
 /**************************************************************************
@@ -1122,7 +1134,11 @@ void libvlc_media_player_set_hwnd( libvlc_media_player_t *p_mi,
                    (drawable != NULL) ? "embed-hwnd,any" : "");
     var_SetInteger (p_mi, "drawable-hwnd", (uintptr_t)drawable);
 #else
-    (void) p_mi; (void) drawable;
+    (void) drawable;
+    libvlc_printerr ("can't set nsobject: WIN32 build required");
+    assert(false);
+    var_SetString (p_mi, "vout", "none");
+    var_SetString (p_mi, "window", "none");
 #endif
 }
 
@@ -1135,6 +1151,7 @@ void *libvlc_media_player_get_hwnd( libvlc_media_player_t *p_mi )
 #if defined (_WIN32) || defined (__OS2__)
     return (void *)(uintptr_t)var_GetInteger (p_mi, "drawable-hwnd");
 #else
+    (void) p_mi;
     return NULL;
 #endif
 }
@@ -1151,7 +1168,29 @@ void libvlc_media_player_set_android_context( libvlc_media_player_t *p_mi,
     var_SetAddress (p_mi, "android-jvm", p_jvm);
     var_SetAddress (p_mi, "drawable-androidwindow", p_awindow_handler);
 #else
-    (void) p_mi; (void) p_jvm; (void) p_awindow_handler;
+    (void) p_jvm; (void) p_awindow_handler;
+    libvlc_printerr ("can't set android context: ANDROID build required");
+    assert(false);
+    var_SetString (p_mi, "vout", "none");
+    var_SetString (p_mi, "window", "none");
+#endif
+}
+
+/**************************************************************************
+ * set_evas_object
+ **************************************************************************/
+int libvlc_media_player_set_evas_object( libvlc_media_player_t *p_mi,
+                                         void *p_evas_object )
+{
+    assert (p_mi != NULL);
+#ifdef HAVE_EVAS
+    var_SetString (p_mi, "vout", "evas");
+    var_SetString (p_mi, "window", "none");
+    var_SetAddress (p_mi, "drawable-evasobject", p_evas_object);
+    return 0;
+#else
+    (void) p_mi; (void) p_evas_object;
+    return -1;
 #endif
 }
 
@@ -1569,16 +1608,25 @@ void libvlc_media_player_previous_chapter( libvlc_media_player_t *p_mi )
 
 float libvlc_media_player_get_fps( libvlc_media_player_t *p_mi )
 {
-    input_thread_t *p_input_thread = libvlc_get_input_thread ( p_mi );
-    double f_fps = 0.0;
+    libvlc_media_t *media = libvlc_media_player_get_media( p_mi );
+    if( media == NULL )
+        return 0.f;
 
-    if( p_input_thread )
+    input_item_t *item = p_mi->p_md->p_input_item;
+    float fps = 0.f;
+
+    vlc_mutex_lock( &item->lock );
+    for( int i = 0; i < item->i_es; i++ )
     {
-        if( input_Control( p_input_thread, INPUT_GET_VIDEO_FPS, &f_fps ) )
-            f_fps = 0.0;
-        vlc_object_release( p_input_thread );
+        const es_format_t *fmt = item->es[i];
+
+        if( fmt->i_cat == VIDEO_ES && fmt->video.i_frame_rate_base > 0 )
+            fps = (float)fmt->video.i_frame_rate
+                  / (float)fmt->video.i_frame_rate_base;
     }
-    return f_fps;
+    vlc_mutex_unlock( &item->lock );
+
+    return fps;
 }
 
 int libvlc_media_player_will_play( libvlc_media_player_t *p_mi )

@@ -25,6 +25,8 @@
 # include "config.h"
 #endif
 
+#include <assert.h>
+
 #include "demux.h"
 #include <libvlc.h>
 #include <vlc_codec.h>
@@ -238,6 +240,97 @@ error:
     return NULL;
 }
 
+demux_t *input_DemuxNew( vlc_object_t *obj, const char *access_name,
+                         const char *demux_name, const char *path,
+                         es_out_t *out, bool quick, input_thread_t *input )
+{
+    char *demux_var = NULL;
+
+    assert( access_name != NULL );
+    assert( demux_name != NULL );
+    assert( path != NULL );
+
+    if( demux_name[0] == '\0' )
+    {
+        /* special hack for forcing a demuxer with --demux=module
+         * (and do nothing with a list) */
+        demux_var = var_InheritString( obj, "demux" );
+        if( demux_var != NULL )
+        {
+            demux_name = demux_var;
+            msg_Dbg( obj, "specified demux: %s", demux_name );
+        }
+        else
+            demux_name = "any";
+    }
+
+    demux_t *demux = NULL;
+
+    if( quick )
+    {
+        if( strcasecmp( demux_name, "any" ) )
+            goto out;
+
+        msg_Dbg( obj, "preparsing %s://%s", access_name, path );
+    }
+    else /* Try access_demux first */
+        demux = demux_NewAdvanced( obj, input, access_name, demux_name, path,
+                                   NULL, out, false );
+
+    if( demux == NULL )
+    {   /* Then try a real access,stream,demux chain */
+        /* Create the stream_t */
+        stream_t *stream = NULL;
+        char *url;
+
+        if( likely(asprintf( &url, "%s://%s", access_name, path) >= 0) )
+        {
+            stream = stream_AccessNew( obj, input, url );
+            free( url );
+        }
+
+        if( stream == NULL )
+        {
+            msg_Err( obj, "cannot access %s://%s", access_name, path );
+            goto out;
+        }
+
+        /* Add stream filters */
+        stream = stream_FilterAutoNew( stream );
+
+        char *filters = var_InheritString( obj, "stream-filter" );
+        if( filters != NULL )
+        {
+            stream = stream_FilterChainNew( stream, filters );
+            free( filters );
+        }
+
+        if( var_InheritBool( obj, "input-record-native" ) )
+            stream = stream_FilterChainNew( stream, "record" );
+
+        /* FIXME: Hysterical raisins. Access is not updated according to any
+         * redirect but path is. This does not make much sense. Probably the
+         * URL should be passed as a whole and demux_t.psz_access removed. */
+        if( stream->psz_url != NULL )
+        {
+            path = strstr( stream->psz_url, "://" );
+            if( path != NULL )
+                path += 3;
+        }
+
+        demux = demux_NewAdvanced( obj, input, access_name, demux_name, path,
+                                   stream, out, quick );
+        if( demux == NULL )
+        {
+            msg_Err( obj, "cannot parse %s://%s", access_name, path );
+            stream_Delete( stream );
+        }
+    }
+out:
+    free( demux_var );
+    return demux;
+}
+
 /*****************************************************************************
  * demux_Delete:
  *****************************************************************************/
@@ -257,6 +350,71 @@ void demux_Delete( demux_t *p_demux )
         stream_Delete( s );
 }
 
+#define static_control_match(foo) \
+    static_assert((unsigned) DEMUX_##foo == STREAM_##foo, "Mismatch")
+
+static int demux_ControlInternal( demux_t *demux, int query, ... )
+{
+    int ret;
+    va_list ap;
+
+    va_start( ap, query );
+    ret = demux->pf_control( demux, query, ap );
+    va_end( ap );
+    return ret;
+}
+
+int demux_vaControl( demux_t *demux, int query, va_list args )
+{
+    if( demux->s != NULL )
+        switch( query )
+        {
+            /* Legacy fallback for missing getters in synchronous demuxers */
+            case DEMUX_CAN_PAUSE:
+            case DEMUX_CAN_CONTROL_PACE:
+            case DEMUX_GET_PTS_DELAY:
+            {
+                int ret;
+                va_list ap;
+
+                va_copy( ap, args );
+                ret = demux->pf_control( demux, query, args );
+                if( ret != VLC_SUCCESS )
+                    ret = stream_vaControl( demux->s, query, ap );
+                va_end( ap );
+                return ret;
+            }
+
+            /* Some demuxers need to control pause directly (e.g. adaptive),
+             * but many legacy demuxers do not understand pause at all.
+             * If DEMUX_CAN_PAUSE is not implemented, bypass the demuxer and
+             * byte stream. If DEMUX_CAN_PAUSE is implemented and pause is
+             * supported, pause the demuxer normally. Else, something went very
+             * wrong.
+             *
+             * Note that this requires asynchronous/threaded demuxers to
+             * always return VLC_SUCCESS for DEMUX_CAN_PAUSE, so that they are
+             * never bypassed. Otherwise, we would reenter demux->s callbacks
+             * and break thread safety. At the time of writing, asynchronous or
+             * threaded *non-access* demuxers do not exist and are not fully
+             * supported by the input thread, so this is theoretical. */
+            case DEMUX_SET_PAUSE_STATE:
+            {
+                bool can_pause;
+
+                if( demux_ControlInternal( demux, DEMUX_CAN_PAUSE,
+                                           &can_pause ) )
+                    return stream_vaControl( demux->s, query, args );
+
+                /* The caller shall not pause if pause is unsupported. */
+                assert( can_pause );
+                break;
+            }
+        }
+
+    return demux->pf_control( demux, query, args );
+}
+
 /*****************************************************************************
  * demux_vaControlHelper:
  *****************************************************************************/
@@ -274,8 +432,33 @@ int demux_vaControlHelper( stream_t *s,
     if( i_align <= 0 ) i_align = 1;
     i_tell = stream_Tell( s );
 
+    static_control_match(CAN_PAUSE);
+    static_control_match(CAN_CONTROL_PACE);
+    static_control_match(GET_PTS_DELAY);
+    static_control_match(GET_META);
+    static_control_match(GET_SIGNAL);
+    static_control_match(SET_PAUSE_STATE);
+
     switch( i_query )
     {
+        case DEMUX_CAN_SEEK:
+        {
+            bool *b = va_arg( args, bool * );
+
+            if( (i_bitrate <= 0 && i_start >= i_end)
+             || stream_Control( s, STREAM_CAN_SEEK, b ) )
+                *b = false;
+            break;
+        }
+
+        case DEMUX_CAN_PAUSE:
+        case DEMUX_CAN_CONTROL_PACE:
+        case DEMUX_GET_PTS_DELAY:
+        case DEMUX_GET_META:
+        case DEMUX_GET_SIGNAL:
+        case DEMUX_SET_PAUSE_STATE:
+            return stream_vaControl( s, i_query, args );
+
         case DEMUX_GET_LENGTH:
             pi64 = (int64_t*)va_arg( args, int64_t * );
             if( i_bitrate > 0 && i_end > i_start )
@@ -332,14 +515,10 @@ int demux_vaControlHelper( stream_t *s,
             }
             return VLC_EGENERIC;
 
-        case DEMUX_GET_META:
-            return stream_vaControl( s, STREAM_GET_META, args );
-
         case DEMUX_IS_PLAYLIST:
             *va_arg( args, bool * ) = false;
             return VLC_SUCCESS;
 
-        case DEMUX_GET_PTS_DELAY:
         case DEMUX_GET_FPS:
         case DEMUX_HAS_UNSUPPORTED_META:
         case DEMUX_SET_NEXT_DEMUX_TIME:
@@ -348,14 +527,17 @@ int demux_vaControlHelper( stream_t *s,
         case DEMUX_SET_ES:
         case DEMUX_GET_ATTACHMENTS:
         case DEMUX_CAN_RECORD:
-        case DEMUX_SET_RECORD_STATE:
-        case DEMUX_GET_SIGNAL:
             return VLC_EGENERIC;
 
+        case DEMUX_SET_TITLE:
+        case DEMUX_SET_SEEKPOINT:
+        case DEMUX_SET_RECORD_STATE:
+            assert(0);
         default:
             msg_Err( s, "unknown query in demux_vaControlDefault" );
             return VLC_EGENERIC;
     }
+    return VLC_SUCCESS;
 }
 
 /****************************************************************************

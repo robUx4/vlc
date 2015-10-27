@@ -93,6 +93,7 @@ Video ouput:
  * Renamed the Direct3D output module to Direct3D9
  * Added Direct3D11 video mode supporting both Windows desktop and WinRT modes,
    supporting subpicture blending and hardware acceleration
+ * EFL Evas video output with Tizen TBM Surface support
 
 Text renderer:
  * CTL support through Harfbuzz in the Freetype module
@@ -151,6 +152,8 @@ libVLC:
  * Add libvlc_media_player_get_full_chapter_descriptions to get full chapter info of the media
  * Deprecate libvlc_video_get_title_description, libvlc_video_get_chapter_description,
    libvlc_media_player_get_agl, libvlc_media_player_set_agl
+ * Add libvlc_media_player_set_android_context to integrate in an Android surface
+ * Add libvlc_media_player_set_evas_object to draw on an EFL/Evas Object
 
 Logging
  * Support for the SystemD Journal
@@ -163,6 +166,7 @@ Misc
  * remove ZPL playlist format
  * Update libVLC doxygen modules
  * Add a text-to-speech renderer for subtitles on OS X/iOS
+ * Add a text-to-speech renderer for subtitles on Windows
 
 Removed modules
  * Atmo video filter

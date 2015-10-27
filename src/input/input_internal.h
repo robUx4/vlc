@@ -40,6 +40,8 @@
 /* input_source_t: gathers all information per input source */
 typedef struct
 {
+    VLC_COMMON_MEMBERS;
+
     demux_t  *p_demux; /**< Demux plugin instance */
 
     /* Title infos for that input */
@@ -61,6 +63,7 @@ typedef struct
     bool b_can_rate_control;
     bool b_can_stream_record;
     bool b_rescale_ts;
+    double f_fps;
 
     /* */
     int64_t i_pts_delay;
@@ -79,7 +82,6 @@ typedef struct
 struct input_thread_private_t
 {
     /* Global properties */
-    double      f_fps;
     bool        b_can_pause;
     bool        b_can_rate_control;
     bool        b_can_pace_control;
@@ -127,7 +129,7 @@ struct input_thread_private_t
     input_item_t   *p_item;
 
     /* Main source */
-    input_source_t input;
+    input_source_t *master;
     /* Slave sources (subs, and others) */
     int            i_slave;
     input_source_t **slave;

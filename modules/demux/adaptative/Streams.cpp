@@ -35,7 +35,6 @@ using namespace adaptative::logic;
 AbstractStream::AbstractStream(demux_t * demux_, const StreamFormat &format_)
 {
     p_realdemux = demux_;
-    type = UNKNOWN;
     format = format_;
     adaptationLogic = NULL;
     currentChunk = NULL;
@@ -80,19 +79,6 @@ AbstractStream::~AbstractStream()
     delete fakeesout;
 }
 
-StreamType AbstractStream::mimeToType(const std::string &mime)
-{
-    StreamType mimetype;
-    if (!mime.compare(0, 6, "video/"))
-        mimetype = VIDEO;
-    else if (!mime.compare(0, 6, "audio/"))
-        mimetype = AUDIO;
-    else if (!mime.compare(0, 12, "application/"))
-        mimetype = APPLICATION;
-    else /* unknown of unsupported */
-        mimetype = UNKNOWN;
-    return mimetype;
-}
 
 void AbstractStream::bind(AbstractAdaptationLogic *logic, SegmentTracker *tracker,
                     HTTPConnectionManager *conn)
@@ -153,11 +139,6 @@ mtime_t AbstractStream::getFirstDTS() const
 int AbstractStream::esCount() const
 {
     return fakeesout->esCount();
-}
-
-bool AbstractStream::operator ==(const AbstractStream &stream) const
-{
-    return stream.type == type;
 }
 
 SegmentChunk * AbstractStream::getChunk()
@@ -233,6 +214,7 @@ bool AbstractStream::restartDemux()
         /* Restart with ignoring pushes to queue */
         return demuxer->restart(fakeesout->commandsqueue);
     }
+    fakeesout->commandsqueue.Commit();
     return true;
 }
 
@@ -281,7 +263,7 @@ AbstractStream::status AbstractStream::demux(mtime_t nz_deadline, bool send)
     if(nz_deadline + VLC_TS_0 > getBufferingLevel()) /* not already demuxed */
     {
         /* need to read, demuxer still buffering, ... */
-        if(demuxer->demux() != VLC_DEMUXER_SUCCESS)
+        if(demuxer->demux(nz_deadline) != VLC_DEMUXER_SUCCESS)
         {
             if(restarting_output || discontinuity)
             {

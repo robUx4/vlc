@@ -258,7 +258,7 @@
 
     BOOL b_inFullscreen = [self fullscreen] || ([self respondsToSelector:@selector(inFullscreenTransition)] && [(VLCVideoWindowCommon *)self inFullscreenTransition]);
 
-    if((OSX_MAVERICKS || OSX_YOSEMITE) && b_inFullscreen && constrainedRect.size.width == screenRect.size.width
+    if((OSX_MAVERICKS) && b_inFullscreen && constrainedRect.size.width == screenRect.size.width
           && constrainedRect.size.height != screenRect.size.height
           && fabs(screenRect.size.height - constrainedRect.size.height) <= 25.) {
 
@@ -334,6 +334,9 @@
 
     if (b_nativeFullscreenMode) {
         [self setCollectionBehavior: NSWindowCollectionBehaviorFullScreenPrimary];
+    } else if (OSX_EL_CAPITAN) {
+        // Native fullscreen seems to be default on El Capitan, this disables it explicitely
+        [self setCollectionBehavior: NSWindowCollectionBehaviorFullScreenAuxiliary];
     }
 
     [super awakeFromNib];

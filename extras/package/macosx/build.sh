@@ -24,6 +24,7 @@ Build vlc in the current directory
 OPTIONS:
    -h            Show some help
    -q            Be quiet
+   -r            Rebuild everything (tools, contribs, vlc)
    -k <sdk>      Use the specified sdk (default: $SDKROOT)
    -a <arch>     Use the specified arch (default: $ARCH)
 EOF
@@ -40,7 +41,7 @@ spopd()
     popd > /dev/null
 }
 
-while getopts "hvk:a:" OPTION
+while getopts "hvrk:a:" OPTION
 do
      case $OPTION in
          h)
@@ -50,6 +51,9 @@ do
          q)
              set +x
              QUIET="yes"
+         ;;
+         r)
+             REBUILD="yes"
          ;;
          a)
              ARCH=$OPTARG
@@ -101,6 +105,9 @@ export PATH="${vlcroot}/extras/tools/build/bin:/bin:/sbin:/usr/bin:/usr/sbin:/us
 info "Building building tools"
 spushd "${vlcroot}/extras/tools"
 ./bootstrap > $out
+if [ "$REBUILD" = "yes" ]; then
+    make clean
+fi
 make > $out
 spopd
 
@@ -111,8 +118,11 @@ spopd
 
 info "Building contribs"
 spushd "${vlcroot}/contrib"
-mkdir -p build && cd build
+mkdir -p contrib-$TRIPLET && cd contrib-$TRIPLET
 ../bootstrap --build=$TRIPLET --host=$TRIPLET > $out
+if [ "$REBUILD" = "yes" ]; then
+    make clean
+fi
 if [ ! -e "../$TRIPLET" ]; then
     make prebuilt > $out
 fi
@@ -151,6 +161,11 @@ fi
 
 core_count=`sysctl -n machdep.cpu.core_count`
 let jobs=$core_count+1
+
+if [ "$REBUILD" = "yes" ]; then
+    info "Running make clean"
+    make clean
+fi
 
 info "Running make -j$jobs"
 make -j$jobs
