@@ -209,6 +209,18 @@ int sout_InputDelete( sout_packetizer_input_t *p_input )
     return( VLC_SUCCESS);
 }
 
+bool sout_InputIsEmpty(sout_packetizer_input_t *p_input)
+{
+    sout_instance_t *p_sout = p_input->p_sout;
+    bool b;
+
+    vlc_mutex_lock( &p_sout->lock );
+    if (sout_StreamControl( p_sout->p_stream, SOUT_STREAM_EMPTY, &b ) != VLC_SUCCESS)
+        b = true;
+    vlc_mutex_unlock( &p_sout->lock );
+    return b;
+}
+
 /*****************************************************************************
  *
  *****************************************************************************/
