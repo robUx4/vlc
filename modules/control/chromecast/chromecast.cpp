@@ -1,7 +1,7 @@
 /*****************************************************************************
- * cast.cpp: Chromecast module for vlc
+ * chromecast.cpp: Chromecast module for vlc
  *****************************************************************************
- * Copyright © 2014 VideoLAN
+ * Copyright © 2014-2015 VideoLAN
  *
  * Authors: Adrien Maglo <magsoft@videolan.org>
  *          Jean-Baptiste Kempf <jb@videolan.org>
@@ -87,6 +87,7 @@ static void msgPlayerStatus(intf_thread_t *p_intf);
 
 #define CONTROL_CFG_PREFIX "chromecast-"
 #define SOUT_CFG_PREFIX    "sout-chromecast-"
+#define SOUT_INTF_ADDRESS  "sout-chromecast-intf"
 
 // Status
 enum connection_status {
@@ -201,8 +202,6 @@ struct intf_sys_t
                               "used to stream the media to the Chromecast.")
 #define MIME_TEXT N_("MIME content type")
 #define MIME_LONGTEXT N_("This sets the media MIME content type sent to the Chromecast.")
-#define CONTROL_ADDR_TEXT N_("Control interface address")
-#define CONTROL_ADDR_LONGTEXT N_("The pointer address to the control chromecast interface.")
 #define MUXER_TEXT N_("Output muxer address")
 #define MUXER_LONGTEXT N_("Output muxer chromecast interface.")
 
@@ -229,7 +228,6 @@ vlc_module_begin ()
         set_capability("sout stream", 0)
         add_shortcut("cc_sout")
         set_callbacks( SoutOpen, SoutClose )
-        add_integer(SOUT_CFG_PREFIX "control", 0, CONTROL_ADDR_TEXT, CONTROL_ADDR_LONGTEXT, false)
         add_integer(SOUT_CFG_PREFIX "http-port", HTTP_PORT, HTTP_PORT_TEXT, HTTP_PORT_LONGTEXT, false)
         add_string(SOUT_CFG_PREFIX "mime", "video/x-matroska", MIME_TEXT, MIME_LONGTEXT, false)
         add_string(SOUT_CFG_PREFIX "mux", "avformat{mux=matroska}", MUXER_TEXT, MUXER_LONGTEXT, false)
@@ -342,6 +340,7 @@ static int PlaylistEvent( vlc_object_t *p_this, char const *psz_var,
     {
         assert( p_sys->p_input == oldval.p_address );
         var_DelCallback( p_sys->p_input, "intf-event", InputEvent, p_intf );
+        var_SetAddress( p_sys->p_input->p_parent, SOUT_INTF_ADDRESS, NULL );
     }
 
     p_sys->p_input = p_input;
@@ -351,8 +350,7 @@ static int PlaylistEvent( vlc_object_t *p_this, char const *psz_var,
         var_AddCallback( p_input, "intf-event", InputEvent, p_intf );
 
         std::stringstream ss;
-        ss << "#cc_sout{control=" << (intptr_t) p_intf
-           << ",http-port=" << var_InheritInteger(p_intf, CONTROL_CFG_PREFIX "http-port")
+        ss << "#cc_sout{http-port=" << var_InheritInteger(p_intf, CONTROL_CFG_PREFIX "http-port")
            << ",mux=avformat{mux=matroska}"
            << ",mime=" << p_sys->mime << "}";
         var_SetString( p_input, "sout", ss.str().c_str() );
@@ -1307,7 +1305,7 @@ static int Control(sout_stream_t *p_stream, int i_query, va_list args)
 }
 
 static const char *const ppsz_sout_options[] = {
-    "http-port", "mux", "mime", "control", NULL
+    "http-port", "mux", "mime", NULL
 };
 
 int SoutOpen(vlc_object_t *p_this)
@@ -1321,7 +1319,7 @@ int SoutOpen(vlc_object_t *p_this)
 
     config_ChainParse(p_stream, SOUT_CFG_PREFIX, ppsz_sout_options, p_stream->p_cfg);
 
-    p_intf = (intf_thread_t *) var_GetInteger(p_stream, SOUT_CFG_PREFIX "control");
+    p_intf = static_cast<intf_thread_t*>(var_InheritAddress(p_stream, SOUT_INTF_ADDRESS));
     if (p_intf == NULL) {
         msg_Err(p_stream, "Missing the control interface to work");
         goto error;
