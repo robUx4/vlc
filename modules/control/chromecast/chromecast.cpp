@@ -42,6 +42,7 @@
 #include <vlc_network.h>
 #include <vlc_tls.h>
 #include <vlc_interrupt.h>
+#include <vlc_sout.h>
 
 #include <cassert>
 #include <sstream>
@@ -61,6 +62,8 @@ static const char MDNS_CHROMECAST[] = "._googlecast._tcp.local";
 
 static int Open(vlc_object_t *);
 static void Close(vlc_object_t *);
+static int SoutOpen(vlc_object_t *);
+static void SoutClose(vlc_object_t *);
 static int PlaylistEvent( vlc_object_t *, char const *,
                           vlc_value_t, vlc_value_t, void * );
 static int InputEvent( vlc_object_t *, char const *,
@@ -83,6 +86,7 @@ static void msgPlayerPause(intf_thread_t *p_intf);
 static void msgPlayerStatus(intf_thread_t *p_intf);
 
 #define CONTROL_CFG_PREFIX "chromecast-"
+#define SOUT_CFG_PREFIX    "sout-chromecast-"
 
 // Status
 enum connection_status {
@@ -166,6 +170,7 @@ struct intf_sys_t
     std::string appTransportId;
     std::queue<castchannel::CastMessage> messagesToSend;
     std::string mediaSessionId;
+    std::string playerState;
 
     int i_sock_fd;
     vlc_tls_creds_t *p_creds;
@@ -180,6 +185,11 @@ struct intf_sys_t
     vlc_thread_t chromecastThread;
 
     unsigned i_requestId;
+
+    bool isBuffering() {
+        vlc_mutex_locker locker(&lock);
+        return playerState == "BUFFERING";
+    }
 };
 
 #define IP_TEXT N_("Chromecast IP address")
@@ -191,6 +201,10 @@ struct intf_sys_t
                               "used to stream the media to the Chromecast.")
 #define MIME_TEXT N_("MIME content type")
 #define MIME_LONGTEXT N_("This sets the media MIME content type sent to the Chromecast.")
+#define CONTROL_ADDR_TEXT N_("Control interface address")
+#define CONTROL_ADDR_LONGTEXT N_("The pointer address to the control chromecast interface.")
+#define MUXER_TEXT N_("Output muxer address")
+#define MUXER_LONGTEXT N_("Output muxer chromecast interface.")
 
 vlc_module_begin ()
     set_shortname( N_("Chromecast") )
@@ -206,6 +220,20 @@ vlc_module_begin ()
     add_integer(CONTROL_CFG_PREFIX "http-port", HTTP_PORT, HTTP_PORT_TEXT, HTTP_PORT_LONGTEXT, false)
     add_string(CONTROL_CFG_PREFIX "mime", "video/x-matroska", MIME_TEXT, MIME_LONGTEXT, false)
     set_callbacks( Open, Close )
+
+    add_submodule()
+        set_shortname( "cc_sout" )
+        set_category(CAT_SOUT)
+        set_subcategory(SUBCAT_SOUT_STREAM)
+        set_description( N_( "chromecast sout wrapper" ) )
+        set_capability("sout stream", 0)
+        add_shortcut("cc_sout")
+        set_callbacks( SoutOpen, SoutClose )
+        add_integer(SOUT_CFG_PREFIX "control", 0, CONTROL_ADDR_TEXT, CONTROL_ADDR_LONGTEXT, false)
+        add_integer(SOUT_CFG_PREFIX "http-port", HTTP_PORT, HTTP_PORT_TEXT, HTTP_PORT_LONGTEXT, false)
+        add_string(SOUT_CFG_PREFIX "mime", "video/x-matroska", MIME_TEXT, MIME_LONGTEXT, false)
+        add_string(SOUT_CFG_PREFIX "mux", "avformat{mux=matroska}", MUXER_TEXT, MUXER_LONGTEXT, false)
+
 vlc_module_end ()
 
 int Open(vlc_object_t *p_this)
@@ -323,9 +351,10 @@ static int PlaylistEvent( vlc_object_t *p_this, char const *psz_var,
         var_AddCallback( p_input, "intf-event", InputEvent, p_intf );
 
         std::stringstream ss;
-        ss << "#standard{dst=:" << var_InheritInteger(p_intf, CONTROL_CFG_PREFIX "http-port") << "/stream"
+        ss << "#cc_sout{control=" << (intptr_t) p_intf
+           << ",http-port=" << var_InheritInteger(p_intf, CONTROL_CFG_PREFIX "http-port")
            << ",mux=avformat{mux=matroska}"
-           << ",access=simplehttpd{mime=" << p_sys->mime << "}}";
+           << ",mime=" << p_sys->mime << "}";
         var_SetString( p_input, "sout", ss.str().c_str() );
     }
 
@@ -374,6 +403,9 @@ static void SendPlayerState(intf_thread_t *p_intf)
     case END_S:
         if (!p_sys->mediaSessionId.empty()) {
             msgPlayerStop(p_intf);
+
+            /* TODO reset the sout as we'll need another one for the next load */
+            var_SetString( p_sys->p_input, "sout", NULL );
             p_sys->play_status = PLAYER_IDLE;
         }
         break;
@@ -770,6 +802,7 @@ static int processMessage(intf_thread_t *p_intf, const castchannel::CastMessage 
             std::string mediaSessionId = std::to_string((json_int_t) status[0]["mediaSessionId"]);
             assert(p_sys->mediaSessionId.empty() || p_sys->mediaSessionId == mediaSessionId);
             p_sys->mediaSessionId = mediaSessionId;
+            p_sys->playerState = status[0]["playerState"].operator const char *();
             if (p_sys->play_status == PLAYER_LOAD_SENT)
                 SendPlayerState(p_intf);
         }
@@ -947,6 +980,8 @@ static void msgPlayerStatus(intf_thread_t *p_intf)
 static void msgPlayerLoad(intf_thread_t *p_intf)
 {
     intf_sys_t *p_sys = p_intf->p_sys;
+
+    /* TODO: extract the metadata from p_sys->p_input */
 
     std::stringstream ss;
     ss << "{\"type\":\"LOAD\","
@@ -1200,4 +1235,139 @@ static void* chromecastThread(void* p_this)
     }
 
     return NULL;
+}
+struct sout_stream_sys_t
+{
+    sout_stream_sys_t(sout_stream_t *stream, intf_thread_t *intf, sout_stream_t *sout)
+        :p_out(sout)
+        ,p_intf(intf)
+        ,p_stream(stream)
+    {
+        assert(p_intf != NULL);
+        vlc_object_hold(p_intf);
+    }
+
+    ~sout_stream_sys_t()
+    {
+        sout_StreamChainDelete(p_out, p_out);
+        vlc_object_release(p_intf);
+    }
+
+public:
+    bool isFinishedPlaying() const {
+        /* check if the Chromecast to be done playing */
+        return p_intf->p_sys->isBuffering();
+    }
+
+    sout_stream_t * const p_out;
+
+protected:
+    intf_thread_t * const p_intf;
+    sout_stream_t * const p_stream;
+};
+
+/*****************************************************************************
+ * Sout callbacks
+ *****************************************************************************/
+static sout_stream_id_sys_t *Add(sout_stream_t *p_stream, const es_format_t *p_fmt)
+{
+    sout_stream_sys_t *p_sys = p_stream->p_sys;
+    return p_sys->p_out->pf_add(p_sys->p_out, p_fmt);
+}
+
+
+static void Del(sout_stream_t *p_stream, sout_stream_id_sys_t *id)
+{
+    sout_stream_sys_t *p_sys = p_stream->p_sys;
+
+    p_sys->p_out->pf_del(p_sys->p_out, id);
+}
+
+
+static int Send(sout_stream_t *p_stream, sout_stream_id_sys_t *id,
+                block_t *p_buffer)
+{
+    sout_stream_sys_t *p_sys = p_stream->p_sys;
+
+    return p_sys->p_out->pf_send(p_sys->p_out, id, p_buffer);
+}
+
+static int Control(sout_stream_t *p_stream, int i_query, va_list args)
+{
+    sout_stream_sys_t *p_sys = p_stream->p_sys;
+
+    if (i_query == SOUT_STREAM_EMPTY)
+    {
+        bool *b = va_arg( args, bool * );
+        *b = p_sys->isFinishedPlaying();
+        return VLC_SUCCESS;
+    }
+
+    return p_sys->p_out->pf_control(p_sys->p_out, i_query, args);
+}
+
+static const char *const ppsz_sout_options[] = {
+    "http-port", "mux", "mime", "control", NULL
+};
+
+int SoutOpen(vlc_object_t *p_this)
+{
+    sout_stream_t *p_stream = reinterpret_cast<sout_stream_t*>(p_this);
+    char *psz_var_mux = NULL, *psz_var_mime = NULL;
+    intf_thread_t *p_intf = NULL;
+    sout_stream_sys_t *p_sys = NULL;
+    sout_stream_t *p_sout = NULL;
+    std::stringstream ss;
+
+    config_ChainParse(p_stream, SOUT_CFG_PREFIX, ppsz_sout_options, p_stream->p_cfg);
+
+    p_intf = (intf_thread_t *) var_GetInteger(p_stream, SOUT_CFG_PREFIX "control");
+    if (p_intf == NULL) {
+        msg_Err(p_stream, "Missing the control interface to work");
+        goto error;
+    }
+
+    psz_var_mux = var_InheritString(p_stream, SOUT_CFG_PREFIX "mux");
+    if (psz_var_mux == NULL || !psz_var_mux[0])
+        goto error;
+    psz_var_mime = var_InheritString(p_stream, SOUT_CFG_PREFIX "mime");
+    if (psz_var_mime == NULL || !psz_var_mime[0])
+        goto error;
+
+    ss << "standard{dst=:" << var_InheritInteger(p_stream, SOUT_CFG_PREFIX "http-port") << "/stream"
+       << ",mux=" << psz_var_mux
+       << ",access=simplehttpd{mime=" << psz_var_mime << "}}";
+
+    p_sout = sout_StreamChainNew( p_stream->p_sout, ss.str().c_str(), NULL, NULL);
+    if (p_sout == NULL) {
+        msg_Dbg(p_stream, "could not create sout chain:%s", ss.str().c_str());
+        goto error;
+    }
+
+    p_sys = new(std::nothrow) sout_stream_sys_t(p_stream, p_intf, p_sout);
+    if (unlikely(p_sys == NULL))
+        return VLC_ENOMEM;
+
+    p_stream->pf_add     = Add;
+    p_stream->pf_del     = Del;
+    p_stream->pf_send    = Send;
+    p_stream->pf_control = Control;
+
+    p_stream->p_sys = p_sys;
+    free(psz_var_mux);
+    free(psz_var_mime);
+    return VLC_SUCCESS;
+
+error:
+    delete p_sys;
+    sout_StreamChainDelete(p_sout, p_sout);
+    free(psz_var_mux);
+    free(psz_var_mime);
+    return VLC_EGENERIC;
+}
+
+void SoutClose(vlc_object_t *p_this)
+{
+    sout_stream_t *p_sout = reinterpret_cast<sout_stream_t*>(p_this);
+    delete p_sout->p_sys;
 }
