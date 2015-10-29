@@ -42,6 +42,7 @@
 #include <vlc_network.h>
 #include <vlc_tls.h>
 #include <vlc_interrupt.h>
+#include <vlc_demux.h>
 #include <vlc_sout.h>
 
 #include <cassert>
@@ -62,6 +63,8 @@ static const char MDNS_CHROMECAST[] = "._googlecast._tcp.local";
 
 static int Open(vlc_object_t *);
 static void Close(vlc_object_t *);
+static int DemuxOpen(vlc_object_t *);
+static void DemuxClose(vlc_object_t *);
 static int SoutOpen(vlc_object_t *);
 static void SoutClose(vlc_object_t *);
 static int PlaylistEvent( vlc_object_t *, char const *,
@@ -139,6 +142,8 @@ struct intf_sys_t
 #ifdef HAVE_MICRODNS
         ,microdns_ctx(NULL)
 #endif
+        ,time_offset(0)
+        ,time_start_play(-1)
         ,i_sock_fd(-1)
         ,p_creds(NULL)
         ,p_tls(NULL)
@@ -157,6 +162,18 @@ struct intf_sys_t
         vlc_interrupt_destroy(p_interrupt);
     }
 
+    mtime_t getPlaybackTime() {
+        if (time_start_play == -1)
+            return 0;
+        return mdate() - time_start_play + time_offset;
+    }
+
+    double getPlaybackPosition(mtime_t i_length) {
+        if( i_length > 0 && time_start_play > 0)
+            return (double)(mdate() - time_start_play) / (double)( i_length );
+        return 0.0;
+    }
+
     input_thread_t *p_input;
     uint16_t       devicePort;
     std::string    deviceIP;
@@ -172,6 +189,9 @@ struct intf_sys_t
     std::queue<castchannel::CastMessage> messagesToSend;
     std::string mediaSessionId;
     std::string playerState;
+
+    mtime_t     time_offset;
+    mtime_t     time_start_play;
 
     int i_sock_fd;
     vlc_tls_creds_t *p_creds;
@@ -219,6 +239,15 @@ vlc_module_begin ()
     add_integer(CONTROL_CFG_PREFIX "http-port", HTTP_PORT, HTTP_PORT_TEXT, HTTP_PORT_LONGTEXT, false)
     add_string(CONTROL_CFG_PREFIX "mime", "video/x-matroska", MIME_TEXT, MIME_LONGTEXT, false)
     set_callbacks( Open, Close )
+
+    add_submodule()
+        set_shortname( "cc_demux" )
+        set_category( CAT_INPUT )
+        set_subcategory( SUBCAT_INPUT_DEMUX )
+        set_description( N_( "chromecast demux wrapper" ) )
+        set_capability( "demux", 0 )
+        add_shortcut( "cc_demux" )
+        set_callbacks( DemuxOpen, DemuxClose )
 
     add_submodule()
         set_shortname( "cc_sout" )
@@ -349,11 +378,18 @@ static int PlaylistEvent( vlc_object_t *p_this, char const *psz_var,
     {
         var_AddCallback( p_input, "intf-event", InputEvent, p_intf );
 
+        assert(!p_input->b_preparsing);
+
+        var_Create( p_input->p_parent, SOUT_INTF_ADDRESS, VLC_VAR_ADDRESS );
+        var_SetAddress( p_input->p_parent, SOUT_INTF_ADDRESS, p_intf );
+
         std::stringstream ss;
         ss << "#cc_sout{http-port=" << var_InheritInteger(p_intf, CONTROL_CFG_PREFIX "http-port")
            << ",mux=avformat{mux=matroska}"
            << ",mime=" << p_sys->mime << "}";
         var_SetString( p_input, "sout", ss.str().c_str() );
+
+        var_SetString( p_input, "demux-filter", "cc_demux" );
     }
 
     return VLC_SUCCESS;
@@ -800,7 +836,14 @@ static int processMessage(intf_thread_t *p_intf, const castchannel::CastMessage 
             std::string mediaSessionId = std::to_string((json_int_t) status[0]["mediaSessionId"]);
             assert(p_sys->mediaSessionId.empty() || p_sys->mediaSessionId == mediaSessionId);
             p_sys->mediaSessionId = mediaSessionId;
+
+            std::string playerState = p_sys->playerState;
             p_sys->playerState = status[0]["playerState"].operator const char *();
+            if (p_sys->playerState != playerState)
+            {
+                if (p_sys->playerState == "PLAYING")
+                    p_sys->time_start_play = mdate();
+            }
             if (p_sys->play_status == PLAYER_LOAD_SENT)
                 SendPlayerState(p_intf);
         }
@@ -1234,6 +1277,98 @@ static void* chromecastThread(void* p_this)
 
     return NULL;
 }
+
+struct demux_sys_t
+{
+    demux_sys_t(demux_t *demux, intf_thread_t *intf)
+        :p_demux(demux)
+        ,p_intf(intf)
+        ,i_length(-1)
+    {
+        assert(p_intf != NULL);
+        vlc_object_hold(p_intf);
+    }
+
+    ~demux_sys_t()
+    {
+        vlc_object_release(p_intf);
+    }
+
+    mtime_t getPlaybackTime() {
+        return p_intf->p_sys->getPlaybackTime();
+    }
+
+    double getPlaybackPosition() {
+        if (i_length == -1) {
+            if (demux_Control(p_demux->p_source, DEMUX_GET_LENGTH, &i_length) != VLC_SUCCESS)
+                i_length = -1;
+        }
+        return p_intf->p_sys->getPlaybackPosition(i_length);
+    }
+
+protected:
+    demux_t       *p_demux;
+    intf_thread_t *p_intf;
+    mtime_t       i_length;
+};
+
+static int DemuxDemux( demux_t *p_demux )
+{
+    return p_demux->p_source->pf_demux( p_demux->p_source );
+}
+
+static int DemuxControl( demux_t *p_demux, int i_query, va_list args)
+{
+    demux_sys_t *p_sys = p_demux->p_sys;
+    if (i_query == DEMUX_GET_POSITION)
+    {
+        *va_arg( args, double * ) = p_sys->getPlaybackPosition();
+        return VLC_SUCCESS;
+    }
+    if (i_query == DEMUX_GET_TIME)
+    {
+        *va_arg(args, int64_t *) = p_sys->getPlaybackTime();
+        return VLC_SUCCESS;
+    }
+    return p_demux->p_source->pf_control( p_demux->p_source, i_query, args );
+}
+
+int DemuxOpen(vlc_object_t *p_this)
+{
+    demux_t *p_demux = reinterpret_cast<demux_t*>(p_this);
+    if (p_demux->p_source == NULL)
+        return VLC_EBADVAR;
+
+    intf_thread_t *p_intf = static_cast<intf_thread_t*>(var_InheritAddress(p_demux, SOUT_INTF_ADDRESS));
+    if (p_intf == NULL) {
+        msg_Err(p_demux, "Missing the control interface to work");
+        return VLC_EBADVAR;
+    }
+
+    demux_sys_t *p_sys = new(std::nothrow) demux_sys_t(p_demux, p_intf);
+    if (unlikely(p_sys == NULL))
+        return VLC_ENOMEM;
+
+    p_demux->pf_demux = DemuxDemux;
+    p_demux->pf_control = DemuxControl;
+
+    vlc_object_hold(p_demux->p_source);
+
+    p_demux->p_sys = p_sys;
+    return VLC_SUCCESS;
+}
+
+void DemuxClose(vlc_object_t *p_this)
+{
+    demux_t *p_demux = reinterpret_cast<demux_t*>(p_this);
+    demux_sys_t *p_sys = p_demux->p_sys;
+
+    demux_Delete(p_demux->p_source);
+    p_demux->s = NULL; /* only the one demux can have a stream source */
+
+    delete p_sys;
+}
+
 struct sout_stream_sys_t
 {
     sout_stream_sys_t(sout_stream_t *stream, intf_thread_t *intf, sout_stream_t *sout)
