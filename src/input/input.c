@@ -2187,6 +2187,18 @@ static input_source_t *InputSourceNew( input_thread_t *p_input,
         return NULL;
     }
 
+    /* add the chain of demux filters */
+    char *psz_var_demux_filters = var_InheritString(p_input, "demux-filter");
+    if (psz_var_demux_filters != NULL)
+    {
+        demux_t *p_filtered_demux = demux_FilterChainNew(in->p_demux, psz_var_demux_filters);
+        if (p_filtered_demux == NULL)
+            msg_Dbg(p_input, "Failed to create demux filter %s", psz_var_demux_filters);
+        else
+            in->p_demux = p_filtered_demux,
+        free(psz_var_demux_filters);
+    }
+
     /* Get infos from (access_)demux */
     bool b_can_seek;
     if( demux_Control( in->p_demux, DEMUX_CAN_SEEK, &b_can_seek ) )

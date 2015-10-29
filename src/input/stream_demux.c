@@ -249,7 +249,7 @@ static void* DStreamThread( void *obj )
 
     /* Create the demuxer */
     p_demux = demux_NewAdvanced( s, s->p_input, "", p_sys->psz_name, "",
-                                 s, p_sys->out, false );
+                                 s, p_sys->out, false, NULL );
     if( p_demux == NULL )
         return NULL;
 
