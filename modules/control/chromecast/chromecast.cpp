@@ -144,6 +144,8 @@ struct intf_sys_t
 #endif
         ,time_offset(0)
         ,time_start_play(-1)
+        ,canPause(false)
+        ,canSeek(false)
         ,i_sock_fd(-1)
         ,p_creds(NULL)
         ,p_tls(NULL)
@@ -176,6 +178,21 @@ struct intf_sys_t
         return 0.0;
     }
 
+    void setCanPause(bool canPause) {
+        vlc_mutex_locker locker(&lock);
+        this->canPause = canPause;
+    }
+
+    void setCanSeek(bool canSeek) {
+        vlc_mutex_locker locker(&lock);
+        this->canSeek = canSeek;
+    }
+
+    bool isBuffering() {
+        vlc_mutex_locker locker(&lock);
+        return playerState == "BUFFERING";
+    }
+
     input_thread_t *p_input;
     uint16_t       devicePort;
     std::string    deviceIP;
@@ -194,6 +211,8 @@ struct intf_sys_t
 
     mtime_t     time_offset;
     mtime_t     time_start_play;
+    bool        canPause;
+    bool        canSeek;
 
     int i_sock_fd;
     vlc_tls_creds_t *p_creds;
@@ -208,11 +227,6 @@ struct intf_sys_t
     vlc_thread_t chromecastThread;
 
     unsigned i_requestId;
-
-    bool isBuffering() {
-        vlc_mutex_locker locker(&lock);
-        return playerState == "BUFFERING";
-    }
 };
 
 #define IP_TEXT N_("Chromecast IP address")
@@ -1295,8 +1309,6 @@ struct demux_sys_t
     {
         assert(p_intf != NULL);
         vlc_object_hold(p_intf);
-        if (demux_Control(p_demux->p_source, DEMUX_GET_LENGTH, &i_length) != VLC_SUCCESS)
-            i_length = -1;
     }
 
     ~demux_sys_t()
@@ -1310,6 +1322,18 @@ struct demux_sys_t
 
     double getPlaybackPosition() {
         return p_intf->p_sys->getPlaybackPosition(i_length);
+    }
+
+    void setCanSeek(bool canSeek) {
+        p_intf->p_sys->setCanSeek( canSeek );
+    }
+
+    void setCanPause(bool canPause) {
+        p_intf->p_sys->setCanPause( canPause );
+    }
+
+    void setLength(mtime_t length) {
+        this->i_length = length;
     }
 
 protected:
@@ -1326,16 +1350,56 @@ static int DemuxDemux( demux_t *p_demux )
 static int DemuxControl( demux_t *p_demux, int i_query, va_list args)
 {
     demux_sys_t *p_sys = p_demux->p_sys;
-    if (i_query == DEMUX_GET_POSITION)
+
+    switch (i_query)
     {
+    case DEMUX_GET_POSITION:
         *va_arg( args, double * ) = p_sys->getPlaybackPosition();
         return VLC_SUCCESS;
-    }
-    if (i_query == DEMUX_GET_TIME)
-    {
+
+    case DEMUX_GET_TIME:
         *va_arg(args, int64_t *) = p_sys->getPlaybackTime();
         return VLC_SUCCESS;
+
+    case DEMUX_CAN_PAUSE:
+    {
+        int ret;
+        va_list ap;
+
+        va_copy( ap, args );
+        ret = p_demux->p_source->pf_control( p_demux->p_source, i_query, args );
+        if( ret == VLC_SUCCESS )
+            p_sys->setCanPause( *va_arg( ap, bool* ) );
+        va_end( ap );
+        return ret;
     }
+
+    case DEMUX_CAN_SEEK:
+    {
+        int ret;
+        va_list ap;
+
+        va_copy( ap, args );
+        ret = p_demux->p_source->pf_control( p_demux->p_source, i_query, args );
+        if( ret == VLC_SUCCESS )
+            p_sys->setCanSeek( *va_arg( ap, bool* ) );
+        va_end( ap );
+        return ret;
+    }
+
+    case DEMUX_GET_LENGTH:
+    {
+        int ret;
+        va_list ap;
+
+        va_copy( ap, args );
+        ret = p_demux->p_source->pf_control( p_demux->p_source, i_query, args );
+        if( ret == VLC_SUCCESS )
+            p_sys->setLength( *va_arg( ap, int64_t * ) );
+        va_end( ap );
+        return ret;
+    }
+
     return p_demux->p_source->pf_control( p_demux->p_source, i_query, args );
 }
 
