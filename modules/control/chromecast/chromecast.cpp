@@ -165,7 +165,7 @@ struct intf_sys_t
         vlc_interrupt_destroy(p_interrupt);
     }
 
-    mtime_t getPlaybackTime() {
+    mtime_t getPlaybackTime() const {
         if (time_start_play == -1)
             return 0;
         if (playerState == "PLAYING")
@@ -173,7 +173,7 @@ struct intf_sys_t
         return time_offset;
     }
 
-    double getPlaybackPosition(mtime_t i_length) {
+    double getPlaybackPosition(mtime_t i_length) const {
         if( i_length > 0 && time_start_play > 0)
             return (double) getPlaybackTime() / (double)( i_length );
         return 0.0;
