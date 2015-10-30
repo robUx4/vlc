@@ -672,9 +672,9 @@ demux_t *demux_FilterChainNew(demux_t *p_demux, const char *psz_chain)
     {
         config_chain_t *p_cfg;
         char *psz_name;
-        psz_chain = config_ChainCreate( &psz_name, &p_cfg, psz_parser );
+        char *psz_rest_chain = config_ChainCreate( &psz_name, &p_cfg, psz_parser );
         free( psz_parser );
-        psz_parser = psz_chain;
+        psz_parser = psz_rest_chain;
 
         vlc_array_append(&cfg, p_cfg);
         vlc_array_append(&name, psz_name);
@@ -686,7 +686,7 @@ demux_t *demux_FilterChainNew(demux_t *p_demux, const char *psz_chain)
     while(i--)
     {
         const char *p_name = vlc_array_item_at_index(&name, i);
-        demux_t *p_next = demux_NewAdvanced(p_demux, p_demux->p_input,
+        demux_t *p_next = demux_NewAdvanced(VLC_OBJECT(p_demux), p_demux->p_input,
                                             p_demux->psz_access, p_name,
                                             p_demux->psz_location, p_demux->s,
                                             p_demux->out, false, p_demux);
