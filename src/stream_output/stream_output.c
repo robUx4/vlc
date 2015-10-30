@@ -626,7 +626,7 @@ static int mrl_Parse( mrl_t *p_mrl, const char *psz_mrl )
     {
         /* msg_Warn( p_sout, "drive letter %c: found in source string",
                           *psz_dup ) ; */
-        psz_parser = "";
+        *psz_parser = '\0';
     }
 #endif
 
@@ -841,9 +841,9 @@ sout_stream_t *sout_StreamChainNew(sout_instance_t *p_sout, const char *psz_chai
     {
         config_chain_t *p_cfg;
         char *psz_name;
-        psz_chain = config_ChainCreate( &psz_name, &p_cfg, psz_parser );
+        char *psz_rest_chain = config_ChainCreate( &psz_name, &p_cfg, psz_parser );
         free( psz_parser );
-        psz_parser = psz_chain;
+        psz_parser = psz_rest_chain;
 
         vlc_array_append(&cfg, p_cfg);
         vlc_array_append(&name, psz_name);
