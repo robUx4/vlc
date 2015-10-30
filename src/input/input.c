@@ -629,6 +629,10 @@ static void MainLoopStatistics( input_thread_t *p_input )
 
     /* update input status variables */
     if( demux_Control( p_input->p->master->p_demux,
+                       DEMUX_GET_LENGTH, &i_length ) )
+        i_length = 0;
+
+    if( demux_Control( p_input->p->master->p_demux,
                        DEMUX_GET_POSITION, &f_position ) )
         f_position = 0.0;
 
@@ -636,10 +640,6 @@ static void MainLoopStatistics( input_thread_t *p_input )
                        DEMUX_GET_TIME, &i_time ) )
         i_time = 0;
     p_input->p->i_time = i_time;
-
-    if( demux_Control( p_input->p->master->p_demux,
-                       DEMUX_GET_LENGTH, &i_length ) )
-        i_length = 0;
 
     es_out_SetTimes( p_input->p->p_es_out, f_position, i_time, i_length );
 

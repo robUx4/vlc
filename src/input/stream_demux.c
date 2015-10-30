@@ -266,10 +266,10 @@ static void* DStreamThread( void *obj )
             double newpos;
             int64_t newlen, newtime;
 
-            if( demux_Control( p_demux, DEMUX_GET_POSITION, &newpos ) )
-                newpos = 0.;
             if( demux_Control( p_demux, DEMUX_GET_LENGTH, &newlen ) )
                 newlen = 0;
+            if( demux_Control( p_demux, DEMUX_GET_POSITION, &newpos ) )
+                newpos = 0.;
             if( demux_Control( p_demux, DEMUX_GET_TIME, &newtime ) )
                 newtime = 0;
 
