@@ -695,8 +695,13 @@ ssize_t vlc_sendto_i11e(int fd, const void *buf, size_t len, int flags,
         return -1;
 
     ssize_t ret = sendto(fd, buf, len, flags, addr, addrlen);
-    if (ret < 0 && WSAGetLastError() == WSAEWOULDBLOCK)
-        errno = EAGAIN;
+    if (ret < 0) {
+        int err = WSAGetLastError();
+        if (err == WSAEWOULDBLOCK)
+            errno = EAGAIN;
+        else if (err == WSAECONNRESET)
+            errno = ECONNRESET;
+    }
     return ret;
 }
 
