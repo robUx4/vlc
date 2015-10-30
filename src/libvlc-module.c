@@ -632,10 +632,6 @@ static const char *const ppsz_prefres[] = {
 #define RUN_TIME_LONGTEXT N_( \
     "The stream will run this duration (in seconds)." )
 
-#define INPUT_FAST_SEEK_TEXT N_("Fast seek")
-#define INPUT_FAST_SEEK_LONGTEXT N_( \
-    "Favor speed over precision while seeking" )
-
 #define INPUT_RATE_TEXT N_("Playback speed")
 #define INPUT_RATE_LONGTEXT N_( \
     "This defines the playback speed (nominal speed is 1.0)." )
@@ -1700,9 +1696,6 @@ vlc_module_begin ()
         change_safe ()
     add_float( "run-time", 0,
                RUN_TIME_TEXT, RUN_TIME_LONGTEXT, true )
-        change_safe ()
-    add_bool( "input-fast-seek", false,
-              INPUT_FAST_SEEK_TEXT, INPUT_FAST_SEEK_LONGTEXT, false )
         change_safe ()
     add_float( "rate", 1.,
                INPUT_RATE_TEXT, INPUT_RATE_LONGTEXT, false )
