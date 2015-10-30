@@ -165,12 +165,14 @@ struct intf_sys_t
     mtime_t getPlaybackTime() {
         if (time_start_play == -1)
             return 0;
-        return mdate() - time_start_play + time_offset;
+        if (playerState == "PLAYING")
+            return mdate() - time_start_play + time_offset;
+        return time_offset;
     }
 
     double getPlaybackPosition(mtime_t i_length) {
         if( i_length > 0 && time_start_play > 0)
-            return (double)(mdate() - time_start_play) / (double)( i_length );
+            return (double) getPlaybackTime() / (double)( i_length );
         return 0.0;
     }
 
@@ -843,6 +845,12 @@ static int processMessage(intf_thread_t *p_intf, const castchannel::CastMessage 
             {
                 if (p_sys->playerState == "PLAYING")
                     p_sys->time_start_play = mdate();
+                else if (playerState == "PLAYING")
+                {
+                    /* playing stopped for now */
+                    p_sys->time_offset += mdate() - p_sys->time_start_play;
+                    p_sys->time_start_play = 0;
+                }
             }
             if (p_sys->play_status == PLAYER_LOAD_SENT)
                 SendPlayerState(p_intf);
