@@ -232,23 +232,16 @@ static void Close( vlc_object_t * p_this )
 
 static int Control( sout_access_out_t *p_access, int i_query, va_list args )
 {
-    sout_access_out_sys_t *p_sys = p_access->p_sys;
-
+    VLC_UNUSED(p_access);
     switch( i_query )
     {
         case ACCESS_OUT_CONTROLS_PACE:
-        {
-            bool *pb = va_arg( args, bool * );
-            *pb = true;
+            *va_arg( args, bool * ) = true;
             break;
-        }
 
         case ACCESS_OUT_CAN_SEEK:
-        {
-            bool *pb = va_arg( args, bool * );
-            *pb = false;
+            *va_arg( args, bool * ) = false;
             break;
-        }
 
         default:
             return VLC_EGENERIC;
