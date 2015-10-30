@@ -1295,6 +1295,8 @@ struct demux_sys_t
     {
         assert(p_intf != NULL);
         vlc_object_hold(p_intf);
+        if (demux_Control(p_demux->p_source, DEMUX_GET_LENGTH, &i_length) != VLC_SUCCESS)
+            i_length = -1;
     }
 
     ~demux_sys_t()
@@ -1307,10 +1309,6 @@ struct demux_sys_t
     }
 
     double getPlaybackPosition() {
-        if (i_length == -1) {
-            if (demux_Control(p_demux->p_source, DEMUX_GET_LENGTH, &i_length) != VLC_SUCCESS)
-                i_length = -1;
-        }
         return p_intf->p_sys->getPlaybackPosition(i_length);
     }
 
