@@ -86,6 +86,7 @@ static void msgPlayerLoad(intf_thread_t *p_intf);
 static void msgPlayerStop(intf_thread_t *p_intf);
 static void msgPlayerPlay(intf_thread_t *p_intf);
 static void msgPlayerPause(intf_thread_t *p_intf);
+static void msgPlayerSeek(intf_thread_t *p_intf, mtime_t i_pos);
 static void msgPlayerStatus(intf_thread_t *p_intf);
 
 #define CONTROL_CFG_PREFIX "chromecast-"
@@ -136,8 +137,9 @@ static const char NAMESPACE_MEDIA[]      = "urn:x-cast:com.google.cast.media";
  *****************************************************************************/
 struct intf_sys_t
 {
-    intf_sys_t()
-        :p_input(NULL)
+    intf_sys_t(intf_thread_t *intf)
+        :p_intf(intf)
+        ,p_input(NULL)
         ,devicePort(8009)
 #ifdef HAVE_MICRODNS
         ,microdns_ctx(NULL)
@@ -145,7 +147,6 @@ struct intf_sys_t
         ,time_offset(0)
         ,time_start_play(-1)
         ,canPause(false)
-        ,canSeek(false)
         ,i_sock_fd(-1)
         ,p_creds(NULL)
         ,p_tls(NULL)
@@ -183,16 +184,14 @@ struct intf_sys_t
         this->canPause = canPause;
     }
 
-    void setCanSeek(bool canSeek) {
-        vlc_mutex_locker locker(&lock);
-        this->canSeek = canSeek;
-    }
-
     bool isBuffering() {
         vlc_mutex_locker locker(&lock);
         return playerState == "BUFFERING";
     }
 
+    bool seekTo(mtime_t pos);
+
+    intf_thread_t  * const p_intf;
     input_thread_t *p_input;
     uint16_t       devicePort;
     std::string    deviceIP;
@@ -212,7 +211,6 @@ struct intf_sys_t
     mtime_t     time_offset;
     mtime_t     time_start_play;
     bool        canPause;
-    bool        canSeek;
 
     int i_sock_fd;
     vlc_tls_creds_t *p_creds;
@@ -282,7 +280,7 @@ vlc_module_end ()
 int Open(vlc_object_t *p_this)
 {
     intf_thread_t *p_intf = reinterpret_cast<intf_thread_t*>(p_this);
-    intf_sys_t *p_sys = new(std::nothrow) intf_sys_t;
+    intf_sys_t *p_sys = new(std::nothrow) intf_sys_t(p_intf);
     char *psz_mime;
     if (unlikely(p_sys == NULL))
         return VLC_ENOMEM;
@@ -1110,6 +1108,23 @@ static void msgPlayerPause(intf_thread_t *p_intf)
     p_sys->messagesToSend.push(msg);
 }
 
+static void msgPlayerSeek(intf_thread_t *p_intf, mtime_t i_pos)
+{
+    intf_sys_t *p_sys = p_intf->p_sys;
+    assert(!p_sys->mediaSessionId.empty());
+
+    std::stringstream ss;
+    ss << "{\"type\":\"SEEK\","
+       <<  "\"mediaSessionId\":" << p_sys->mediaSessionId << ","
+       <<  "\"currentTime\":" << double( i_pos ) / 1000000.0 << ","
+       <<  "\"requestId\":" << p_sys->i_requestId++ << "}";
+
+    castchannel::CastMessage msg = buildMessage(NAMESPACE_MEDIA,
+        castchannel::CastMessage_PayloadType_STRING, ss.str(), p_sys->appTransportId);
+
+    p_sys->messagesToSend.push(msg);
+}
+
 
 #ifdef HAVE_MICRODNS
 static bool mdnsShouldStop(void *p_callback_cookie)
@@ -1306,6 +1321,7 @@ struct demux_sys_t
         :p_demux(demux)
         ,p_intf(intf)
         ,i_length(-1)
+        ,canSeek(false)
     {
         assert(p_intf != NULL);
         vlc_object_hold(p_intf);
@@ -1325,11 +1341,23 @@ struct demux_sys_t
     }
 
     void setCanSeek(bool canSeek) {
-        p_intf->p_sys->setCanSeek( canSeek );
+        this->canSeek = canSeek;
     }
 
     void setCanPause(bool canPause) {
         p_intf->p_sys->setCanPause( canPause );
+    }
+
+    bool seekTo(double pos) {
+        if (i_length == -1)
+            return false;
+        return seekTo( mtime_t( i_length * getPlaybackPosition() /* pos */ ) );
+    }
+
+    bool seekTo(mtime_t i_pos) {
+        if (!canSeek)
+            return false;
+        return p_intf->p_sys->seekTo(i_pos);
     }
 
     void setLength(mtime_t length) {
@@ -1340,6 +1368,7 @@ protected:
     demux_t       *p_demux;
     intf_thread_t *p_intf;
     mtime_t       i_length;
+    bool          canSeek;
 };
 
 static int DemuxDemux( demux_t *p_demux )
@@ -1399,6 +1428,68 @@ static int DemuxControl( demux_t *p_demux, int i_query, va_list args)
         va_end( ap );
         return ret;
     }
+
+    case DEMUX_SET_POSITION:
+    {
+        int ret = VLC_SUCCESS;
+        va_list ap;
+
+        va_copy( ap, args );
+        double pos = va_arg( ap, double );
+        va_end( ap );
+        if (!p_sys->seekTo( pos ))
+        {
+            msg_Err( p_demux, "failed to seek to %f", pos );
+            return VLC_EGENERIC;
+        }
+#if TODO
+        ret = p_demux->p_source->pf_control( p_demux->p_source, i_query, args );
+        if (ret == VLC_SUCCESS) {
+
+        }
+#endif
+        return ret;
+    }
+
+    case DEMUX_SET_TIME:
+    {
+        int ret = VLC_SUCCESS;
+        va_list ap;
+
+        va_copy( ap, args );
+        mtime_t pos = va_arg( ap, mtime_t );
+        va_end( ap );
+        if (!p_sys->seekTo( pos ))
+        {
+            msg_Err( p_demux, "failed to seek to time %" PRId64, pos );
+            return VLC_EGENERIC;
+        }
+#if TODO
+        ret = p_demux->p_source->pf_control( p_demux->p_source, i_query, args );
+        if (ret == VLC_SUCCESS) {
+
+        }
+#endif
+        return ret;
+    }
+
+#if 0
+    case DEMUX_GET_PTS_DELAY:
+    {
+        int ret;
+        va_list ap;
+
+        va_copy( ap, args );
+        ret = p_demux->p_source->pf_control( p_demux->p_source, i_query, args );
+        //if( ret == VLC_SUCCESS )
+        //    p_sys->setCanSeek( *va_arg( ap, bool* ) );
+        va_end( ap );
+        return ret;
+    }
+#endif
+    }
+
+    msg_Dbg(p_demux, "DemuxControl %s", demux_control_names[i_query]);
 
     return p_demux->p_source->pf_control( p_demux->p_source, i_query, args );
 }
@@ -1573,4 +1664,15 @@ void SoutClose(vlc_object_t *p_this)
 {
     sout_stream_t *p_sout = reinterpret_cast<sout_stream_t*>(p_this);
     delete p_sout->p_sys;
+}
+
+bool intf_sys_t::seekTo(mtime_t pos)
+{
+    vlc_mutex_locker locker(&lock);
+    if (conn_status == CHROMECAST_DEAD)
+        return false;
+
+    //msgPlayerStop(p_intf, pos);
+    msgPlayerSeek(p_intf, pos);
+    return false;
 }
