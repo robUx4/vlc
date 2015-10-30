@@ -218,6 +218,7 @@ static void Close( vlc_object_t * p_this )
     sout_access_out_sys_t *p_sys = p_access->p_sys;
 
     net_ListenClose(p_sys->pi_listen_fd);
+    p_sys->pi_listen_fd = NULL;
     net_Close(p_sys->i_socket);
 
     vlc_cancel(p_sys->thread);
@@ -279,9 +280,43 @@ static ssize_t Write( sout_access_out_t *p_access, block_t *p_buffer )
                                 p_buffer->p_buffer, p_buffer->i_buffer);
         if (val <= 0)
         {
-            block_ChainRelease (p_buffer);
-            msg_Err( p_access, "cannot write: %s", vlc_strerror_c(errno) );
-            return -1;
+            if (errno == ECONNRESET) {
+                msg_Err( p_access, "The client closed the connection, wait for another one" );
+                net_Close(p_sys->i_socket);
+                p_sys->i_socket = -1;
+
+                p_sys->state = STATE_LISTEN;
+
+                if (vlc_clone(&p_sys->thread, httpd_HostThread, p_access,
+                               VLC_THREAD_PRIORITY_LOW)) {
+                    msg_Err(p_access, "cannot spawn http host thread");
+                    net_ListenClose(p_sys->pi_listen_fd);
+                    return -1;
+                }
+
+                vlc_mutex_lock( &p_sys->lock );
+                mutex_cleanup_push( &p_sys->lock );
+
+                while (p_sys->state != STATE_SEND_BODY && p_sys->state != STATE_DEAD)
+                    vlc_cond_wait( &p_sys->wait, &p_sys->lock );
+
+                vlc_cleanup_pop();
+
+                if (p_sys->state == STATE_DEAD)
+                {
+                    vlc_mutex_unlock( &p_sys->lock );
+                    block_ChainRelease (p_buffer);
+                    msg_Err( p_access, "did not receive a new connection" );
+                    return -1;
+                }
+                vlc_mutex_unlock( &p_sys->lock );
+                val = 0;
+
+            } else {
+                block_ChainRelease (p_buffer);
+                msg_Err( p_access, "cannot write: %s", vlc_strerror_c(errno) );
+                return -1;
+            }
         }
 
         if ((size_t)val >= p_buffer->i_buffer)
@@ -311,8 +346,10 @@ void* httpd_HostThread(void *p_this)
         {
         case STATE_LISTEN:
             p_sys->i_socket = net_Accept(VLC_OBJECT(p_access), p_sys->pi_listen_fd);
-            net_ListenClose(p_sys->pi_listen_fd);
+#if 0
+            net_ListenClose(p_sys->pi_listen_fd); /* TODO may be kept for seeking */
             p_sys->pi_listen_fd = NULL;
+#endif
             if (p_sys->i_socket < 0)
             {
                 msg_Err(p_access, "failed to get a client socket");
