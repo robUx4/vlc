@@ -140,6 +140,7 @@ struct intf_sys_t
         ,p_tls(NULL)
         ,conn_status(CHROMECAST_DISCONNECTED)
         ,play_status(PLAYER_IDLE)
+        ,i_supportedMediaCommands(15)
         ,f_seektime(-1.0)
         ,i_app_requestId(0)
         ,i_requestId(0)
@@ -210,6 +211,7 @@ struct intf_sys_t
 
     enum connection_status conn_status;
     enum player_status     play_status;
+    int                    i_supportedMediaCommands;
     double                 f_seektime;
     std::string            currentTime; /* position of seeking requested */
 
@@ -742,7 +744,7 @@ static int processMessage(intf_thread_t *p_intf, const castchannel::CastMessage 
     std::string namespace_ = msg.namespace_();
 
 #ifndef NDEBUG
-    msg_Dbg(p_intf,"processMessage: fd:%d %s payload:%s", p_sys->i_sock_fd, namespace_.c_str(), msg.payload_utf8().c_str());
+    msg_Dbg(p_intf,"processMessage: %s payload:%s", namespace_.c_str(), msg.payload_utf8().c_str());
 #endif
 
     if (namespace_ == NAMESPACE_DEVICEAUTH)
