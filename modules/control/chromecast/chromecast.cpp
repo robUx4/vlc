@@ -133,12 +133,14 @@ struct intf_sys_t
 #endif
         ,time_offset(0)
         ,time_start_play(-1)
+        ,playback_time_ref(-1.0)
         ,canPause(false)
         ,i_sock_fd(-1)
         ,p_creds(NULL)
         ,p_tls(NULL)
         ,conn_status(CHROMECAST_DISCONNECTED)
         ,play_status(PLAYER_IDLE)
+        ,f_seektime(-1.0)
         ,i_app_requestId(0)
         ,i_requestId(0)
     {
@@ -174,7 +176,7 @@ struct intf_sys_t
 
     bool isBuffering() {
         vlc_mutex_locker locker(&lock);
-        return playerState == "BUFFERING";
+        return conn_status == CHROMECAST_DEAD || playerState == "BUFFERING";
     }
 
     bool seekTo(mtime_t pos);
@@ -199,6 +201,7 @@ struct intf_sys_t
 
     mtime_t     time_offset;
     mtime_t     time_start_play;
+    double      playback_time_ref;
     bool        canPause;
 
     int i_sock_fd;
@@ -207,10 +210,13 @@ struct intf_sys_t
 
     enum connection_status conn_status;
     enum player_status     play_status;
+    double                 f_seektime;
+    std::string            currentTime; /* position of seeking requested */
 
     vlc_interrupt_t *p_interrupt;
     vlc_mutex_t  lock;
     vlc_cond_t   loadCommandCond; /* TODO not needed anymore ? */
+    vlc_cond_t   seekCommandCond; /* TODO not needed anymore ? */
     vlc_thread_t chromecastThread;
 
 
@@ -224,6 +230,7 @@ struct intf_sys_t
     void msgReceiverLaunchApp();
     void msgReceiverClose();
     void msgReceiverGetStatus();
+    void msgPlayerGetStatus();
 
 private:
     int sendMessage(castchannel::CastMessage &msg);
@@ -243,11 +250,10 @@ private:
     std::queue<castchannel::CastMessage> messagesToSend;
 
     void msgPlayerLoad();
-    void msgPlayerGetStatus();
     void msgPlayerStop();
     void msgPlayerPlay();
     void msgPlayerPause();
-    void msgPlayerSeek(mtime_t i_pos);
+    void msgPlayerSeek(std::string & currentTime);
 };
 
 #define IP_TEXT N_("Chromecast IP address")
@@ -343,6 +349,7 @@ int Open(vlc_object_t *p_this)
 
     vlc_mutex_init(&p_sys->lock);
     vlc_cond_init(&p_sys->loadCommandCond);
+    vlc_cond_init(&p_sys->seekCommandCond);
 
     p_intf->p_sys = p_sys;
 
@@ -379,6 +386,7 @@ void Close(vlc_object_t *p_this)
     vlc_join(p_sys->chromecastThread, NULL);
 
     vlc_mutex_destroy(&p_sys->lock);
+    vlc_cond_destroy(&p_sys->seekCommandCond);
     vlc_cond_destroy(&p_sys->loadCommandCond);
 
     disconnectChromecast(p_intf);
@@ -448,6 +456,7 @@ void intf_sys_t::sendPlayerCmd()
             msgPlayerStop();
             mediaSessionId = "";
         }
+        playback_time_ref = -1.0;
         msgPlayerLoad();
         play_status = PLAYER_LOAD_SENT;
         break;
@@ -768,6 +777,10 @@ static int processMessage(intf_thread_t *p_intf, const castchannel::CastMessage 
         {
             msg_Dbg(p_intf, "PING received from the Chromecast");
             p_sys->msgPong();
+#if 0
+            if (!p_sys->appTransportId.empty())
+                p_sys->msgPlayerGetStatus();
+#endif
         }
         else if (type == "PONG")
         {
@@ -860,20 +873,43 @@ static int processMessage(intf_thread_t *p_intf, const castchannel::CastMessage 
 
             vlc_mutex_locker locker(&p_sys->lock);
             std::string mediaSessionId = std::to_string((json_int_t) status[0]["mediaSessionId"]);
-            assert(p_sys->mediaSessionId.empty() || p_sys->mediaSessionId == mediaSessionId);
+            if (!mediaSessionId.empty() && mediaSessionId != p_sys->mediaSessionId) {
+                msg_Warn(p_intf, "different mediaSessionId detected %s", mediaSessionId.c_str());
+            }
             p_sys->mediaSessionId = mediaSessionId;
+            p_sys->i_supportedMediaCommands = status[0]["supportedMediaCommands"].operator json_int_t();
 
             std::string playerState = p_sys->playerState;
             p_sys->playerState = status[0]["playerState"].operator const char *();
             if (p_sys->playerState != playerState)
             {
                 if (p_sys->playerState == "PLAYING")
+                {
+                    /* TODO reset demux PCR ? */
                     p_sys->time_start_play = mdate();
+                    p_sys->playback_time_ref = double( status[0]["currentTime"] );
+                    msg_Dbg(p_intf, "Playback starting with an offset of %f", p_sys->playback_time_ref);
+                }
                 else if (playerState == "PLAYING")
                 {
                     /* playing stopped for now */
                     p_sys->time_offset += mdate() - p_sys->time_start_play;
                     p_sys->time_start_play = 0;
+                    /* TODO after seeking we should reset the offset */
+                }
+            }
+            if (p_sys->playerState == "BUFFERING" && p_sys->f_seektime != -1.0)
+            {
+                if ( int64_t( 10.0 * p_sys->f_seektime ) ==
+                     int64_t( 10.0 * double( status[0]["currentTime"] ) ) )
+                {
+                    msg_Dbg(p_intf, "Chromecast ready to receive seeked data");
+                    p_sys->currentTime = "";
+                    vlc_cond_signal(&p_sys->seekCommandCond);
+                }
+                else
+                {
+                    msg_Dbg(p_intf, "Chromecast not ready to use seek data from %f got %f", p_sys->f_seektime, double( status[0]["currentTime"] ));
                 }
             }
             if (p_sys->play_status == PLAYER_LOAD_SENT)
@@ -1081,13 +1117,13 @@ void intf_sys_t::msgPlayerPause()
     pushMediaPlayerMessage( ss );
 }
 
-void intf_sys_t::msgPlayerSeek(mtime_t i_pos)
+void intf_sys_t::msgPlayerSeek(std::string & currentTime)
 {
     assert(!mediaSessionId.empty());
 
     std::stringstream ss;
     ss << "{\"type\":\"SEEK\","
-       <<  "\"currentTime\":" << double( i_pos ) / 1000000.0 << ","
+       <<  "\"currentTime\":" << currentTime << ","
         <<  "\"mediaSessionId\":" << mediaSessionId << ","
        <<  "\"requestId\":" << i_requestId++ << "}";
 
@@ -1317,7 +1353,7 @@ struct demux_sys_t
     bool seekTo(double pos) {
         if (i_length == -1)
             return false;
-        return seekTo( mtime_t( i_length * getPlaybackPosition() /* pos */ ) );
+        return seekTo( mtime_t( i_length * pos ) );
     }
 
     bool seekTo(mtime_t i_pos) {
@@ -1513,6 +1549,8 @@ struct sout_stream_sys_t
         vlc_object_release(p_intf);
     }
 
+    int sendBlock(sout_stream_id_sys_t *id, block_t *p_buffer);
+
 public:
     bool isFinishedPlaying() const {
         /* check if the Chromecast to be done playing */
@@ -1548,8 +1586,20 @@ static int Send(sout_stream_t *p_stream, sout_stream_id_sys_t *id,
                 block_t *p_buffer)
 {
     sout_stream_sys_t *p_sys = p_stream->p_sys;
+    return p_sys->sendBlock(id, p_buffer);
+}
 
-    return p_sys->p_out->pf_send(p_sys->p_out, id, p_buffer);
+int sout_stream_sys_t::sendBlock(sout_stream_id_sys_t *id,
+                                 block_t *p_buffer)
+{
+    /* TODO hold the data while seeking */
+    vlc_mutex_lock(&p_intf->p_sys->lock);
+    /* wait until the client is buffering for seeked data */
+    while (!p_intf->p_sys->currentTime.empty())
+        vlc_cond_wait(&p_intf->p_sys->seekCommandCond, &p_intf->p_sys->lock);
+    vlc_mutex_unlock(&p_intf->p_sys->lock);
+
+    return p_out->pf_send(p_out, id, p_buffer);
 }
 
 static int Control(sout_stream_t *p_stream, int i_query, va_list args)
@@ -1638,7 +1688,13 @@ bool intf_sys_t::seekTo(mtime_t pos)
     if (conn_status == CHROMECAST_DEAD)
         return false;
 
+    assert(playback_time_ref != -1.0);
     //msgPlayerStop();
-    msgPlayerSeek(pos);
-    return false;
+
+    f_seektime = /* playback_time_ref + */ ( double( pos ) / 1000000.0 );
+    currentTime = std::to_string( f_seektime );
+    msg_Dbg( p_intf, "Seeking to %s playback_time:%f", currentTime.c_str(), playback_time_ref);
+    msgPlayerSeek( currentTime );
+
+    return true;
 }
