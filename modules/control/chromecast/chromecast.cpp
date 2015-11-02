@@ -620,7 +620,7 @@ int intf_sys_t::sendMessages()
 // Use here only C linkage and POD types as this function is a cancelation point.
 extern "C" int recvPacket(intf_thread_t *p_intf, bool &b_msgReceived,
                           uint32_t &i_payloadSize, int i_sock_fd, vlc_tls_t *p_tls,
-                          unsigned *pi_received, char *p_data, bool *pb_pingTimeout,
+                          unsigned *pi_received, uint8_t *p_data, bool *pb_pingTimeout,
                           int *pi_wait_delay, int *pi_wait_retries)
 {
     struct pollfd ufd[1];
@@ -665,47 +665,31 @@ extern "C" int recvPacket(intf_thread_t *p_intf, bool &b_msgReceived,
      * +------------------------------------+------------------------------+
      * | Payload size (uint32_t big endian) |         Payload data         |
      * +------------------------------------+------------------------------+ */
-    if (*pi_received < PACKET_HEADER_LEN)
+    while (*pi_received < PACKET_HEADER_LEN)
     {
         // We receive the header.
-        i_ret = tls_Recv(p_tls, p_data, PACKET_HEADER_LEN - *pi_received);
+        i_ret = tls_Recv(p_tls, p_data + *pi_received, PACKET_HEADER_LEN - *pi_received);
         if (i_ret <= 0)
             return i_ret;
         *pi_received += i_ret;
     }
-    else
+
+    // We receive the payload.
+
+    // Get the size of the payload
+    i_payloadSize = U32_AT( p_data );
+    const uint32_t i_maxPayloadSize = PACKET_MAX_LEN - PACKET_HEADER_LEN;
+
+    if (i_payloadSize > i_maxPayloadSize)
     {
-        // We receive the payload.
+        // Error case: the packet sent by the Chromecast is too long: we drop it.
+        msg_Err(p_intf, "Packet too long: droping its data");
 
-        // Get the size of the payload
-        memcpy(&i_payloadSize, p_data, PACKET_HEADER_LEN);
-        i_payloadSize = hton32(i_payloadSize);
-        const uint32_t i_maxPayloadSize = PACKET_MAX_LEN - PACKET_HEADER_LEN;
+        uint32_t i_size = i_payloadSize - (*pi_received - PACKET_HEADER_LEN);
+        if (i_size > i_maxPayloadSize)
+            i_size = i_maxPayloadSize;
 
-        if (i_payloadSize > i_maxPayloadSize)
-        {
-            // Error case: the packet sent by the Chromecast is too long: we drop it.
-            msg_Err(p_intf, "Packet too long: droping its data");
-
-            uint32_t i_size = i_payloadSize - (*pi_received - PACKET_HEADER_LEN);
-            if (i_size > i_maxPayloadSize)
-                i_size = i_maxPayloadSize;
-
-            i_ret = tls_Recv(p_tls, p_data + PACKET_HEADER_LEN, i_size);
-            if (i_ret <= 0)
-                return i_ret;
-            *pi_received += i_ret;
-
-            if (*pi_received < i_payloadSize + PACKET_HEADER_LEN)
-                return i_ret;
-
-            *pi_received = 0;
-            return -1;
-        }
-
-        // Normal case
-        i_ret = tls_Recv(p_tls, p_data + *pi_received,
-                         i_payloadSize - (*pi_received - PACKET_HEADER_LEN));
+        i_ret = tls_Recv(p_tls, p_data + PACKET_HEADER_LEN, i_size);
         if (i_ret <= 0)
             return i_ret;
         *pi_received += i_ret;
@@ -713,12 +697,23 @@ extern "C" int recvPacket(intf_thread_t *p_intf, bool &b_msgReceived,
         if (*pi_received < i_payloadSize + PACKET_HEADER_LEN)
             return i_ret;
 
-        assert(*pi_received == i_payloadSize + PACKET_HEADER_LEN);
         *pi_received = 0;
-        b_msgReceived = true;
-        return i_ret;
+        return -1;
     }
 
+    // Normal case
+    i_ret = tls_Recv(p_tls, p_data + *pi_received,
+                     i_payloadSize - (*pi_received - PACKET_HEADER_LEN));
+    if (i_ret <= 0)
+        return i_ret;
+    *pi_received += i_ret;
+
+    if (*pi_received < i_payloadSize + PACKET_HEADER_LEN)
+        return i_ret;
+
+    assert(*pi_received == i_payloadSize + PACKET_HEADER_LEN);
+    *pi_received = 0;
+    b_msgReceived = true;
     return i_ret;
 }
 
@@ -1147,7 +1142,7 @@ static void* chromecastThread(void* p_this)
     intf_sys_t *p_sys = p_intf->p_sys;
 
     unsigned i_received = 0;
-    char p_packet[PACKET_MAX_LEN];
+    uint8_t p_packet[PACKET_MAX_LEN];
     bool b_pingTimeout = false;
 
     int i_waitdelay = PING_WAIT_TIME;
@@ -1215,6 +1210,7 @@ static void* chromecastThread(void* p_this)
     {
         bool b_msgReceived = false;
         uint32_t i_payloadSize = 0;
+        i_received = 0;
         int i_ret = recvPacket(p_intf, b_msgReceived, i_payloadSize, p_sys->i_sock_fd,
                                p_sys->p_tls, &i_received, p_packet, &b_pingTimeout,
                                &i_waitdelay, &i_retries);
