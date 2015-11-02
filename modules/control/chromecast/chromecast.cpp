@@ -568,7 +568,7 @@ int intf_sys_t::sendMessage(castchannel::CastMessage &msg)
     uint32_t i_size = msg.ByteSize();
     uint32_t i_sizeNetwork = hton32(i_size);
 
-    char *p_data = new(std::nothrow) char[PACKET_HEADER_LEN + i_size];
+    uint8_t *p_data = new(std::nothrow) uint8_t[PACKET_HEADER_LEN + i_size];
     if (p_data == NULL)
         return -1;
 
@@ -577,7 +577,7 @@ int intf_sys_t::sendMessage(castchannel::CastMessage &msg)
 #endif
 
     memcpy(p_data, &i_sizeNetwork, PACKET_HEADER_LEN);
-    msg.SerializeWithCachedSizesToArray((uint8_t *)(p_data + PACKET_HEADER_LEN));
+    msg.SerializeWithCachedSizesToArray(p_data + PACKET_HEADER_LEN);
 
     int i_ret = tls_Send(p_tls, p_data, PACKET_HEADER_LEN + i_size);
     delete[] p_data;
