@@ -457,7 +457,7 @@ static ssize_t Write( sout_access_out_t *p_access, block_t *p_buffer )
         }
 
         /* send data */
-        httpd_StreamBlockingSize( p_sys->p_httpd_stream, p_sys->i_buf_size );
+        /* TODO httpd_StreamBlockingSize( p_sys->p_httpd_stream, p_sys->i_buf_size ); */
         i_err = httpd_StreamSend( p_sys->p_httpd_stream, p_buffer );
 
         block_Release( p_buffer );
