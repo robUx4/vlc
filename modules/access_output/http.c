@@ -442,8 +442,6 @@ static ssize_t Write( sout_access_out_t *p_access, block_t *p_buffer )
             memcpy( hdr.sync, METACUBE2_SYNC, sizeof( METACUBE2_SYNC ) );
             hdr.size = hton32( p_buffer->i_buffer );
             hdr.flags = hton16( 0 );
-            if( p_buffer->i_flags & BLOCK_FLAG_HEADER )
-                hdr.flags |= hton16( METACUBE_FLAGS_HEADER );
             if( p_sys->b_has_keyframes && !( p_buffer->i_flags & BLOCK_FLAG_TYPE_I ) )
                 hdr.flags |= hton16( METACUBE_FLAGS_NOT_SUITABLE_FOR_STREAM_START );
             hdr.csum = hton16( metacube2_compute_crc( &hdr ) );
