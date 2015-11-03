@@ -218,7 +218,7 @@ struct intf_sys_t
     vlc_interrupt_t *p_interrupt;
     vlc_mutex_t  lock;
     vlc_cond_t   loadCommandCond; /* TODO not needed anymore ? */
-    vlc_cond_t   seekCommandCond; /* TODO not needed anymore ? */
+    vlc_cond_t   seekCommandCond;
     vlc_thread_t chromecastThread;
 
 
@@ -493,6 +493,23 @@ void intf_sys_t::sendPlayerCmd()
         //msgClose();
         break;
     }
+}
+
+bool intf_sys_t::seekTo(mtime_t pos)
+{
+    vlc_mutex_locker locker(&lock);
+    if (conn_status == CHROMECAST_DEAD)
+        return false;
+
+    assert(playback_time_ref != -1.0);
+    //msgPlayerStop();
+
+    f_seektime = /* playback_time_ref + */ ( double( pos ) / 1000000.0 );
+    currentTime = std::to_string( f_seektime );
+    msg_Dbg( p_intf, "Seeking to %s playback_time:%f", currentTime.c_str(), playback_time_ref);
+    msgPlayerSeek( currentTime );
+
+    return true;
 }
 
 static int InputEvent( vlc_object_t *p_this, char const *psz_var,
@@ -907,7 +924,7 @@ static int processMessage(intf_thread_t *p_intf, const castchannel::CastMessage 
                 {
                     msg_Dbg(p_intf, "Chromecast ready to receive seeked data");
                     p_sys->currentTime = "";
-                    vlc_cond_signal(&p_sys->seekCommandCond);
+                    vlc_cond_broadcast( &p_sys->seekCommandCond );
                 }
                 else
                 {
@@ -1368,16 +1385,50 @@ struct demux_sys_t
         this->i_length = length;
     }
 
+    int Demux() {
+        /* TODO hold the data while seeking */
+        vlc_mutex_lock(&p_demux->p_sys->p_intf->p_sys->lock);
+        /* wait until the client is buffering for seeked data */
+        if (p_demux->p_sys->p_intf->p_sys->f_seektime != -1.0)
+        {
+            msg_Dbg(p_demux, "waiting for Chromecast seek");
+            vlc_cond_wait(&p_demux->p_sys->p_intf->p_sys->seekCommandCond, &p_intf->p_sys->lock);
+            msg_Dbg(p_demux, "finished waiting for Chromecast seek");
+
+            int i_ret = source_Control( DEMUX_SET_TIME, mtime_t( p_demux->p_sys->p_intf->p_sys->f_seektime * 1000000.0 ) );
+            p_demux->p_sys->p_intf->p_sys->f_seektime = -1.0;
+            vlc_mutex_unlock(&p_demux->p_sys->p_intf->p_sys->lock);
+            if (i_ret != VLC_SUCCESS)
+                return 0;
+            return 1;
+        }
+        vlc_mutex_unlock(&p_demux->p_sys->p_intf->p_sys->lock);
+
+        return p_demux->p_source->pf_demux( p_demux->p_source );
+    }
+
 protected:
     demux_t       *p_demux;
     intf_thread_t *p_intf;
     mtime_t       i_length;
     bool          canSeek;
+
+private:
+    int source_Control(int cmd, ...)
+    {
+        va_list ap;
+        int ret;
+
+        va_start(ap, cmd);
+        ret = p_demux->p_source->pf_control(p_demux->p_source, cmd, ap);
+        va_end(ap);
+        return ret;
+    }
 };
 
 static int DemuxDemux( demux_t *p_demux )
 {
-    return p_demux->p_source->pf_demux( p_demux->p_source );
+    return p_demux->p_sys->Demux();
 }
 
 static int DemuxControl( demux_t *p_demux, int i_query, va_list args)
@@ -1594,11 +1645,15 @@ static int Send(sout_stream_t *p_stream, sout_stream_id_sys_t *id,
 int sout_stream_sys_t::sendBlock(sout_stream_id_sys_t *id,
                                  block_t *p_buffer)
 {
-    /* TODO hold the data while seeking */
+    /* hold the data while seeking */
     vlc_mutex_lock(&p_intf->p_sys->lock);
     /* wait until the client is buffering for seeked data */
-    while (!p_intf->p_sys->currentTime.empty())
+    if (p_intf->p_sys->f_seektime != -1.0)
+    {
+        msg_Dbg(p_stream, "waiting for Chromecast seek");
         vlc_cond_wait(&p_intf->p_sys->seekCommandCond, &p_intf->p_sys->lock);
+        msg_Dbg(p_stream, "finished waiting for Chromecast seek");
+    }
     vlc_mutex_unlock(&p_intf->p_sys->lock);
 
     return p_out->pf_send(p_out, id, p_buffer);
@@ -1682,21 +1737,4 @@ void SoutClose(vlc_object_t *p_this)
 {
     sout_stream_t *p_sout = reinterpret_cast<sout_stream_t*>(p_this);
     delete p_sout->p_sys;
-}
-
-bool intf_sys_t::seekTo(mtime_t pos)
-{
-    vlc_mutex_locker locker(&lock);
-    if (conn_status == CHROMECAST_DEAD)
-        return false;
-
-    assert(playback_time_ref != -1.0);
-    //msgPlayerStop();
-
-    f_seektime = /* playback_time_ref + */ ( double( pos ) / 1000000.0 );
-    currentTime = std::to_string( f_seektime );
-    msg_Dbg( p_intf, "Seeking to %s playback_time:%f", currentTime.c_str(), playback_time_ref);
-    msgPlayerSeek( currentTime );
-
-    return true;
 }
