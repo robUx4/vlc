@@ -413,6 +413,7 @@ static ssize_t Write( sout_access_out_t *p_access, block_t *p_buffer )
             }
             else
             {
+                msg_Dbg( p_access, "set HTTPd stream header size:%d", p_sys->i_header_size );
                 httpd_StreamHeader( p_sys->p_httpd_stream, p_sys->p_header,
                                     p_sys->i_header_size );
             }
