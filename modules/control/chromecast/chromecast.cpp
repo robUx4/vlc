@@ -1391,6 +1391,7 @@ struct demux_sys_t
         :p_demux(demux)
         ,p_intf(intf)
         ,i_length(-1)
+        ,demuxReady(false)
         ,canSeek(false)
     {
         assert(p_intf != NULL);
@@ -1435,26 +1436,51 @@ struct demux_sys_t
     }
 
     int Demux() {
-        if (p_demux->p_sys->p_intf->p_sys->isHeaderDone())
-        {
-            /* hold the data while seeking */
-            vlc_mutex_lock(&p_demux->p_sys->p_intf->p_sys->lock);
-            /* wait until the client is buffering for seeked data */
-            if (p_demux->p_sys->p_intf->p_sys->f_seektime != -1.0)
-            {
-                msg_Dbg(p_demux, "waiting for Chromecast seek");
-                vlc_cond_wait(&p_demux->p_sys->p_intf->p_sys->seekCommandCond, &p_intf->p_sys->lock);
-                msg_Dbg(p_demux, "finished waiting for Chromecast seek");
+        if (!p_intf->p_sys->isHeaderDone())
+            return p_demux->p_source->pf_demux( p_demux->p_source );
 
-                int i_ret = source_Control( DEMUX_SET_TIME, mtime_t( p_demux->p_sys->p_intf->p_sys->f_seektime * 1000000.0 ) );
-                p_demux->p_sys->p_intf->p_sys->f_seektime = -1.0;
-                vlc_mutex_unlock(&p_demux->p_sys->p_intf->p_sys->lock);
-                if (i_ret != VLC_SUCCESS)
-                    return 0;
-                return 1;
-            }
-            vlc_mutex_unlock(&p_demux->p_sys->p_intf->p_sys->lock);
+        vlc_mutex_lock(&p_intf->p_sys->lock);
+        if (!demuxReady)
+        {
+            mutex_cleanup_push(&p_intf->p_sys->lock);
+
+            while (p_intf->p_sys->conn_status != CHROMECAST_APP_STARTED &&
+                   p_intf->p_sys->conn_status != CHROMECAST_DEAD)
+                vlc_cond_wait(&p_intf->p_sys->loadCommandCond, &p_intf->p_sys->lock);
+
+            vlc_cleanup_pop();
+
+            demuxReady = true;
         }
+
+        if (p_intf->p_sys->conn_status != CHROMECAST_APP_STARTED) {
+            vlc_mutex_unlock(&p_intf->p_sys->lock);
+            return 0;
+        }
+
+        /* hold the data while seeking */
+        /* wait until the client is buffering for seeked data */
+        if (p_intf->p_sys->f_seektime != -1.0)
+        {
+            msg_Dbg(p_demux, "waiting for Chromecast seek");
+            vlc_cond_wait(&p_intf->p_sys->seekCommandCond, &p_intf->p_sys->lock);
+            msg_Dbg(p_demux, "finished waiting for Chromecast seek");
+
+            if (p_intf->p_sys->conn_status != CHROMECAST_APP_STARTED) {
+                vlc_mutex_unlock(&p_intf->p_sys->lock);
+                return 0;
+            }
+
+            mtime_t i_seek_time = mtime_t( p_intf->p_sys->f_seektime * 1000000.0 );
+            p_intf->p_sys->f_seektime = -1.0;
+            vlc_mutex_unlock(&p_intf->p_sys->lock);
+
+            int i_ret = source_Control( DEMUX_SET_TIME, i_seek_time );
+            if (i_ret != VLC_SUCCESS)
+                return 0;
+            return 1;
+        }
+        vlc_mutex_unlock(&p_intf->p_sys->lock);
 
         return p_demux->p_source->pf_demux( p_demux->p_source );
     }
@@ -1463,6 +1489,7 @@ protected:
     demux_t       *p_demux;
     intf_thread_t *p_intf;
     mtime_t       i_length;
+    bool          demuxReady;
     bool          canSeek;
 
 private:
