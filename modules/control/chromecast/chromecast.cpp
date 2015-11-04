@@ -234,7 +234,6 @@ struct intf_sys_t
     vlc_cond_t   seekCommandCond;
     vlc_thread_t chromecastThread;
 
-    int sendMessages();
 
     void msgAuth();
     void msgPing();
@@ -261,7 +260,6 @@ private:
 
     unsigned i_app_requestId;
     unsigned i_requestId;
-    std::queue<castchannel::CastMessage> messagesToSend;
 
     std::atomic<bool> b_header_done;
 
@@ -654,28 +652,6 @@ int intf_sys_t::sendMessage(castchannel::CastMessage &msg)
 }
 
 
-/**
- * @brief Send all the messages in the pending queue to the Chromecast
- * @param msg the CastMessage to send
- * @return the number of bytes sent or -1 on error
- */
-int intf_sys_t::sendMessages()
-{
-    int i_ret = 0;
-    while (!messagesToSend.empty())
-    {
-        unsigned i_retSend = sendMessage(messagesToSend.front());
-        if (i_retSend <= 0)
-            return i_retSend;
-
-        messagesToSend.pop();
-        i_ret += i_retSend;
-    }
-
-    return i_ret;
-}
-
-
 
 
 /**
@@ -874,9 +850,9 @@ static int processMessage(intf_thread_t *p_intf, const castchannel::CastMessage 
                 else if (!appId.empty())
                 {
                     /* the app running is not compatible with VLC, launch the compatible one */
-                    msg_Dbg(p_intf, "Chromecast was running app:%s", appId.c_str());
-                    p_sys->appTransportId = "";
-                    p_sys->msgReceiverLaunchApp();
+                    //msg_Dbg(p_intf, "Chromecast was running app:%s, launch media_app", appId.c_str());
+                    //p_sys->appTransportId = "";
+                    //p_sys->msgReceiverLaunchApp();
                 }
             }
 
@@ -905,7 +881,14 @@ static int processMessage(intf_thread_t *p_intf, const castchannel::CastMessage 
                     msg_Warn(p_intf, "app is no longer present. closing");
                     p_sys->msgReceiverClose();
                     vlc_cond_signal(&p_sys->loadCommandCond);
-                    // ft
+                    break;
+
+                case CHROMECAST_AUTHENTICATED:
+                    msg_Dbg(p_intf, "Chromecast was running no app, launch media_app");
+                    p_sys->appTransportId = "";
+                    p_sys->msgReceiverLaunchApp();
+                    break;
+
                 default:
                     break;
                 }
@@ -1049,7 +1032,8 @@ void intf_sys_t::pushMessage(const std::string & namespace_,
     else // CastMessage_PayloadType_BINARY
         msg.set_payload_binary(payload);
 
-    messagesToSend.push(msg);
+    vlc_mutex_locker locker(&lock);
+    sendMessage(msg);
 }
 
 void intf_sys_t::setHeaderDone()
@@ -1133,7 +1117,6 @@ void intf_sys_t::msgPlayerGetStatus()
 
 void intf_sys_t::msgPlayerLoad()
 {
-    intf_sys_t *p_sys = p_intf->p_sys;
 
     /* TODO: extract the metadata from p_sys->p_input */
 
@@ -1328,7 +1311,6 @@ static void* chromecastThread(void* p_this)
     p_sys->conn_status = CHROMECAST_TLS_CONNECTED;
 
     p_sys->msgAuth();
-    p_sys->sendMessages();
     vlc_restorecancel(canc);
 
     while (1)
@@ -1366,20 +1348,6 @@ static void* chromecastThread(void* p_this)
             castchannel::CastMessage msg;
             msg.ParseFromArray(p_packet + PACKET_HEADER_LEN, i_payloadSize);
             processMessage(p_intf, msg);
-        }
-
-        // Send the answer messages if there is any.
-        i_ret = p_sys->sendMessages();
-#if defined(_WIN32)
-        if ((i_ret < 0 && WSAGetLastError() != WSAEWOULDBLOCK))
-#else
-        if ((i_ret < 0 && errno != EAGAIN))
-#endif
-        {
-            msg_Err(p_intf, "The connection to the Chromecast died (sending).");
-            vlc_mutex_locker locker(&p_sys->lock);
-            p_sys->conn_status = CHROMECAST_DEAD;
-            vlc_cond_signal(&p_sys->loadCommandCond);
         }
 
         if ( p_sys->conn_status == CHROMECAST_DEAD )
@@ -1442,9 +1410,6 @@ struct demux_sys_t
     }
 
     int Demux() {
-        if (!p_intf->p_sys->isHeaderDone())
-            return p_demux->p_source->pf_demux( p_demux->p_source );
-
         vlc_mutex_lock(&p_intf->p_sys->lock);
         if (!demuxReady)
         {
@@ -1457,11 +1422,17 @@ struct demux_sys_t
             vlc_cleanup_pop();
 
             demuxReady = true;
+            msg_Dbg(p_demux, "ready to demux");
         }
 
         if (p_intf->p_sys->conn_status != CHROMECAST_APP_STARTED) {
             vlc_mutex_unlock(&p_intf->p_sys->lock);
             return 0;
+        }
+
+        if (!p_intf->p_sys->isHeaderDone()) {
+            vlc_mutex_unlock(&p_intf->p_sys->lock);
+            return p_demux->p_source->pf_demux( p_demux->p_source );
         }
 
         /* hold the data while seeking */
