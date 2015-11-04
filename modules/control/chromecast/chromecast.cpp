@@ -155,6 +155,8 @@ struct intf_sys_t
 
     ~intf_sys_t()
     {
+        disconnectChromecast(p_intf);
+
 #ifdef HAVE_MICRODNS
         mdns_cleanup(microdns_ctx);
 #endif
@@ -422,8 +424,6 @@ void Close(vlc_object_t *p_this)
     vlc_mutex_destroy(&p_sys->lock);
     vlc_cond_destroy(&p_sys->seekCommandCond);
     vlc_cond_destroy(&p_sys->loadCommandCond);
-
-    disconnectChromecast(p_intf);
 
     delete p_sys;
 }
