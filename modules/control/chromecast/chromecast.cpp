@@ -1004,6 +1004,7 @@ static int processMessage(intf_thread_t *p_intf, const castchannel::CastMessage 
             vlc_mutex_locker locker(&p_sys->lock);
             p_sys->conn_status = CHROMECAST_DEAD;
             vlc_cond_signal(&p_sys->loadCommandCond);
+            vlc_cond_signal(&p_sys->seekCommandCond);
         }
         else
         {
@@ -1703,7 +1704,7 @@ int sout_stream_sys_t::sendBlock(sout_stream_id_sys_t *id,
         if ( !( p_buffer->i_flags & BLOCK_FLAG_HEADER ) ) {
             msg_Warn(p_stream, "starting to send non header data, discard");
 #if 0
-            return 1;
+            return VLC_SUCCESS;
 #else
             return p_out->pf_send(p_out, id, p_buffer);
 #endif
@@ -1722,7 +1723,6 @@ int sout_stream_sys_t::sendBlock(sout_stream_id_sys_t *id,
         p_intf->p_sys->setHeaderDone();
         /* TODO: wait until the Chromecast is ready to receive the data */
     }
-
 
 #if 0
     /* hold the data while seeking */
@@ -1827,6 +1827,8 @@ struct sout_access_out_sys_t
         ,p_access(p_access)
         ,p_intf(intf)
         ,b_header_started(false)
+
+        ,i_header_size(0)
     {
         assert(p_access != NULL);
         assert(p_intf != NULL);
@@ -1850,6 +1852,8 @@ protected:
     intf_thread_t     * const p_intf;
 
     bool                      b_header_started;
+
+    int i_header_size;
 };
 
 static int AccessOutControl( sout_access_out_t *p_this, int i_query, va_list args )
@@ -1935,30 +1939,35 @@ int sout_access_out_sys_t::Seek( off_t i_pos )
 
 ssize_t sout_access_out_sys_t::Write( block_t *p_buffer )
 {
-    if (!b_header_started)
+    while ( p_buffer != NULL)
     {
-        if ( !( p_buffer->i_flags & BLOCK_FLAG_HEADER ) ) {
-            msg_Warn(p_this, "starting to send non header data, discard");
-#if 1
-            return 1;
-#else
-            return p_out->pf_send(p_out, id, p_buffer);
-#endif
-        }
+        if (!b_header_started)
+        {
+            if ( !( p_buffer->i_flags & BLOCK_FLAG_HEADER ) ) {
+                msg_Warn(p_this, "starting to send non header data, discard");
+                block_t *p_next = p_buffer->p_next;
+                block_Release( p_next );
+                p_buffer = p_next;
+                continue;
+            }
 
-        b_header_started = true;
-        return p_access->pf_write( p_access, p_buffer );
-    }
-
-    if (!p_intf->p_sys->isHeaderDone())
-    {
-        if ( p_buffer->i_flags & BLOCK_FLAG_HEADER ) {
+            i_header_size += p_buffer->i_buffer;
+            b_header_started = true;
             return p_access->pf_write( p_access, p_buffer );
         }
 
-        p_intf->p_sys->setHeaderDone();
-        /* TODO: wait until the Chromecast is ready to receive the data */
-    }
+        if (!p_intf->p_sys->isHeaderDone())
+        {
+            if ( p_buffer->i_flags & BLOCK_FLAG_HEADER ) {
+                i_header_size += p_buffer->i_buffer;
+                return p_access->pf_write( p_access, p_buffer );
+            }
 
-    return p_access->pf_write( p_access, p_buffer );
+            p_intf->p_sys->setHeaderDone();
+            /* TODO: wait until the Chromecast is ready to receive the data */
+        }
+
+        return p_access->pf_write( p_access, p_buffer );
+    }
+    return VLC_SUCCESS;
 }
