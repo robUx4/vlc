@@ -45,6 +45,7 @@
 #include <vlc_demux.h>
 #include <vlc_sout.h>
 
+#include <atomic>
 #include <cassert>
 #include <sstream>
 #include <queue>
@@ -67,6 +68,8 @@ static int DemuxOpen(vlc_object_t *);
 static void DemuxClose(vlc_object_t *);
 static int SoutOpen(vlc_object_t *);
 static void SoutClose(vlc_object_t *);
+static int SoutAccessOpen(vlc_object_t *);
+static void SoutAccessClose(vlc_object_t *);
 static int PlaylistEvent( vlc_object_t *, char const *,
                           vlc_value_t, vlc_value_t, void * );
 static int InputEvent( vlc_object_t *, char const *,
@@ -109,6 +112,7 @@ static const std::string DEFAULT_CHOMECAST_RECEIVER = "receiver-0";
 /* deadline regarding pong we expect after pinging the receiver */
 #define PONG_WAIT_TIME 500
 #define PONG_WAIT_RETRIES 2
+
 #define TIMEOUT_LOAD_CMD  (6 * CLOCK_FREQ)
 #define TIMEOUT_MDNS_IP   (4 * CLOCK_FREQ)
 
@@ -144,6 +148,7 @@ struct intf_sys_t
         ,f_seektime(-1.0)
         ,i_app_requestId(0)
         ,i_requestId(0)
+        ,b_header_done(false)
     {
         p_interrupt = vlc_interrupt_create();
     }
@@ -184,12 +189,19 @@ struct intf_sys_t
 
     void sendPlayerCmd();
 
+    bool isHeaderDone() const {
+        return b_header_done;
+    }
+
+    void setHeaderDone();
+
     intf_thread_t  * const p_intf;
     input_thread_t *p_input;
     uint16_t       devicePort;
     std::string    deviceIP;
     std::string    serverIP;
     std::string    mime;
+    std::string    muxer;
 #ifdef HAVE_MICRODNS
     struct mdns_ctx *microdns_ctx;
     mtime_t         i_timeout;
@@ -220,7 +232,6 @@ struct intf_sys_t
     vlc_cond_t   seekCommandCond;
     vlc_thread_t chromecastThread;
 
-
     int sendMessages();
 
     void msgAuth();
@@ -249,6 +260,8 @@ private:
     unsigned i_app_requestId;
     unsigned i_requestId;
     std::queue<castchannel::CastMessage> messagesToSend;
+
+    std::atomic<bool> b_header_done;
 
     void msgPlayerLoad();
     void msgPlayerStop();
@@ -282,6 +295,7 @@ vlc_module_begin ()
 #endif
     add_integer(CONTROL_CFG_PREFIX "http-port", HTTP_PORT, HTTP_PORT_TEXT, HTTP_PORT_LONGTEXT, false)
     add_string(CONTROL_CFG_PREFIX "mime", "video/x-matroska", MIME_TEXT, MIME_LONGTEXT, false)
+    add_string(CONTROL_CFG_PREFIX "muxer", "avformat{mux=matroska}", MUXER_TEXT, MUXER_LONGTEXT, false)
     set_callbacks( Open, Close )
 
     add_submodule()
@@ -304,6 +318,16 @@ vlc_module_begin ()
         add_integer(SOUT_CFG_PREFIX "http-port", HTTP_PORT, HTTP_PORT_TEXT, HTTP_PORT_LONGTEXT, false)
         add_string(SOUT_CFG_PREFIX "mime", "video/x-matroska", MIME_TEXT, MIME_LONGTEXT, false)
         add_string(SOUT_CFG_PREFIX "mux", "avformat{mux=matroska}", MUXER_TEXT, MUXER_LONGTEXT, false)
+
+    add_submodule()
+        set_shortname( "cc_access" )
+        set_category( CAT_SOUT )
+        set_subcategory( SUBCAT_SOUT_ACO )
+        set_description( N_( "chromecast sout access filter" ) )
+        set_capability("sout access", 0)
+        add_shortcut("cc_access")
+        set_callbacks( SoutAccessOpen, SoutAccessClose )
+        add_string(SOUT_CFG_PREFIX "mime", "video/x-matroska", MIME_TEXT, MIME_LONGTEXT, false)
 
 vlc_module_end ()
 
@@ -346,6 +370,15 @@ int Open(vlc_object_t *p_this)
         goto error;
     }
     p_sys->mime = psz_mime; /* TODO get the MIME type from the playlist/input ? */
+    free(psz_mime);
+
+    psz_mime = var_InheritString(p_intf, CONTROL_CFG_PREFIX "muxer");
+    if (psz_mime == NULL)
+    {
+        msg_Err(p_intf, "Bad muxer provided");
+        goto error;
+    }
+    p_sys->muxer = psz_mime; /* TODO get the MIME type from the playlist/input ? */
     free(psz_mime);
 
     vlc_mutex_init(&p_sys->lock);
@@ -429,9 +462,9 @@ static int PlaylistEvent( vlc_object_t *p_this, char const *psz_var,
         var_SetAddress( p_input->p_parent, SOUT_INTF_ADDRESS, p_intf );
 
         std::stringstream ss;
-        ss << "#cc_sout{http-port=" << var_InheritInteger(p_intf, CONTROL_CFG_PREFIX "http-port")
-           << ",mux=avformat{mux=matroska}"
-           << ",mime=" << p_sys->mime << "}";
+        ss << "#standard{dst=:" << var_InheritInteger(p_intf, CONTROL_CFG_PREFIX "http-port") << "/stream"
+           << ",mux=" << p_intf->p_sys->muxer
+           << ",access=cc_access{mime=" << p_intf->p_sys->mime << "}}";
         var_SetString( p_input, "sout", ss.str().c_str() );
 
         var_SetString( p_input, "demux-filter", "cc_demux" );
@@ -1018,6 +1051,12 @@ void intf_sys_t::pushMessage(const std::string & namespace_,
     messagesToSend.push(msg);
 }
 
+void intf_sys_t::setHeaderDone()
+{
+    b_header_done = true;
+    msgPlayerGetStatus();
+}
+
 /*****************************************************************************
  * Message preparation
  *****************************************************************************/
@@ -1395,23 +1434,26 @@ struct demux_sys_t
     }
 
     int Demux() {
-        /* TODO hold the data while seeking */
-        vlc_mutex_lock(&p_demux->p_sys->p_intf->p_sys->lock);
-        /* wait until the client is buffering for seeked data */
-        if (p_demux->p_sys->p_intf->p_sys->f_seektime != -1.0)
+        if (p_demux->p_sys->p_intf->p_sys->isHeaderDone())
         {
-            msg_Dbg(p_demux, "waiting for Chromecast seek");
-            vlc_cond_wait(&p_demux->p_sys->p_intf->p_sys->seekCommandCond, &p_intf->p_sys->lock);
-            msg_Dbg(p_demux, "finished waiting for Chromecast seek");
+            /* hold the data while seeking */
+            vlc_mutex_lock(&p_demux->p_sys->p_intf->p_sys->lock);
+            /* wait until the client is buffering for seeked data */
+            if (p_demux->p_sys->p_intf->p_sys->f_seektime != -1.0)
+            {
+                msg_Dbg(p_demux, "waiting for Chromecast seek");
+                vlc_cond_wait(&p_demux->p_sys->p_intf->p_sys->seekCommandCond, &p_intf->p_sys->lock);
+                msg_Dbg(p_demux, "finished waiting for Chromecast seek");
 
-            int i_ret = source_Control( DEMUX_SET_TIME, mtime_t( p_demux->p_sys->p_intf->p_sys->f_seektime * 1000000.0 ) );
-            p_demux->p_sys->p_intf->p_sys->f_seektime = -1.0;
+                int i_ret = source_Control( DEMUX_SET_TIME, mtime_t( p_demux->p_sys->p_intf->p_sys->f_seektime * 1000000.0 ) );
+                p_demux->p_sys->p_intf->p_sys->f_seektime = -1.0;
+                vlc_mutex_unlock(&p_demux->p_sys->p_intf->p_sys->lock);
+                if (i_ret != VLC_SUCCESS)
+                    return 0;
+                return 1;
+            }
             vlc_mutex_unlock(&p_demux->p_sys->p_intf->p_sys->lock);
-            if (i_ret != VLC_SUCCESS)
-                return 0;
-            return 1;
         }
-        vlc_mutex_unlock(&p_demux->p_sys->p_intf->p_sys->lock);
 
         return p_demux->p_source->pf_demux( p_demux->p_source );
     }
@@ -1600,6 +1642,7 @@ struct sout_stream_sys_t
         :p_out(sout)
         ,p_intf(intf)
         ,p_stream(stream)
+        ,b_header_started(false)
     {
         assert(p_intf != NULL);
         vlc_object_hold(p_intf);
@@ -1624,6 +1667,7 @@ public:
 protected:
     intf_thread_t * const p_intf;
     sout_stream_t * const p_stream;
+    bool                  b_header_started;
 };
 
 /*****************************************************************************
@@ -1654,6 +1698,32 @@ static int Send(sout_stream_t *p_stream, sout_stream_id_sys_t *id,
 int sout_stream_sys_t::sendBlock(sout_stream_id_sys_t *id,
                                  block_t *p_buffer)
 {
+    if (!b_header_started)
+    {
+        if ( !( p_buffer->i_flags & BLOCK_FLAG_HEADER ) ) {
+            msg_Warn(p_stream, "starting to send non header data, discard");
+#if 0
+            return 1;
+#else
+            return p_out->pf_send(p_out, id, p_buffer);
+#endif
+        }
+
+        b_header_started = true;
+        return p_out->pf_send(p_out, id, p_buffer);
+    }
+
+    if (!p_intf->p_sys->isHeaderDone())
+    {
+        if ( p_buffer->i_flags & BLOCK_FLAG_HEADER ) {
+            return p_out->pf_send(p_out, id, p_buffer);
+        }
+
+        p_intf->p_sys->setHeaderDone();
+        /* TODO: wait until the Chromecast is ready to receive the data */
+    }
+
+
 #if 0
     /* hold the data while seeking */
     vlc_mutex_lock(&p_intf->p_sys->lock);
@@ -1747,4 +1817,148 @@ void SoutClose(vlc_object_t *p_this)
 {
     sout_stream_t *p_sout = reinterpret_cast<sout_stream_t*>(p_this);
     delete p_sout->p_sys;
+}
+
+
+struct sout_access_out_sys_t
+{
+    sout_access_out_sys_t(sout_access_out_t *p_this, intf_thread_t *intf, sout_access_out_t *p_access)
+        :p_this(p_this)
+        ,p_access(p_access)
+        ,p_intf(intf)
+        ,b_header_started(false)
+    {
+        assert(p_access != NULL);
+        assert(p_intf != NULL);
+        vlc_object_hold(p_intf);
+    }
+
+    ~sout_access_out_sys_t()
+    {
+        sout_AccessOutDelete(p_access);
+        vlc_object_release(p_intf);
+    }
+
+public:
+    int Control( int i_query, va_list args );
+    int Seek( off_t i_pos );
+    ssize_t Write( block_t *p_buffer );
+
+protected:
+    sout_access_out_t * const p_this;
+    sout_access_out_t * const p_access;
+    intf_thread_t     * const p_intf;
+
+    bool                      b_header_started;
+};
+
+static int AccessOutControl( sout_access_out_t *p_this, int i_query, va_list args )
+{
+    return p_this->p_sys->Control( i_query, args );
+}
+
+static int AccessOutSeek( sout_access_out_t *p_this, off_t i_pos )
+{
+    return p_this->p_sys->Seek( i_pos );
+}
+
+#if 0
+ssize_t AccessOutRead( sout_access_out_t *p_this, block_t *p_buffer )
+{
+    return p_this->p_sys->Read( p_buffer );
+}
+#endif
+
+ssize_t AccessOutWrite( sout_access_out_t *p_this, block_t *p_buffer )
+{
+    return p_this->p_sys->Write( p_buffer );
+}
+
+int SoutAccessOpen(vlc_object_t *p_this)
+{
+    sout_access_out_t *p_access = reinterpret_cast<sout_access_out_t*>(p_this);
+    sout_access_out_sys_t *p_sys = NULL;
+    intf_thread_t *p_intf = NULL;
+    sout_access_out_t *p_saout;
+
+    p_intf = static_cast<intf_thread_t*>(var_InheritAddress(p_access, SOUT_INTF_ADDRESS));
+    if (p_intf == NULL) {
+        msg_Err(p_access, "Missing the control interface to work");
+        goto error;
+    }
+
+    /* TODO pass the host & port parameters */
+#if 0
+    p_saout = sout_AccessOutNew(p_this, "http", p_access_out->psz_path);
+#else
+    p_saout = sout_AccessOutNew(p_this, "simplehttpd", p_access->psz_path);
+#endif
+    if (p_saout == NULL) {
+        msg_Dbg(p_access, "could not create http output");
+        goto error;
+    }
+
+    p_sys = new(std::nothrow) sout_access_out_sys_t(p_access, p_intf, p_saout);
+    if (unlikely(p_sys == NULL))
+        return VLC_ENOMEM;
+
+    p_access->p_sys = p_sys;
+    p_access->pf_seek = AccessOutSeek;
+    //p_access_out->pf_read = AccessOutRead;
+    p_access->pf_write = AccessOutWrite;
+    p_access->pf_control = AccessOutControl;
+
+    return VLC_SUCCESS;
+
+error:
+    if (p_saout)
+        sout_AccessOutDelete(p_saout);
+    delete p_sys;
+    return VLC_EGENERIC;
+}
+
+void SoutAccessClose(vlc_object_t *p_this)
+{
+    sout_access_out_t *p_access_out = reinterpret_cast<sout_access_out_t*>(p_this);
+    delete p_access_out->p_sys;
+}
+
+int sout_access_out_sys_t::Control( int i_query, va_list args )
+{
+    return p_access->pf_control( p_access, i_query, args );
+}
+
+int sout_access_out_sys_t::Seek( off_t i_pos )
+{
+    return p_access->pf_seek( p_access, i_pos );
+}
+
+ssize_t sout_access_out_sys_t::Write( block_t *p_buffer )
+{
+    if (!b_header_started)
+    {
+        if ( !( p_buffer->i_flags & BLOCK_FLAG_HEADER ) ) {
+            msg_Warn(p_this, "starting to send non header data, discard");
+#if 1
+            return 1;
+#else
+            return p_out->pf_send(p_out, id, p_buffer);
+#endif
+        }
+
+        b_header_started = true;
+        return p_access->pf_write( p_access, p_buffer );
+    }
+
+    if (!p_intf->p_sys->isHeaderDone())
+    {
+        if ( p_buffer->i_flags & BLOCK_FLAG_HEADER ) {
+            return p_access->pf_write( p_access, p_buffer );
+        }
+
+        p_intf->p_sys->setHeaderDone();
+        /* TODO: wait until the Chromecast is ready to receive the data */
+    }
+
+    return p_access->pf_write( p_access, p_buffer );
 }
