@@ -1808,9 +1808,9 @@ int SoutOpen(vlc_object_t *p_this)
     if (psz_var_mime == NULL || !psz_var_mime[0])
         goto error;
 
-    ss << "standard{dst=:" << var_InheritInteger(p_stream, SOUT_CFG_PREFIX "http-port") << "/stream"
+    ss << "http{dst=:" << var_InheritInteger(p_stream, SOUT_CFG_PREFIX "http-port") << "/stream"
        << ",mux=" << psz_var_mux
-       << ",access=simplehttpd{mime=" << psz_var_mime << "}}";
+       << ",access=http{mime=" << psz_var_mime << "}}";
 
     p_sout = sout_StreamChainNew( p_stream->p_sout, ss.str().c_str(), NULL, NULL);
     if (p_sout == NULL) {
@@ -1919,8 +1919,8 @@ int SoutAccessOpen(vlc_object_t *p_this)
     }
 
     /* TODO pass the host & port parameters */
-#if 0
-    p_saout = sout_AccessOutNew(p_this, "http", p_access_out->psz_path);
+#if 1
+    p_saout = sout_AccessOutNew(p_this, "http", p_access->psz_path);
 #else
     p_saout = sout_AccessOutNew(p_this, "simplehttpd", p_access->psz_path);
 #endif
