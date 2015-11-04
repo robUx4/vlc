@@ -1127,6 +1127,7 @@ void intf_sys_t::msgPlayerGetStatus()
     ss << "{\"type\":\"GET_STATUS\","
        <<  "\"requestId\":" << i_requestId++ << "}";
 
+    assert(!appTransportId.empty());
     pushMediaPlayerMessage( ss );
 }
 
@@ -1146,6 +1147,7 @@ void intf_sys_t::msgPlayerLoad()
        <<             "\"contentType\":\"" << mime << "\"},"
        <<  "\"requestId\":" << i_requestId++ << "}";
 
+    assert(!appTransportId.empty());
     pushMediaPlayerMessage( ss );
 }
 
@@ -1158,6 +1160,7 @@ void intf_sys_t::msgPlayerStop()
        <<  "\"mediaSessionId\":" << mediaSessionId << ","
        <<  "\"requestId\":" << i_requestId++ << "}";
 
+    assert(!appTransportId.empty());
     pushMediaPlayerMessage( ss );
 }
 
@@ -1170,6 +1173,7 @@ void intf_sys_t::msgPlayerPlay()
        <<  "\"mediaSessionId\":" << mediaSessionId << ","
        <<  "\"requestId\":" << i_requestId++ << "}";
 
+    assert(!appTransportId.empty());
     pushMediaPlayerMessage( ss );
 }
 
@@ -1182,6 +1186,7 @@ void intf_sys_t::msgPlayerPause()
        <<  "\"mediaSessionId\":" << mediaSessionId << ","
        <<  "\"requestId\":" << i_requestId++ << "}";
 
+    assert(!appTransportId.empty());
     pushMediaPlayerMessage( ss );
 }
 
@@ -1195,6 +1200,7 @@ void intf_sys_t::msgPlayerSeek(const std::string & currentTime)
         <<  "\"mediaSessionId\":" << mediaSessionId << ","
        <<  "\"requestId\":" << i_requestId++ << "}";
 
+    assert(!appTransportId.empty());
     pushMediaPlayerMessage( ss );
 }
 
