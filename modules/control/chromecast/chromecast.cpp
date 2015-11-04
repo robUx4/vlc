@@ -234,7 +234,6 @@ struct intf_sys_t
     vlc_cond_t   seekCommandCond;
     vlc_thread_t chromecastThread;
 
-
     void msgAuth();
     void msgPing();
     void msgPong();
@@ -460,9 +459,21 @@ static int PlaylistEvent( vlc_object_t *p_this, char const *psz_var,
         var_SetAddress( p_input->p_parent, SOUT_INTF_ADDRESS, p_intf );
 
         std::stringstream ss;
+#if 0
+        ss << "#cc_sout{http-port=" << var_InheritInteger(p_intf, CONTROL_CFG_PREFIX "http-port")
+           << ",mux=avformat{mux=matroska}"
+           << ",mime=" << p_sys->mime << "}";
+#else
+#if 0
+        ss << "standard{dst=:" << var_InheritInteger(p_intf, CONTROL_CFG_PREFIX "http-port") << "/stream"
+           << ",mux=" << psz_var_mux
+           << ",access=simplehttpd{mime=" << psz_var_mime << "}}";
+#else
         ss << "#standard{dst=:" << var_InheritInteger(p_intf, CONTROL_CFG_PREFIX "http-port") << "/stream"
            << ",mux=" << p_intf->p_sys->muxer
            << ",access=cc_access{mime=" << p_intf->p_sys->mime << "}}";
+#endif
+#endif
         var_SetString( p_input, "sout", ss.str().c_str() );
 
         var_SetString( p_input, "demux-filter", "cc_demux" );
@@ -650,7 +661,6 @@ int intf_sys_t::sendMessage(castchannel::CastMessage &msg)
 
     return i_ret;
 }
-
 
 
 
@@ -1117,15 +1127,22 @@ void intf_sys_t::msgPlayerGetStatus()
 
 void intf_sys_t::msgPlayerLoad()
 {
+#if 0
+    input_item_t * p_item = input_GetItem(p_input);
+#endif
 
     /* TODO: extract the metadata from p_sys->p_input */
 
     std::stringstream ss;
     ss << "{\"type\":\"LOAD\","
        <<  "\"autoplay\":\"false\","
+#if 1
        <<  "\"media\":{\"contentId\":\"http://" << serverIP << ":"
            << var_InheritInteger(p_intf, CONTROL_CFG_PREFIX "http-port")
            << "/stream\","
+#else
+       << "\"media\":{\"contentId\":\"" << input_item_GetURI(p_item) << "\","
+#endif
        <<             "\"streamType\":\"LIVE\","
        <<             "\"contentType\":\"" << mime << "\"},"
        <<  "\"requestId\":" << i_requestId++ << "}";
@@ -1785,9 +1802,15 @@ int SoutOpen(vlc_object_t *p_this)
     if (psz_var_mime == NULL || !psz_var_mime[0])
         goto error;
 
+#if 0
+    ss << "standard{dst=:" << var_InheritInteger(p_stream, SOUT_CFG_PREFIX "http-port") << "/stream"
+       << ",mux=" << psz_var_mux
+       << ",access=simplehttpd{mime=" << psz_var_mime << "}}";
+#else
     ss << "http{dst=:" << var_InheritInteger(p_stream, SOUT_CFG_PREFIX "http-port") << "/stream"
        << ",mux=" << psz_var_mux
        << ",access=http{mime=" << psz_var_mime << "}}";
+#endif
 
     p_sout = sout_StreamChainNew( p_stream->p_sout, ss.str().c_str(), NULL, NULL);
     if (p_sout == NULL) {
