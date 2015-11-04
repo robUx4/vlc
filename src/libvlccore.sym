@@ -164,7 +164,6 @@ httpd_StreamHeader
 httpd_StreamNew
 httpd_StreamSend
 httpd_StreamSetHTTPHeaders
-httpd_StreamBlockingSize
 httpd_UrlCatch
 httpd_UrlDelete
 httpd_UrlNew
