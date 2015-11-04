@@ -644,7 +644,7 @@ static int httpd_StreamCallBack(httpd_callback_sys_t *p_sys,
 
         if (answer->i_body_offset >= stream->i_buffer_pos)
         {
-#if 1 && !defined(NDEBUG)
+#if 0 && !defined(NDEBUG)
             wchar_t dbg[256];
             wsprintf(dbg,L"httpd:clbk no data1\n");
             OutputDebugString(dbg);
@@ -2122,14 +2122,14 @@ static void httpdLoop(httpd_host_t *host)
     vlc_mutex_unlock(&host->lock);
     vlc_restorecancel(canc);
 
-#if 1 && !defined(NDEBUG)
+#if 0 && !defined(NDEBUG)
     wsprintf(dbg,L"httpd:lop poll nfd:%d timeout:%d ",nfd, b_low_delay ? 20 : -1);
     OutputDebugString(dbg);
 #endif
     /* we will wait 20ms (not too big) if HTTPD_CLIENT_WAITING */
     int ret = poll(ufd, nfd, b_low_delay ? 20 : -1);
 
-#if 1 && !defined(NDEBUG)
+#if 0 && !defined(NDEBUG)
     wsprintf(dbg,L"- done\n");
     OutputDebugString(dbg);
 #endif
