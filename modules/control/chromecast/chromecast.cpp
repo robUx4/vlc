@@ -638,28 +638,28 @@ static void disconnectChromecast(intf_thread_t *p_intf)
 /**
  * @brief Send a message to the Chromecast
  * @param msg the CastMessage to send
- * @return the number of bytes sent or -1 on error
+ * @return vlc error code
  */
 int intf_sys_t::sendMessage(castchannel::CastMessage &msg)
 {
     uint32_t i_size = msg.ByteSize();
-    uint32_t i_sizeNetwork = hton32(i_size);
-
     uint8_t *p_data = new(std::nothrow) uint8_t[PACKET_HEADER_LEN + i_size];
     if (p_data == NULL)
-        return -1;
+        return VLC_ENOMEM;
 
 #ifndef NDEBUG
-    msg_Dbg(p_intf, "sendMessage: %s-%s %s", msg.namespace_().c_str(), msg.destination_id().c_str(), msg.payload_utf8().c_str());
+    msg_Dbg(p_intf, "sendMessage: %s->%s %s", msg.namespace_().c_str(), msg.destination_id().c_str(), msg.payload_utf8().c_str());
 #endif
 
-    memcpy(p_data, &i_sizeNetwork, PACKET_HEADER_LEN);
+    SetDWBE(p_data, i_size);
     msg.SerializeWithCachedSizesToArray(p_data + PACKET_HEADER_LEN);
 
     int i_ret = tls_Send(p_tls, p_data, PACKET_HEADER_LEN + i_size);
     delete[] p_data;
+    if (i_ret == PACKET_HEADER_LEN + i_size)
+        return VLC_SUCCESS;
 
-    return i_ret;
+    return VLC_EGENERIC;
 }
 
 
@@ -785,7 +785,7 @@ static int processMessage(intf_thread_t *p_intf, const castchannel::CastMessage 
     std::string namespace_ = msg.namespace_();
 
 #ifndef NDEBUG
-    msg_Dbg(p_intf,"processMessage: %s-%s %s", namespace_.c_str(), msg.destination_id().c_str(), msg.payload_utf8().c_str());
+    msg_Dbg(p_intf,"processMessage: %s->%s %s", namespace_.c_str(), msg.destination_id().c_str(), msg.payload_utf8().c_str());
 #endif
 
     if (namespace_ == NAMESPACE_DEVICEAUTH)
