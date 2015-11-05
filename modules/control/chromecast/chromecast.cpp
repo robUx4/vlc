@@ -135,9 +135,9 @@ struct intf_sys_t
 #ifdef HAVE_MICRODNS
         ,microdns_ctx(NULL)
 #endif
-        ,time_offset(0)
-        ,time_start_play(-1)
-        ,playback_time_ref(-1.0)
+        ,date_play_start(-1)
+        ,playback_start_chromecast(-1.0)
+        ,playback_start_local(0)
         ,canPause(false)
         ,i_sock_fd(-1)
         ,p_creds(NULL)
@@ -164,15 +164,15 @@ struct intf_sys_t
     }
 
     mtime_t getPlaybackTime() const {
-        if (time_start_play == -1)
-            return 0;
-        if (playerState == "PLAYING")
-            return mdate() - time_start_play + time_offset;
-        return time_offset;
+        if (date_play_start == -1) {
+            msg_Dbg(p_intf, "playback not running using buffering time %" PRId64, playback_start_local);
+            return playback_start_local;
+        }
+        return ( mdate() - date_play_start ) + playback_start_local;
     }
 
     double getPlaybackPosition(mtime_t i_length) const {
-        if( i_length > 0 && time_start_play > 0)
+        if( i_length > 0 && date_play_start > 0)
             return (double) getPlaybackTime() / (double)( i_length );
         return 0.0;
     }
@@ -214,9 +214,9 @@ struct intf_sys_t
     std::string mediaSessionId;
     std::string playerState;
 
-    mtime_t     time_offset;
-    mtime_t     time_start_play;
-    mtime_t     playback_time_ref;
+    mtime_t     date_play_start;
+    mtime_t     playback_start_chromecast;
+    mtime_t     playback_start_local;
     bool        canPause;
 
     int i_sock_fd;
@@ -505,7 +505,8 @@ void intf_sys_t::sendPlayerCmd()
             msgPlayerStop();
             mediaSessionId = "";
         }
-        playback_time_ref = -1.0;
+        //playback_start_chromecast = -1.0;
+        playback_start_local = 0;
         msgPlayerLoad();
         play_status = PLAYER_LOAD_SENT;
         break;
@@ -548,12 +549,13 @@ bool intf_sys_t::seekTo(mtime_t pos)
     if (conn_status == CHROMECAST_DEAD)
         return false;
 
-    assert(playback_time_ref != -1.0);
+    assert(playback_start_chromecast != -1.0);
     //msgPlayerStop();
 
-    m_seektime = playback_time_ref + pos;
+    m_seektime = playback_start_chromecast + pos - playback_start_local;
+    playback_start_local = pos;
     const std::string currentTime = std::to_string( double( m_seektime ) / 1000000.0 );
-    msg_Dbg( p_intf, "Seeking to %s playback_time:%" PRId64, currentTime.c_str(), playback_time_ref);
+    msg_Dbg( p_intf, "Seeking to %" PRId64 "/%s playback_time:%" PRId64, pos, currentTime.c_str(), playback_start_chromecast);
     msgPlayerSeek( currentTime );
 
     return true;
@@ -927,30 +929,41 @@ static int processMessage(intf_thread_t *p_intf, const castchannel::CastMessage 
                     (int)(json_int_t) status[0]["mediaSessionId"]);
 
             vlc_mutex_locker locker(&p_sys->lock);
+            p_sys->i_supportedMediaCommands = status[0]["supportedMediaCommands"].operator json_int_t();
+
             std::string mediaSessionId = std::to_string((json_int_t) status[0]["mediaSessionId"]);
             if (!mediaSessionId.empty() && mediaSessionId != p_sys->mediaSessionId) {
                 msg_Warn(p_intf, "different mediaSessionId detected %s", mediaSessionId.c_str());
+                p_sys->mediaSessionId = mediaSessionId;
+                p_sys->playerState = status[0]["playerState"].operator const char *();
+                //p_sys->msgPlayerLoad();
             }
-            p_sys->mediaSessionId = mediaSessionId;
-            p_sys->i_supportedMediaCommands = status[0]["supportedMediaCommands"].operator json_int_t();
+            else
+            {
+                p_sys->mediaSessionId = mediaSessionId;
 
                 std::string playerState = p_sys->playerState;
                 p_sys->playerState = status[0]["playerState"].operator const char *();
                 if (p_sys->playerState != playerState)
                 {
-                    if (p_sys->playerState == "PLAYING")
+                    if (p_sys->playerState == "BUFFERING")
+                    {
+                        p_sys->playback_start_chromecast = mtime_t( double( status[0]["currentTime"] ) * 1000000.0 );
+                        msg_Dbg(p_intf, "Playback pending with an offset of %" PRId64, p_sys->playback_start_chromecast);
+                        p_sys->date_play_start = -1;
+                    }
+                    else if (p_sys->playerState == "PLAYING")
                     {
                         /* TODO reset demux PCR ? */
-                        p_sys->time_start_play = mdate();
-                        p_sys->playback_time_ref = mtime_t( double( status[0]["currentTime"] ) * 1000000.0 );
-                        msg_Dbg(p_intf, "Playback starting with an offset of %" PRId64, p_sys->playback_time_ref);
+                        if (unlikely(p_sys->playback_start_chromecast == -1.0)) {
+                            msg_Warn(p_intf, "start playing without buffering");
+                            p_sys->playback_start_chromecast = mtime_t( double( status[0]["currentTime"] ) * 1000000.0 );
+                        }
+                        p_sys->date_play_start = mdate();
+                        msg_Dbg(p_intf, "Playback started with an offset of %" PRId64, p_sys->playback_start_chromecast);
                     }
-                    else if (playerState == "PLAYING")
-                    {
-                        /* playing stopped for now */
-                        p_sys->time_offset += mdate() - p_sys->time_start_play;
-                        p_sys->time_start_play = 0;
-                        /* TODO after seeking we should reset the offset */
+                    else {
+                        p_sys->date_play_start = -1;
                     }
                 }
                 if (p_sys->playerState == "BUFFERING" && p_sys->m_seektime != -1.0)
@@ -966,7 +979,7 @@ static int processMessage(intf_thread_t *p_intf, const castchannel::CastMessage 
                         msg_Dbg(p_intf, "Chromecast not ready to use seek data from %" PRId64 " got %f", p_sys->m_seektime, double( status[0]["currentTime"] ));
                     }
                 }
-
+            }
             if (p_sys->play_status == PLAYER_LOAD_SENT)
                 p_sys->sendPlayerCmd();
         }
@@ -1466,7 +1479,7 @@ struct demux_sys_t
                 return 0;
             }
 
-            mtime_t i_seek_time = p_intf->p_sys->m_seektime - p_intf->p_sys->playback_time_ref;
+            mtime_t i_seek_time = p_intf->p_sys->m_seektime - (p_intf->p_sys->playback_start_chromecast - p_intf->p_sys->playback_start_local);
             p_intf->p_sys->m_seektime = -1.0;
             vlc_mutex_unlock(&p_intf->p_sys->lock);
 
