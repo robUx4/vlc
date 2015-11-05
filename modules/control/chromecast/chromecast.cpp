@@ -95,6 +95,7 @@ enum player_status {
     PLAYER_IDLE,
     PLAYER_LOAD_SENT,
     PLAYER_PLAYBACK_SENT,
+    PLAYER_SEEK_SENT,
 };
 
 #define PACKET_MAX_LEN 10 * 1024
@@ -182,9 +183,9 @@ struct intf_sys_t
         this->canPause = canPause;
     }
 
-    bool isBuffering() {
+    bool isFinishedPlaying() {
         vlc_mutex_locker locker(&lock);
-        return conn_status == CHROMECAST_DEAD || playerState == "BUFFERING";
+        return conn_status == CHROMECAST_DEAD || (playerState == "BUFFERING" && play_status != PLAYER_SEEK_SENT);
     }
 
     bool seekTo(mtime_t pos);
@@ -459,20 +460,26 @@ static int PlaylistEvent( vlc_object_t *p_this, char const *psz_var,
         var_SetAddress( p_input->p_parent, SOUT_INTF_ADDRESS, p_intf );
 
         std::stringstream ss;
-#if 0
+#if 1
         ss << "#cc_sout{http-port=" << var_InheritInteger(p_intf, CONTROL_CFG_PREFIX "http-port")
-           << ",mux=avformat{mux=matroska}"
+           << ",mux=" << p_intf->p_sys->muxer
            << ",mime=" << p_sys->mime << "}";
 #else
-#if 0
+# if 0
         ss << "standard{dst=:" << var_InheritInteger(p_intf, CONTROL_CFG_PREFIX "http-port") << "/stream"
            << ",mux=" << psz_var_mux
            << ",access=simplehttpd{mime=" << psz_var_mime << "}}";
-#else
+# else
+#  if 0
         ss << "#standard{dst=:" << var_InheritInteger(p_intf, CONTROL_CFG_PREFIX "http-port") << "/stream"
            << ",mux=" << p_intf->p_sys->muxer
            << ",access=cc_access{mime=" << p_intf->p_sys->mime << "}}";
-#endif
+#  else
+        ss << "#cc_sout{dst=:" << var_InheritInteger(p_intf, CONTROL_CFG_PREFIX "http-port") << "/stream"
+           << ",mux=" << p_intf->p_sys->muxer
+           << ",access=cc_access{mime=" << p_intf->p_sys->mime << "}}";
+#  endif
+# endif
 #endif
         var_SetString( p_input, "sout", ss.str().c_str() );
 
@@ -556,6 +563,7 @@ bool intf_sys_t::seekTo(mtime_t pos)
     playback_start_local = pos;
     const std::string currentTime = std::to_string( double( m_seektime ) / 1000000.0 );
     msg_Dbg( p_intf, "Seeking to %" PRId64 "/%s playback_time:%" PRId64, pos, currentTime.c_str(), playback_start_chromecast);
+    play_status = PLAYER_SEEK_SENT;
     msgPlayerSeek( currentTime );
 
     return true;
@@ -959,6 +967,7 @@ static int processMessage(intf_thread_t *p_intf, const castchannel::CastMessage 
                             msg_Warn(p_intf, "start playing without buffering");
                             p_sys->playback_start_chromecast = mtime_t( double( status[0]["currentTime"] ) * 1000000.0 );
                         }
+                        p_sys->play_status = PLAYER_PLAYBACK_SENT;
                         p_sys->date_play_start = mdate();
                         msg_Dbg(p_intf, "Playback started with an offset of %" PRId64, p_sys->playback_start_chromecast);
                     }
@@ -1683,7 +1692,7 @@ struct sout_stream_sys_t
 public:
     bool isFinishedPlaying() const {
         /* check if the Chromecast to be done playing */
-        return p_intf->p_sys->isBuffering();
+        return p_intf->p_sys->isFinishedPlaying();
     }
 
     sout_stream_t * const p_out;
@@ -1722,6 +1731,7 @@ static int Send(sout_stream_t *p_stream, sout_stream_id_sys_t *id,
 int sout_stream_sys_t::sendBlock(sout_stream_id_sys_t *id,
                                  block_t *p_buffer)
 {
+#if 0
     if (!b_header_started)
     {
         if ( !( p_buffer->i_flags & BLOCK_FLAG_HEADER ) ) {
@@ -1758,6 +1768,7 @@ int sout_stream_sys_t::sendBlock(sout_stream_id_sys_t *id,
         msg_Dbg(p_stream, "finished waiting for Chromecast seek");
     }
     vlc_mutex_unlock(&p_intf->p_sys->lock);
+#endif
 #endif
     return p_out->pf_send(p_out, id, p_buffer);
 }
@@ -1809,9 +1820,15 @@ int SoutOpen(vlc_object_t *p_this)
        << ",mux=" << psz_var_mux
        << ",access=simplehttpd{mime=" << psz_var_mime << "}}";
 #else
+# if 0
     ss << "http{dst=:" << var_InheritInteger(p_stream, SOUT_CFG_PREFIX "http-port") << "/stream"
        << ",mux=" << psz_var_mux
        << ",access=http{mime=" << psz_var_mime << "}}";
+# else
+    ss << "http{dst=:" << var_InheritInteger(p_stream, SOUT_CFG_PREFIX "http-port") << "/stream"
+       << ",mux=" << psz_var_mux
+       << ",access=cc_access{mime=" << psz_var_mime << "}}";
+# endif
 #endif
 
     p_sout = sout_StreamChainNew( p_stream->p_sout, ss.str().c_str(), NULL, NULL);
