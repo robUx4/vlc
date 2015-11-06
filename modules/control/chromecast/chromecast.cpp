@@ -559,12 +559,15 @@ bool intf_sys_t::seekTo(mtime_t pos)
     assert(playback_start_chromecast != -1.0);
     //msgPlayerStop();
 
-    m_seektime = playback_start_chromecast + pos - playback_start_local;
+    m_seektime = pos; // + playback_start_chromecast - playback_start_local;
     playback_start_local = pos;
-    const std::string currentTime = std::to_string( double( m_seektime ) / 1000000.0 );
+    const std::string currentTime = std::to_string( double( m_seektime + playback_start_chromecast - playback_start_local ) / 1000000.0 );
     msg_Dbg( p_intf, "Seeking to %" PRId64 "/%s playback_time:%" PRId64, pos, currentTime.c_str(), playback_start_chromecast);
     play_status = PLAYER_SEEK_SENT;
-    msgPlayerSeek( currentTime );
+    //msgPlayerSeek( currentTime );
+    msgPlayerGetStatus();
+    /* TODO first stop then load at a different position */
+    //msgPlayerStop();
 
     return true;
 }
@@ -977,7 +980,7 @@ static int processMessage(intf_thread_t *p_intf, const castchannel::CastMessage 
                 }
                 if (p_sys->playerState == "BUFFERING" && p_sys->m_seektime != -1.0)
                 {
-                    if ( int64_t( double( p_sys->m_seektime ) / 100000.0 ) ==
+                    if ( 1 || int64_t( double( p_sys->m_seektime + p_sys->playback_start_chromecast - p_sys->playback_start_local ) / 100000.0 ) ==
                          int64_t( 10.0 * double( status[0]["currentTime"] ) ) )
                     {
                         msg_Dbg(p_intf, "Chromecast ready to receive seeked data");
@@ -1488,16 +1491,17 @@ struct demux_sys_t
                 return 0;
             }
 
-            mtime_t i_seek_time = p_intf->p_sys->m_seektime - (p_intf->p_sys->playback_start_chromecast - p_intf->p_sys->playback_start_local);
+            mtime_t i_seek_time = p_intf->p_sys->m_seektime; // - (p_intf->p_sys->playback_start_chromecast - p_intf->p_sys->playback_start_local);
             p_intf->p_sys->m_seektime = -1.0;
             vlc_mutex_unlock(&p_intf->p_sys->lock);
 
             int i_ret = source_Control( DEMUX_SET_TIME, i_seek_time );
             if (i_ret != VLC_SUCCESS)
                 return 0;
-            return 1;
+            //return 1;
+        } else {
+            vlc_mutex_unlock(&p_intf->p_sys->lock);
         }
-        vlc_mutex_unlock(&p_intf->p_sys->lock);
 
         return p_demux->p_source->pf_demux( p_demux->p_source );
     }
