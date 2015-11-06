@@ -559,13 +559,13 @@ bool intf_sys_t::seekTo(mtime_t pos)
     assert(playback_start_chromecast != -1.0);
     //msgPlayerStop();
 
+    const std::string currentTime = std::to_string( double( mdate() + playback_start_local + 1000000 ) / 1000000.0 );
     m_seektime = pos; // + playback_start_chromecast - playback_start_local;
     playback_start_local = pos;
-    const std::string currentTime = std::to_string( double( m_seektime + playback_start_chromecast - playback_start_local ) / 1000000.0 );
     msg_Dbg( p_intf, "Seeking to %" PRId64 "/%s playback_time:%" PRId64, pos, currentTime.c_str(), playback_start_chromecast);
     play_status = PLAYER_SEEK_SENT;
-    //msgPlayerSeek( currentTime );
-    msgPlayerGetStatus();
+    msgPlayerSeek( currentTime );
+    //msgPlayerGetStatus();
     /* TODO first stop then load at a different position */
     //msgPlayerStop();
 
