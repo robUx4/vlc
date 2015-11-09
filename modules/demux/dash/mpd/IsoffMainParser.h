@@ -33,7 +33,6 @@
 #include "Profile.hpp"
 
 #include <cstdlib>
-#include <sstream>
 
 #include <vlc_common.h>
 
@@ -44,15 +43,14 @@ namespace adaptative
         class SegmentInformation;
         class MediaSegmentTemplate;
     }
-}
-
-namespace dash
-{
     namespace xml
     {
         class Node;
     }
+}
 
+namespace dash
+{
     namespace mpd
     {
         class Period;
@@ -60,24 +58,24 @@ namespace dash
         class MPD;
 
         using namespace adaptative::playlist;
+        using namespace adaptative;
 
         class IsoffMainParser
         {
             public:
-                IsoffMainParser             (xml::Node *root, stream_t *p_stream, std::string &);
+                IsoffMainParser             (xml::Node *root, stream_t *p_stream, const std::string &);
                 virtual ~IsoffMainParser    ();
-
-                bool            parse  (Profile profile);
-                virtual MPD*    getMPD ();
-                virtual void    setMPDBaseUrl(xml::Node *root);
+                MPD *   parse();
 
             private:
-                void    setMPDAttributes    ();
-                void    setAdaptationSets   (xml::Node *periodNode, Period *period);
-                void    setRepresentations  (xml::Node *adaptationSetNode, AdaptationSet *adaptationSet);
+                mpd::Profile getProfile     () const;
+                void    parseMPDBaseUrl     (MPD *, xml::Node *);
+                void    parseMPDAttributes  (MPD *, xml::Node *);
+                void    parseAdaptationSets (xml::Node *periodNode, Period *period);
+                void    parseRepresentations(xml::Node *adaptationSetNode, AdaptationSet *adaptationSet);
                 void    parseInitSegment    (xml::Node *, Initializable<Segment> *, SegmentInformation *);
                 void    parseTimeline       (xml::Node *, MediaSegmentTemplate *);
-                void    parsePeriods        (xml::Node *);
+                void    parsePeriods        (MPD *, xml::Node *);
                 size_t  parseSegmentInformation(xml::Node *, SegmentInformation *, uint64_t *);
                 size_t  parseSegmentBase    (xml::Node *, SegmentInformation *);
                 size_t  parseSegmentList    (xml::Node *, SegmentInformation *);
@@ -85,52 +83,8 @@ namespace dash
                 void    parseProgramInformation(xml::Node *, MPD *);
 
                 xml::Node       *root;
-                MPD             *mpd;
                 stream_t        *p_stream;
                 std::string      playlisturl;
-        };
-
-        class IsoTime
-        {
-            public:
-                IsoTime(const std::string&);
-                operator time_t() const;
-
-            private:
-                time_t time;
-        };
-
-        class UTCTime
-        {
-            public:
-                UTCTime(const std::string&);
-                operator time_t() const;
-
-            private:
-                time_t time;
-        };
-
-        template<typename T> class Integer
-        {
-            public:
-                Integer(const std::string &str)
-                {
-                    try
-                    {
-                        std::istringstream in(str);
-                        in >> value;
-                    } catch (int) {
-                        value = 0;
-                    }
-                }
-
-                operator T() const
-                {
-                    return value;
-                }
-
-            private:
-                T value;
         };
     }
 }

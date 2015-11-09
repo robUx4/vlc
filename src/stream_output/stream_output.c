@@ -166,7 +166,8 @@ sout_packetizer_input_t *sout_InputNew( sout_instance_t *p_sout,
     p_input->p_sout = p_sout;
     p_input->p_fmt  = p_fmt;
 
-    msg_Dbg( p_sout, "adding a new sout input (sout_input:%p)", p_input );
+    msg_Dbg( p_sout, "adding a new sout input (sout_input: %p)",
+             (void *)p_input );
 
     if( p_fmt->i_codec == VLC_CODEC_NULL )
     {
@@ -195,7 +196,8 @@ int sout_InputDelete( sout_packetizer_input_t *p_input )
 {
     sout_instance_t     *p_sout = p_input->p_sout;
 
-    msg_Dbg( p_sout, "removing a sout input (sout_input:%p)", p_input );
+    msg_Dbg( p_sout, "removing a sout input (sout_input: %p)",
+             (void *)p_input );
 
     if( p_input->p_fmt->i_codec != VLC_CODEC_NULL )
     {
@@ -567,9 +569,10 @@ int sout_MuxGetStream( sout_mux_t *p_mux, unsigned i_blocks, mtime_t *pi_dts )
         sout_input_t *p_input = p_mux->pp_inputs[i];
         block_t *p_data;
 
-        if( (!p_mux->b_add_stream_any_time) && block_FifoCount( p_input->p_fifo ) < i_blocks )
+        if( block_FifoCount( p_input->p_fifo ) < i_blocks )
         {
-            if( p_input->p_fmt->i_cat != SPU_ES )
+            if( (!p_mux->b_add_stream_any_time) &&
+                (p_input->p_fmt->i_cat != SPU_ES ) )
             {
                 return -1;
             }

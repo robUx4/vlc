@@ -26,6 +26,8 @@
 #include "SegmentTimeline.h"
 #include "AbstractPlaylist.hpp"
 
+#include <algorithm>
+
 using namespace adaptative::playlist;
 
 SegmentInformation::SegmentInformation(SegmentInformation *parent_) :
@@ -174,10 +176,19 @@ ISegment * SegmentInformation::getNextSegment(SegmentInfoType type, uint64_t i_p
             {
                 /* Check if we don't exceed timeline */
                 MediaSegmentTemplate *templ = dynamic_cast<MediaSegmentTemplate*>(retSegments[0]);
-                if(templ && templ->segmentTimeline.Get() &&
-                   templ->segmentTimeline.Get()->maxElementNumber() < i_pos)
-                    return NULL;
-                *pi_newpos = std::max(seg->getSequenceNumber(), i_pos);
+                SegmentTimeline *timeline = (templ) ? templ->segmentTimeline.Get() : NULL;
+                if(timeline)
+                {
+                    *pi_newpos = std::max(timeline->minElementNumber(), i_pos);
+                    if(timeline->maxElementNumber() < i_pos)
+                        return NULL;
+                }
+                else
+                {
+                    *pi_newpos = i_pos;
+                    /* start number */
+                    *pi_newpos = std::max((uint64_t)templ->startNumber.Get(), i_pos);
+                }
                 return seg;
             }
             else if(seg->getSequenceNumber() >= i_pos)
@@ -230,6 +241,15 @@ bool SegmentInformation::getSegmentNumberByTime(mtime_t time, uint64_t *ret) con
     if( mediaSegmentTemplate )
     {
         const uint64_t timescale = mediaSegmentTemplate->inheritTimescale();
+
+        SegmentTimeline *timeline = mediaSegmentTemplate->segmentTimeline.Get();
+        if(timeline)
+        {
+            time = time * timescale / CLOCK_FREQ;
+            *ret = timeline->getElementNumberByScaledPlaybackTime(time);
+            return true;
+        }
+
         const mtime_t duration = mediaSegmentTemplate->duration.Get();
         *ret = mediaSegmentTemplate->startNumber.Get();
         if(duration)
@@ -312,11 +332,9 @@ void SegmentInformation::getDurationsRange(mtime_t *min, mtime_t *max) const
 
     if(mediaSegmentTemplate && mediaSegmentTemplate->segmentTimeline.Get())
     {
-        const mtime_t duration = mediaSegmentTemplate->segmentTimeline.Get()->start() -
-                                 mediaSegmentTemplate->segmentTimeline.Get()->end();
-
-        if (!*min || duration < *min)
-            *min = duration;
+        const mtime_t duration = mediaSegmentTemplate->segmentTimeline.Get()->end() -
+                                 mediaSegmentTemplate->segmentTimeline.Get()->start();
+        *min = 0; /* fixme: get minimum ? */
 
         if(duration > *max)
             *max = duration;
@@ -357,10 +375,24 @@ void SegmentInformation::mergeWith(SegmentInformation *updated, mtime_t prunetim
     /* FIXME: handle difference */
 }
 
+void SegmentInformation::mergeWithTimeline(SegmentTimeline *updated)
+{
+    MediaSegmentTemplate *templ = inheritSegmentTemplate();
+    if(templ)
+    {
+        SegmentTimeline *timeline = templ->segmentTimeline.Get();
+        if(timeline)
+            timeline->mergeWith(*updated);
+    }
+}
+
 void SegmentInformation::pruneBySegmentNumber(uint64_t num)
 {
     if(segmentList)
         segmentList->pruneBySegmentNumber(num);
+
+    if(mediaSegmentTemplate && mediaSegmentTemplate->segmentTimeline.Get())
+         mediaSegmentTemplate->segmentTimeline.Get()->pruneBySequenceNumber(num);
 
     for(size_t i=0; i<childs.size(); i++)
         childs.at(i)->pruneBySegmentNumber(num);

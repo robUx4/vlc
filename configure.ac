@@ -452,8 +452,8 @@ AS_IF([test "${enable_shared}" = "no" -a "${enable_vlc}" != "no"], [
 dnl
 dnl Gettext stuff
 dnl
-AM_GNU_GETTEXT_VERSION([0.19.4])
-AM_GNU_GETTEXT([external], [need-ngettext])
+AM_GNU_GETTEXT_VERSION([0.19.6])
+AM_GNU_GETTEXT([external], [need-formatstring-macros])
 
 dnl
 dnl Iconv stuff
@@ -3655,6 +3655,11 @@ dnl
 dnl libsamplerate plugin
 dnl
 PKG_ENABLE_MODULES_VLC([SAMPLERATE], [], [samplerate], [Resampler with libsamplerate], [auto])
+
+dnl
+dnl  soxr module
+dnl
+PKG_ENABLE_MODULES_VLC([SOXR], [], [soxr >= 0.1.2], [SoX Resampler library], [auto])
 
 dnl
 dnl  OS/2 KAI plugin

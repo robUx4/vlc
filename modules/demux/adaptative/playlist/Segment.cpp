@@ -28,7 +28,9 @@
 
 #include "Segment.h"
 #include "BaseRepresentation.h"
+#include "AbstractPlaylist.hpp"
 #include "SegmentChunk.hpp"
+#include "../http/BytesRange.hpp"
 #include <cassert>
 
 using namespace adaptative::http;
@@ -57,9 +59,12 @@ ISegment::~ISegment()
     assert(chunksuse.Get() == 0);
 }
 
-SegmentChunk * ISegment::getChunk(const std::string &url)
+SegmentChunk * ISegment::getChunk(const std::string &url, HTTPConnectionManager *connManager)
 {
-    return new (std::nothrow) SegmentChunk(this, url);
+    HTTPChunkSource *source = new HTTPChunkSource(url, connManager);
+    if(startByte != endByte)
+        source->setBytesRange(BytesRange(startByte, endByte));
+    return new (std::nothrow) SegmentChunk(this, source);
 }
 
 void ISegment::onChunkDownload(block_t **, SegmentChunk *, BaseRepresentation *)
@@ -67,25 +72,19 @@ void ISegment::onChunkDownload(block_t **, SegmentChunk *, BaseRepresentation *)
 
 }
 
-SegmentChunk* ISegment::toChunk(size_t index, BaseRepresentation *ctxrep)
+SegmentChunk* ISegment::toChunk(size_t index, BaseRepresentation *ctxrep, HTTPConnectionManager *connManager)
 {
     SegmentChunk *chunk;
     try
     {
-        chunk = getChunk(getUrlSegment().toString(index, ctxrep));
+        chunk = getChunk(getUrlSegment().toString(index, ctxrep), connManager);
         if (!chunk)
             return NULL;
     }
     catch (int)
     {
         return NULL;
-    }
-
-    if(startByte != endByte)
-    {
-        chunk->setStartByte(startByte);
-        chunk->setEndByte(endByte);
-    }
+    };
 
     chunk->setRepresentation(ctxrep);
 
@@ -223,14 +222,6 @@ Url Segment::getUrlSegment() const
             ret.append(sourceUrl);
         return ret;
     }
-}
-
-SegmentChunk* Segment::toChunk(size_t index, BaseRepresentation *ctxrep)
-{
-    SegmentChunk *chunk = ISegment::toChunk(index, ctxrep);
-    if (chunk && ctxrep)
-        chunk->setBitrate(ctxrep->getBandwidth());
-    return chunk;
 }
 
 std::vector<ISegment*> Segment::subSegments()

@@ -159,10 +159,7 @@ int MP4_PeekBoxHeader( stream_t *p_stream, MP4_Box_t *p_box )
         /* get extented type on 16 bytes */
         GetUUID( &p_box->i_uuid, p_peek );
     }
-    else
-    {
-        CreateUUID( &p_box->i_uuid, p_box->i_type );
-    }
+
 #ifdef MP4_ULTRA_VERBOSE
     if( p_box->i_size )
     {
@@ -675,66 +672,12 @@ static int MP4_ReadBox_tfrf(  stream_t *p_stream, MP4_Box_t *p_box )
     MP4_READBOX_EXIT( 1 );
 }
 
-static void MP4_FreeBox_stra( MP4_Box_t *p_box )
-{
-    FREENULL( p_box->data.p_stra->CodecPrivateData );
-}
-
-static int MP4_ReadBox_stra( stream_t *p_stream, MP4_Box_t *p_box )
-{
-    MP4_READBOX_ENTER( MP4_Box_data_stra_t, MP4_FreeBox_stra );
-    MP4_Box_data_stra_t *p_stra = p_box->data.p_stra;
-
-    uint8_t i_reserved;
-    VLC_UNUSED(i_reserved);
-    MP4_GET1BYTE( p_stra->i_es_cat );
-    MP4_GET1BYTE( i_reserved );
-    MP4_GET2BYTES( p_stra->i_track_ID );
-
-    MP4_GET4BYTES( p_stra->i_timescale );
-    MP4_GET8BYTES( p_stra->i_duration );
-
-    MP4_GET4BYTES( p_stra->FourCC );
-    MP4_GET4BYTES( p_stra->Bitrate );
-    MP4_GET4BYTES( p_stra->MaxWidth );
-    MP4_GET4BYTES( p_stra->MaxHeight );
-    MP4_GET4BYTES( p_stra->SamplingRate );
-    MP4_GET4BYTES( p_stra->Channels );
-    MP4_GET4BYTES( p_stra->BitsPerSample );
-    MP4_GET4BYTES( p_stra->AudioTag );
-    MP4_GET2BYTES( p_stra->nBlockAlign );
-
-    MP4_GET1BYTE( i_reserved );
-    MP4_GET1BYTE( i_reserved );
-    MP4_GET1BYTE( i_reserved );
-    MP4_GET1BYTE( p_stra->cpd_len );
-    if( p_stra->cpd_len > i_read )
-        goto error;
-    p_stra->CodecPrivateData = malloc( p_stra->cpd_len );
-    if( unlikely( p_stra->CodecPrivateData == NULL ) )
-        goto error;
-    memcpy( p_stra->CodecPrivateData, p_peek, p_stra->cpd_len );
-
-#ifdef MP4_VERBOSE
-    msg_Dbg( p_stream, "es_cat is %"PRIu8", birate is %"PRIu32,
-              p_stra->i_es_cat, p_stra->Bitrate );
-#endif
-
-    MP4_READBOX_EXIT( 1 );
-error:
-    MP4_READBOX_EXIT( 0 );
-}
-
 static int MP4_ReadBox_uuid( stream_t *p_stream, MP4_Box_t *p_box )
 {
     if( !CmpUUID( &p_box->i_uuid, &TfrfBoxUUID ) )
         return MP4_ReadBox_tfrf( p_stream, p_box );
     if( !CmpUUID( &p_box->i_uuid, &TfxdBoxUUID ) )
         return MP4_ReadBox_tfxd( p_stream, p_box );
-    if( !CmpUUID( &p_box->i_uuid, &SmooBoxUUID ) )
-        return MP4_ReadBoxContainer( p_stream, p_box );
-    if( !CmpUUID( &p_box->i_uuid, &StraBoxUUID ) )
-        return MP4_ReadBox_stra( p_stream, p_box );
 
     msg_Warn( p_stream, "Unknown uuid type box" );
     return 1;
@@ -1861,33 +1804,19 @@ static int MP4_ReadBox_dac3( stream_t *p_stream, MP4_Box_t *p_box )
 
 static int MP4_ReadBox_dvc1( stream_t *p_stream, MP4_Box_t *p_box )
 {
-    MP4_Box_data_dvc1_t *p_dvc1;
-
     MP4_READBOX_ENTER( MP4_Box_data_dvc1_t, NULL );
-    p_dvc1 = p_box->data.p_dvc1;
-
-    MP4_GET1BYTE( p_dvc1->i_profile_level ); /* profile is on 4bits, level 3bits */
-    uint8_t i_profile = (p_dvc1->i_profile_level & 0xf0) >> 4;
-    if( i_profile != 0x06 && i_profile != 0x0c )
-    {
-        msg_Warn( p_stream, "unsupported VC-1 profile (%"PRIu8"), please report", i_profile );
+    if( i_read < 7 )
         MP4_READBOX_EXIT( 0 );
-    }
 
-
-    p_dvc1->i_vc1 = p_box->i_size - 7; /* Header + profile_level */
-
-    if( p_dvc1->i_vc1 > 0 )
-    {
-        uint8_t *p = p_dvc1->p_vc1 = malloc( p_dvc1->i_vc1 );
-        if( p )
-            memcpy( p, p_peek, i_read );
-    }
+    MP4_Box_data_dvc1_t *p_dvc1 = p_box->data.p_dvc1;
+    MP4_GET1BYTE( p_dvc1->i_profile_level );
+    p_dvc1->i_vc1 = i_read; /* Header + profile_level */
+    if( p_dvc1->i_vc1 > 0 && (p_dvc1->p_vc1 = malloc( p_dvc1->i_vc1 )) )
+        memcpy( p_dvc1->p_vc1, p_peek, i_read );
 
 #ifdef MP4_VERBOSE
     msg_Dbg( p_stream,
-             "read box: \"dvc1\" profile=%"PRIu8" level=%i",
-             i_profile, p_dvc1->i_profile_level & 0x0e >> 1 );
+             "read box: \"dvc1\" profile=%"PRIu8, (p_dvc1->i_profile_level & 0xf0) >> 4 );
 #endif
 
     MP4_READBOX_EXIT( 1 );
@@ -3339,6 +3268,20 @@ static int MP4_ReadBox_iods( stream_t *p_stream, MP4_Box_t *p_box )
     MP4_READBOX_EXIT( 1 );
 }
 
+static int MP4_ReadBox_btrt( stream_t *p_stream, MP4_Box_t *p_box )
+{
+    MP4_READBOX_ENTER( MP4_Box_data_btrt_t, NULL );
+
+    if(i_read != 12)
+        MP4_READBOX_EXIT( 0 );
+
+    MP4_GET4BYTES( p_box->data.p_btrt->i_buffer_size );
+    MP4_GET4BYTES( p_box->data.p_btrt->i_max_bitrate );
+    MP4_GET4BYTES( p_box->data.p_btrt->i_avg_bitrate );
+
+    MP4_READBOX_EXIT( 1 );
+}
+
 static int MP4_ReadBox_pasp( stream_t *p_stream, MP4_Box_t *p_box )
 {
     MP4_READBOX_ENTER( MP4_Box_data_pasp_t, NULL );
@@ -3739,12 +3682,13 @@ static const struct
     { ATOM_hvcC,    MP4_ReadBox_Binary,       0 },
     { ATOM_dac3,    MP4_ReadBox_dac3,         0 },
     { ATOM_dec3,    MP4_ReadBox_dec3,         0 },
-    { ATOM_dvc1,    MP4_ReadBox_dvc1,         0 },
+    { ATOM_dvc1,    MP4_ReadBox_dvc1,         ATOM_vc1  },
     { ATOM_fiel,    MP4_ReadBox_fiel,         0 },
     { ATOM_glbl,    MP4_ReadBox_Binary,       ATOM_FFV1 },
     { ATOM_enda,    MP4_ReadBox_enda,         0 },
     { ATOM_iods,    MP4_ReadBox_iods,         0 },
     { ATOM_pasp,    MP4_ReadBox_pasp,         0 },
+    { ATOM_btrt,    MP4_ReadBox_btrt,         0 }, /* codecs bitrate stsd/????/btrt */
     { ATOM_keys,    MP4_ReadBox_keys,         ATOM_meta },
 
     /* Quicktime preview atoms, all at root */
@@ -3793,11 +3737,13 @@ static const struct
     { ATOM_OggS,    MP4_ReadBox_sample_soun,  ATOM_stsd },
     { ATOM_alac,    MP4_ReadBox_sample_soun,  ATOM_stsd },
     { ATOM_WMA2,    MP4_ReadBox_sample_soun,  ATOM_stsd }, /* flip4mac */
+    { ATOM_wma,     MP4_ReadBox_sample_soun,  ATOM_stsd }, /* ismv wmapro */
     { ATOM_Opus,    MP4_ReadBox_sample_soun,  ATOM_stsd },
     /* Sound extensions */
     { ATOM_chan,    MP4_ReadBox_stsdext_chan, 0 },
     { ATOM_WMA2,    MP4_ReadBox_WMA2,         ATOM_wave }, /* flip4mac */
     { ATOM_dOps,    MP4_ReadBox_Binary,       ATOM_Opus },
+    { ATOM_wfex,    MP4_ReadBox_WMA2,         ATOM_wma  }, /* ismv formatex */
 
     { ATOM_drmi,    MP4_ReadBox_sample_vide,  ATOM_stsd },
     { ATOM_vide,    MP4_ReadBox_sample_vide,  ATOM_stsd },
@@ -3838,6 +3784,7 @@ static const struct
     { ATOM_h264,    MP4_ReadBox_sample_vide,  ATOM_stsd },
 
     { ATOM_jpeg,    MP4_ReadBox_sample_vide,  ATOM_stsd },
+    { ATOM_vc1,     MP4_ReadBox_sample_vide,  ATOM_stsd },
     { ATOM_avc1,    MP4_ReadBox_sample_vide,  ATOM_stsd },
     { ATOM_avc3,    MP4_ReadBox_sample_vide,  ATOM_stsd },
 
@@ -3904,6 +3851,12 @@ static const struct
     { ATOM_rtng,    MP4_ReadBox_Metadata,    ATOM_ilst },
     { ATOM_trkn,    MP4_ReadBox_Metadata,    ATOM_ilst },
     { ATOM_xid_,    MP4_ReadBox_Metadata,    ATOM_ilst },
+    { ATOM_gshh,    MP4_ReadBox_Metadata,    ATOM_ilst }, /* YouTube gs?? */
+    { ATOM_gspm,    MP4_ReadBox_Metadata,    ATOM_ilst },
+    { ATOM_gspu,    MP4_ReadBox_Metadata,    ATOM_ilst },
+    { ATOM_gssd,    MP4_ReadBox_Metadata,    ATOM_ilst },
+    { ATOM_gsst,    MP4_ReadBox_Metadata,    ATOM_ilst },
+    { ATOM_gstd,    MP4_ReadBox_Metadata,    ATOM_ilst },
 
     /* udta */
     { ATOM_0x40PRM, MP4_ReadBox_String,    ATOM_udta },
@@ -4092,39 +4045,6 @@ void MP4_BoxFree( MP4_Box_t *p_box )
     free( p_box );
 }
 
-/* SmooBox is a very simple MP4 box, VLC specific, used only for the stream_filter to
- * send information to the demux. SmooBox is actually a simplified moov box (we wanted
- * to avoid the hassle of building a moov box at the stream_filter level) */
-MP4_Box_t *MP4_BoxGetSmooBox( stream_t *s )
-{
-    /* p_chunk is a virtual root container for the smoo box */
-    MP4_Box_t *p_chunk;
-    MP4_Box_t *p_smoo;
-
-    p_chunk = calloc( 1, sizeof( MP4_Box_t ) );
-    if( unlikely( p_chunk == NULL ) )
-        return NULL;
-
-    p_chunk->i_type = ATOM_root;
-    p_chunk->i_shortsize = 1;
-
-    p_smoo = MP4_ReadBox( s, p_chunk );
-    if( !p_smoo || p_smoo->i_type != ATOM_uuid || CmpUUID( &p_smoo->i_uuid, &SmooBoxUUID ) )
-    {
-        msg_Warn( s, "no smoo box found!");
-        goto error;
-    }
-
-    p_chunk->p_first = p_smoo;
-    p_chunk->p_last = p_smoo;
-
-    return p_chunk;
-
-error:
-    free( p_chunk );
-    return NULL;
-}
-
 MP4_Box_t *MP4_BoxGetNextChunk( stream_t *s )
 {
     /* p_chunk is a virtual root container for the moof and mdat boxes */
@@ -4138,12 +4058,7 @@ MP4_Box_t *MP4_BoxGetNextChunk( stream_t *s )
     /* We might get a ftyp box or a SmooBox */
     MP4_PeekBoxHeader( s, p_tmp_box );
 
-    if( (p_tmp_box->i_type == ATOM_uuid && !CmpUUID( &p_tmp_box->i_uuid, &SmooBoxUUID )) )
-    {
-        free( p_tmp_box );
-        return MP4_BoxGetSmooBox( s );
-    }
-    else if( p_tmp_box->i_type == ATOM_ftyp )
+    if( p_tmp_box->i_type == ATOM_ftyp )
     {
         free( p_tmp_box );
         return MP4_BoxGetRoot( s );
@@ -4189,9 +4104,6 @@ MP4_Box_t *MP4_BoxGetRoot( stream_t *p_stream )
     int64_t i_size = stream_Size( p_stream );
     if( i_size > 0 )
         p_vroot->i_size = i_size;
-
-    /* could be a DASH stream for exemple, 0 means unknown or infinite size */
-    CreateUUID( &p_vroot->i_uuid, p_vroot->i_type );
 
     /* First get the moov */
     const uint32_t stoplist[] = { ATOM_moov, ATOM_mdat, 0 };

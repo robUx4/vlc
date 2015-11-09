@@ -47,6 +47,11 @@ TimescaleAble::~TimescaleAble()
 {
 }
 
+void TimescaleAble::setParentTimescale(TimescaleAble *parent)
+{
+    parentTimescale = parent;
+}
+
 uint64_t TimescaleAble::inheritTimescale() const
 {
     if(timescale.Get())

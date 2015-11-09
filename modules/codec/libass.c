@@ -219,7 +219,7 @@ static int Create( vlc_object_t *p_this )
 #endif
 
 #ifdef HAVE_FONTCONFIG
-#if defined(_WIN32) || defined(__APPLE__)
+#if defined(_WIN32)
     dialog_progress_bar_t *p_dialog =
         dialog_ProgressCreate( p_dec,
                                _("Building font cache"),
@@ -227,7 +227,7 @@ static int Create( vlc_object_t *p_this )
                                   "This should take less than a minute." ), NULL );
 #endif
     ass_set_fonts( p_renderer, psz_font, psz_family, 1, NULL, 1 );  // setup default font/family
-#if defined(_WIN32) || defined(__APPLE__)
+#if defined(_WIN32)
     if( p_dialog )
     {
         dialog_ProgressSet( p_dialog, NULL, 1.0 );
@@ -235,7 +235,6 @@ static int Create( vlc_object_t *p_this )
     }
 #endif
 #else
-    /* FIXME you HAVE to give him a font if no fontconfig */
     ass_set_fonts( p_renderer, psz_font, psz_family, 1, NULL, 1 );
 #endif
 
@@ -307,13 +306,14 @@ static subpicture_t *DecodeBlock( decoder_t *p_dec, block_t **pp_block )
         return NULL;
 
     p_block = *pp_block;
-    if( p_block->i_flags & (BLOCK_FLAG_DISCONTINUITY|BLOCK_FLAG_CORRUPTED) )
+    *pp_block = NULL;
+
+    if( p_block->i_flags & BLOCK_FLAG_CORRUPTED )
     {
         p_sys->i_max_stop = VLC_TS_INVALID;
         block_Release( p_block );
         return NULL;
     }
-    *pp_block = NULL;
 
     if( p_block->i_buffer == 0 || p_block->p_buffer[0] == '\0' )
     {

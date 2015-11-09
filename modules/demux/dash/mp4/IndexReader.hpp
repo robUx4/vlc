@@ -1,11 +1,7 @@
 /*
- * MPDFactory.cpp
+ * IndexReader.hpp
  *****************************************************************************
- * Copyright (C) 2010 - 2012 Klagenfurt University
- *
- * Created on: Jan 27, 2012
- * Authors: Christopher Mueller <christopher.mueller@itec.uni-klu.ac.at>
- *          Christian Timmerer  <christian.timmerer@itec.uni-klu.ac.at>
+ * Copyright (C) 2015 - VideoLAN and VLC authors
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU Lesser General Public License as published
@@ -21,39 +17,33 @@
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston MA 02110-1301, USA.
  *****************************************************************************/
+#ifndef INDEXREADER_HPP
+#define INDEXREADER_HPP
 
-#ifdef HAVE_CONFIG_H
-# include "config.h"
-#endif
+#include "../adaptative/mp4/AtomsReader.hpp"
 
-#include "MPDFactory.h"
-#include "IsoffMainParser.h"
-
-using namespace dash::xml;
-using namespace dash::mpd;
-
-MPD* MPDFactory::create(Node *root, stream_t *p_stream,
-                        std::string & playlisturl, Profile profile)
+namespace adaptative
 {
-    IsoffMainParser *parser = NULL;
-
-    switch( profile )
+    namespace playlist
     {
-        case Profile::Unknown:
-            break;
-        default:
-            parser = new (std::nothrow) IsoffMainParser(root, p_stream, playlisturl);
-            break;
+        class BaseRepresentation;
     }
-
-    if(!parser)
-        return NULL;
-
-    MPD* mpd = NULL;
-    if(parser->parse(profile))
-        mpd = parser->getMPD();
-
-    delete parser;
-
-    return mpd;
 }
+
+namespace dash
+{
+    namespace mp4
+    {
+        using namespace adaptative::mp4;
+        using namespace adaptative::playlist;
+
+        class IndexReader : public AtomsReader
+        {
+            public:
+                IndexReader(vlc_object_t *);
+                bool parseIndex(block_t *, BaseRepresentation *);
+        };
+    }
+}
+
+#endif // INDEXREADER_HPP

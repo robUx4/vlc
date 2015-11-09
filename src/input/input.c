@@ -55,7 +55,8 @@
 /*****************************************************************************
  * Local prototypes
  *****************************************************************************/
-static  void *Run            ( void * );
+static  void *Run( void * );
+static  void *Preparse( void * );
 
 static input_thread_t * Create  ( vlc_object_t *, input_item_t *,
                                   const char *, bool, input_resource_t * );
@@ -149,41 +150,10 @@ int input_Read( vlc_object_t *p_parent, input_item_t *p_item )
     return VLC_SUCCESS;
 }
 
-/**
- * Initialize an input and initialize it to preparse the item
- * This function is blocking. It will only accept parsing regular files.
- *
- * \param p_parent a vlc_object_t
- * \param p_item an input item
- * \return VLC_SUCCESS or an error
- */
-int input_Preparse( vlc_object_t *p_parent, input_item_t *p_item )
+input_thread_t *input_CreatePreparser( vlc_object_t *parent,
+                                       input_item_t *item )
 {
-    input_thread_t *p_input;
-
-    /* Allocate descriptor */
-    p_input = Create( p_parent, p_item, NULL, true, NULL );
-    if( !p_input )
-        return VLC_EGENERIC;
-
-    if( !Init( p_input ) ) {
-        /* if the demux is a playlist, call Mainloop that will call
-         * demux_Demux in order to fetch sub items */
-        bool b_is_playlist = false;
-
-        if ( input_item_ShouldPreparseSubItems( p_item )
-          && demux_Control( p_input->p->master->p_demux,
-                            DEMUX_IS_PLAYLIST,
-                            &b_is_playlist ) )
-            b_is_playlist = false;
-        if( b_is_playlist )
-            MainLoop( p_input, false );
-        End( p_input );
-    }
-
-    vlc_object_release( p_input );
-
-    return VLC_SUCCESS;
+    return Create( parent, item, NULL, true, NULL );
 }
 
 /**
@@ -195,10 +165,15 @@ int input_Preparse( vlc_object_t *p_parent, input_item_t *p_item )
  */
 int input_Start( input_thread_t *p_input )
 {
+    void *(*func)(void *) = Run;
+
+    if( p_input->b_preparsing )
+        func = Preparse;
+
     assert( !p_input->p->is_running );
     /* Create thread and wait for its readiness. */
-    p_input->p->is_running = !vlc_clone( &p_input->p->thread,
-                                         Run, p_input, VLC_THREAD_PRIORITY_INPUT );
+    p_input->p->is_running = !vlc_clone( &p_input->p->thread, func, p_input,
+                                         VLC_THREAD_PRIORITY_INPUT );
     if( !p_input->p->is_running )
     {
         input_ChangeState( p_input, ERROR_S );
@@ -336,7 +311,6 @@ static input_thread_t *Create( vlc_object_t *p_parent, input_item_t *p_item,
     p_input->p->i_start = 0;
     p_input->p->i_time  = 0;
     p_input->p->i_stop  = 0;
-    p_input->p->i_run   = 0;
     p_input->p->i_title = 0;
     p_input->p->title = NULL;
     p_input->p->i_title_offset = p_input->p->i_seekpoint_offset = 0;
@@ -508,6 +482,31 @@ static void *Run( void *obj )
     return NULL;
 }
 
+static void *Preparse( void *obj )
+{
+    input_thread_t *p_input = (input_thread_t *)obj;
+
+    vlc_interrupt_set(&p_input->p->interrupt);
+
+    if( !Init( p_input ) )
+    {   /* if the demux is a playlist, call Mainloop that will call
+         * demux_Demux in order to fetch sub items */
+        bool b_is_playlist = false;
+
+        if ( input_item_ShouldPreparseSubItems( p_input->p->p_item )
+          && demux_Control( p_input->p->master->p_demux,
+                            DEMUX_IS_PLAYLIST,
+                            &b_is_playlist ) )
+            b_is_playlist = false;
+        if( b_is_playlist )
+            MainLoop( p_input, false );
+        End( p_input );
+    }
+
+    input_SendEventDead( p_input );
+    return NULL;
+}
+
 bool input_Stopped( input_thread_t *input )
 {
     input_thread_private_t *sys = input->p;
@@ -527,14 +526,13 @@ bool input_Stopped( input_thread_t *input )
  * MainLoopDemux
  * It asks the demuxer to demux some data
  */
-static void MainLoopDemux( input_thread_t *p_input, bool *pb_changed, mtime_t i_start_mdate )
+static void MainLoopDemux( input_thread_t *p_input, bool *pb_changed )
 {
     int i_ret;
 
     *pb_changed = false;
 
-    if( ( p_input->p->i_stop > 0 && p_input->p->i_time >= p_input->p->i_stop ) ||
-        ( p_input->p->i_run > 0 && i_start_mdate+p_input->p->i_run < mdate() ) )
+    if( p_input->p->i_stop > 0 && p_input->p->i_time >= p_input->p->i_stop )
         i_ret = 0; /* EOF */
     else
         i_ret = demux_Demux( p_input->p->master->p_demux );
@@ -572,7 +570,7 @@ static void MainLoopDemux( input_thread_t *p_input, bool *pb_changed, mtime_t i_
         SlaveDemux( p_input );
 }
 
-static int MainLoopTryRepeat( input_thread_t *p_input, mtime_t *pi_start_mdate )
+static int MainLoopTryRepeat( input_thread_t *p_input )
 {
     int i_repeat = var_GetInteger( p_input, "input-repeat" );
     if( i_repeat <= 0 )
@@ -613,8 +611,6 @@ static int MainLoopTryRepeat( input_thread_t *p_input, mtime_t *pi_start_mdate )
         input_ControlPush( p_input, INPUT_CONTROL_SET_POSITION, &val );
     }
 
-    /* */
-    *pi_start_mdate = mdate();
     return VLC_SUCCESS;
 }
 
@@ -658,12 +654,11 @@ static void MainLoopStatistics( input_thread_t *p_input )
  */
 static void MainLoop( input_thread_t *p_input, bool b_interactive )
 {
-    mtime_t i_start_mdate = mdate();
     mtime_t i_intf_update = 0;
     mtime_t i_last_seek_mdate = 0;
 
     if( b_interactive && var_InheritBool( p_input, "start-paused" ) )
-        ControlPause( p_input, i_start_mdate );
+        ControlPause( p_input, mdate() );
 
     bool b_pause_after_eof = b_interactive &&
                              var_InheritBool( p_input, "play-and-pause" );
@@ -685,7 +680,7 @@ static void MainLoop( input_thread_t *p_input, bool b_interactive )
             {
                 bool b_force_update = false;
 
-                MainLoopDemux( p_input, &b_force_update, i_start_mdate );
+                MainLoopDemux( p_input, &b_force_update );
 
                 if( p_input->p->master->p_demux->pf_demux != NULL )
                     i_wakeup = es_out_GetWakeup( p_input->p->p_es_out );
@@ -710,7 +705,7 @@ static void MainLoop( input_thread_t *p_input, bool b_interactive )
             }
             else
             {
-                if( MainLoopTryRepeat( p_input, &i_start_mdate ) )
+                if( MainLoopTryRepeat( p_input ) )
                     break;
             }
 
@@ -883,12 +878,17 @@ static void StartTitle( input_thread_t * p_input )
                                      * var_GetFloat( p_input, "start-time" ));
     p_input->p->i_stop  = llroundf(1000000.f
                                      * var_GetFloat( p_input, "stop-time" ));
-    p_input->p->i_run   = llroundf(1000000.f
-                                     * var_GetFloat( p_input, "run-time" ));
-    if( p_input->p->i_run < 0 )
+    if( p_input->p->i_stop <= 0 )
     {
-        msg_Warn( p_input, "invalid run-time ignored" );
-        p_input->p->i_run = 0;
+        p_input->p->i_stop = llroundf(1000000.f
+                                     * var_GetFloat( p_input, "run-time" ));
+        if( p_input->p->i_stop < 0 )
+        {
+            msg_Warn( p_input, "invalid run-time ignored" );
+            p_input->p->i_stop = 0;
+        }
+        else
+            p_input->p->i_stop += p_input->p->i_start;
     }
 
     if( p_input->p->i_start > 0 )

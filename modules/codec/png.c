@@ -198,14 +198,14 @@ static picture_t *DecodeBlock( decoder_t *p_dec, block_t **pp_block )
 
     png_structp p_png;
     png_infop p_info, p_end_info;
-    png_bytep *p_row_pointers = NULL;
+    png_bytep *volatile p_row_pointers = NULL;
 
     if( !pp_block || !*pp_block ) return NULL;
 
     p_block = *pp_block;
     p_sys->b_error = false;
 
-    if( p_block->i_flags & BLOCK_FLAG_DISCONTINUITY )
+    if( p_block->i_flags & BLOCK_FLAG_CORRUPTED )
     {
         block_Release( p_block ); *pp_block = NULL;
         return NULL;

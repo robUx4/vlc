@@ -35,8 +35,6 @@ namespace hls
                         AbstractStreamFactory *,
                         logic::AbstractAdaptationLogic::LogicType type );
             virtual ~HLSManager();
-            virtual AbstractAdaptationLogic *createLogic(AbstractAdaptationLogic::LogicType);
-
             static bool isHTTPLiveStreaming(stream_t *);
     };
 

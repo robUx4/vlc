@@ -96,10 +96,10 @@ public:
 protected:
     ConfigControl( vlc_object_t *_p_this, module_config_t *_p_conf ) :
                             p_this (_p_this ), p_item( _p_conf ) {}
-    virtual void changeVisibility( bool b ) { Q_UNUSED(b); };
+    virtual void changeVisibility( bool ) { }
     vlc_object_t *p_this;
     module_config_t *p_item;
-    virtual void fillGrid( QGridLayout*, int ) {};
+    virtual void fillGrid( QGridLayout*, int ) {}
 signals:
     void changed();
 #if 0
@@ -116,11 +116,11 @@ class VIntConfigControl : public ConfigControl
 Q_OBJECT
 public:
     virtual int getValue() const = 0;
-    int getType() const Q_DECL_OVERRIDE;
-    virtual void doApply();
+    virtual int getType() const Q_DECL_OVERRIDE;
+    virtual void doApply() Q_DECL_OVERRIDE;
 protected:
     VIntConfigControl( vlc_object_t *a, module_config_t *b ) :
-                ConfigControl(a,b) {};
+                ConfigControl(a,b) {}
 };
 
 class IntegerConfigControl : public VIntConfigControl
@@ -305,7 +305,7 @@ public:
     void doApply() Q_DECL_OVERRIDE;
 protected:
     VStringConfigControl( vlc_object_t *a, module_config_t *b ) :
-                ConfigControl(a,b) {};
+                ConfigControl(a,b) {}
 };
 
 class StringConfigControl : public VStringConfigControl

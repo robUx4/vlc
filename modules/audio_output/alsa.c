@@ -158,6 +158,7 @@ static const uint16_t vlc_chans[] = {
     [SND_CHMAP_SR]   = AOUT_CHAN_MIDDLERIGHT,
     [SND_CHMAP_RC]   = AOUT_CHAN_REARCENTER,
 };
+static_assert(AOUT_CHAN_MAX == 9, "Missing channel entries");
 
 static int Map2Mask (vlc_object_t *obj, const snd_pcm_chmap_t *restrict map)
 {
@@ -495,6 +496,15 @@ static int Start (audio_output_t *aout, audio_sample_format_t *restrict fmt)
     }
     sys->rate = fmt->i_rate;
 
+#if 1 /* work-around for period-long latency outputs (e.g. PulseAudio): */
+    param = AOUT_MIN_PREPARE_TIME;
+    val = snd_pcm_hw_params_set_period_time_near (pcm, hw, &param, NULL);
+    if (val)
+    {
+        msg_Err (aout, "cannot set period: %s", snd_strerror (val));
+        goto error;
+    }
+#endif
     /* Set buffer size */
     param = AOUT_MAX_ADVANCE_TIME;
     val = snd_pcm_hw_params_set_buffer_time_near (pcm, hw, &param, NULL);
@@ -503,14 +513,22 @@ static int Start (audio_output_t *aout, audio_sample_format_t *restrict fmt)
         msg_Err (aout, "cannot set buffer duration: %s", snd_strerror (val));
         goto error;
     }
-
-    param = AOUT_MIN_PREPARE_TIME;
+#if 0
+    val = snd_pcm_hw_params_get_buffer_time (hw, &param, NULL);
+    if (val)
+    {
+        msg_Warn (aout, "cannot get buffer time: %s", snd_strerror(val));
+        param = AOUT_MIN_PREPARE_TIME;
+    }
+    else
+        param /= 2;
     val = snd_pcm_hw_params_set_period_time_near (pcm, hw, &param, NULL);
     if (val)
     {
         msg_Err (aout, "cannot set period: %s", snd_strerror (val));
         goto error;
     }
+#endif
 
     /* Commit hardware parameters */
     val = snd_pcm_hw_params (pcm, hw);
@@ -742,7 +760,7 @@ static int EnumDevices(vlc_object_t *obj, char const *varname,
         ids = xrealloc (ids, (n + 1) * sizeof (*ids));
         names = xrealloc (names, (n + 1) * sizeof (*names));
         ids[n] = xstrdup ("default");
-        names[n] = _("Default");
+        names[n] = xstrdup (_("Default"));
         n++;
     }
 

@@ -39,6 +39,8 @@ typedef int64_t stime_t;
 #define MAJOR_isom VLC_FOURCC( 'i', 's', 'o', 'm' )
 #define MAJOR_qt__ VLC_FOURCC( 'q', 't', ' ', ' ' )
 #define MAJOR_dash VLC_FOURCC( 'd', 'a', 's', 'h' )
+#define MAJOR_mp41 VLC_FOURCC( 'm', 'p', '4', '1' )
+#define MAJOR_avc1 VLC_FOURCC( 'a', 'v', 'c', '1' )
 
 #define ATOM_root VLC_FOURCC( 'r', 'o', 'o', 't' )
 #define ATOM_uuid VLC_FOURCC( 'u', 'u', 'i', 'd' )
@@ -130,6 +132,7 @@ typedef int64_t stime_t;
 #define ATOM_mpod VLC_FOURCC( 'm', 'p', 'o', 'd' )
 #define ATOM_hnti VLC_FOURCC( 'h', 'n', 't', 'i' )
 #define ATOM_rtp  VLC_FOURCC( 'r', 't', 'p', ' ' )
+#define ATOM_btrt VLC_FOURCC( 'b', 't', 'r', 't' )
 
 #define ATOM_esds VLC_FOURCC( 'e', 's', 'd', 's' )
 
@@ -159,8 +162,10 @@ typedef int64_t stime_t;
 #define ATOM_eac3 VLC_FOURCC( 'e', 'c', '-', '3' )
 #define ATOM_dac3 VLC_FOURCC( 'd', 'a', 'c', '3' )
 #define ATOM_dec3 VLC_FOURCC( 'd', 'e', 'c', '3' )
+#define ATOM_vc1  VLC_FOURCC( 'v', 'c', '-', '1' )
 #define ATOM_dvc1 VLC_FOURCC( 'd', 'v', 'c', '1' )
 #define ATOM_WMA2 VLC_FOURCC( 'W', 'M', 'A', '2' )
+#define ATOM_wma  VLC_FOURCC( 'w', 'm', 'a', ' ' )
 #define ATOM_enda VLC_FOURCC( 'e', 'n', 'd', 'a' )
 #define ATOM_gnre VLC_FOURCC( 'g', 'n', 'r', 'e' )
 #define ATOM_trkn VLC_FOURCC( 't', 'r', 'k', 'n' )
@@ -214,6 +219,7 @@ typedef int64_t stime_t;
 #define ATOM_dv5p VLC_FOURCC( 'd', 'v', '5', 'p' )
 #define ATOM_raw  VLC_FOURCC( 'r', 'a', 'w', ' ' )
 #define ATOM_dOps VLC_FOURCC( 'd', 'O', 'p', 's' )
+#define ATOM_wfex VLC_FOURCC( 'w', 'f', 'e', 'x' )
 
 #define ATOM_jpeg VLC_FOURCC( 'j', 'p', 'e', 'g' )
 
@@ -321,6 +327,12 @@ typedef int64_t stime_t;
 #define ATOM_rtng VLC_FOURCC( 'r', 't', 'n', 'g' )
 #define ATOM_tsel VLC_FOURCC( 't', 's', 'e', 'l' )
 #define ATOM_xid_ VLC_FOURCC( 'x', 'i', 'd', ' ' )
+#define ATOM_gshh VLC_FOURCC( 'g', 's', 'h', 'h' )
+#define ATOM_gspm VLC_FOURCC( 'g', 's', 'p', 'm' )
+#define ATOM_gspu VLC_FOURCC( 'g', 's', 'p', 'u' )
+#define ATOM_gssd VLC_FOURCC( 'g', 's', 's', 'd' )
+#define ATOM_gsst VLC_FOURCC( 'g', 's', 's', 't' )
+#define ATOM_gstd VLC_FOURCC( 'g', 's', 't', 'd' )
 
 #define ATOM_0x40PRM VLC_FOURCC( '@', 'P', 'R', 'M' )
 #define ATOM_0x40PRQ VLC_FOURCC( '@', 'P', 'R', 'Q' )
@@ -1233,7 +1245,7 @@ typedef struct
 {
     uint8_t i_profile_level;
 
-    int i_vc1;
+    uint32_t i_vc1;
     uint8_t *p_vc1;
 
 } MP4_Box_data_dvc1_t;
@@ -1272,6 +1284,13 @@ typedef struct
     uint8_t i_graphics_profile_level;
 
 } MP4_Box_data_iods_t;
+
+typedef struct
+{
+    uint32_t i_buffer_size;
+    uint32_t i_max_bitrate;
+    uint32_t i_avg_bitrate;
+} MP4_Box_data_btrt_t;
 
 typedef struct
 {
@@ -1338,26 +1357,6 @@ typedef struct
     uint8_t *p_trun_number;
     uint8_t *p_sample_number;
 } MP4_Box_data_tfra_t;
-
-typedef struct
-{
-    uint64_t i_duration;
-    uint32_t i_timescale;
-    uint16_t i_track_ID;
-    uint8_t  i_es_cat;
-
-    uint32_t FourCC;
-    uint32_t Bitrate;
-    uint32_t MaxWidth;
-    uint32_t MaxHeight;
-    uint32_t SamplingRate;
-    uint32_t Channels;
-    uint32_t BitsPerSample;
-    uint32_t AudioTag;
-    uint16_t nBlockAlign;
-    uint8_t  cpd_len;
-    uint8_t  *CodecPrivateData;
-} MP4_Box_data_stra_t;
 
 typedef struct
 {
@@ -1433,6 +1432,7 @@ typedef union MP4_Box_data_s
     MP4_Box_data_enda_t *p_enda;
     MP4_Box_data_keys_t *p_keys;
     MP4_Box_data_iods_t *p_iods;
+    MP4_Box_data_btrt_t *p_btrt;
     MP4_Box_data_pasp_t *p_pasp;
     MP4_Box_data_trex_t *p_trex;
     MP4_Box_data_mehd_t *p_mehd;
@@ -1442,7 +1442,6 @@ typedef union MP4_Box_data_s
 
     MP4_Box_data_tfra_t *p_tfra;
     MP4_Box_data_mfro_t *p_mfro;
-    MP4_Box_data_stra_t *p_stra;
 
     MP4_Box_data_stsz_t *p_stsz;
     MP4_Box_data_stz2_t *p_stz2;
@@ -1629,15 +1628,6 @@ static inline int CmpUUID( const UUID_t *u1, const UUID_t *u2 )
     return memcmp( u1, u2, 16 );
 }
 
-static inline void CreateUUID( UUID_t *p_uuid, uint32_t i_fourcc )
-{
-    /* made by 0xXXXXXXXX-0011-0010-8000-00aa00389b71
-            where XXXXXXXX is the fourcc */
-    /* FIXME implement this */
-    (void)p_uuid;
-    (void)i_fourcc;
-}
-
 static const UUID_t TfrfBoxUUID = {
                 { 0xd4, 0x80, 0x7e, 0xf2, 0xca, 0x39, 0x46, 0x95,
                   0x8e, 0x54, 0x26, 0xcb, 0x9e, 0x46, 0xa7, 0x9f } };
@@ -1645,16 +1635,6 @@ static const UUID_t TfrfBoxUUID = {
 static const UUID_t TfxdBoxUUID = {
                 { 0x6d, 0x1d, 0x9b, 0x05, 0x42, 0xd5, 0x44, 0xe6,
                   0x80, 0xe2, 0x14, 0x1d, 0xaf, 0xf7, 0x57, 0xb2 } };
-
-static const UUID_t SmooBoxUUID = {
-                { 0xe1, 0xda, 0x72, 0xba, 0x24, 0xd7, 0x43, 0xc3,
-                  0xa6, 0xa5, 0x1b, 0x57, 0x59, 0xa1, 0xa9, 0x2c } };
-
-static const UUID_t StraBoxUUID = {
-                { 0xb0, 0x3e, 0xf7, 0x70, 0x33, 0xbd, 0x4b, 0xac,
-                  0x96, 0xc7, 0xbf, 0x25, 0xf9, 0x7e, 0x24, 0x47 } };
-
-MP4_Box_t *MP4_BoxGetSmooBox( stream_t * );
 
 /*****************************************************************************
  * MP4_BoxGetNextChunk : Parse the entire moof box.

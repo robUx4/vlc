@@ -27,15 +27,14 @@
 
 #include "HTTPConnectionManager.h"
 #include "HTTPConnection.hpp"
-#include "Chunk.h"
 #include "Sockets.hpp"
+#include <vlc_url.h>
 
 using namespace adaptative::http;
 
-const uint64_t  HTTPConnectionManager::CHUNKDEFAULTBITRATE    = 1;
-
 HTTPConnectionManager::HTTPConnectionManager    (vlc_object_t *stream) :
-                       stream                   (stream)
+                       stream                   (stream),
+                       rateObserver             (NULL)
 {
 }
 HTTPConnectionManager::~HTTPConnectionManager   ()
@@ -53,53 +52,63 @@ void HTTPConnectionManager::releaseAllConnections()
 {
     std::vector<HTTPConnection *>::iterator it;
     for(it = connectionPool.begin(); it != connectionPool.end(); ++it)
-        (*it)->releaseChunk();
+        (*it)->setUsed(false);
 }
 
-HTTPConnection * HTTPConnectionManager::getConnectionForHost(const std::string &hostname)
+HTTPConnection * HTTPConnectionManager::getConnection(const std::string &hostname, uint16_t port, int sockettype)
 {
     std::vector<HTTPConnection *>::const_iterator it;
     for(it = connectionPool.begin(); it != connectionPool.end(); ++it)
     {
-        if(!(*it)->getHostname().compare(hostname) && (*it)->isAvailable())
-            return *it;
+        HTTPConnection *conn = *it;
+        if(conn->isAvailable() && conn->compare(hostname, port, sockettype))
+            return conn;
     }
     return NULL;
 }
 
-bool HTTPConnectionManager::connectChunk(Chunk *chunk)
+HTTPConnection * HTTPConnectionManager::getConnection(const std::string &scheme,
+                                                      const std::string &hostname,
+                                                      uint16_t port)
 {
-    if(chunk == NULL)
-        return false;
-    if(chunk->getConnection())
-        return true;
+    if((scheme != "http" && scheme != "https") || hostname.empty())
+        return NULL;
 
-    msg_Dbg(stream, "Retrieving %s @%zu", chunk->getUrl().c_str(),
-            chunk->getStartByte());
-
-    HTTPConnection *conn = getConnectionForHost(chunk->getHostname());
+    const int sockettype = (scheme == "https") ? TLSSocket::TLS : Socket::REGULAR;
+    HTTPConnection *conn = getConnection(hostname, port, sockettype);
     if(!conn)
     {
-        const bool tls = (chunk->getScheme() == "https");
-        Socket *socket = tls ? new (std::nothrow) TLSSocket(): new (std::nothrow) Socket();
+        Socket *socket = (sockettype == TLSSocket::TLS) ? new (std::nothrow) TLSSocket()
+                                                        : new (std::nothrow) Socket();
         if(!socket)
-            return false;
+            return NULL;
         /* disable pipelined tls until we have ticket/resume session support */
-        conn = new (std::nothrow) HTTPConnection(stream, socket, chunk, !tls);
+        conn = new (std::nothrow) HTTPConnection(stream, socket, sockettype != TLSSocket::TLS);
         if(!conn)
         {
             delete socket;
-            return false;
+            return NULL;
         }
+
         connectionPool.push_back(conn);
-        if (!chunk->getConnection()->connect(chunk->getHostname(), chunk->getPort()))
-            return false;
+
+        if (!conn->connect(hostname, port))
+        {
+            return NULL;
+        }
     }
 
-    conn->bindChunk(chunk);
+    conn->setUsed(true);
+    return conn;
+}
 
-    if(chunk->getBitrate() <= 0)
-        chunk->setBitrate(HTTPConnectionManager::CHUNKDEFAULTBITRATE);
+void HTTPConnectionManager::updateDownloadRate(size_t size, mtime_t time)
+{
+    if(rateObserver)
+        rateObserver->updateDownloadRate(size, time);
+}
 
-    return true;
+void HTTPConnectionManager::setDownloadRateObserver(IDownloadRateObserver *obs)
+{
+    rateObserver = obs;
 }

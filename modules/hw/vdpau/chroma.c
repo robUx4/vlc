@@ -418,12 +418,6 @@ drop:
     return NULL;
 }
 
-static inline VdpVideoSurface picture_GetVideoSurface(const picture_t *pic)
-{
-    vlc_vdp_video_field_t *field = pic->context;
-    return field->frame->surface;
-}
-
 static picture_t *Render(filter_t *filter, picture_t *src, bool import)
 {
     filter_sys_t *sys = filter->p_sys;
@@ -432,7 +426,7 @@ static picture_t *Render(filter_t *filter, picture_t *src, bool import)
 
     if (unlikely(src->context == NULL))
     {
-        msg_Err(filter, "corrupt VDPAU video surface %p", src);
+        msg_Err(filter, "corrupt VDPAU video surface %p", (void *)src);
         picture_Release(src);
         return NULL;
     }
@@ -770,7 +764,7 @@ static int OutputOpen(vlc_object_t *obj)
     sys->procamp.hue = 0.f;
 
     filter->pf_video_filter = video_filter;
-    filter->pf_video_flush = Flush;
+    filter->pf_flush = Flush;
     return VLC_SUCCESS;
 error:
     free(sys);

@@ -33,25 +33,29 @@
 #include <vlc_demux.h>
 
 #include "playlist/BasePeriod.h"
+#include "xml/DOMParser.h"
 
-#include "../dash/xml/DOMParser.h"
-#include "../dash/mpd/MPDFactory.h"
 #include "../dash/DASHManager.h"
 #include "../dash/DASHStream.hpp"
+#include "../dash/mpd/IsoffMainParser.h"
 
 #include "../hls/HLSManager.hpp"
 #include "../hls/HLSStreams.hpp"
 #include "../hls/playlist/Parser.hpp"
 #include "../hls/playlist/M3U8.hpp"
-
+#include "../smooth/SmoothManager.hpp"
+#include "../smooth/SmoothStream.hpp"
+#include "../smooth/playlist/Parser.hpp"
 
 using namespace adaptative::logic;
 using namespace adaptative::playlist;
+using namespace adaptative::xml;
 using namespace dash::mpd;
-using namespace dash::xml;
 using namespace dash;
 using namespace hls;
 using namespace hls::playlist;
+using namespace smooth;
+using namespace smooth::playlist;
 
 /*****************************************************************************
  * Module descriptor
@@ -96,6 +100,10 @@ vlc_module_end ()
 /*****************************************************************************
  * Local prototypes
  *****************************************************************************/
+static PlaylistManager * HandleDash(demux_t *, DOMParser &,
+                                    const std::string &, AbstractAdaptationLogic::LogicType);
+static PlaylistManager * HandleSmooth(demux_t *, DOMParser &,
+                                      const std::string &, AbstractAdaptationLogic::LogicType);
 
 /*****************************************************************************
  * Open:
@@ -104,58 +112,76 @@ static int Open(vlc_object_t *p_obj)
 {
     demux_t *p_demux = (demux_t*) p_obj;
 
-    bool b_mimematched = false;
+    std::string mimeType;
+
     char *psz_mime = stream_ContentType(p_demux->s);
     if(psz_mime)
     {
-        b_mimematched = !strcmp(psz_mime, "application/dash+xml");
+        mimeType = std::string(psz_mime);
         free(psz_mime);
     }
 
     PlaylistManager *p_manager = NULL;
-    int logic = var_InheritInteger(p_obj, "adaptative-logic");
+    AbstractAdaptationLogic::LogicType logic =
+            static_cast<AbstractAdaptationLogic::LogicType>(var_InheritInteger(p_obj, "adaptative-logic"));
 
     std::string playlisturl(p_demux->psz_access);
     playlisturl.append("://");
     playlisturl.append(p_demux->psz_location);
 
-    if(b_mimematched || DASHManager::isDASH(p_demux->s))
-    {
-        //Build a XML tree
-        DOMParser parser(p_demux->s);
-        if( !parser.parse() )
-        {
-            msg_Err( p_demux, "Could not parse MPD" );
-            return VLC_EGENERIC;
-        }
+    bool dashmime = DASHManager::mimeMatched(mimeType);
+    bool smoothmime = SmoothManager::mimeMatched(mimeType);
 
-        //Begin the actual MPD parsing:
-        MPD *p_playlist = MPDFactory::create(parser.getRootNode(), p_demux->s,
-                                             playlisturl, parser.getProfile());
-        if(p_playlist == NULL)
-        {
-            msg_Err( p_demux, "Cannot create/unknown MPD for profile");
-            return VLC_EGENERIC;
-        }
-
-        p_manager = new DASHManager( p_demux, p_playlist,
-                                     new (std::nothrow) DASHStreamFactory,
-                                     static_cast<AbstractAdaptationLogic::LogicType>(logic) );
-    }
-    else if(HLSManager::isHTTPLiveStreaming(p_demux->s))
+    if(!dashmime && !smoothmime && HLSManager::isHTTPLiveStreaming(p_demux->s))
     {
         M3U8Parser parser;
         M3U8 *p_playlist = parser.parse(p_demux->s, playlisturl);
         if(!p_playlist)
         {
-            msg_Err( p_demux, "Could not parse MPD" );
+            msg_Err( p_demux, "Could not parse playlist" );
             return VLC_EGENERIC;
         }
 
-        p_manager =
-                new (std::nothrow) HLSManager(p_demux, p_playlist,
-                                              new (std::nothrow) HLSStreamFactory,
-                                              static_cast<AbstractAdaptationLogic::LogicType>(logic));
+        p_manager = new (std::nothrow) HLSManager(p_demux, p_playlist,
+                                                  new (std::nothrow) HLSStreamFactory, logic);
+    }
+    else
+    {
+        /* Handle XML Based ones */
+        DOMParser xmlParser; /* Share that xml reader */
+        if(dashmime)
+        {
+            p_manager = HandleDash(p_demux, xmlParser, playlisturl, logic);
+        }
+        else if(smoothmime)
+        {
+            p_manager = HandleSmooth(p_demux, xmlParser, playlisturl, logic);
+        }
+        else
+        {
+            /* We need to probe content */
+            const uint8_t *p_peek;
+            const ssize_t i_peek = stream_Peek(p_demux->s, &p_peek, 2048);
+            if(i_peek > 0)
+            {
+                stream_t *peekstream = stream_MemoryNew(p_demux, const_cast<uint8_t *>(p_peek), (size_t)i_peek, true);
+                if(peekstream)
+                {
+                    if(xmlParser.reset(peekstream) && xmlParser.parse(false))
+                    {
+                        if(DASHManager::isDASH(xmlParser.getRootNode()))
+                        {
+                            p_manager = HandleDash(p_demux, xmlParser, playlisturl, logic);
+                        }
+                        else if(SmoothManager::isSmoothStreaming(xmlParser.getRootNode()))
+                        {
+                            p_manager = HandleSmooth(p_demux, xmlParser, playlisturl, logic);
+                        }
+                    }
+                    stream_Delete(peekstream);
+                }
+            }
+        }
     }
 
     if(!p_manager || !p_manager->start())
@@ -172,6 +198,7 @@ static int Open(vlc_object_t *p_obj)
 
     return VLC_SUCCESS;
 }
+
 /*****************************************************************************
  * Close:
  *****************************************************************************/
@@ -181,4 +208,51 @@ static void Close(vlc_object_t *p_obj)
     PlaylistManager *p_manager  = reinterpret_cast<PlaylistManager *>(p_demux->p_sys);
 
     delete p_manager;
+}
+
+/*****************************************************************************
+ *
+ *****************************************************************************/
+static PlaylistManager * HandleDash(demux_t *p_demux, DOMParser &xmlParser,
+                                    const std::string & playlisturl,
+                                    AbstractAdaptationLogic::LogicType logic)
+{
+    if(!xmlParser.reset(p_demux->s) || !xmlParser.parse(true))
+    {
+        msg_Err(p_demux, "Cannot parse MPD");
+        return NULL;
+    }
+    IsoffMainParser mpdparser(xmlParser.getRootNode(), p_demux->s, playlisturl);
+    MPD *p_playlist = mpdparser.parse();
+    if(p_playlist == NULL)
+    {
+        msg_Err( p_demux, "Cannot create/unknown MPD for profile");
+        return NULL;
+    }
+
+    return new (std::nothrow) DASHManager( p_demux, p_playlist,
+                                 new (std::nothrow) DASHStreamFactory,
+                                 logic );
+}
+
+static PlaylistManager * HandleSmooth(demux_t *p_demux, DOMParser &xmlParser,
+                                    const std::string & playlisturl,
+                                    AbstractAdaptationLogic::LogicType logic)
+{
+    if(!xmlParser.reset(p_demux->s) || !xmlParser.parse(true))
+    {
+        msg_Err(p_demux, "Cannot parse Manifest");
+        return NULL;
+    }
+    ManifestParser mparser(xmlParser.getRootNode(), p_demux->s, playlisturl);
+    Manifest *p_playlist = mparser.parse();
+    if(p_playlist == NULL)
+    {
+        msg_Err( p_demux, "Cannot create Manifest");
+        return NULL;
+    }
+
+    return new (std::nothrow) SmoothManager( p_demux, p_playlist,
+                                 new (std::nothrow) SmoothStreamFactory,
+                                 logic );
 }

@@ -49,6 +49,7 @@ PlaylistManager::PlaylistManager( demux_t *p_demux_,
                                   AbstractAdaptationLogic::LogicType type ) :
              conManager     ( NULL ),
              logicType      ( type ),
+             logic          ( NULL ),
              playlist       ( pl ),
              streamFactory  ( factory ),
              p_demux        ( p_demux_ ),
@@ -60,10 +61,11 @@ PlaylistManager::PlaylistManager( demux_t *p_demux_,
 
 PlaylistManager::~PlaylistManager   ()
 {
-    delete conManager;
     delete streamFactory;
     unsetPeriod();
     delete playlist;
+    delete conManager;
+    delete logic;
 }
 
 void PlaylistManager::unsetPeriod()
@@ -79,6 +81,9 @@ bool PlaylistManager::setupPeriod()
     if(!currentPeriod)
         return false;
 
+    if(!logic && !(logic = createLogic(logicType, conManager)))
+        return false;
+
     std::vector<BaseAdaptationSet*> sets = currentPeriod->getAdaptationSets();
     std::vector<BaseAdaptationSet*>::iterator it;
     for(it=sets.begin();it!=sets.end();++it)
@@ -86,23 +91,15 @@ bool PlaylistManager::setupPeriod()
         BaseAdaptationSet *set = *it;
         if(set && streamFactory)
         {
-            AbstractAdaptationLogic *logic = createLogic(logicType);
-            if(!logic)
-                continue;
-
             SegmentTracker *tracker = new (std::nothrow) SegmentTracker(logic, set);
             if(!tracker)
-            {
-                delete logic;
                 continue;
-            }
 
             AbstractStream *st = streamFactory->create(p_demux, set->getStreamFormat(),
-                                               logic, tracker, conManager);
+                                                       tracker, conManager);
             if(!st)
             {
                 delete tracker;
-                delete logic;
                 continue;
             }
 
@@ -391,18 +388,28 @@ int PlaylistManager::doControl(int i_query, va_list args)
     return VLC_SUCCESS;
 }
 
-AbstractAdaptationLogic *PlaylistManager::createLogic(AbstractAdaptationLogic::LogicType type)
+AbstractAdaptationLogic *PlaylistManager::createLogic(AbstractAdaptationLogic::LogicType type, HTTPConnectionManager *conn)
 {
     switch(type)
     {
-        case AbstractAdaptationLogic::AlwaysBest:
-            return new (std::nothrow) AlwaysBestAdaptationLogic();
         case AbstractAdaptationLogic::FixedRate:
+        {
+            size_t bps = var_InheritInteger(p_demux, "adaptative-bw") * 8192;
+            return new (std::nothrow) FixedRateAdaptationLogic(bps);
+        }
         case AbstractAdaptationLogic::AlwaysLowest:
             return new (std::nothrow) AlwaysLowestAdaptationLogic();
+        case AbstractAdaptationLogic::AlwaysBest:
+            return new (std::nothrow) AlwaysBestAdaptationLogic();
         case AbstractAdaptationLogic::Default:
         case AbstractAdaptationLogic::RateBased:
-            return new (std::nothrow) RateBasedAdaptationLogic(0, 0);
+        {
+            int width = var_InheritInteger(p_demux, "adaptative-width");
+            int height = var_InheritInteger(p_demux, "adaptative-height");
+            RateBasedAdaptationLogic *logic = new (std::nothrow) RateBasedAdaptationLogic(width, height);
+            conn->setDownloadRateObserver(logic);
+            return logic;
+        }
         default:
             return NULL;
     }

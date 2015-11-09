@@ -292,6 +292,10 @@ libadaptative_plugin_la_SOURCES = \
     demux/adaptative/logic/RateBasedAdaptationLogic.cpp \
     demux/adaptative/logic/Representationselectors.hpp \
     demux/adaptative/logic/Representationselectors.cpp \
+    demux/adaptative/mp4/AtomsReader.cpp \
+    demux/adaptative/mp4/AtomsReader.hpp \
+    demux/adaptative/http/BytesRange.cpp \
+    demux/adaptative/http/BytesRange.hpp \
     demux/adaptative/http/Chunk.cpp \
     demux/adaptative/http/Chunk.h \
     demux/adaptative/http/HTTPConnection.cpp \
@@ -320,12 +324,20 @@ libadaptative_plugin_la_SOURCES = \
     demux/adaptative/Streams.cpp \
     demux/adaptative/Streams.hpp \
     demux/adaptative/Time.hpp \
+    demux/adaptative/tools/Conversions.hpp \
+    demux/adaptative/tools/Conversions.cpp \
     demux/adaptative/tools/Debug.hpp \
     demux/adaptative/tools/Helper.cpp \
     demux/adaptative/tools/Helper.h \
     demux/adaptative/tools/Properties.hpp \
     demux/adaptative/tools/Retrieve.cpp \
-    demux/adaptative/tools/Retrieve.hpp
+    demux/adaptative/tools/Retrieve.hpp \
+    demux/adaptative/xml/DOMHelper.cpp \
+    demux/adaptative/xml/DOMHelper.h \
+    demux/adaptative/xml/DOMParser.cpp \
+    demux/adaptative/xml/DOMParser.h \
+    demux/adaptative/xml/Node.cpp \
+    demux/adaptative/xml/Node.h
 
 libadaptative_dash_SOURCES = \
     demux/dash/mpd/AdaptationSet.cpp \
@@ -340,8 +352,6 @@ libadaptative_dash_SOURCES = \
     demux/dash/mpd/IsoffMainParser.h \
     demux/dash/mpd/MPD.cpp \
     demux/dash/mpd/MPD.h \
-    demux/dash/mpd/MPDFactory.cpp \
-    demux/dash/mpd/MPDFactory.h \
     demux/dash/mpd/Period.cpp \
     demux/dash/mpd/Period.h \
     demux/dash/mpd/Profile.cpp \
@@ -352,14 +362,8 @@ libadaptative_dash_SOURCES = \
     demux/dash/mpd/Representation.h \
     demux/dash/mpd/TrickModeType.cpp \
     demux/dash/mpd/TrickModeType.h \
-    demux/dash/mp4/AtomsReader.cpp \
-    demux/dash/mp4/AtomsReader.hpp \
-    demux/dash/xml/DOMHelper.cpp \
-    demux/dash/xml/DOMHelper.h \
-    demux/dash/xml/DOMParser.cpp \
-    demux/dash/xml/DOMParser.h \
-    demux/dash/xml/Node.cpp \
-    demux/dash/xml/Node.h \
+    demux/dash/mp4/IndexReader.cpp \
+    demux/dash/mp4/IndexReader.hpp \
     demux/dash/DASHManager.cpp \
     demux/dash/DASHManager.h \
     demux/dash/DASHStream.cpp \
@@ -383,8 +387,32 @@ libadaptative_hls_SOURCES = \
     demux/hls/HLSStreams.hpp \
     demux/hls/HLSStreams.cpp
 
+libadaptative_smooth_SOURCES = \
+    demux/smooth/mp4/IndexReader.cpp \
+    demux/smooth/mp4/IndexReader.hpp \
+    demux/smooth/playlist/ForgedInitSegment.hpp \
+    demux/smooth/playlist/ForgedInitSegment.cpp \
+    demux/smooth/playlist/Manifest.hpp \
+    demux/smooth/playlist/Manifest.cpp \
+    demux/smooth/playlist/MemoryChunk.hpp \
+    demux/smooth/playlist/MemoryChunk.cpp \
+    demux/smooth/playlist/Parser.hpp \
+    demux/smooth/playlist/Parser.cpp \
+    demux/smooth/playlist/Representation.hpp \
+    demux/smooth/playlist/Representation.cpp \
+    demux/smooth/playlist/SmoothSegment.hpp \
+    demux/smooth/playlist/SmoothSegment.cpp \
+    demux/smooth/SmoothManager.hpp \
+    demux/smooth/SmoothManager.cpp \
+    demux/smooth/SmoothStreamFormat.hpp \
+    demux/smooth/SmoothStream.hpp \
+    demux/smooth/SmoothStream.cpp
+libadaptative_smooth_SOURCES += mux/mp4/libmp4mux.c mux/mp4/libmp4mux.h \
+				packetizer/h264_nal.c packetizer/h264_nal.h
+
 libadaptative_plugin_la_SOURCES += $(libadaptative_hls_SOURCES)
 libadaptative_plugin_la_SOURCES += $(libadaptative_dash_SOURCES)
+libadaptative_plugin_la_SOURCES += $(libadaptative_smooth_SOURCES)
 libadaptative_plugin_la_SOURCES += demux/adaptative/adaptative.cpp
 libadaptative_plugin_la_SOURCES += demux/mp4/libmp4.c demux/mp4/libmp4.h
 libadaptative_plugin_la_CXXFLAGS = $(AM_CFLAGS) -I$(srcdir)/demux/adaptative

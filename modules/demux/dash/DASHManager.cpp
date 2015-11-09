@@ -29,14 +29,16 @@
 #include <inttypes.h>
 
 #include "DASHManager.h"
-#include "mpd/MPDFactory.h"
 #include "mpd/ProgramInformation.h"
+#include "mpd/IsoffMainParser.h"
 #include "xml/DOMParser.h"
-#include "../adaptative/logic/RateBasedAdaptationLogic.h"
+#include "xml/Node.h"
 #include "../adaptative/tools/Helper.h"
+#include "../adaptative/http/HTTPConnectionManager.h"
 #include <vlc_stream.h>
 #include <vlc_demux.h>
 #include <vlc_meta.h>
+#include <vlc_block.h>
 #include "../adaptative/tools/Retrieve.hpp"
 
 #include <algorithm>
@@ -73,23 +75,23 @@ bool DASHManager::updatePlaylist()
         url.append("://");
         url.append(p_demux->psz_location);
 
-        uint8_t *p_data = NULL;
-        size_t i_data = Retrieve::HTTP(VLC_OBJECT(p_demux->s), url, (void**) &p_data);
-        if(!p_data)
+        block_t *p_block = Retrieve::HTTP(VLC_OBJECT(p_demux->s), url);
+        if(!p_block)
             return false;
 
-        stream_t *mpdstream = stream_MemoryNew(p_demux->s, p_data, i_data, false);
+        stream_t *mpdstream = stream_MemoryNew(p_demux->s, p_block->p_buffer, p_block->i_buffer, true);
         if(!mpdstream)
         {
-            free(p_data);
+            block_Release(p_block);
             nextPlaylistupdate = now + playlist->minUpdatePeriod.Get() / CLOCK_FREQ;
             return false;
         }
 
         xml::DOMParser parser(mpdstream);
-        if(!parser.parse())
+        if(!parser.parse(true))
         {
             stream_Delete(mpdstream);
+            block_Release(p_block);
             nextPlaylistupdate = now + playlist->minUpdatePeriod.Get() / CLOCK_FREQ;
             return false;
         }
@@ -103,15 +105,16 @@ bool DASHManager::updatePlaylist()
                 minsegmentTime = segmentTime;
         }
 
-        MPD *newmpd = MPDFactory::create(parser.getRootNode(), mpdstream,
-                                         Helper::getDirectoryPath(url).append("/"),
-                                         parser.getProfile());
+        IsoffMainParser mpdparser(parser.getRootNode(), mpdstream,
+                                Helper::getDirectoryPath(url).append("/"));
+        MPD *newmpd = mpdparser.parse();
         if(newmpd)
         {
             playlist->mergeWith(newmpd, minsegmentTime);
             delete newmpd;
         }
         stream_Delete(mpdstream);
+        block_Release(p_block);
     }
 
     /* Compute new MPD update time */
@@ -131,7 +134,7 @@ bool DASHManager::updatePlaylist()
     nextPlaylistupdate = now + (mininterval + (maxinterval - mininterval) / 2) / CLOCK_FREQ;
 
     msg_Dbg(p_demux, "Updated MPD, next update in %" PRId64 "s (%" PRId64 "..%" PRId64 ")",
-            nextPlaylistupdate - now, mininterval/ CLOCK_FREQ, maxinterval/ CLOCK_FREQ );
+            (mtime_t) nextPlaylistupdate - now, mininterval/ CLOCK_FREQ, maxinterval/ CLOCK_FREQ );
 
     return true;
 }
@@ -174,48 +177,30 @@ int DASHManager::doControl(int i_query, va_list args)
     return PlaylistManager::doControl(i_query, args);
 }
 
-bool DASHManager::isDASH(stream_t *stream)
+bool DASHManager::isDASH(xml::Node *root)
 {
     const std::string namespaces[] = {
-        "xmlns=\"urn:mpeg:mpegB:schema:DASH:MPD:DIS2011\"",
-        "xmlns=\"urn:mpeg:schema:dash:mpd:2011\"",
-        "xmlns=\"urn:mpeg:DASH:schema:MPD:2011\"",
-        "xmlns='urn:mpeg:mpegB:schema:DASH:MPD:DIS2011'",
-        "xmlns='urn:mpeg:schema:dash:mpd:2011'",
-        "xmlns='urn:mpeg:DASH:schema:MPD:2011'",
+        "urn:mpeg:mpegB:schema:DASH:MPD:DIS2011",
+        "urn:mpeg:schema:dash:mpd:2011",
+        "urn:mpeg:DASH:schema:MPD:2011",
+        "urn:mpeg:mpegB:schema:DASH:MPD:DIS2011",
+        "urn:mpeg:schema:dash:mpd:2011",
+        "urn:mpeg:DASH:schema:MPD:2011",
     };
 
-    const uint8_t *peek;
-    int peek_size = stream_Peek(stream, &peek, 1024);
-    if (peek_size < (int)namespaces[0].length())
+    if(root->getName() != "MPD")
         return false;
 
-    std::string header((const char*)peek, peek_size);
+    std::string ns = root->getAttributeValue("xmlns");
     for( size_t i=0; i<ARRAY_SIZE(namespaces); i++ )
     {
-        if ( adaptative::Helper::ifind(header, namespaces[i]) )
+        if ( adaptative::Helper::ifind(ns, namespaces[i]) )
             return true;
     }
     return false;
 }
 
-AbstractAdaptationLogic *DASHManager::createLogic(AbstractAdaptationLogic::LogicType type)
+bool DASHManager::mimeMatched(const std::string &mime)
 {
-    switch(type)
-    {
-        case AbstractAdaptationLogic::FixedRate:
-        {
-            size_t bps = var_InheritInteger(p_demux, "adaptative-bw") * 8192;
-            return new (std::nothrow) FixedRateAdaptationLogic(bps);
-        }
-        case AbstractAdaptationLogic::Default:
-        case AbstractAdaptationLogic::RateBased:
-        {
-            int width = var_InheritInteger(p_demux, "adaptative-width");
-            int height = var_InheritInteger(p_demux, "adaptative-height");
-            return new (std::nothrow) RateBasedAdaptationLogic(width, height);
-        }
-        default:
-            return PlaylistManager::createLogic(type);
-    }
+    return (mime == "application/dash+xml");
 }

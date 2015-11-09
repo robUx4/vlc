@@ -39,21 +39,20 @@
 #include "AdaptationSet.h"
 #include "ProgramInformation.h"
 #include "DASHSegment.h"
-#include "../xml/DOMHelper.h"
+#include "../adaptative/xml/DOMHelper.h"
 #include "../adaptative/tools/Helper.h"
 #include "../adaptative/tools/Debug.hpp"
-#include <vlc_strings.h>
+#include "../adaptative/tools/Conversions.hpp"
 #include <vlc_stream.h>
 #include <cstdio>
 
 using namespace dash::mpd;
-using namespace dash::xml;
+using namespace adaptative::xml;
 using namespace adaptative::playlist;
 
-IsoffMainParser::IsoffMainParser    (Node *root_, stream_t *stream, std::string & streambaseurl_)
+IsoffMainParser::IsoffMainParser    (Node *root_, stream_t *stream, const std::string & streambaseurl_)
 {
     root = root_;
-    mpd = NULL;
     p_stream = stream;
     playlisturl = streambaseurl_;
 }
@@ -62,7 +61,7 @@ IsoffMainParser::~IsoffMainParser   ()
 {
 }
 
-void IsoffMainParser::setMPDBaseUrl(Node *root)
+void IsoffMainParser::parseMPDBaseUrl(MPD *mpd, Node *root)
 {
     std::vector<Node *> baseUrls = DOMHelper::getChildElementByTagName(root, "BaseURL");
 
@@ -72,37 +71,33 @@ void IsoffMainParser::setMPDBaseUrl(Node *root)
     mpd->setPlaylistUrl( Helper::getDirectoryPath(playlisturl).append("/") );
 }
 
-MPD* IsoffMainParser::getMPD()
+MPD * IsoffMainParser::parse()
 {
+    MPD *mpd = new (std::nothrow) MPD(p_stream, getProfile());
+    if(mpd)
+    {
+        parseMPDAttributes(mpd, root);
+        parseProgramInformation(DOMHelper::getFirstChildElementByName(root, "ProgramInformation"), mpd);
+        parseMPDBaseUrl(mpd, root);
+        parsePeriods(mpd, root);
+        mpd->debug();
+    }
     return mpd;
 }
 
-bool    IsoffMainParser::parse              (Profile profile)
+void    IsoffMainParser::parseMPDAttributes   (MPD *mpd, xml::Node *node)
 {
-    mpd = new MPD(p_stream, profile);
-    setMPDAttributes();
-    parseProgramInformation(DOMHelper::getFirstChildElementByName(root, "ProgramInformation"), mpd);
-    setMPDBaseUrl(root);
-    parsePeriods(root);
-
-    if(mpd)
-        mpd->debug();
-    return true;
-}
-
-void    IsoffMainParser::setMPDAttributes   ()
-{
-    const std::map<std::string, std::string> attr = this->root->getAttributes();
+    const std::map<std::string, std::string> attr = node->getAttributes();
 
     std::map<std::string, std::string>::const_iterator it;
 
     it = attr.find("mediaPresentationDuration");
     if(it != attr.end())
-        this->mpd->duration.Set(IsoTime(it->second) * CLOCK_FREQ);
+        mpd->duration.Set(IsoTime(it->second) * CLOCK_FREQ);
 
     it = attr.find("minBufferTime");
     if(it != attr.end())
-        this->mpd->minBufferTime.Set(IsoTime(it->second) * CLOCK_FREQ);
+        mpd->minBufferTime.Set(IsoTime(it->second) * CLOCK_FREQ);
 
     it = attr.find("minimumUpdatePeriod");
     if(it != attr.end())
@@ -129,7 +124,7 @@ void    IsoffMainParser::setMPDAttributes   ()
             mpd->timeShiftBufferDepth.Set(IsoTime(it->second) * CLOCK_FREQ);
 }
 
-void IsoffMainParser::parsePeriods(Node *root)
+void IsoffMainParser::parsePeriods(MPD *mpd, Node *root)
 {
     std::vector<Node *> periods = DOMHelper::getElementByTagName(root, "Period", false);
     std::vector<Node *>::const_iterator it;
@@ -149,7 +144,7 @@ void IsoffMainParser::parsePeriods(Node *root)
         if(!baseUrls.empty())
             period->baseUrl.Set( new Url( baseUrls.front()->getText() ) );
 
-        setAdaptationSets(*it, period);
+        parseAdaptationSets(*it, period);
         mpd->addPeriod(period);
     }
 }
@@ -222,7 +217,7 @@ size_t IsoffMainParser::parseSegmentInformation(Node *node, SegmentInformation *
     return total;
 }
 
-void    IsoffMainParser::setAdaptationSets  (Node *periodNode, Period *period)
+void    IsoffMainParser::parseAdaptationSets  (Node *periodNode, Period *period)
 {
     std::vector<Node *> adaptationSets = DOMHelper::getElementByTagName(periodNode, "AdaptationSet", false);
     std::vector<Node *>::const_iterator it;
@@ -264,11 +259,11 @@ void    IsoffMainParser::setAdaptationSets  (Node *periodNode, Period *period)
 
         parseSegmentInformation(*it, adaptationSet, &nextid);
 
-        setRepresentations((*it), adaptationSet);
+        parseRepresentations((*it), adaptationSet);
         period->addAdaptationSet(adaptationSet);
     }
 }
-void    IsoffMainParser::setRepresentations (Node *adaptationSetNode, AdaptationSet *adaptationSet)
+void    IsoffMainParser::parseRepresentations (Node *adaptationSetNode, AdaptationSet *adaptationSet)
 {
     std::vector<Node *> representations = DOMHelper::getElementByTagName(adaptationSetNode, "Representation", false);
     uint64_t nextid = 0;
@@ -503,85 +498,25 @@ void IsoffMainParser::parseProgramInformation(Node * node, MPD *mpd)
     }
 }
 
-IsoTime::IsoTime(const std::string &str)
+Profile IsoffMainParser::getProfile() const
 {
-    time = str_duration(str.c_str());
-}
+    Profile res(Profile::Unknown);
+    if(this->root == NULL)
+        return res;
 
-IsoTime::operator time_t () const
-{
-    return time;
-}
+    std::string urn = root->getAttributeValue("profiles");
+    if ( urn.length() == 0 )
+        urn = root->getAttributeValue("profile"); //The standard spells it the both ways...
 
-/* i_year: year - 1900  i_month: 0-11  i_mday: 1-31 i_hour: 0-23 i_minute: 0-59 i_second: 0-59 */
-static int64_t vlc_timegm( int i_year, int i_month, int i_mday, int i_hour, int i_minute, int i_second )
-{
-    static const int pn_day[12+1] = { 0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334 };
-    int64_t i_day;
-
-    if( i_year < 70 ||
-        i_month < 0 || i_month > 11 || i_mday < 1 || i_mday > 31 ||
-        i_hour < 0 || i_hour > 23 || i_minute < 0 || i_minute > 59 || i_second < 0 || i_second > 59 )
-        return -1;
-
-    /* Count the number of days */
-    i_day = (int64_t)365 * (i_year-70) + pn_day[i_month] + i_mday - 1;
-#define LEAP(y) ( ((y)%4) == 0 && (((y)%100) != 0 || ((y)%400) == 0) ? 1 : 0)
-    for( int i = 70; i < i_year; i++ )
-        i_day += LEAP(1900+i);
-    if( i_month > 1 )
-        i_day += LEAP(1900+i_year);
-#undef LEAP
-    /**/
-    return ((24*i_day + i_hour)*60 + i_minute)*60 + i_second;
-}
-
-UTCTime::UTCTime(const std::string &str)
-{
-    enum { YEAR = 0, MON, DAY, HOUR, MIN, SEC, TZ };
-    int values[7] = {0};
-    std::istringstream in(str);
-
-    try
+    size_t pos;
+    size_t nextpos = -1;
+    do
     {
-        /* Date */
-        for(int i=YEAR;i<=DAY && !in.eof();i++)
-        {
-            if(i!=YEAR)
-                in.ignore(1);
-            in >> values[i];
-        }
-        /* Time */
-        if (!in.eof() && in.peek() == 'T')
-        {
-            for(int i=HOUR;i<=SEC && !in.eof();i++)
-            {
-                in.ignore(1);
-                in >> values[i];
-            }
-        }
-        /* Timezone */
-        if (!in.eof() && in.peek() == 'Z')
-        {
-            in.ignore(1);
-            while(!in.eof())
-            {
-                if(in.peek() == '+')
-                    continue;
-                in >> values[TZ];
-                break;
-            }
-        }
-
-        time = vlc_timegm( values[YEAR] - 1900, values[MON] - 1, values[DAY],
-                           values[HOUR], values[MIN], values[SEC] );
-        time += values[TZ] * 3600;
-    } catch(int) {
-        time = 0;
+        pos = nextpos + 1;
+        nextpos = urn.find_first_of(",", pos);
+        res = Profile(urn.substr(pos, nextpos - pos));
     }
-}
+    while (nextpos != std::string::npos && res == Profile::Unknown);
 
-UTCTime::operator time_t () const
-{
-    return time;
+    return res;
 }

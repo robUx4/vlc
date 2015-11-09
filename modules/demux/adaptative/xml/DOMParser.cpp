@@ -31,8 +31,14 @@
 #include <stack>
 #include <vlc_xml.h>
 
-using namespace dash::xml;
-using namespace dash::mpd;
+using namespace adaptative::xml;
+
+DOMParser::DOMParser() :
+    root( NULL ),
+    stream( NULL ),
+    vlc_reader( NULL )
+{
+}
 
 DOMParser::DOMParser    (stream_t *stream) :
     root( NULL ),
@@ -52,21 +58,37 @@ Node*   DOMParser::getRootNode              ()
 {
     return this->root;
 }
-bool    DOMParser::parse                    ()
+bool    DOMParser::parse                    (bool b)
 {
-    this->vlc_reader = xml_ReaderCreate(this->stream, this->stream);
-
-    if(!this->vlc_reader)
+    if(!stream)
         return false;
 
-    root = processNode();
+    if(!vlc_reader && !(vlc_reader = xml_ReaderCreate(stream, stream)))
+        return false;
+
+    const int i_flags = vlc_reader->i_flags;
+    if(!b)
+        vlc_reader->i_flags |= OBJECT_FLAGS_QUIET;
+    root = processNode(b);
+    vlc_reader->i_flags = i_flags;
     if ( root == NULL )
         return false;
 
     return true;
 }
 
-Node* DOMParser::processNode()
+bool DOMParser::reset(stream_t *s)
+{
+    stream = s;
+    if(!vlc_reader)
+        return true;
+    delete root;
+    root = NULL;
+    vlc_reader = xml_ReaderReset(vlc_reader, s);
+    return !!vlc_reader;
+}
+
+Node* DOMParser::processNode(bool b_strict)
 {
     const char *data;
     int type;
@@ -121,10 +143,15 @@ Node* DOMParser::processNode()
     while( lifo.size() > 1 )
         lifo.pop();
 
-    if(!lifo.empty())
-        delete lifo.top();
+    Node *node = (!lifo.empty()) ? lifo.top() : NULL;
 
-    return NULL;
+    if(b_strict && node)
+    {
+        delete node;
+        return NULL;
+    }
+
+    return node;
 }
 
 void    DOMParser::addAttributesToNode      (Node *node)
@@ -165,26 +192,4 @@ void    DOMParser::print                    ()
     this->print(this->root, 0);
 }
 
-Profile DOMParser::getProfile() const
-{
-    Profile res(Profile::Unknown);
-    if(this->root == NULL)
-        return res;
 
-    std::string urn = this->root->getAttributeValue("profiles");
-    if ( urn.length() == 0 )
-        urn = this->root->getAttributeValue("profile"); //The standard spells it the both ways...
-
-
-    size_t pos;
-    size_t nextpos = -1;
-    do
-    {
-        pos = nextpos + 1;
-        nextpos = urn.find_first_of(",", pos);
-        res = Profile(urn.substr(pos, nextpos - pos));
-    }
-    while (nextpos != std::string::npos && res == Profile::Unknown);
-
-    return res;
-}

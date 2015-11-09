@@ -49,6 +49,7 @@ struct playlist_preparser_t
 
     vlc_mutex_t     lock;
     vlc_cond_t      wait;
+    vlc_sem_t       item_done;
     bool            b_live;
     preparser_entry_t  **pp_waiting;
     int             i_waiting;
@@ -72,6 +73,7 @@ playlist_preparser_t *playlist_preparser_New( vlc_object_t *parent )
 
     vlc_mutex_init( &p_preparser->lock );
     vlc_cond_init( &p_preparser->wait );
+    vlc_sem_init( &p_preparser->item_done, 0 );
     p_preparser->b_live = false;
     p_preparser->i_waiting = 0;
     p_preparser->pp_waiting = NULL;
@@ -123,11 +125,14 @@ void playlist_preparser_Delete( playlist_preparser_t *p_preparser )
         REMOVE_ELEM( p_preparser->pp_waiting, p_preparser->i_waiting, 0 );
     }
 
+    vlc_sem_post( &p_preparser->item_done );
+
     while( p_preparser->b_live )
         vlc_cond_wait( &p_preparser->wait, &p_preparser->lock );
     vlc_mutex_unlock( &p_preparser->lock );
 
     /* Destroy the item preparser */
+    vlc_sem_destroy( &p_preparser->item_done );
     vlc_cond_destroy( &p_preparser->wait );
     vlc_mutex_destroy( &p_preparser->lock );
 
@@ -139,10 +144,24 @@ void playlist_preparser_Delete( playlist_preparser_t *p_preparser )
 /*****************************************************************************
  * Privates functions
  *****************************************************************************/
+
+static int InputEvent( vlc_object_t *obj, const char *varname,
+                       vlc_value_t old, vlc_value_t cur, void *data )
+{
+    vlc_sem_t *done = data;
+    int event = cur.i_int;
+
+    if( event == INPUT_EVENT_DEAD )
+        vlc_sem_post( done );
+
+    (void) obj; (void) varname; (void) old;
+    return VLC_SUCCESS;
+}
+
 /**
  * This function preparses an item when needed.
  */
-static void Preparse( vlc_object_t *obj, input_item_t *p_item,
+static void Preparse( playlist_preparser_t *preparser, input_item_t *p_item,
                       input_item_meta_request_option_t i_options )
 {
     vlc_mutex_lock( &p_item->lock );
@@ -160,21 +179,31 @@ static void Preparse( vlc_object_t *obj, input_item_t *p_item,
             b_preparse = true;
         break;
     }
-    if( !b_preparse )
-    {
-        input_item_SetPreparsed( p_item, true );
-        input_item_SignalPreparseEnded( p_item );
-        return;
-    }
 
     /* Do not preparse if it is already done (like by playing it) */
-    if( !input_item_IsPreparsed( p_item ) )
+    if( b_preparse && !input_item_IsPreparsed( p_item ) )
     {
-        input_Preparse( obj, p_item );
-        input_item_SetPreparsed( p_item, true );
+        input_thread_t *input = input_CreatePreparser( preparser->object,
+                                                       p_item );
+        if( input == NULL )
+            return;
 
-        var_SetAddress( obj, "item-change", p_item );
+        var_AddCallback( input, "intf-event", InputEvent,
+                         &preparser->item_done );
+        if( input_Start( input ) == VLC_SUCCESS )
+            vlc_sem_wait( &preparser->item_done );
+        var_DelCallback( input, "intf-event", InputEvent,
+                         &preparser->item_done );
+        /* Normally, the input is already stopped since we waited for it. But
+         * if the playlist preparser is being deleted, then the input might
+         * still be running. Force it to stop. */
+        input_Stop( input );
+        input_Close( input );
+
+        var_SetAddress( preparser->object, "item-change", p_item );
     }
+
+    input_item_SetPreparsed( p_item, true );
     input_item_SignalPreparseEnded( p_item );
 }
 
@@ -225,7 +254,6 @@ static void Art( playlist_preparser_t *p_preparser, input_item_t *p_item )
 static void *Thread( void *data )
 {
     playlist_preparser_t *p_preparser = data;
-    vlc_object_t *obj = p_preparser->object;
 
     for( ;; )
     {
@@ -253,7 +281,7 @@ static void *Thread( void *data )
         if( !p_current )
             break;
 
-        Preparse( obj, p_current, i_options );
+        Preparse( p_preparser, p_current, i_options );
 
         Art( p_preparser, p_current );
         vlc_gc_decref(p_current);

@@ -26,21 +26,106 @@
 #endif
 
 #include "Chunk.h"
+#include "HTTPConnection.hpp"
+#include "HTTPConnectionManager.h"
 
 #include <vlc_common.h>
 #include <vlc_url.h>
+#include <vlc_block.h>
 
 using namespace adaptative::http;
 
-Chunk::Chunk        (const std::string& url) :
-       startByte    (0),
-       endByte      (0),
-       bitrate      (1),
-       port         (0),
-       length       (0),
-       bytesRead    (0),
-       bytesToRead  (0),
-       connection   (NULL)
+AbstractChunkSource::AbstractChunkSource()
+{
+    parentChunk = NULL;
+    contentLength = 0;
+}
+
+AbstractChunkSource::~AbstractChunkSource()
+{
+
+}
+
+void AbstractChunkSource::setParentChunk(AbstractChunk *parent)
+{
+    parentChunk = parent;
+}
+
+size_t AbstractChunkSource::getContentLength() const
+{
+    return contentLength;
+}
+
+void AbstractChunkSource::setBytesRange(const BytesRange &range)
+{
+    bytesRange = range;
+    if(bytesRange.isValid() && bytesRange.getEndByte())
+        contentLength = bytesRange.getEndByte() - bytesRange.getStartByte();
+}
+
+const BytesRange & AbstractChunkSource::getBytesRange() const
+{
+    return bytesRange;
+}
+
+AbstractChunk::AbstractChunk(AbstractChunkSource *source_)
+{
+    bytesRead = 0;
+    source = source_;
+    source->setParentChunk(this);
+}
+
+AbstractChunk::~AbstractChunk()
+{
+    delete source;
+}
+
+size_t AbstractChunk::getBytesRead() const
+{
+    return this->bytesRead;
+}
+
+size_t AbstractChunk::getBytesToRead() const
+{
+    return source->getContentLength() - bytesRead;
+}
+
+block_t * AbstractChunk::read(size_t size)
+{
+    if(!source)
+        return NULL;
+
+    block_t *block = source->read(size);
+    if(block)
+    {
+	if(bytesRead == 0)
+            block->i_flags |= BLOCK_FLAG_HEADER;
+        bytesRead += block->i_buffer;
+        onDownload(&block);
+        block->i_flags ^= BLOCK_FLAG_HEADER;
+    }
+
+    return block;
+}
+
+HTTPChunkSource::HTTPChunkSource(const std::string& url, HTTPConnectionManager *manager) :
+    AbstractChunkSource(),
+    connection   (NULL),
+    connManager  (manager),
+    consumed     (0),
+    port         (0)
+{
+    if(!init(url))
+        throw VLC_EGENERIC;
+}
+
+HTTPChunkSource::~HTTPChunkSource()
+{
+    if(connection)
+        connection->setUsed(false);
+}
+
+bool HTTPChunkSource::init(const std::string &url)
 {
     this->url = url;
 
@@ -51,7 +136,7 @@ Chunk::Chunk        (const std::string& url) :
     }
 
     if(scheme != "http" && scheme != "https")
-        throw VLC_EGENERIC;
+        return false;
 
     vlc_url_t url_components;
     vlc_UrlParse(&url_components, url.c_str());
@@ -71,104 +156,147 @@ Chunk::Chunk        (const std::string& url) :
     vlc_UrlClean(&url_components);
 
     if(path.empty() || hostname.empty())
-        throw VLC_EGENERIC;
+        return false;
+
+    return true;
 }
 
-size_t              Chunk::getEndByte           () const
+block_t * HTTPChunkSource::consume(size_t readsize)
 {
-    return endByte;
-}
-size_t              Chunk::getStartByte         () const
-{
-    return startByte;
-}
-const std::string&  Chunk::getUrl               () const
-{
-    return url;
-}
-void                Chunk::setEndByte           (size_t endByte)
-{
-    this->endByte = endByte;
-    if (endByte > startByte)
-        bytesToRead = endByte - startByte;
-}
-void                Chunk::setStartByte         (size_t startByte)
-{
-    this->startByte = startByte;
-    if (endByte > startByte)
-        bytesToRead = endByte - startByte;
-}
-void                Chunk::addOptionalUrl       (const std::string& url)
-{
-    this->optionalUrls.push_back(url);
-}
-bool                Chunk::usesByteRange        () const
-{
-    return (startByte != endByte);
+    if(contentLength && readsize > contentLength - consumed)
+        readsize = contentLength - consumed;
+
+    block_t *p_block = block_Alloc(readsize);
+    if(!p_block)
+        return NULL;
+
+    mtime_t time = mdate();
+    ssize_t ret = connection->read(p_block->p_buffer, readsize);
+    time = mdate() - time;
+    if(ret < 0)
+    {
+        block_Release(p_block);
+        p_block = NULL;
+    }
+    else
+    {
+        p_block->i_buffer = (size_t) ret;
+        consumed += p_block->i_buffer;
+        connManager->updateDownloadRate(p_block->i_buffer, time);
+    }
+
+    return p_block;
 }
 
-void                Chunk::setBitrate           (uint64_t bitrate)
+block_t * HTTPChunkSource::read(size_t readsize)
 {
-    this->bitrate = bitrate;
-}
-int                 Chunk::getBitrate           ()
-{
-    return this->bitrate;
+    if(!connManager || !parentChunk)
+        return NULL;
+
+    if(!connection)
+    {
+        connection = connManager->getConnection(scheme, hostname, port);
+        if(!connection)
+            return NULL;
+    }
+
+    if(consumed == 0)
+    {
+        if( connection->query(path, bytesRange) != VLC_SUCCESS )
+            return NULL;
+        /* Because we don't know Chunk size at start, we need to get size
+           from content length */
+        contentLength = connection->getContentLength();
+    }
+
+    if(consumed == contentLength && consumed > 0)
+        return NULL;
+
+    return consume(readsize);
 }
 
-const std::string&  Chunk::getScheme            () const
+HTTPChunkBufferedSource::HTTPChunkBufferedSource(const std::string& url, HTTPConnectionManager *manager) :
+    HTTPChunkSource(url, manager),
+    p_buffer     (NULL),
+    buffered     (0)
 {
-    return scheme;
 }
 
-const std::string&  Chunk::getHostname          () const
+HTTPChunkBufferedSource::~HTTPChunkBufferedSource()
 {
-    return hostname;
-}
-const std::string&  Chunk::getPath              () const
-{
-    return this->path;
-}
-int                 Chunk::getPort              () const
-{
-    return this->port;
-}
-uint64_t            Chunk::getLength            () const
-{
-    return this->length;
-}
-void                Chunk::setLength            (uint64_t length)
-{
-    this->length = length;
-}
-uint64_t            Chunk::getBytesRead         () const
-{
-    return this->bytesRead;
-}
-void                Chunk::setBytesRead         (uint64_t bytes)
-{
-    this->bytesRead = bytes;
+    if(p_buffer)
+        block_ChainRelease(p_buffer);
 }
 
-void                Chunk::setBytesToRead         (uint64_t bytes)
+void HTTPChunkBufferedSource::bufferize(size_t readsize)
 {
-    bytesToRead = bytes;
+    if(readsize < 32768)
+        readsize = 32768;
+
+    if(contentLength && readsize > contentLength - consumed)
+        readsize = contentLength - consumed;
+
+    block_t *p_block = block_Alloc(readsize);
+    if(!p_block)
+        return;
+
+    mtime_t time = mdate();
+    ssize_t ret = connection->read(p_block->p_buffer, readsize);
+    time = mdate() - time;
+    if(ret < 0)
+    {
+        block_Release(p_block);
+    }
+    else
+    {
+        p_block->i_buffer = (size_t) ret;
+        buffered += p_block->i_buffer;
+        block_ChainAppend(&p_buffer, p_block);
+        connManager->updateDownloadRate(p_block->i_buffer, time);
+    }
 }
 
-uint64_t            Chunk::getBytesToRead       () const
+block_t * HTTPChunkBufferedSource::consume(size_t readsize)
 {
-        return length - bytesRead;
+    if(readsize > buffered)
+        bufferize(readsize);
+
+    block_t *p_block = NULL;
+    if(!readsize || !buffered || !(p_block = block_Alloc(readsize)) )
+        return NULL;
+
+    size_t copied = 0;
+    while(buffered && readsize)
+    {
+        const size_t toconsume = std::min(p_buffer->i_buffer, readsize);
+        memcpy(&p_block->p_buffer[copied], p_buffer->p_buffer, toconsume);
+        copied += toconsume;
+        readsize -= toconsume;
+        buffered -= toconsume;
+        p_buffer->i_buffer -= toconsume;
+        p_buffer->p_buffer += toconsume;
+        if(p_buffer->i_buffer == 0)
+        {
+            block_t *next = p_buffer->p_next;
+            p_buffer->p_next = NULL;
+            block_Release(p_buffer);
+            p_buffer = next;
+        }
+    }
+
+    consumed += copied;
+    p_block->i_buffer = copied;
+
+    return p_block;
 }
 
-size_t              Chunk::getPercentDownloaded () const
+HTTPChunk::HTTPChunk(const std::string &url, HTTPConnectionManager *manager):
+    AbstractChunk(new HTTPChunkSource(url, manager))
 {
-    return (size_t)(((float)this->bytesRead / this->length) * 100);
+
 }
-HTTPConnection*     Chunk::getConnection           () const
+
+HTTPChunk::~HTTPChunk()
 {
-    return this->connection;
-}
-void                Chunk::setConnection   (HTTPConnection *connection)
-{
-    this->connection = connection;
+
 }

@@ -468,6 +468,7 @@ static subpicture_t *DecodeBlock( decoder_t *p_dec, block_t **pp_block )
         return NULL;
 
     p_block = *pp_block;
+    *pp_block = NULL;
 
     if( p_block->i_flags & (BLOCK_FLAG_DISCONTINUITY|BLOCK_FLAG_CORRUPTED) )
     {
@@ -480,9 +481,12 @@ static subpicture_t *DecodeBlock( decoder_t *p_dec, block_t **pp_block )
             vlc_mutex_unlock( &p_sys->lock );
         }
 #endif
-        p_sys->i_max_stop = VLC_TS_INVALID;
-        block_Release( p_block );
-        return NULL;
+        if( p_block->i_flags & BLOCK_FLAG_CORRUPTED )
+        {
+            p_sys->i_max_stop = VLC_TS_INVALID;
+            block_Release( p_block );
+            return NULL;
+        }
     }
 
     /* Block to Kate packet */
@@ -653,7 +657,7 @@ static void GetVideoSize( decoder_t *p_dec, int *w, int *h )
         *w = p_sys->ki.original_canvas_width;
         *h = p_sys->ki.original_canvas_height;
         msg_Dbg( p_dec, "original canvas %zu %zu",
-	         p_sys->ki.original_canvas_width, p_sys->ki.original_canvas_height );
+                 p_sys->ki.original_canvas_width, p_sys->ki.original_canvas_height );
     }
     else
     {

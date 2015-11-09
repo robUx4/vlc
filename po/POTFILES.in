@@ -994,7 +994,9 @@ modules/misc/xml/libxml.c
 modules/mux/asf.c
 modules/mux/avi.c
 modules/mux/dummy.c
-modules/mux/mp4.c
+modules/mux/mp4/libmp4mux.c
+modules/mux/mp4/libmp4mux.h
+modules/mux/mp4/mp4.c
 modules/mux/mpeg/bits.h
 modules/mux/mpeg/csa.c
 modules/mux/mpeg/csa.h
@@ -1036,7 +1038,6 @@ modules/stream_filter/decomp.c
 modules/stream_filter/hds/hds.c
 modules/stream_filter/prefetch.c
 modules/stream_filter/record.c
-modules/stream_filter/smooth/smooth.c
 modules/stream_out/autodel.c
 modules/stream_out/bridge.c
 modules/stream_out/cycle.c

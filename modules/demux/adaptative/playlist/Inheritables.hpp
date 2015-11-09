@@ -44,6 +44,7 @@ namespace adaptative
             public:
                 TimescaleAble( TimescaleAble * = NULL );
                 ~TimescaleAble();
+                void setParentTimescale( TimescaleAble * );
                 uint64_t inheritTimescale() const;
                 Property<uint64_t> timescale;
 

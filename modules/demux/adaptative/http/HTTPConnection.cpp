@@ -20,25 +20,24 @@
 
 #include "HTTPConnection.hpp"
 #include "Sockets.hpp"
-#include "Chunk.h"
 #include "../adaptative/tools/Helper.h"
 
 #include <sstream>
 
 using namespace adaptative::http;
 
-HTTPConnection::HTTPConnection(vlc_object_t *stream_, Socket *socket_,
-                               Chunk *chunk_, bool persistent)
+HTTPConnection::HTTPConnection(vlc_object_t *stream_, Socket *socket_, bool persistent)
 {
     socket = socket_;
     stream = stream_;
     psz_useragent = var_InheritString(stream, "http-user-agent");
-    toRead = 0;
-    chunk = NULL;
+    bytesRead = 0;
+    contentLength = 0;
     queryOk = false;
     retries = 0;
     connectionClose = !persistent;
-    bindChunk(chunk_);
+    port = 80;
+    available = true;
 }
 
 HTTPConnection::~HTTPConnection()
@@ -47,12 +46,20 @@ HTTPConnection::~HTTPConnection()
     delete socket;
 }
 
-bool HTTPConnection::connect(const std::string &hostname, int port)
+bool HTTPConnection::compare(const std::string &hostname, uint16_t port, int type) const
+{
+    return ( hostname == this->hostname &&
+            (socket && socket->getType() == type) &&
+             port == this->port );
+}
+
+bool HTTPConnection::connect(const std::string &hostname, uint16_t port)
 {
     if(!socket->connect(stream, hostname.c_str(), port))
         return false;
 
     this->hostname = hostname;
+    this->port = port;
 
     return true;
 }
@@ -65,20 +72,23 @@ bool HTTPConnection::connected() const
 void HTTPConnection::disconnect()
 {
     queryOk = false;
-    toRead = 0;
+    bytesRead = 0;
+    contentLength = 0;
+    bytesRange = BytesRange();
     socket->disconnect();
 }
 
-int HTTPConnection::query(const std::string &path)
+int HTTPConnection::query(const std::string &path, const BytesRange &range)
 {
-    if(!chunk)
-        return VLC_EGENERIC;
-
     queryOk = false;
 
-    if(!connected() &&
-       !connect(chunk->getHostname(), chunk->getPort()))
+    msg_Dbg(stream, "Retrieving ://%s:%u%s @%zu", hostname.c_str(), port, path.c_str(),
+            range.isValid() ? range.getStartByte() : 0);
+
+    if(!connected() && ( hostname.empty() || !connect(hostname, port) ))
         return VLC_EGENERIC;
+
+    bytesRange = range;
 
     std::string header = buildRequestHeader(path);
     if(connectionClose)
@@ -92,7 +102,7 @@ int HTTPConnection::query(const std::string &path)
         {
             /* server closed connection pipeline after last req. need new */
             connectionClose = true;
-            return query(path);
+            return query(path, range);
         }
         return VLC_EGENERIC;
     }
@@ -108,7 +118,7 @@ int HTTPConnection::query(const std::string &path)
         if(!connectionClose)
         {
             connectionClose = true;
-            return query(path);
+            return query(path, range);
         }
     }
 
@@ -117,8 +127,8 @@ int HTTPConnection::query(const std::string &path)
 
 ssize_t HTTPConnection::read(void *p_buffer, size_t len)
 {
-    if(!chunk || !connected() ||
-       (!queryOk && chunk->getBytesRead() == 0) )
+    if( !connected() ||
+       (!queryOk && bytesRead == 0) )
         return VLC_EGENERIC;
 
     if(len == 0)
@@ -126,19 +136,20 @@ ssize_t HTTPConnection::read(void *p_buffer, size_t len)
 
     queryOk = false;
 
-    if(chunk->getBytesToRead() == 0)
+    const size_t toRead = contentLength - bytesRead;
+
+    if (toRead == 0)
         return VLC_SUCCESS;
 
-    if(len > chunk->getBytesToRead())
-        len = chunk->getBytesToRead();
+    if(len > toRead)
+        len = toRead;
 
     ssize_t ret = socket->read(stream, p_buffer, len);
     if(ret >= 0)
-        chunk->setBytesRead(chunk->getBytesRead() + ret);
+        bytesRead += ret;
 
     if(ret < 0 || (size_t)ret < len) /* set EOF */
     {
-        chunk->setBytesToRead(chunk->getBytesRead());
         socket->disconnect();
         return VLC_EGENERIC;
     }
@@ -194,41 +205,31 @@ std::string HTTPConnection::readLine()
     return socket->readline(stream);
 }
 
-const std::string& HTTPConnection::getHostname() const
-{
-    return hostname;
-}
-
-void HTTPConnection::bindChunk(Chunk *chunk_)
-{
-    if(chunk_ == chunk)
-        return;
-    if (chunk_)
-        chunk_->setConnection(this);
-    chunk = chunk_;
-}
-
-void HTTPConnection::releaseChunk()
-{
-    if(!connectionClose &&
-       (!chunk || chunk->getBytesRead() == toRead) ) /* We can't resend request if we haven't finished reading */
-    {
-        queryOk = false;
-        toRead = 0;
-    }
-    else
-        disconnect();
-
-    if(chunk)
-    {
-        chunk->setConnection(NULL);
-        chunk = NULL;
-    }
-}
-
 bool HTTPConnection::isAvailable() const
 {
-    return chunk == NULL;
+    return available;
+}
+
+void HTTPConnection::setUsed( bool b )
+{
+    available = !b;
+    if(available)
+    {
+        if(!connectionClose && contentLength == bytesRead )
+        {
+            queryOk = false;
+            bytesRead = 0;
+            contentLength = 0;
+            bytesRange = BytesRange();
+        }
+        else  /* We can't resend request if we haven't finished reading */
+            disconnect();
+    }
+}
+
+size_t HTTPConnection::getContentLength() const
+{
+    return contentLength;
 }
 
 void HTTPConnection::onHeader(const std::string &key,
@@ -239,8 +240,7 @@ void HTTPConnection::onHeader(const std::string &key,
         std::istringstream ss(value);
         size_t length;
         ss >> length;
-        chunk->setLength(length);
-        toRead = length;
+        contentLength = length;
     }
     else if (key == "Connection" && value =="close")
     {
@@ -262,11 +262,11 @@ std::string HTTPConnection::buildRequestHeader(const std::string &path) const
 std::string HTTPConnection::extraRequestHeaders() const
 {
     std::stringstream ss;
-    if(chunk->usesByteRange())
+    if(bytesRange.isValid())
     {
-        ss << "Range: bytes=" << chunk->getStartByte() << "-";
-        if(chunk->getEndByte())
-            ss << chunk->getEndByte();
+        ss << "Range: bytes=" << bytesRange.getStartByte() << "-";
+        if(bytesRange.getEndByte())
+            ss << bytesRange.getEndByte();
         ss << "\r\n";
     }
     return ss.str();

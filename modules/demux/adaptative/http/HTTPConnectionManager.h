@@ -29,6 +29,8 @@
 # include "config.h"
 #endif
 
+#include "../logic/IDownloadRateObserver.h"
+
 #include <vlc_common.h>
 #include <vector>
 #include <string>
@@ -38,9 +40,8 @@ namespace adaptative
     namespace http
     {
         class HTTPConnection;
-        class Chunk;
 
-        class HTTPConnectionManager
+        class HTTPConnectionManager : public IDownloadRateObserver
         {
             public:
                 HTTPConnectionManager           (vlc_object_t *stream);
@@ -48,15 +49,19 @@ namespace adaptative
 
                 void    closeAllConnections ();
                 void    releaseAllConnections ();
-                bool    connectChunk        (Chunk *chunk);
+                HTTPConnection * getConnection(const std::string &scheme,
+                                               const std::string &hostname,
+                                               uint16_t port);
+
+                virtual void updateDownloadRate(size_t, mtime_t); /* reimpl */
+                void setDownloadRateObserver(IDownloadRateObserver *);
 
             private:
                 std::vector<HTTPConnection *>                       connectionPool;
                 vlc_object_t                                       *stream;
+                IDownloadRateObserver                              *rateObserver;
 
-                static const uint64_t   CHUNKDEFAULTBITRATE;
-
-                HTTPConnection * getConnectionForHost    (const std::string &hostname);
+                HTTPConnection * getConnection(const std::string &hostname, uint16_t port, int);
         };
     }
 }

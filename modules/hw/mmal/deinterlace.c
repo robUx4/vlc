@@ -231,7 +231,7 @@ static int Open(filter_t *filter)
     sys->filtered_pictures = mmal_queue_create();
 
     filter->pf_video_filter = deinterlace;
-    filter->pf_video_flush = flush;
+    filter->pf_flush = flush;
     vlc_mutex_init_recursive(&sys->mutex);
     vlc_mutex_init(&sys->buffer_cond_mutex);
     vlc_cond_init(&sys->buffer_cond);
@@ -437,7 +437,8 @@ static void flush(filter_t *filter)
 
     while ((buffer = mmal_queue_get(sys->filtered_pictures))) {
         picture_t *pic = (picture_t *)buffer->user_data;
-        msg_Dbg(filter, "flush: release already filtered pic %p", pic);
+        msg_Dbg(filter, "flush: release already filtered pic %p",
+                (void *)pic);
         picture_Release(pic);
     }
     msg_Dbg(filter, "flush: done");

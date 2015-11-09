@@ -1,11 +1,7 @@
 /*
- * MPDFactory.h
+ * AtomsReader.hpp
  *****************************************************************************
- * Copyright (C) 2010 - 2012 Klagenfurt University
- *
- * Created on: Jan 27, 2012
- * Authors: Christopher Mueller <christopher.mueller@itec.uni-klu.ac.at>
- *          Christian Timmerer  <christian.timmerer@itec.uni-klu.ac.at>
+ * Copyright (C) 2014 - VideoLAN and VLC authors
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU Lesser General Public License as published
@@ -21,28 +17,36 @@
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston MA 02110-1301, USA.
  *****************************************************************************/
-#ifndef MPDFACTORY_H_
-#define MPDFACTORY_H_
+#ifndef ATOMSREADER_HPP
+#define ATOMSREADER_HPP
 
-#include "MPD.h"
-#include "Profile.hpp"
+#ifdef HAVE_CONFIG_H
+# include "config.h"
+#endif
 
-namespace dash
+#include <vlc_common.h>
+#include <vlc_stream.h>
+extern "C" {
+#include "../../demux/mp4/libmp4.h"
+}
+
+namespace adaptative
 {
-    namespace xml
+    namespace mp4
     {
-        class Node;
-    }
-
-    namespace mpd
-    {
-        class MPDFactory
+        class AtomsReader
         {
             public:
-                static MPD* create(xml::Node *root, stream_t *p_stream,
-                                   std::string &, Profile profile);
+                AtomsReader(vlc_object_t *);
+                ~AtomsReader();
+                void clean();
+                bool parseBlock(block_t *);
+
+            protected:
+                vlc_object_t *object;
+                MP4_Box_t *rootbox;
         };
     }
 }
 
-#endif /* MPDFACTORY_H_ */
+#endif // ATOMSREADER_HPP

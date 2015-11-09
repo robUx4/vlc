@@ -1613,9 +1613,9 @@ static int Control( demux_t *p_demux, int i_query, va_list args )
     {
         vlc_list_t *p_list;
 
-        i_int = (int)va_arg( args, int );
+        i_int = va_arg( args, int );
         p_list = (vlc_list_t *)va_arg( args, vlc_list_t * );
-        msg_Dbg( p_demux, "DEMUX_SET_GROUP %d %p", i_int, p_list );
+        msg_Dbg( p_demux, "DEMUX_SET_GROUP %d %p", i_int, (void *)p_list );
 
         if( i_int != 0 ) /* If not default program */
         {
@@ -3227,7 +3227,7 @@ static bool GatherData( demux_t *p_demux, ts_pid_t *pid, block_t *p_bk )
             {
                 msg_Warn( p_demux, "discontinuity indicator (pid=%d) ",
                             pid->i_pid );
-                pid->u.p_pes->p_data->i_flags |= BLOCK_FLAG_DISCONTINUITY;
+                /* pid->es->p_data->i_flags |= BLOCK_FLAG_DISCONTINUITY; */
             }
 #if 0
             if( p[5]&0x40 )

@@ -400,6 +400,11 @@ typedef enum
 #   include <windows.h>
 #endif
 
+#ifdef __APPLE__
+#include <sys/syslimits.h>
+#include <AvailabilityMacros.h>
+#endif
+
 #ifdef __OS2__
 #   define OS2EMX_PLAIN_CHAR
 #   define INCL_BASE
@@ -813,9 +818,6 @@ static inline void SetQWLE (void *p, uint64_t qw)
 VLC_API bool vlc_ureduce( unsigned *, unsigned *, uint64_t, uint64_t, uint64_t );
 
 /* Aligned memory allocator */
-#ifdef __APPLE__
-#include <AvailabilityMacros.h>
-#endif
 
 #ifdef __MINGW32__
 # define vlc_memalign(align, size) (__mingw_aligned_malloc(size, align))
@@ -823,26 +825,6 @@ VLC_API bool vlc_ureduce( unsigned *, unsigned *, uint64_t, uint64_t, uint64_t )
 #elif defined(_MSC_VER)
 # define vlc_memalign(align, size) (_aligned_malloc(size, align))
 # define vlc_free(base)            (_aligned_free(base))
-#elif defined(__APPLE__) && !defined(MAC_OS_X_VERSION_10_6)
-static inline void *vlc_memalign(size_t align, size_t size)
-{
-    long diff;
-    void *ptr;
-
-    ptr = malloc(size+align);
-    if(!ptr)
-        return ptr;
-    diff = ((-(long)ptr - 1)&(align-1)) + 1;
-    ptr  = (char*)ptr + diff;
-    ((char*)ptr)[-1]= diff;
-    return ptr;
-}
-
-static void vlc_free(void *ptr)
-{
-    if (ptr)
-        free((char*)ptr - ((char*)ptr)[-1]);
-}
 #else
 static inline void *vlc_memalign(size_t align, size_t size)
 {

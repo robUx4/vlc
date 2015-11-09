@@ -25,6 +25,7 @@
 #ifndef CHUNK_H_
 #define CHUNK_H_
 
+#include "BytesRange.hpp"
 #include <vector>
 #include <string>
 #include <stdint.h>
@@ -36,54 +37,92 @@ namespace adaptative
     namespace http
     {
         class HTTPConnection;
+        class HTTPConnectionManager;
+        class AbstractChunk;
 
-        class Chunk
+        class AbstractChunkSource
         {
             public:
-                Chunk           (const std::string &url);
-                virtual ~Chunk  () {}
+                AbstractChunkSource();
+                virtual ~AbstractChunkSource();
+                virtual block_t *   read(size_t) = 0;
+                void                setParentChunk  (AbstractChunk *);
+                void                setBytesRange   (const BytesRange &);
+                const BytesRange &  getBytesRange   () const;
+                size_t              getContentLength() const;
 
-                size_t              getEndByte              () const;
-                size_t              getStartByte            () const;
-                const std::string&  getUrl                  () const;
-                const std::string&  getScheme               () const;
-                const std::string&  getHostname             () const;
-                const std::string&  getPath                 () const;
-                int                 getPort                 () const;
-                uint64_t            getLength               () const;
-                uint64_t            getBytesRead            () const;
-                uint64_t            getBytesToRead          () const;
-                size_t              getPercentDownloaded    () const;
-                HTTPConnection*     getConnection           () const;
+            protected:
+                AbstractChunk      *parentChunk;
+                size_t              contentLength;
+                BytesRange          bytesRange;
+        };
 
-                void                setConnection   (HTTPConnection *connection);
-                void                setBytesRead    (uint64_t bytes);
-                void                setBytesToRead  (uint64_t bytes);
-                void                setLength       (uint64_t length);
-                void                setEndByte      (size_t endByte);
-                void                setStartByte    (size_t startByte);
-                void                addOptionalUrl  (const std::string& url);
-                bool                usesByteRange   () const;
-                void                setBitrate      (uint64_t bitrate);
-                int                 getBitrate      ();
+        class AbstractChunk
+        {
+            public:
+                virtual ~AbstractChunk();
 
-                virtual void        onDownload      (block_t **) {}
+                size_t              getBytesRead            () const;
+                size_t              getBytesToRead          () const;
+
+                virtual block_t *   read            (size_t);
+                virtual void        onDownload      (block_t **) = 0;
+
+            protected:
+                AbstractChunk(AbstractChunkSource *);
+                AbstractChunkSource *source;
 
             private:
-                std::string                 url;
-                std::string                 scheme;
-                std::string                 path;
-                std::string                 hostname;
-                std::vector<std::string>    optionalUrls;
-                size_t                      startByte;
-                size_t                      endByte;
-                int                         bitrate;
-                int                         port;
-                uint64_t                    length;
-                uint64_t                    bytesRead;
-                uint64_t                    bytesToRead;
-                HTTPConnection             *connection;
+                size_t              bytesRead;
         };
+
+        class HTTPChunkSource : public AbstractChunkSource
+        {
+            public:
+                HTTPChunkSource(const std::string &url, HTTPConnectionManager *);
+                virtual ~HTTPChunkSource();
+
+                virtual block_t * read(size_t); /* impl */
+
+            protected:
+                virtual block_t * consume(size_t);
+                HTTPConnection     *connection;
+                HTTPConnectionManager *connManager;
+                size_t              consumed; /* read pointer */
+
+            private:
+                bool init(const std::string &);
+                std::string         url;
+                std::string         scheme;
+                std::string         path;
+                std::string         hostname;
+                uint16_t            port;
+        };
+
+        class HTTPChunkBufferedSource : public HTTPChunkSource
+        {
+            public:
+                HTTPChunkBufferedSource(const std::string &url, HTTPConnectionManager *);
+                virtual ~HTTPChunkBufferedSource();
+
+            protected:
+                virtual block_t *  consume(size_t);
+
+            private:
+                void               bufferize(size_t);
+                block_t            *p_buffer; /* read cache buffer */
+                size_t              buffered; /* read cache size */
+        };
+
+        class HTTPChunk : public AbstractChunk
+        {
+            public:
+                HTTPChunk(const std::string &url, HTTPConnectionManager *);
+                virtual ~HTTPChunk();
+
+                virtual void        onDownload      (block_t **) {} /* impl */
+        };
+
     }
 }
 

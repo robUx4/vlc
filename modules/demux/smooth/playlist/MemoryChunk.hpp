@@ -1,11 +1,7 @@
 /*
- * DOMHelper.h
+ * MemoryChunk.hpp
  *****************************************************************************
- * Copyright (C) 2010 - 2011 Klagenfurt University
- *
- * Created on: Aug 10, 2010
- * Authors: Christopher Mueller <christopher.mueller@itec.uni-klu.ac.at>
- *          Christian Timmerer  <christian.timmerer@itec.uni-klu.ac.at>
+ * Copyright (C) 2015 - VideoLAN Authors
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU Lesser General Public License as published
@@ -21,30 +17,31 @@
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston MA 02110-1301, USA.
  *****************************************************************************/
+#ifndef MEMORYCHUNK_HPP
+#define MEMORYCHUNK_HPP
 
-#ifndef DOMHELPER_H_
-#define DOMHELPER_H_
+#include "../adaptative/http/Chunk.h"
 
-#include <vector>
-#include <string>
-
-#include "Node.h"
-
-namespace dash
+namespace smooth
 {
-    namespace xml
+    namespace http
     {
-        class DOMHelper
+        using namespace adaptative::http;
+
+        class MemoryChunkSource : public AbstractChunkSource
         {
             public:
-                static std::vector<Node *> getElementByTagName      (Node *root, const std::string& name, bool selfContain);
-                static std::vector<Node *> getChildElementByTagName (Node *root, const std::string& name);
-                static Node*               getFirstChildElementByName( Node *root, const std::string& name );
+                MemoryChunkSource(block_t *);
+                virtual ~MemoryChunkSource();
+
+                virtual block_t * read(size_t); /* impl */
 
             private:
-                static void getElementsByTagName(Node *root, const std::string& name, std::vector<Node *> *elements, bool selfContain);
+                block_t *data;
+                size_t   i_read;
         };
+
     }
 }
 
-#endif /* DOMHELPER_H_ */
+#endif // MEMORYCHUNK_HPP

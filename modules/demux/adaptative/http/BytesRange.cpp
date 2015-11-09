@@ -1,7 +1,7 @@
 /*
- * AtomsReader.hpp
+ * BytesRange.cpp
  *****************************************************************************
- * Copyright (C) 2014 - VideoLAN and VLC authors
+ * Copyright (C) 2015 - VideoLAN Authors
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU Lesser General Public License as published
@@ -17,43 +17,35 @@
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston MA 02110-1301, USA.
  *****************************************************************************/
-#ifndef ATOMSREADER_HPP
-#define ATOMSREADER_HPP
+#include "BytesRange.hpp"
 
-#ifdef HAVE_CONFIG_H
-# include "config.h"
-#endif
+using namespace adaptative::http;
 
-#include <vlc_common.h>
-#include <vlc_stream.h>
-extern "C" {
-#include "../../demux/mp4/libmp4.h"
-}
-
-namespace adaptative
+BytesRange::BytesRange()
 {
-    namespace playlist
-    {
-        class BaseRepresentation;
-    }
+    bytesStart = 2;
+    bytesEnd = 1;
 }
 
-namespace dash
+BytesRange::BytesRange(size_t start, size_t end)
 {
-    namespace mp4
-    {
-        class AtomsReader
-        {
-            public:
-                AtomsReader(vlc_object_t *);
-                ~AtomsReader();
-                bool parseBlock(block_t *, adaptative::playlist::BaseRepresentation *);
-
-            protected:
-                vlc_object_t *object;
-                MP4_Box_t *rootbox;
-        };
-    }
+    bytesStart = start;
+    bytesEnd = end;
 }
 
-#endif // ATOMSREADER_HPP
+bool BytesRange::isValid() const
+{
+    if(bytesEnd < bytesStart)
+        return bytesEnd == 0;
+    return true;
+}
+
+size_t BytesRange::getStartByte() const
+{
+    return bytesStart;
+}
+
+size_t BytesRange::getEndByte() const
+{
+    return bytesEnd;
+}

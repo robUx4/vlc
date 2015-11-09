@@ -37,7 +37,7 @@ EXTRA_PROGRAMS = \
 	$(NULL)
 
 #check_DATA = samples/test.sample samples/meta.sample
-EXTRA_DIST = samples/empty.voc samples/image.jpg $(check_SCRIPTS)
+EXTRA_DIST = samples/empty.voc samples/image.jpg samples/subitems $(check_SCRIPTS)
 
 check_HEADERS = libvlc/test.h libvlc/libvlc_additions.h
 
@@ -66,7 +66,7 @@ test_libvlc_core_LDADD = $(LIBVLC)
 test_libvlc_equalizer_SOURCES = libvlc/equalizer.c
 test_libvlc_equalizer_LDADD = $(LIBVLC)
 test_libvlc_media_SOURCES = libvlc/media.c
-test_libvlc_media_LDADD = $(LIBVLC)
+test_libvlc_media_LDADD = $(LIBVLCCORE) $(LIBVLC)
 test_libvlc_media_list_player_SOURCES = libvlc/media_list_player.c
 test_libvlc_media_list_player_LDADD = $(LIBVLC)
 test_libvlc_media_list_SOURCES = libvlc/media_list.c

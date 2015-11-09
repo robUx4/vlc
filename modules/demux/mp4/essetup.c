@@ -30,6 +30,18 @@
 #include <vlc_aout.h>
 #include <assert.h>
 
+static void SetupGlobalExtensions( mp4_track_t *p_track, MP4_Box_t *p_sample )
+{
+    if( !p_track->fmt.i_bitrate )
+    {
+        const MP4_Box_t *p_btrt = MP4_BoxGet( p_sample, "btrt" );
+        if( p_btrt && BOXDATA(p_btrt) )
+        {
+            p_track->fmt.i_bitrate = BOXDATA(p_btrt)->i_avg_bitrate;
+        }
+    }
+}
+
 static void SetupESDS( demux_t *p_demux, mp4_track_t *p_track, const MP4_descriptor_decoder_config_t *p_decconfig )
 {
     /* First update information based on i_objectTypeIndication */
@@ -229,6 +241,8 @@ int SetupVideoES( demux_t *p_demux, mp4_track_t *p_track, MP4_Box_t *p_sample )
         p_track->i_block_flags = BOXDATA(p_fiel)->i_flags;
     }
 
+    SetupGlobalExtensions( p_track, p_sample );
+
     /* now see if esds is present and if so create a data packet
         with decoder_specific_info  */
     MP4_Box_t *p_esds = MP4_BoxGet( p_sample, "esds" );
@@ -387,6 +401,27 @@ int SetupVideoES( demux_t *p_demux, mp4_track_t *p_track, MP4_Box_t *p_sample )
     }
 
     return 1;
+}
+
+static bool SetupAudioFromWaveFormatEx( es_format_t *p_fmt, const MP4_Box_t *p_WMA2 )
+{
+    if( p_WMA2 && BOXDATA(p_WMA2) )
+    {
+        wf_tag_to_fourcc(BOXDATA(p_WMA2)->Format.wFormatTag, &p_fmt->i_codec, NULL);
+        p_fmt->audio.i_channels = BOXDATA(p_WMA2)->Format.nChannels;
+        p_fmt->audio.i_rate = BOXDATA(p_WMA2)->Format.nSamplesPerSec;
+        p_fmt->i_bitrate = BOXDATA(p_WMA2)->Format.nAvgBytesPerSec * 8;
+        p_fmt->audio.i_blockalign = BOXDATA(p_WMA2)->Format.nBlockAlign;
+        p_fmt->audio.i_bitspersample = BOXDATA(p_WMA2)->Format.wBitsPerSample;
+        p_fmt->i_extra = BOXDATA(p_WMA2)->i_extra;
+        if( p_fmt->i_extra > 0 )
+        {
+            p_fmt->p_extra = malloc( BOXDATA(p_WMA2)->i_extra );
+            memcpy( p_fmt->p_extra, BOXDATA(p_WMA2)->p_extra, p_fmt->i_extra );
+        }
+        return true;
+    }
+    return false;
 }
 
 int SetupAudioES( demux_t *p_demux, mp4_track_t *p_track, MP4_Box_t *p_sample )
@@ -668,6 +703,8 @@ int SetupAudioES( demux_t *p_demux, mp4_track_t *p_track, MP4_Box_t *p_sample )
 
     }
 
+    SetupGlobalExtensions( p_track, p_sample );
+
     /* now see if esds is present and if so create a data packet
         with decoder_specific_info  */
     MP4_Box_t *p_esds = MP4_BoxGet( p_sample, "esds" );
@@ -714,21 +751,9 @@ int SetupAudioES( demux_t *p_demux, mp4_track_t *p_track, MP4_Box_t *p_sample )
         }
         case ATOM_WMA2:
         {
-            MP4_Box_t *p_WMA2 = MP4_BoxGet( p_sample, "wave/WMA2" );
-            if( p_WMA2 && BOXDATA(p_WMA2) )
+            if( SetupAudioFromWaveFormatEx( &p_track->fmt,
+                                            MP4_BoxGet( p_sample, "wave/WMA2" ) ) )
             {
-                p_track->fmt.audio.i_channels = BOXDATA(p_WMA2)->Format.nChannels;
-                p_track->fmt.audio.i_rate = BOXDATA(p_WMA2)->Format.nSamplesPerSec;
-                p_track->fmt.i_bitrate = BOXDATA(p_WMA2)->Format.nAvgBytesPerSec * 8;
-                p_track->fmt.audio.i_blockalign = BOXDATA(p_WMA2)->Format.nBlockAlign;
-                p_track->fmt.audio.i_bitspersample = BOXDATA(p_WMA2)->Format.wBitsPerSample;
-                p_track->fmt.i_extra = BOXDATA(p_WMA2)->i_extra;
-                if( p_track->fmt.i_extra > 0 )
-                {
-                    p_track->fmt.p_extra = malloc( BOXDATA(p_WMA2)->i_extra );
-                    memcpy( p_track->fmt.p_extra, BOXDATA(p_WMA2)->p_extra,
-                            p_track->fmt.i_extra );
-                }
                 p_track->p_asf = MP4_BoxGet( p_sample, "wave/ASF " );
             }
             else
@@ -736,6 +761,11 @@ int SetupAudioES( demux_t *p_demux, mp4_track_t *p_track, MP4_Box_t *p_sample )
                 msg_Err( p_demux, "missing WMA2 %4.4s", (char*) &p_sample->p_father->i_type );
             }
             break;
+        }
+        case ATOM_wma: /* isml wmapro */
+        {
+            if( !SetupAudioFromWaveFormatEx( &p_track->fmt, MP4_BoxGet( p_sample, "wfex" ) ) )
+                msg_Err( p_demux, "missing wfex for wma" );
         }
 
         default:
@@ -822,6 +852,8 @@ int SetupSpuES( demux_t *p_demux, mp4_track_t *p_track, MP4_Box_t *p_sample )
             p_track->fmt.i_codec = p_sample->i_type;
             break;
     }
+
+    SetupGlobalExtensions( p_track, p_sample );
 
     /* now see if esds is present and if so create a data packet
         with decoder_specific_info  */

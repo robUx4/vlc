@@ -28,7 +28,7 @@
 
 #include "DASHSegment.h"
 #include "../adaptative/playlist/BaseRepresentation.h"
-#include "../mp4/AtomsReader.hpp"
+#include "../mp4/IndexReader.hpp"
 #include "../adaptative/playlist/AbstractPlaylist.hpp"
 #include "../adaptative/playlist/SegmentChunk.hpp"
 
@@ -43,9 +43,9 @@ DashIndexSegment::DashIndexSegment(ICanonicalUrl *parent) :
 
 void DashIndexSegment::onChunkDownload(block_t **pp_block, SegmentChunk *, BaseRepresentation *rep)
 {
-    if(!rep)
+    if(!rep || ((*pp_block)->i_flags & BLOCK_FLAG_HEADER) == 0 )
         return;
 
-    AtomsReader br(rep->getPlaylist()->getVLCObject());
-    br.parseBlock(*pp_block, rep);
+    IndexReader br(rep->getPlaylist()->getVLCObject());
+    br.parseIndex(*pp_block, rep);
 }

@@ -20,7 +20,6 @@
 #include "Streams.hpp"
 #include "http/HTTPConnection.hpp"
 #include "http/HTTPConnectionManager.h"
-#include "logic/AbstractAdaptationLogic.h"
 #include "playlist/SegmentChunk.hpp"
 #include "SegmentTracker.hpp"
 #include "plumbing/SourceStream.hpp"
@@ -30,13 +29,11 @@
 
 using namespace adaptative;
 using namespace adaptative::http;
-using namespace adaptative::logic;
 
 AbstractStream::AbstractStream(demux_t * demux_, const StreamFormat &format_)
 {
     p_realdemux = demux_;
     format = format_;
-    adaptationLogic = NULL;
     currentChunk = NULL;
     eof = false;
     dead = false;
@@ -71,7 +68,6 @@ AbstractStream::AbstractStream(demux_t * demux_, const StreamFormat &format_)
 AbstractStream::~AbstractStream()
 {
     delete currentChunk;
-    delete adaptationLogic;
     delete segmentTracker;
 
     delete demuxer;
@@ -80,10 +76,8 @@ AbstractStream::~AbstractStream()
 }
 
 
-void AbstractStream::bind(AbstractAdaptationLogic *logic, SegmentTracker *tracker,
-                    HTTPConnectionManager *conn)
+void AbstractStream::bind(SegmentTracker *tracker, HTTPConnectionManager *conn)
 {
-    adaptationLogic = logic;
     segmentTracker = tracker;
     connManager = conn;
 }
@@ -148,9 +142,10 @@ SegmentChunk * AbstractStream::getChunk()
         if(esCount() && !isSelected())
         {
             disabled = true;
+            segmentTracker->reset();
             return NULL;
         }
-        currentChunk = segmentTracker->getNextChunk(!fakeesout->restarting());
+        currentChunk = segmentTracker->getNextChunk(!fakeesout->restarting(), connManager);
         if (currentChunk == NULL)
             eof = true;
     }
@@ -226,7 +221,7 @@ bool AbstractStream::isDisabled() const
 AbstractStream::status AbstractStream::demux(mtime_t nz_deadline, bool send)
 {
     /* Ensure it is configured */
-    if(!adaptationLogic || !segmentTracker || !connManager || dead)
+    if(!segmentTracker || !connManager || dead)
         return AbstractStream::status_eof;
 
     if(flushing)
@@ -294,7 +289,7 @@ AbstractStream::status AbstractStream::demux(mtime_t nz_deadline, bool send)
     return AbstractStream::status_demuxed;
 }
 
-block_t * AbstractStream::readNextBlock(size_t)
+block_t * AbstractStream::readNextBlock(size_t toread)
 {
     SegmentChunk *chunk = getChunk();
     if(!chunk)
@@ -320,63 +315,20 @@ block_t * AbstractStream::readNextBlock(size_t)
         return NULL;
     }
 
-    if(!chunk->getConnection())
+    const bool b_segment_head_chunk = (chunk->getBytesRead() == 0);
+
+    block_t *block = chunk->read(toread);
+    if(block == NULL)
     {
-       if(!connManager->connectChunk(chunk))
-        return NULL;
-    }
-
-    size_t readsize = 0;
-    bool b_segment_head_chunk = false;
-
-    /* New chunk, do query */
-    if(chunk->getBytesRead() == 0)
-    {
-        if(chunk->getConnection()->query(chunk->getPath()) != VLC_SUCCESS)
-        {
-            chunk->getConnection()->releaseChunk();
-            currentChunk = NULL;
-            delete chunk;
-            return NULL;
-        }
-        b_segment_head_chunk = true;
-    }
-
-    /* Because we don't know Chunk size at start, we need to get size
-       from content length */
-    readsize = chunk->getBytesToRead();
-    if (readsize > 32768)
-        readsize = 32768;
-
-    block_t *block = block_Alloc(readsize);
-    if(!block)
-        return NULL;
-
-    mtime_t time = mdate();
-    ssize_t ret = chunk->getConnection()->read(block->p_buffer, readsize);
-    time = mdate() - time;
-
-    if(ret < 0)
-    {
-        block_Release(block);
-        chunk->getConnection()->releaseChunk();
         currentChunk = NULL;
         delete chunk;
         return NULL;
     }
-    else
+
+    if (chunk->getBytesToRead() == 0)
     {
-        block->i_buffer = (size_t)ret;
-
-        adaptationLogic->updateDownloadRate(block->i_buffer, time);
-        chunk->onDownload(&block);
-
-        if (chunk->getBytesToRead() == 0)
-        {
-            chunk->getConnection()->releaseChunk();
-            currentChunk = NULL;
-            delete chunk;
-        }
+        currentChunk = NULL;
+        delete chunk;
     }
 
     block = checkBlock(block, b_segment_head_chunk);
@@ -395,10 +347,7 @@ bool AbstractStream::setPosition(mtime_t time, bool tryonly)
         if(demuxer->reinitsOnSeek())
         {
             if(currentChunk)
-            {
-                currentChunk->getConnection()->releaseChunk();
                 delete currentChunk;
-            }
             currentChunk = NULL;
 
             restartDemux();

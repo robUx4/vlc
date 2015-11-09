@@ -32,6 +32,12 @@ SegmentTimeline::SegmentTimeline(TimescaleAble *parent)
 {
 }
 
+SegmentTimeline::SegmentTimeline(uint64_t scale)
+    :TimescaleAble(NULL)
+{
+    timescale.Set(scale);
+}
+
 SegmentTimeline::~SegmentTimeline()
 {
     std::list<Element *>::iterator it;
@@ -115,21 +121,38 @@ uint64_t SegmentTimeline::maxElementNumber() const
     return e->number + e->r;
 }
 
-size_t SegmentTimeline::prune(mtime_t time)
+uint64_t SegmentTimeline::minElementNumber() const
 {
-    stime_t scaled = time * inheritTimescale() / CLOCK_FREQ;
+    if(elements.empty())
+        return 0;
+    return elements.front()->number;
+}
+
+size_t SegmentTimeline::pruneBySequenceNumber(uint64_t number)
+{
     size_t prunednow = 0;
     while(elements.size())
     {
         Element *el = elements.front();
-        if(el->t + (el->d * (stime_t)(el->r + 1)) < scaled)
+        if(el->number >= number)
         {
-            prunednow += el->r + 1;
-            delete el;
-            elements.pop_front();
+            break;
+        }
+        else if(el->number + el->r >= number)
+        {
+            uint64_t count = number - el->number;
+            el->number += count;
+            el->t += count * el->d;
+            el->r -= count;
+            prunednow += count;
+            break;
         }
         else
-            break;
+        {
+            delete el;
+            elements.pop_front();
+            prunednow += el->r + 1;
+        }
     }
 
     return prunednow;
@@ -152,33 +175,22 @@ void SegmentTimeline::mergeWith(SegmentTimeline &other)
     {
         Element *el = other.elements.front();
         other.elements.pop_front();
-        if(el->t == last->t) /* Same element, but prev could have been middle of repeat */
+
+        if(last->contains(el->t)) /* Same element, but prev could have been middle of repeat */
         {
-            last->r = std::max(last->r, el->r);
+            const uint64_t count = (el->t - last->t) / last->d;
+            last->r = std::max(last->r, el->r + count);
             delete el;
         }
-        else if(el->t > last->t) /* Did not exist in previous list */
-        {
-            if( el->t - last->t >= last->d * (stime_t)(last->r + 1) )
-            {
-                elements.push_back(el);
-                last = el;
-            }
-            else if(last->d == el->d) /* should always be in that case */
-            {
-                last->r = ((el->t - last->t) / last->d) - 1;
-                elements.push_back(el);
-                last = el;
-            }
-            else
-            {
-                /* borked: skip */
-                delete el;
-            }
-        }
-        else
+        else if(el->t < last->t)
         {
             delete el;
+        }
+        else /* Did not exist in previous list */
+        {
+            elements.push_back(el);
+            el->number = last->number + last->r + 1;
+            last = el;
         }
     }
 }
@@ -199,10 +211,36 @@ mtime_t SegmentTimeline::end() const
     return scaled  * CLOCK_FREQ / inheritTimescale();
 }
 
+void SegmentTimeline::debug(vlc_object_t *obj, int indent) const
+{
+    std::stringstream ss;
+    ss << std::string(indent, ' ') << "Timeline";
+    msg_Dbg(obj, "%s", ss.str().c_str());
+
+    std::list<Element *>::const_iterator it;
+    for(it = elements.begin(); it != elements.end(); ++it)
+        (*it)->debug(obj, indent + 1);
+}
+
 SegmentTimeline::Element::Element(uint64_t number_, stime_t d_, uint64_t r_, stime_t t_)
 {
     number = number_;
     d = d_;
     t = t_;
     r = r_;
+}
+
+bool SegmentTimeline::Element::contains(stime_t time) const
+{
+    if(time >= t && time < t + (stime_t)(r + 1) * d)
+        return true;
+    return false;
+}
+
+void SegmentTimeline::Element::debug(vlc_object_t *obj, int indent) const
+{
+    std::stringstream ss;
+    ss << std::string(indent + 1, ' ') << "Element #" << number
+       << " d=" << d << " r=" << r << " @t=" << t;
+    msg_Dbg(obj, "%s", ss.str().c_str());
 }
