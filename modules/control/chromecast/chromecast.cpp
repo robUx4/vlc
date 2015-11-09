@@ -1632,8 +1632,6 @@ static int DemuxControl( demux_t *p_demux, int i_query, va_list args)
 #endif
     }
 
-    msg_Dbg(p_demux, "DemuxControl %s", demux_control_names[i_query]);
-
     return p_demux->p_source->pf_control( p_demux->p_source, i_query, args );
 }
 
