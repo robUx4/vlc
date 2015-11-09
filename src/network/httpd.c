@@ -758,8 +758,10 @@ static int httpd_StreamCallBack(httpd_callback_sys_t *p_sys,
                 answer->i_body = stream->i_header;
                 answer->p_body = xmalloc(stream->i_header);
                 memcpy(answer->p_body, stream->p_header, stream->i_header);
+#if !defined(NDEBUG)
                 wsprintf(dbg,L"%d:%ld httpd:sent header %d", GetCurrentThreadId(), mdate() * 1000 / CLOCK_FREQ, stream->i_header);
                 OutputDebugString(dbg);
+#endif
             }
 #endif
             answer->i_body_offset = stream->i_buffer_last_pos;
