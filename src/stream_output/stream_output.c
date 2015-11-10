@@ -223,6 +223,15 @@ bool sout_InputIsEmpty(sout_packetizer_input_t *p_input)
     return b;
 }
 
+void sout_InputFlush( sout_packetizer_input_t *p_input )
+{
+    sout_instance_t     *p_sout = p_input->p_sout;
+
+    vlc_mutex_lock( &p_sout->lock );
+    sout_StreamFlush( p_sout->p_stream, p_input->id );
+    vlc_mutex_unlock( &p_sout->lock );
+}
+
 /*****************************************************************************
  *
  *****************************************************************************/
@@ -527,6 +536,7 @@ int sout_MuxSendBuffer( sout_mux_t *p_mux, sout_input_t *p_input,
                          block_t *p_buffer )
 {
     mtime_t i_dts = p_buffer->i_dts;
+
     block_FifoPut( p_input->p_fifo, p_buffer );
 
     if( p_mux->p_sout->i_out_pace_nocontrol )
@@ -553,6 +563,11 @@ int sout_MuxSendBuffer( sout_mux_t *p_mux, sout_input_t *p_input,
     return p_mux->pf_mux( p_mux );
 }
 
+int sout_MuxFlush( sout_mux_t *p_mux, sout_input_t *p_input )
+{
+    block_FifoEmpty( p_input->p_fifo );
+    return VLC_SUCCESS;
+}
 
 /*****************************************************************************
  * sout_MuxGetStream: find stream to be muxed

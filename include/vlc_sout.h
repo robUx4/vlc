@@ -176,6 +176,7 @@ VLC_API void sout_MuxDeleteStream( sout_mux_t *, sout_input_t * );
 VLC_API void sout_MuxDelete( sout_mux_t * );
 VLC_API int sout_MuxSendBuffer( sout_mux_t *, sout_input_t  *, block_t * );
 VLC_API int sout_MuxGetStream(sout_mux_t *, unsigned, mtime_t *);
+VLC_API int sout_MuxFlush( sout_mux_t *, sout_input_t * );
 
 static inline int sout_MuxControl( sout_mux_t *p_mux, int i_query, ... )
 {
@@ -210,6 +211,7 @@ struct sout_stream_t
     void              (*pf_del)( sout_stream_t *, sout_stream_id_sys_t * );
     /* manage a packet */
     int               (*pf_send)( sout_stream_t *, sout_stream_id_sys_t *, block_t* );
+    int               (*pf_flush)( sout_stream_t *, sout_stream_id_sys_t * );
     int               (*pf_control)( sout_stream_t *, int, va_list );
 
     sout_stream_sys_t *p_sys;
@@ -236,6 +238,14 @@ static inline int sout_StreamIdSend( sout_stream_t *s,
                                      sout_stream_id_sys_t *id, block_t *b )
 {
     return s->pf_send( s, id, b );
+}
+
+static inline int sout_StreamFlush( sout_stream_t *s,
+                                     sout_stream_id_sys_t *id )
+{
+    if (s->pf_flush)
+        return s->pf_flush( s, id );
+    return VLC_SUCCESS;
 }
 
 static inline int sout_StreamControl( sout_stream_t *s, int i_query, ... )

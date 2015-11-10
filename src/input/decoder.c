@@ -709,7 +709,7 @@ static int DecoderPlaySout( decoder_t *p_dec, block_t *p_sout_block )
 
 /* This function process a block for sout
  */
-static void DecoderProcessSout( decoder_t *p_dec, block_t *p_block )
+static void DecoderProcessSout( decoder_t *p_dec, block_t *p_block, bool b_flush )
 {
     decoder_owner_sys_t *p_owner = p_dec->p_owner;
     block_t *p_sout_block;
@@ -778,6 +778,12 @@ static void DecoderProcessSout( decoder_t *p_dec, block_t *p_block )
 
             p_sout_block = p_next;
         }
+    }
+    /* The packetizer does not output a block that tell the decoder to flush
+     * do it ourself */
+    if( b_flush )
+    {
+        sout_InputFlush( p_owner->p_sout_input );
     }
 }
 #endif
@@ -1284,29 +1290,26 @@ static void DecoderProcess( decoder_t *p_dec, block_t *p_block )
         return;
     }
 
+    bool b_flush = false;
+
+    if( p_block )
+    {
+        const bool b_flushing = p_owner->i_preroll_end == INT64_MAX;
+        DecoderUpdatePreroll( &p_owner->i_preroll_end, p_block );
+
+        b_flush = !b_flushing && b_flush_request;
+
+        p_block->i_flags &= ~BLOCK_FLAG_CORE_PRIVATE_MASK;
+    }
+
 #ifdef ENABLE_SOUT
     if( p_owner->b_packetizer )
     {
-        if( p_block )
-            p_block->i_flags &= ~BLOCK_FLAG_CORE_PRIVATE_MASK;
-
-        DecoderProcessSout( p_dec, p_block );
+        DecoderProcessSout( p_dec, p_block, b_flush );
     }
     else
 #endif
     {
-        bool b_flush = false;
-
-        if( p_block )
-        {
-            const bool b_flushing = p_owner->i_preroll_end == INT64_MAX;
-            DecoderUpdatePreroll( &p_owner->i_preroll_end, p_block );
-
-            b_flush = !b_flushing && b_flush_request;
-
-            p_block->i_flags &= ~BLOCK_FLAG_CORE_PRIVATE_MASK;
-        }
-
         if( p_dec->fmt_out.i_cat == AUDIO_ES )
         {
             DecoderProcessAudio( p_dec, p_block, b_flush );
