@@ -918,6 +918,13 @@ static int processMessage(intf_thread_t *p_intf, const castchannel::CastMessage 
 
             }
         }
+        else if (type == "LAUNCH_ERROR")
+        {
+            json_value reason = (*p_data)["reason"];
+            msg_Err(p_intf, "Failed to start the MediaPlayer: %s",
+                    (const char *)reason);
+            i_ret = -1;
+        }
         else
         {
             msg_Err(p_intf, "Receiver command not supported: %s",
