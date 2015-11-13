@@ -711,7 +711,7 @@ static int DecoderPlaySout( decoder_t *p_dec, block_t *p_sout_block )
  */
 static void DecoderProcessSout( decoder_t *p_dec, block_t *p_block )
 {
-    decoder_owner_sys_t *p_owner = (decoder_owner_sys_t *)p_dec->p_owner;
+    decoder_owner_sys_t *p_owner = p_dec->p_owner;
     block_t *p_sout_block;
     const bool b_preroll = p_block && p_block->i_flags & BLOCK_FLAG_PREROLL;
 
@@ -958,7 +958,7 @@ static void DecoderDecodeVideo( decoder_t *p_dec, block_t *p_block )
  */
 static void DecoderProcessVideo( decoder_t *p_dec, block_t *p_block, bool b_flush )
 {
-    decoder_owner_sys_t *p_owner = (decoder_owner_sys_t *)p_dec->p_owner;
+    decoder_owner_sys_t *p_owner = p_dec->p_owner;
 
     if( p_owner->p_packetizer )
     {
@@ -1113,7 +1113,7 @@ static void DecoderDecodeAudio( decoder_t *p_dec, block_t *p_block )
  */
 static void DecoderProcessAudio( decoder_t *p_dec, block_t *p_block, bool b_flush )
 {
-    decoder_owner_sys_t *p_owner = (decoder_owner_sys_t *)p_dec->p_owner;
+    decoder_owner_sys_t *p_owner = p_dec->p_owner;
 
     if( p_owner->p_packetizer )
     {
@@ -1267,7 +1267,7 @@ static void DecoderProcessSpu( decoder_t *p_dec, block_t *p_block, bool b_flush 
  */
 static void DecoderProcess( decoder_t *p_dec, block_t *p_block )
 {
-    decoder_owner_sys_t *p_owner = (decoder_owner_sys_t *)p_dec->p_owner;
+    decoder_owner_sys_t *p_owner = p_dec->p_owner;
     const bool b_flush_request = p_block && (p_block->i_flags & BLOCK_FLAG_CORE_FLUSH);
 
     if( p_dec->b_error )
