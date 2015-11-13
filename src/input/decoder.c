@@ -114,6 +114,8 @@ struct decoder_owner_sys_t
     bool b_draining;
     atomic_bool drained;
     bool b_idle;
+    /* any preroll block_t before the DecoderBlockFlushNew() call is garbage */
+    bool b_preroll_started;
 
     /* CC */
     struct
@@ -711,6 +713,7 @@ static void DecoderProcessSout( decoder_t *p_dec, block_t *p_block, bool b_flush
 {
     decoder_owner_sys_t *p_owner = (decoder_owner_sys_t *)p_dec->p_owner;
     block_t *p_sout_block;
+    const bool b_preroll = p_block && p_block->i_flags & BLOCK_FLAG_PREROLL;
 
     while( ( p_sout_block =
                  p_dec->pf_packetize( p_dec, p_block ? &p_block : NULL ) ) )
@@ -749,16 +752,28 @@ static void DecoderProcessSout( decoder_t *p_dec, block_t *p_block, bool b_flush
             block_t *p_next = p_sout_block->p_next;
 
             p_sout_block->p_next = NULL;
-
-            if( DecoderPlaySout( p_dec, p_sout_block ) == VLC_EGENERIC )
+            if (b_preroll && !p_owner->b_preroll_started)
             {
-                msg_Err( p_dec, "cannot continue streaming due to errors" );
+                if (p_sout_block->i_pts == VLC_TS_0)
+                    p_owner->b_preroll_started = true;
+                msg_Dbg( p_dec, "discard preroll block at %" PRId64, p_sout_block->i_pts );
+                block_ChainRelease(p_sout_block);
+            }
+            else
+            {
+                if (!b_preroll)
+                    p_owner->b_preroll_started = false;
 
-                p_dec->b_error = true;
+                if( DecoderPlaySout( p_dec, p_sout_block ) == VLC_EGENERIC )
+                {
+                    msg_Err( p_dec, "cannot continue streaming due to errors" );
 
-                /* Cleanup */
-                block_ChainRelease( p_next );
-                return;
+                    p_dec->b_error = true;
+
+                    /* Cleanup */
+                    block_ChainRelease( p_next );
+                    return;
+                }
             }
 
             p_sout_block = p_next;
@@ -1496,6 +1511,7 @@ static decoder_t * CreateDecoder( vlc_object_t *p_parent,
     p_owner->b_draining = false;
     atomic_init( &p_owner->drained, false );
     p_owner->b_idle = false;
+    p_owner->b_preroll_started = false;
 
     es_format_Init( &p_owner->fmt, UNKNOWN_ES, 0 );
 
