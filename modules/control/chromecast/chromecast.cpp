@@ -572,6 +572,68 @@ bool intf_sys_t::seekTo(mtime_t pos)
     return true;
 }
 
+static const char *event_names[] = {
+    "INPUT_EVENT_STATE",
+    /* b_dead is true */
+    "INPUT_EVENT_DEAD",
+
+    /* "rate" has changed */
+    "INPUT_EVENT_RATE",
+
+    /* At least one of "position" or "time" */
+    "INPUT_EVENT_POSITION",
+
+    /* "length" has changed */
+    "INPUT_EVENT_LENGTH",
+
+    /* A title has been added or removed or selected.
+     * It imply that chapter has changed (not chapter event is sent) */
+    "INPUT_EVENT_TITLE",
+    /* A chapter has been added or removed or selected. */
+    "INPUT_EVENT_CHAPTER",
+
+    /* A program ("program") has been added or removed or selected",
+     * or "program-scrambled" has changed.*/
+    "INPUT_EVENT_PROGRAM",
+    /* A ES has been added or removed or selected */
+    "INPUT_EVENT_ES",
+    /* "teletext-es" has changed */
+    "INPUT_EVENT_TELETEXT",
+
+    /* "record" has changed */
+    "INPUT_EVENT_RECORD",
+
+    /* "INPUT_item_t media has changed */
+    "INPUT_EVENT_ITEM_META",
+    /* "INPUT_item_t info has changed */
+    "INPUT_EVENT_ITEM_INFO",
+    /* "INPUT_item_t name has changed */
+    "INPUT_EVENT_ITEM_NAME",
+    /* "INPUT_item_t epg has changed */
+    "INPUT_EVENT_ITEM_EPG",
+
+    /* Input statistics have been updated */
+    "INPUT_EVENT_STATISTICS",
+    /* At least one of "signal-quality" or "signal-strength" has changed */
+    "INPUT_EVENT_SIGNAL",
+
+    /* "audio-delay" has changed */
+    "INPUT_EVENT_AUDIO_DELAY",
+    /* "spu-delay" has changed */
+    "INPUT_EVENT_SUBTITLE_DELAY",
+
+    /* "bookmark" has changed */
+    "INPUT_EVENT_BOOKMARK",
+
+    /* cache" has changed */
+    "INPUT_EVENT_CACHE",
+
+    /* A audio_output_t object has been created/deleted by *the input* */
+    "INPUT_EVENT_AOUT",
+    /* A vout_thread_t object has been created/deleted by *the input* */
+    "INPUT_EVENT_VOUT",
+};
+
 static int InputEvent( vlc_object_t *p_this, char const *psz_var,
                        vlc_value_t oldval, vlc_value_t val, void *p_data )
 {
@@ -593,7 +655,17 @@ static int InputEvent( vlc_object_t *p_this, char const *psz_var,
             p_sys->sendPlayerCmd();
         }
         break;
+    case INPUT_EVENT_POSITION:
+        msg_Info(p_this, "position changed event %f/%" PRId64, var_GetFloat( p_input, "position" ), var_GetInteger( p_input, "time" ));
+        return VLC_SUCCESS;
+
+    case INPUT_EVENT_STATISTICS:
+    case INPUT_EVENT_CACHE:
+        /* discard logs */
+        return VLC_SUCCESS;
     }
+
+    msg_Dbg(p_this, "InputEvent %s", event_names[val.i_int]);
 
     return VLC_SUCCESS;
 }
@@ -1538,6 +1610,167 @@ static int DemuxDemux( demux_t *p_demux )
     return p_demux->p_sys->Demux();
 }
 
+static const char *demux_control_names[] = {
+    "DEMUX_CAN_SEEK",
+
+    "DEMUX_can_fastseek",
+
+    /** Checks whether (long) pause then stream resumption is supported.
+     * Can fail only if synchronous and <b>not</b> an access-demuxer. The
+     * underlying input stream then determines if pause is supported.
+     * \bug Failing should not be allowed.
+     *
+     * arg1= bool * */
+    "DEMUX_CAN_PAUSE",
+
+    /** Whether the stream can be read at an arbitrary pace.
+     * Cannot fail.
+     *
+     * arg1= bool * */
+    "DEMUX_CAN_CONTROL_PACE",
+
+    "DEMUX_get_size",
+    "DEMUX_is_directory",
+
+    /** Retrieves the PTS delay (roughly the default buffer duration).
+     * Can fail only if synchronous and <b>not</b> an access-demuxer. The
+     * underlying input stream then determines the PTS delay.
+     *
+     * arg1= int64_t * */
+    "DEMUX_GET_PTS_DELAY",
+
+    /**
+     * \todo Document
+     *
+     * \warning The prototype is different from STREAM_GET_TITLE_INFO
+     *
+     * Can fail", meaning there is only one title and one chapter.
+     *
+     * arg1= input_title_t ***", arg2=int *", arg3=int *pi_title_offset(0)",
+     * arg4= int *pi_seekpoint_offset(0) */
+    "DEMUX_GET_TITLE_INFO",
+
+    "DEMUX_get_title",
+    "DEMUX_get_seekpoint",
+
+    /** Retrieves stream meta-data.
+     * Should fail if no meta-data were retrieved.
+     *
+     * arg1= vlc_meta_t * */
+    "DEMUX_GET_META",
+
+    "DEMUX_get_content_type",
+
+    /** Retrieves an estimate of signal quality and strength.
+     * Can fail.
+     *
+     * arg1=double *quality", arg2=double *strength */
+    "DEMUX_GET_SIGNAL",
+
+    /** Sets the paused or playing/resumed state.
+     *
+     * Streams are initially in playing state. The control always specifies a
+     * change from paused to playing (false) or from playing to paused (true)
+     * and streams are initially playing; a no-op cannot be requested.
+     *
+     * The control is never used if "DEMUX_CAN_PAUSE fails.
+     * Can fail.
+     *
+     * arg1= bool */
+    "DEMUX_SET_PAUSE_STATE",
+
+    /** Seeks to the beginning of a title.
+     *
+     * The control is never used if "DEMUX_GET_TITLE_INFO fails.
+     * Can fail.
+     *
+     * arg1= int */
+    "DEMUX_SET_TITLE",
+
+    /** Seeks to the beginning of a chapter of the current title.
+     *
+     * The control is never used if "DEMUX_GET_TITLE_INFO fails.
+     * Can fail.
+     *
+     * arg1= int */
+    "DEMUX_SET_SEEKPOINT",        /* arg1= int            can fail */
+
+    /**
+     * \todo Document
+     *
+     * \warning The prototype is different from STREAM_SET_RECORD_STATE
+     *
+     * The control is never used if "DEMUX_CAN_RECORD fails or returns false.
+     * Can fail.
+     *
+     * arg1= bool */
+    "DEMUX_SET_RECORD_STATE",
+
+    /* I. Common queries to access_demux and demux */
+    /* POSITION double between 0.0 and 1.0 */
+    "DEMUX_GET_POSITION", /* arg1= double *       res=    */
+    "DEMUX_SET_POSITION",         /* arg1= double arg2= bool b_precise    res=can fail    */
+
+    /* LENGTH/TIME in microsecond", 0 if unknown */
+    "DEMUX_GET_LENGTH",           /* arg1= int64_t *      res=    */
+    "DEMUX_GET_TIME",             /* arg1= int64_t *      res=    */
+    "DEMUX_SET_TIME",             /* arg1= int64_t arg2= bool b_precise   res=can fail    */
+
+    /* "DEMUX_SET_GROUP/SET_ES only a hint for demuxer (mainly DVB) to allow not
+     * reading everything (you should not use this to call es_out_Control)
+     * if you don't know what to do with it", just IGNORE it", it is safe(r)
+     * -1 means all group", 0 default group (first es added) */
+    "DEMUX_SET_GROUP",            /* arg1= int", arg2=const vlc_list_t *   can fail */
+    "DEMUX_SET_ES",               /* arg1= int                            can fail */
+
+    /* Ask the demux to demux until the given date at the next pf_demux call
+     * but not more (and not less", at the precision available of course).
+     * XXX: not mandatory (except for subtitle demux) but will help a lot
+     * for multi-input
+     */
+    "DEMUX_SET_NEXT_DEMUX_TIME",  /* arg1= int64_t        can fail */
+    /* FPS for correct subtitles handling */
+    "DEMUX_GET_FPS",              /* arg1= double *       res=can fail    */
+
+    /* Meta data */
+    "DEMUX_HAS_UNSUPPORTED_META", /* arg1= bool *   res can fail    */
+
+    /* Attachments */
+    "DEMUX_GET_ATTACHMENTS",      /* arg1=input_attachment_t***", int* res=can fail */
+
+    /* RECORD you are ensured that it is never called twice with the same state
+     * you should accept it only if the stream can be recorded without
+     * any modification or header addition. */
+    "DEMUX_CAN_RECORD",           /* arg1=bool*   res=can fail(assume false) */
+
+    /* II. Specific access_demux queries */
+
+    /* "DEMUX_CAN_CONTROL_RATE is called only if "DEMUX_CAN_CONTROL_PACE has returned false.
+     * *pb_rate should be true when the rate can be changed (using "DEMUX_SET_RATE)
+     * *pb_ts_rescale should be true when the timestamps (pts/dts/pcr) have to be rescaled */
+    "DEMUX_CAN_CONTROL_RATE",     /* arg1= bool*pb_rate arg2= bool*pb_ts_rescale  can fail(assume false) */
+    /* "DEMUX_SET_RATE is called only if "DEMUX_CAN_CONTROL_RATE has returned true.
+     * It should return the value really used in *pi_rate */
+    "DEMUX_SET_RATE",             /* arg1= int*pi_rate                                        can fail */
+
+    /** Checks whether the stream is actually a playlist", rather than a real
+     * stream.
+     *
+     * \warning The prototype is different from STREAM_IS_DIRECTORY.
+     *
+     * Can fail if the stream is not a playlist (same as returning false).
+     *
+     * arg1= bool * */
+    "DEMUX_IS_PLAYLIST",
+
+    /* Navigation */
+    "DEMUX_NAV_ACTIVATE",        /* res=can fail */
+    "DEMUX_NAV_UP",              /* res=can fail */
+    "DEMUX_NAV_DOWN",            /* res=can fail */
+    "DEMUX_NAV_LEFT",            /* res=can fail */
+    "DEMUX_NAV_RIGHT",           /* res=can fail */
+};
+
 static int DemuxControl( demux_t *p_demux, int i_query, va_list args)
 {
     demux_sys_t *p_sys = p_demux->p_sys;
@@ -1638,6 +1871,8 @@ static int DemuxControl( demux_t *p_demux, int i_query, va_list args)
     }
 #endif
     }
+
+    msg_Dbg(p_demux, "DemuxControl %s", demux_control_names[i_query]);
 
     return p_demux->p_source->pf_control( p_demux->p_source, i_query, args );
 }
