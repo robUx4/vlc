@@ -539,15 +539,6 @@ int sout_MuxSendBuffer( sout_mux_t *p_mux, sout_input_t *p_input,
 
     block_FifoPut( p_input->p_fifo, p_buffer );
 
-    if ( p_buffer->i_flags & BLOCK_FLAG_DISCONTINUITY)
-    {
-        msg_Info(p_mux, "discontinuity, flush the FIFO");
-        block_FifoEmpty( p_input->p_fifo );
-    }
-    else
-    {
-        block_FifoPut( p_input->p_fifo, p_buffer );
-    }
 
     if( p_mux->p_sout->i_out_pace_nocontrol )
     {
