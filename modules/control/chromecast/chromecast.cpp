@@ -147,6 +147,7 @@ struct intf_sys_t
         ,play_status(PLAYER_IDLE)
         ,i_supportedMediaCommands(15)
         ,m_seektime(-1.0)
+        ,i_seektime(-1.0)
         ,i_app_requestId(0)
         ,i_requestId(0)
         ,b_header_done(false)
@@ -227,7 +228,10 @@ struct intf_sys_t
     enum connection_status conn_status;
     enum player_status     play_status;
     int                    i_supportedMediaCommands;
+    /* internal seek time */
     mtime_t                m_seektime;
+    /* seek time with Chromecast relative timestamp */
+    mtime_t                i_seektime;
 
     vlc_interrupt_t *p_interrupt;
     vlc_mutex_t  lock;
@@ -559,7 +563,8 @@ bool intf_sys_t::seekTo(mtime_t pos)
     assert(playback_start_chromecast != -1.0);
     //msgPlayerStop();
 
-    const std::string currentTime = std::to_string( double( mdate() + playback_start_local + 1000000 ) / 1000000.0 );
+    i_seektime = mdate() + playback_start_local + 1000000;
+    const std::string currentTime = std::to_string( double( i_seektime ) / 1000000.0 );
     m_seektime = pos; // + playback_start_chromecast - playback_start_local;
     playback_start_local = pos;
     msg_Dbg( p_intf, "Seeking to %" PRId64 "/%s playback_time:%" PRId64, pos, currentTime.c_str(), playback_start_chromecast);
@@ -1057,18 +1062,12 @@ static int processMessage(intf_thread_t *p_intf, const castchannel::CastMessage 
                         p_sys->date_play_start = -1;
                     }
                 }
-                if (p_sys->playerState == "BUFFERING" && p_sys->m_seektime != -1.0)
+
+                if (p_sys->playerState == "BUFFERING" && p_sys->i_seektime != -1.0)
                 {
-                    if ( 1 || int64_t( double( p_sys->m_seektime + p_sys->playback_start_chromecast - p_sys->playback_start_local ) / 100000.0 ) ==
-                         int64_t( 10.0 * double( status[0]["currentTime"] ) ) )
-                    {
-                        msg_Dbg(p_intf, "Chromecast ready to receive seeked data");
-                        vlc_cond_broadcast( &p_sys->seekCommandCond );
-                    }
-                    else
-                    {
-                        msg_Dbg(p_intf, "Chromecast not ready to use seek data from %" PRId64 " got %f", p_sys->m_seektime, double( status[0]["currentTime"] ));
-                    }
+
+                    msg_Dbg(p_intf, "Chromecast seeking possibly done");
+                    vlc_cond_signal( &p_sys->seekCommandCond );
                 }
             }
             if (p_sys->play_status == PLAYER_LOAD_SENT)
@@ -1559,25 +1558,32 @@ struct demux_sys_t
 
         /* hold the data while seeking */
         /* wait until the client is buffering for seeked data */
-        if (p_intf->p_sys->m_seektime != -1.0)
+        if (p_intf->p_sys->i_seektime != -1.0)
         {
-            msg_Dbg(p_demux, "waiting for Chromecast seek");
-            vlc_cond_wait(&p_intf->p_sys->seekCommandCond, &p_intf->p_sys->lock);
-            msg_Dbg(p_demux, "finished waiting for Chromecast seek");
-
-            if (p_intf->p_sys->conn_status != CHROMECAST_APP_STARTED) {
+            const mtime_t i_seek_time = p_intf->p_sys->m_seektime; // - (p_intf->p_sys->playback_start_chromecast - p_intf->p_sys->playback_start_local);
+            int i_ret = source_Control( DEMUX_SET_TIME, i_seek_time );
+            if (i_ret != VLC_SUCCESS)
+            {
+                msg_Warn(p_demux, "failed to seek in the muxer %d", i_ret);
                 vlc_mutex_unlock(&p_intf->p_sys->lock);
                 return 0;
             }
 
-            mtime_t i_seek_time = p_intf->p_sys->m_seektime; // - (p_intf->p_sys->playback_start_chromecast - p_intf->p_sys->playback_start_local);
+            while (p_intf->p_sys->playback_start_chromecast < p_intf->p_sys->i_seektime)
+            {
+                msg_Dbg(p_demux, "waiting for Chromecast seek");
+                vlc_cond_wait(&p_intf->p_sys->seekCommandCond, &p_intf->p_sys->lock);
+                msg_Dbg(p_demux, "finished waiting for Chromecast seek");
+            }
             p_intf->p_sys->m_seektime = -1.0;
-            vlc_mutex_unlock(&p_intf->p_sys->lock);
+            p_intf->p_sys->i_seektime = -1.0;
 
-            int i_ret = source_Control( DEMUX_SET_TIME, i_seek_time );
-            if (i_ret != VLC_SUCCESS)
+            if (p_intf->p_sys->conn_status != CHROMECAST_APP_STARTED) {
+                msg_Warn(p_demux, "cannot seek as the Chromecast app is not running %d", p_intf->p_sys->conn_status);
+                vlc_mutex_unlock(&p_intf->p_sys->lock);
                 return 0;
-            //return 1;
+            }
+            vlc_mutex_unlock(&p_intf->p_sys->lock);
         } else {
             vlc_mutex_unlock(&p_intf->p_sys->lock);
         }
