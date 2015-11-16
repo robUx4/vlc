@@ -1027,8 +1027,8 @@ static int processMessage(intf_thread_t *p_intf, const castchannel::CastMessage 
             p_sys->i_supportedMediaCommands = status[0]["supportedMediaCommands"].operator json_int_t();
 
             std::string mediaSessionId = std::to_string((json_int_t) status[0]["mediaSessionId"]);
-            if (!mediaSessionId.empty() && mediaSessionId != p_sys->mediaSessionId) {
-                msg_Warn(p_intf, "different mediaSessionId detected %s", mediaSessionId.c_str());
+            if (!mediaSessionId.empty() && !p_sys->mediaSessionId.empty() && mediaSessionId != p_sys->mediaSessionId ) {
+                msg_Warn(p_intf, "different mediaSessionId detected %s was %s", mediaSessionId.c_str(), p_sys->mediaSessionId.c_str());
                 p_sys->mediaSessionId = mediaSessionId;
                 p_sys->playerState = status[0]["playerState"].operator const char *();
                 //p_sys->msgPlayerLoad();
