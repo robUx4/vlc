@@ -321,6 +321,11 @@ static int MuxBlock( sout_mux_t *p_mux, sout_input_t *p_input )
     pkt.size = p_data->i_buffer;
     pkt.stream_index = i_stream;
 
+    if (p_data->i_flags & BLOCK_FLAG_DISCONTINUITY)
+    {
+        msg_Warn(p_mux, "MuxBlock detected discontinuity at %" PRId64 " pts:%" PRId64, p_data->i_pts, p_data->i_dts);
+    }
+
     if( p_data->i_flags & BLOCK_FLAG_TYPE_I )
     {
 #ifdef AVFMT_ALLOW_FLUSH
