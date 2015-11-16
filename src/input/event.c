@@ -60,6 +60,13 @@ void input_SendEventPosition( input_thread_t *p_input, double f_position, mtime_
 {
     vlc_value_t val;
 
+#ifndef NDEBUG
+    if (i_time == 0)
+        msg_Dbg(p_input,"start SendEventPosition time:%" PRId64, i_time);
+    else
+        msg_Dbg(p_input,"SendEventPosition time:%" PRId64, i_time);
+#endif
+
     /* */
     val.f_float = f_position;
     var_Change( p_input, "position", VLC_VAR_SETVALUE, &val, NULL );

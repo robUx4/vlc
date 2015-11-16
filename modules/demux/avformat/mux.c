@@ -314,6 +314,17 @@ static int MuxBlock( sout_mux_t *p_mux, sout_input_t *p_input )
     AVStream *p_stream = p_sys->oc->streams[i_stream];
     AVPacket pkt;
 
+#if 0
+    if (p_stream->codec->codec_type == AVMEDIA_TYPE_VIDEO)
+    {
+        msg_Dbg(p_mux, "video packet at %" PRId64 " key:%d", p_data->i_pts, (p_data->i_flags & BLOCK_FLAG_TYPE_I) != 0);
+    }
+    if (p_stream->codec->codec_type == AVMEDIA_TYPE_AUDIO)
+    {
+        msg_Dbg(p_mux, "audio packet at %" PRId64, p_data->i_pts);
+    }
+#endif
+
     memset( &pkt, 0, sizeof(AVPacket) );
 
     av_init_packet(&pkt);
