@@ -713,7 +713,7 @@ static void DecoderProcessSout( decoder_t *p_dec, block_t *p_block, bool b_flush
 {
     decoder_owner_sys_t *p_owner = p_dec->p_owner;
     block_t *p_sout_block;
-    const bool b_preroll = p_block && p_block->i_flags & BLOCK_FLAG_PREROLL;
+    const bool b_preroll = p_block && p_block->i_flags & (BLOCK_FLAG_PREROLL|BLOCK_FLAG_DISCONTINUITY);
 
     while( ( p_sout_block =
                  p_dec->pf_packetize( p_dec, p_block ? &p_block : NULL ) ) )
@@ -754,15 +754,24 @@ static void DecoderProcessSout( decoder_t *p_dec, block_t *p_block, bool b_flush
             p_sout_block->p_next = NULL;
             if (b_preroll && !p_owner->b_preroll_started)
             {
-                if (p_sout_block->i_pts == VLC_TS_0)
+                msg_Dbg( p_dec, "%ld discard preroll block at %" PRId64 " started:%d", GetCurrentThreadId(), p_sout_block->i_pts, p_owner->b_preroll_started );
+                if (p_sout_block->i_pts == VLC_TS_0) {
+                    msg_Dbg( p_dec, "found preroll start" );
                     p_owner->b_preroll_started = true;
-                msg_Dbg( p_dec, "discard preroll block at %" PRId64, p_sout_block->i_pts );
+                }
                 block_ChainRelease(p_sout_block);
             }
             else
             {
-                if (!b_preroll)
+                if (!b_preroll && p_owner->b_preroll_started)
+                {
+                    msg_Dbg( p_dec, "preroll finished at %" PRId64, p_sout_block->i_pts );
                     p_owner->b_preroll_started = false;
+                }
+                if (p_sout_block->i_pts == VLC_TS_0)
+                    msg_Warn( p_dec, "zero timestamp" );
+                if (p_sout_block->i_pts == VLC_TS_INVALID)
+                    msg_Warn( p_dec, "invalid timestamp" );
 
                 if( DecoderPlaySout( p_dec, p_sout_block ) == VLC_EGENERIC )
                 {
@@ -783,6 +792,7 @@ static void DecoderProcessSout( decoder_t *p_dec, block_t *p_block, bool b_flush
      * do it ourself */
     if( b_flush )
     {
+        msg_Warn(p_dec, "%ld flushing sout", GetCurrentThreadId());
         sout_InputFlush( p_owner->p_sout_input );
     }
 }
