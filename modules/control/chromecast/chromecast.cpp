@@ -1737,6 +1737,13 @@ static int Send(sout_stream_t *p_stream, sout_stream_id_sys_t *id,
     return p_sys->sendBlock(id, p_buffer);
 }
 
+static int Flush( sout_stream_t *p_stream, sout_stream_id_sys_t *id )
+{
+    sout_stream_sys_t *p_sys = p_stream->p_sys;
+
+    return sout_StreamFlush( p_sys->p_out, id );
+}
+
 int sout_stream_sys_t::sendBlock(sout_stream_id_sys_t *id,
                                  block_t *p_buffer)
 {
@@ -1853,6 +1860,7 @@ int SoutOpen(vlc_object_t *p_this)
     p_stream->pf_add     = Add;
     p_stream->pf_del     = Del;
     p_stream->pf_send    = Send;
+    p_stream->pf_flush   = Flush;
     p_stream->pf_control = Control;
 
     p_stream->p_sys = p_sys;
