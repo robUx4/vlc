@@ -28,6 +28,9 @@
 
 #include <deque>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wincompatible-ms-struct"
+
 typedef struct VLCMediaSample
 {
     IMediaSample *p_sample;
@@ -217,3 +220,5 @@ public:
     STDMETHODIMP Reset();
     STDMETHODIMP Clone( IEnumMediaTypes **ppEnum );
 };
+
+#pragma clang diagnostic pop
