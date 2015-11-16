@@ -961,6 +961,21 @@ AS_IF([test "${SYS}" != "mingw32" -a "${SYS}" != "os2"], [
   AS_IF([test "${ac_cv_c_visibility_hidden}" = "no"], [VLC_RESTORE_FLAGS])
 ])
 
+AS_IF([test "${SYS}" == "mingw32"], [
+  VLC_SAVE_FLAGS
+  CFLAGS="${CFLAGS} -Wincompatible-ms-struct"
+  CXXFLAGS="${CXXFLAGS} -Wincompatible-ms-struct"
+  OBJCFLAGS="${OBJCFLAGS} -Wincompatible-ms-struct"
+  AC_CACHE_CHECK([if $CC accepts -Wincompatible-ms-struct],
+                 [ac_cv_c_incompatible_ms_struct], [
+    AC_COMPILE_IFELSE([AC_LANG_PROGRAM()], [
+      ac_cv_c_incompatible_ms_struct=yes
+    ], [
+      ac_cv_c_incompatible_ms_struct=no
+    ])
+  ])
+  AS_IF([test "${ac_cv_c_incompatible_ms_struct}" = "no"], [VLC_RESTORE_FLAGS])
+])
 
 dnl
 dnl  Enable/disable optimizations
