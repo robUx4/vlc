@@ -56,6 +56,8 @@
 #   include <sys/socket.h>
 #endif
 
+#define NDEBUG
+
 #if 1 && defined(_WIN32)
 /* We need HUGE buffer otherwise TCP throughput is very limited */
 #define HTTPD_CL_BUFSIZE (101360+1)
@@ -1688,7 +1690,7 @@ static void httpd_ClientSend(httpd_client_t *cl)
 
     i_len = httpd_NetSend(cl, &cl->p_buffer[cl->i_buffer],
                            cl->i_buffer_size - cl->i_buffer);
-#if 1 && defined(NDEBUG)
+#if 1 && !defined(NDEBUG)
     wchar_t dbg[256];
     wsprintf(dbg,L"%d:%d httpd:snt ", GetCurrentThreadId(), mdate() * 1000 / CLOCK_FREQ);
     OutputDebugString(dbg);
