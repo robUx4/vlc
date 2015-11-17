@@ -707,6 +707,23 @@ static int DecoderPlaySout( decoder_t *p_dec, block_t *p_sout_block )
     return sout_InputSendBuffer( p_owner->p_sout_input, p_sout_block );
 }
 
+static void FlushPacketizer( decoder_t *p_packetizer )
+{
+    /* Flush the packetizer using the special flush block_t */
+    block_t *p_null = DecoderBlockFlushNew();
+    if( p_null )
+    {
+        block_t *p_sout_block = p_packetizer->pf_packetize( p_dec, &p_null );
+        while ( p_sout_block != NULL )
+        {
+            block_t *p_next = p_sout_block->p_next;
+            p_sout_block->p_next = NULL;
+            block_ChainRelease(p_sout_block);
+            p_sout_block = p_next;
+        }
+    }
+}
+
 /* This function process a block for sout
  */
 static void DecoderProcessSout( decoder_t *p_dec, block_t *p_block, bool b_flush )
@@ -714,6 +731,9 @@ static void DecoderProcessSout( decoder_t *p_dec, block_t *p_block, bool b_flush
     decoder_owner_sys_t *p_owner = p_dec->p_owner;
     block_t *p_sout_block;
     const bool b_preroll = p_block && p_block->i_flags & (BLOCK_FLAG_PREROLL|BLOCK_FLAG_DISCONTINUITY);
+
+    if( b_flush )
+        FlushPacketizer( p_dec );
 
     while( ( p_sout_block =
                  p_dec->pf_packetize( p_dec, p_block ? &p_block : NULL ) ) )
@@ -981,6 +1001,9 @@ static void DecoderProcessVideo( decoder_t *p_dec, block_t *p_block, bool b_flus
         block_t *p_packetized_block;
         decoder_t *p_packetizer = p_owner->p_packetizer;
 
+        if( b_flush )
+            FlushPacketizer( p_packetizer );
+
         while( (p_packetized_block =
                 p_packetizer->pf_packetize( p_packetizer, p_block ? &p_block : NULL )) )
         {
@@ -1135,6 +1158,9 @@ static void DecoderProcessAudio( decoder_t *p_dec, block_t *p_block, bool b_flus
     {
         block_t *p_packetized_block;
         decoder_t *p_packetizer = p_owner->p_packetizer;
+
+        if( b_flush )
+            FlushPacketizer( p_packetizer );
 
         while( (p_packetized_block =
                 p_packetizer->pf_packetize( p_packetizer, p_block ? &p_block : NULL )) )
