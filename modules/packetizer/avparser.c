@@ -139,6 +139,16 @@ static block_t *Packetize ( decoder_t *p_dec, block_t **pp_block )
 
     if( pp_block == NULL || *pp_block == NULL )
         return NULL;
+    if( (*pp_block)->i_flags&(BLOCK_FLAG_DISCONTINUITY) )
+    {
+        /* reopen as there's no clean way to flush avparser */
+        ClosePacketizer( p_dec );
+        if ( OpenPacketizer( p_dec ) != VLC_SUCCESS )
+        {
+            block_Release( *pp_block );
+            return NULL;
+        }
+    }
     if( (*pp_block)->i_flags&(BLOCK_FLAG_CORRUPTED) )
     {
         block_Release( *pp_block );
