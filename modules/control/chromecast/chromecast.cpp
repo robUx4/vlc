@@ -567,7 +567,7 @@ bool intf_sys_t::seekTo(mtime_t pos)
     const std::string currentTime = std::to_string( double( i_seektime ) / 1000000.0 );
     m_seektime = pos; // + playback_start_chromecast - playback_start_local;
     playback_start_local = pos;
-    msg_Dbg( p_intf, "Seeking to %" PRId64 "/%s playback_time:%" PRId64, pos, currentTime.c_str(), playback_start_chromecast);
+    msg_Dbg( p_intf, "%ld Seeking to %" PRId64 "/%s playback_time:%" PRId64, GetCurrentThreadId(), pos, currentTime.c_str(), playback_start_chromecast);
     play_status = PLAYER_SEEK_SENT;
     msgPlayerSeek( currentTime );
     //msgPlayerGetStatus();
@@ -1561,6 +1561,7 @@ struct demux_sys_t
         if (p_intf->p_sys->i_seektime != -1.0)
         {
             const mtime_t i_seek_time = p_intf->p_sys->m_seektime; // - (p_intf->p_sys->playback_start_chromecast - p_intf->p_sys->playback_start_local);
+            msg_Dbg(p_demux, "%ld do the actual seek", GetCurrentThreadId());
             int i_ret = source_Control( DEMUX_SET_TIME, i_seek_time );
             if (i_ret != VLC_SUCCESS)
             {
@@ -1571,9 +1572,9 @@ struct demux_sys_t
 
             while (p_intf->p_sys->playback_start_chromecast < p_intf->p_sys->i_seektime)
             {
-                msg_Dbg(p_demux, "waiting for Chromecast seek");
+                msg_Dbg(p_demux, "%ld waiting for Chromecast seek", GetCurrentThreadId());
                 vlc_cond_wait(&p_intf->p_sys->seekCommandCond, &p_intf->p_sys->lock);
-                msg_Dbg(p_demux, "finished waiting for Chromecast seek");
+                msg_Dbg(p_demux, "%ld finished waiting for Chromecast seek", GetCurrentThreadId());
             }
             p_intf->p_sys->m_seektime = -1.0;
             p_intf->p_sys->i_seektime = -1.0;

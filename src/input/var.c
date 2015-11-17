@@ -589,6 +589,7 @@ static int PositionCallback( vlc_object_t *p_this, char const *psz_cmd,
         }
 
         /* */
+        msg_Dbg(p_input, "INPUT_CONTROL_SET_POSITION %" PRId64, (mtime_t) (i_length * newval.f_float));
         input_ControlPush( p_input, INPUT_CONTROL_SET_POSITION, &newval );
     }
     return VLC_SUCCESS;

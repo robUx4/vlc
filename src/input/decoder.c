@@ -774,7 +774,7 @@ static void DecoderProcessSout( decoder_t *p_dec, block_t *p_block, bool b_flush
             p_sout_block->p_next = NULL;
             if (b_preroll && !p_owner->b_preroll_started)
             {
-                msg_Dbg( p_dec, "%ld discard preroll block at %" PRId64 " started:%d", GetCurrentThreadId(), p_sout_block->i_pts, p_owner->b_preroll_started );
+                msg_Dbg( p_dec, "%ld discard preroll block %p from p_block %p at %" PRId64 " started:%d", GetCurrentThreadId(), p_sout_block, p_block, p_sout_block->i_pts, p_owner->b_preroll_started );
                 if (p_sout_block->i_pts == VLC_TS_0) {
                     msg_Dbg( p_dec, "found preroll start" );
                     p_owner->b_preroll_started = true;
@@ -1389,6 +1389,8 @@ static void *DecoderThread( void *p_data )
              * for the sake of flushing (glitches could otherwise happen). */
             int canc = vlc_savecancel();
 
+            msg_Dbg(p_dec, "%ld start flushing decoder", GetCurrentThreadId());
+
             /* TODO: add a flush callback to decoder, do not depend on an
              * allocated block */
             block_t *dummy = DecoderBlockFlushNew();
@@ -1409,6 +1411,7 @@ static void *DecoderThread( void *p_data )
             /* Owner is supposed to wait for flush to complete.
              * TODO: It might be possible to remove this restriction. */
             assert( vlc_fifo_IsEmpty( p_owner->p_fifo ) );
+            msg_Dbg(p_dec, "%ld finished flushing decoder", GetCurrentThreadId());
             p_owner->flushed = true;
             vlc_cond_signal( &p_owner->wait_fifo );
             continue;
@@ -1459,6 +1462,11 @@ static void *DecoderThread( void *p_data )
              * drain. Pass p_block = NULL to decoder just once. */
             p_owner->b_draining = false;
         }
+
+        if ( p_block )
+            msg_Dbg(p_dec, "%ld dequeued block %p %" PRId64 " disconti:%d flush:%d", GetCurrentThreadId(), p_block, p_block->i_dts, p_block->i_flags & BLOCK_FLAG_DISCONTINUITY, p_block->i_flags & BLOCK_FLAG_FLUSH );
+        else
+            msg_Dbg(p_dec, "%ld dequeued NO BLOCK!", GetCurrentThreadId() );
 
         vlc_fifo_Unlock( p_owner->p_fifo );
 
@@ -1873,6 +1881,8 @@ void input_DecoderDecode( decoder_t *p_dec, block_t *p_block, bool b_do_pace )
             vlc_fifo_WaitCond( p_owner->p_fifo, &p_owner->wait_fifo );
     }
 
+    msg_Dbg(p_dec, "%ld queue block %" PRId64, GetCurrentThreadId(), p_block->i_dts );
+
     p_owner->flushed = false;
     vlc_fifo_QueueUnlocked( p_owner->p_fifo, p_block );
     vlc_fifo_Unlock( p_owner->p_fifo );
@@ -1928,6 +1938,8 @@ void input_DecoderDrain( decoder_t *p_dec )
 void input_DecoderFlush( decoder_t *p_dec )
 {
     decoder_owner_sys_t *p_owner = p_dec->p_owner;
+
+    msg_Dbg( p_dec, "%ld input_DecoderFlush", GetCurrentThreadId() );
 
     vlc_fifo_Lock( p_owner->p_fifo );
     /* Empty the fifo */
