@@ -420,9 +420,18 @@ static block_t *PacketizeAVC1( decoder_t *p_dec, block_t **pp_block )
 
     if( !pp_block || !*pp_block )
         return NULL;
-    if( (*pp_block)->i_flags&(BLOCK_FLAG_CORRUPTED) )
+
+    if( unlikely( (*pp_block)->i_flags&(BLOCK_FLAG_DISCONTINUITY|BLOCK_FLAG_CORRUPTED) ) )
     {
-        block_Release( *pp_block );
+        const bool b_broken = ( (*pp_block)->i_flags&BLOCK_FLAG_CORRUPTED ) != 0;
+        p_sys->packetizer.i_state = STATE_NOSYNC;
+        block_BytestreamEmpty( &p_sys->packetizer.bytestream );
+        p_sys->packetizer.i_offset = 0;
+        p_sys->packetizer.pf_reset( p_sys->packetizer.p_private, b_broken );
+        if( b_broken )
+        {
+            block_Release( *pp_block );
+        }
         return NULL;
     }
 
