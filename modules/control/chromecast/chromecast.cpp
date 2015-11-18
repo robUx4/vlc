@@ -332,6 +332,7 @@ vlc_module_begin ()
         set_capability("sout access", 0)
         add_shortcut("cc_access")
         set_callbacks( SoutAccessOpen, SoutAccessClose )
+        add_integer(SOUT_CFG_PREFIX "http-port", HTTP_PORT, HTTP_PORT_TEXT, HTTP_PORT_LONGTEXT, false)
         add_string(SOUT_CFG_PREFIX "mime", "video/x-matroska", MIME_TEXT, MIME_LONGTEXT, false)
 
 vlc_module_end ()
@@ -2195,18 +2196,22 @@ int SoutAccessOpen(vlc_object_t *p_this)
     intf_thread_t *p_intf = NULL;
     sout_access_out_t *p_saout;
 
+    config_ChainParse( p_access, SOUT_CFG_PREFIX, ppsz_sout_options, p_access->p_cfg );
+
+    char *psz_mime = var_GetNonEmptyString( p_access, SOUT_CFG_PREFIX "mime" );
+    std::stringstream s_access;
+    s_access << "http{mime=" << psz_mime
+             << ",http-port=" << var_InheritInteger(p_intf, SOUT_CFG_PREFIX "http-port")
+             << '}';
+    free(psz_mime);
+
     p_intf = static_cast<intf_thread_t*>(var_InheritAddress(p_access, SOUT_INTF_ADDRESS));
     if (p_intf == NULL) {
         msg_Err(p_access, "Missing the control interface to work");
         goto error;
     }
 
-    /* TODO pass the host & port parameters */
-#if 1
-    p_saout = sout_AccessOutNew(p_this, "http", p_access->psz_path);
-#else
-    p_saout = sout_AccessOutNew(p_this, "simplehttpd", p_access->psz_path);
-#endif
+    p_saout = sout_AccessOutNew(p_this, s_access.str().c_str(), p_access->psz_path);
     if (p_saout == NULL) {
         msg_Dbg(p_access, "could not create http output");
         goto error;
