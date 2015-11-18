@@ -733,7 +733,6 @@ static void DecoderProcessSout( decoder_t *p_dec, block_t *p_block )
 {
     decoder_owner_sys_t *p_owner = p_dec->p_owner;
     block_t *p_sout_block;
-    const bool b_preroll = p_block && p_block->i_flags & (BLOCK_FLAG_PREROLL|BLOCK_FLAG_DISCONTINUITY);
 
     while( ( p_sout_block =
                  p_dec->pf_packetize( p_dec, p_block ? &p_block : NULL ) ) )
@@ -1526,7 +1525,6 @@ static decoder_t * CreateDecoder( vlc_object_t *p_parent,
     p_owner->b_draining = false;
     atomic_init( &p_owner->drained, false );
     p_owner->b_idle = false;
-    p_owner->b_preroll_started = false;
 
     es_format_Init( &p_owner->fmt, UNKNOWN_ES, 0 );
 
