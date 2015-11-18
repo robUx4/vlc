@@ -273,6 +273,8 @@ private:
     void msgPlayerPlay();
     void msgPlayerPause();
     void msgPlayerSeek(const std::string & currentTime);
+
+    std::string GetMediaInformation();
 };
 
 #define IP_TEXT N_("Chromecast IP address")
@@ -1235,27 +1237,46 @@ void intf_sys_t::msgPlayerGetStatus()
     pushMediaPlayerMessage( ss );
 }
 
-void intf_sys_t::msgPlayerLoad()
+std::string intf_sys_t::GetMediaInformation()
 {
-#if 0
-    input_item_t * p_item = input_GetItem(p_input);
-#endif
+    std::stringstream ss;
 
     /* TODO: extract the metadata from p_sys->p_input */
+    int i_port = var_InheritInteger(p_intf, CONTROL_CFG_PREFIX "http-port");
+
+#if 1
+    input_item_t * p_item = input_GetItem(p_input);
+    if ( p_item )
+    {
+        char *psz_name = input_item_GetName( p_item );
+        ss << "\"metadata\":{"
+           << " \"metadataType\":0,"
+           << " \"title\":\"" << psz_name << "\""
+           << "},";
+        free( psz_name );
+    }
+#endif
+    ss << "\"contentId\":\"";
+#if 1
+    ss <<   "http://" << serverIP << ":" << i_port << "/stream\"";
+#else
+    ss <<   input_item_GetURI(p_item) << "\"";
+#endif
+    ss << ",\"streamType\":\"LIVE\","
+       << "\"contentType\":\"" << mime << "\"";
+
+    return ss.str();
+}
+
+void intf_sys_t::msgPlayerLoad()
+{
 
     std::stringstream ss;
     ss << "{\"type\":\"LOAD\","
+       <<  "\"media\":{" << GetMediaInformation() << "},"
        <<  "\"autoplay\":\"false\","
-#if 1
-       <<  "\"media\":{\"contentId\":\"http://" << serverIP << ":"
-           << var_InheritInteger(p_intf, CONTROL_CFG_PREFIX "http-port")
-           << "/stream\","
-#else
-       << "\"media\":{\"contentId\":\"" << input_item_GetURI(p_item) << "\","
-#endif
-       <<             "\"streamType\":\"LIVE\","
-       <<             "\"contentType\":\"" << mime << "\"},"
-       <<  "\"requestId\":" << i_requestId++ << "}";
+       <<  "\"requestId\":" << i_requestId++
+       << "}";
 
     assert(!appTransportId.empty());
     pushMediaPlayerMessage( ss );
