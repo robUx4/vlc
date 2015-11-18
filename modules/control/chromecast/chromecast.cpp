@@ -1059,6 +1059,8 @@ static int processMessage(intf_thread_t *p_intf, const castchannel::CastMessage 
                         msg_Dbg(p_intf, "Playback started with an offset of %" PRId64, p_sys->playback_start_chromecast);
                     }
                     else {
+                        if (p_sys->playerState == "IDLE")
+                            p_sys->play_status = PLAYER_IDLE;
                         p_sys->date_play_start = -1;
                     }
                 }
