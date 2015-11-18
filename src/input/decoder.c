@@ -114,8 +114,6 @@ struct decoder_owner_sys_t
     bool b_draining;
     atomic_bool drained;
     bool b_idle;
-    /* any preroll block_t before the DecoderBlockFlushNew() call is garbage */
-    bool b_preroll_started;
 
     /* CC */
     struct
@@ -774,37 +772,20 @@ static void DecoderProcessSout( decoder_t *p_dec, block_t *p_block )
             block_t *p_next = p_sout_block->p_next;
 
             p_sout_block->p_next = NULL;
-            if (b_preroll && !p_owner->b_preroll_started)
+            if (p_sout_block->i_pts == VLC_TS_0)
+                msg_Warn( p_dec, "zero timestamp" );
+            if (p_sout_block->i_pts == VLC_TS_INVALID)
+                msg_Warn( p_dec, "invalid timestamp" );
+
+            if( DecoderPlaySout( p_dec, p_sout_block ) == VLC_EGENERIC )
             {
-                msg_Dbg( p_dec, "%ld discard preroll block %p from p_block %p at %" PRId64 " started:%d", GetCurrentThreadId(), p_sout_block, p_block, p_sout_block->i_pts, p_owner->b_preroll_started );
-                if (p_sout_block->i_pts == VLC_TS_0) {
-                    msg_Dbg( p_dec, "found preroll start" );
-                    p_owner->b_preroll_started = true;
-                }
-                block_ChainRelease(p_sout_block);
-            }
-            else
-            {
-                if (!b_preroll && p_owner->b_preroll_started)
-                {
-                    msg_Dbg( p_dec, "preroll finished at %" PRId64, p_sout_block->i_pts );
-                    p_owner->b_preroll_started = false;
-                }
-                if (p_sout_block->i_pts == VLC_TS_0)
-                    msg_Warn( p_dec, "zero timestamp" );
-                if (p_sout_block->i_pts == VLC_TS_INVALID)
-                    msg_Warn( p_dec, "invalid timestamp" );
+                msg_Err( p_dec, "cannot continue streaming due to errors" );
 
-                if( DecoderPlaySout( p_dec, p_sout_block ) == VLC_EGENERIC )
-                {
-                    msg_Err( p_dec, "cannot continue streaming due to errors" );
+                p_dec->b_error = true;
 
-                    p_dec->b_error = true;
-
-                    /* Cleanup */
-                    block_ChainRelease( p_next );
-                    return;
-                }
+                /* Cleanup */
+                block_ChainRelease( p_next );
+                return;
             }
 
             p_sout_block = p_next;
