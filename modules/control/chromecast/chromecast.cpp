@@ -104,6 +104,7 @@ enum player_status {
 // Media player Chromecast app id
 #define MEDIA_RECEIVER_APP_ID "CC1AD845" // Default media player aka DEFAULT_MEDIA_RECEIVER_APPLICATION_ID
 static const std::string DEFAULT_CHOMECAST_RECEIVER = "receiver-0";
+static const mtime_t SEEK_FORWARD_OFFSET = 1000000;
 
 #define HTTP_PORT               8010
 
@@ -563,7 +564,9 @@ bool intf_sys_t::seekTo(mtime_t pos)
     assert(playback_start_chromecast != -1.0);
     //msgPlayerStop();
 
-    i_seektime = mdate() + playback_start_local + 1000000;
+    //return ( mdate() - date_play_start ) + playback_start_local;
+
+    i_seektime = mdate() + /* playback_start_local +*/ SEEK_FORWARD_OFFSET;
     const std::string currentTime = std::to_string( double( i_seektime ) / 1000000.0 );
     m_seektime = pos; // + playback_start_chromecast - playback_start_local;
     playback_start_local = pos;
