@@ -1436,10 +1436,12 @@ static void *DecoderThread( void *p_data )
             p_owner->b_draining = false;
         }
 
+#if 0 && !defined(NDEBUG)
         if ( p_block )
             msg_Dbg(p_dec, "%ld dequeued block %p %" PRId64 " disconti:%d flush:%d", GetCurrentThreadId(), p_block, p_block->i_dts, p_block->i_flags & BLOCK_FLAG_DISCONTINUITY, p_block->i_flags & BLOCK_FLAG_CORE_FLUSH );
         else
             msg_Dbg(p_dec, "%ld dequeued NO BLOCK!", GetCurrentThreadId() );
+#endif
 
         vlc_fifo_Unlock( p_owner->p_fifo );
 
@@ -1853,7 +1855,9 @@ void input_DecoderDecode( decoder_t *p_dec, block_t *p_block, bool b_do_pace )
             vlc_fifo_WaitCond( p_owner->p_fifo, &p_owner->wait_fifo );
     }
 
+#if 0 && !defined(NDEBUG)
     msg_Dbg(p_dec, "%ld queue block %" PRId64, GetCurrentThreadId(), p_block->i_dts );
+#endif
 
     p_owner->flushed = false;
     vlc_fifo_QueueUnlocked( p_owner->p_fifo, p_block );
