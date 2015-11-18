@@ -136,6 +136,8 @@ struct decoder_owner_sys_t
 /* */
 #define DECODER_SPU_VOUT_WAIT_DURATION ((int)(0.200*CLOCK_FREQ))
 
+static int DecoderFlush( decoder_t *p_dec );
+
 /**
  * Load a decoder module
  */
@@ -150,6 +152,7 @@ static int LoadDecoder( decoder_t *p_dec, bool b_packetizer,
     p_dec->pf_decode_sub = NULL;
     p_dec->pf_get_cc = NULL;
     p_dec->pf_packetize = NULL;
+    p_dec->pf_flush = DecoderFlush;
 
     es_format_Copy( &p_dec->fmt_in, p_fmt );
     es_format_Init( &p_dec->fmt_out, UNKNOWN_ES, 0 );
@@ -224,6 +227,25 @@ static block_t *DecoderBlockFlushNew()
     memset( p_null->p_buffer, 0, p_null->i_buffer );
 
     return p_null;
+}
+
+int DecoderFlush( decoder_t *p_dec )
+{
+    block_t *p_flush = DecoderBlockFlushNew();
+    if( p_flush )
+    {
+        if (p_dec->pf_decode_video)
+            p_dec->pf_decode_video( p_dec, &p_flush );
+        else if (p_dec->pf_decode_audio)
+            p_dec->pf_decode_audio( p_dec, &p_flush );
+        else if (p_dec->pf_decode_sub)
+            p_dec->pf_decode_sub( p_dec, &p_flush );
+        else if (p_dec->pf_packetize)
+            p_dec->pf_packetize( p_dec, &p_flush );
+        else
+            block_Release( p_flush );
+    }
+    return VLC_SUCCESS;
 }
 
 /*****************************************************************************
@@ -707,33 +729,13 @@ static int DecoderPlaySout( decoder_t *p_dec, block_t *p_sout_block )
     return sout_InputSendBuffer( p_owner->p_sout_input, p_sout_block );
 }
 
-static void FlushPacketizer( decoder_t *p_packetizer )
-{
-    /* Flush the packetizer using the special flush block_t */
-    block_t *p_null = DecoderBlockFlushNew();
-    if( p_null )
-    {
-        block_t *p_sout_block = p_packetizer->pf_packetize( p_dec, &p_null );
-        while ( p_sout_block != NULL )
-        {
-            block_t *p_next = p_sout_block->p_next;
-            p_sout_block->p_next = NULL;
-            block_ChainRelease(p_sout_block);
-            p_sout_block = p_next;
-        }
-    }
-}
-
 /* This function process a block for sout
  */
-static void DecoderProcessSout( decoder_t *p_dec, block_t *p_block, bool b_flush )
+static void DecoderProcessSout( decoder_t *p_dec, block_t *p_block )
 {
     decoder_owner_sys_t *p_owner = p_dec->p_owner;
     block_t *p_sout_block;
     const bool b_preroll = p_block && p_block->i_flags & (BLOCK_FLAG_PREROLL|BLOCK_FLAG_DISCONTINUITY);
-
-    if( b_flush )
-        FlushPacketizer( p_dec );
 
     while( ( p_sout_block =
                  p_dec->pf_packetize( p_dec, p_block ? &p_block : NULL ) ) )
@@ -807,13 +809,6 @@ static void DecoderProcessSout( decoder_t *p_dec, block_t *p_block, bool b_flush
 
             p_sout_block = p_next;
         }
-    }
-    /* The packetizer does not output a block that tell the decoder to flush
-     * do it ourself */
-    if( b_flush )
-    {
-        msg_Warn(p_dec, "%ld flushing sout", GetCurrentThreadId());
-        sout_InputFlush( p_owner->p_sout_input );
     }
 }
 #endif
@@ -964,7 +959,7 @@ static void DecoderDecodeVideo( decoder_t *p_dec, block_t *p_block )
         {
             msg_Dbg( p_dec, "End of video preroll" );
             if( p_vout )
-                vout_Flush( p_vout, VLC_TS_INVALID+1 );
+                vout_Flush( p_vout, VLC_TS_0 );
             /* */
             p_owner->i_preroll_end = VLC_TS_INVALID;
         }
@@ -992,7 +987,7 @@ static void DecoderDecodeVideo( decoder_t *p_dec, block_t *p_block )
 
 /* This function process a video block
  */
-static void DecoderProcessVideo( decoder_t *p_dec, block_t *p_block, bool b_flush )
+static void DecoderProcessVideo( decoder_t *p_dec, block_t *p_block )
 {
     decoder_owner_sys_t *p_owner = p_dec->p_owner;
 
@@ -1000,9 +995,6 @@ static void DecoderProcessVideo( decoder_t *p_dec, block_t *p_block, bool b_flus
     {
         block_t *p_packetized_block;
         decoder_t *p_packetizer = p_owner->p_packetizer;
-
-        if( b_flush )
-            FlushPacketizer( p_packetizer );
 
         while( (p_packetized_block =
                 p_packetizer->pf_packetize( p_packetizer, p_block ? &p_block : NULL )) )
@@ -1036,22 +1028,11 @@ static void DecoderProcessVideo( decoder_t *p_dec, block_t *p_block, bool b_flus
                 p_packetized_block = p_next;
             }
         }
-        /* The packetizer does not output a block that tell the decoder to flush
-         * do it ourself */
-        if( b_flush )
-        {
-            block_t *p_null = DecoderBlockFlushNew();
-            if( p_null )
-                DecoderDecodeVideo( p_dec, p_null );
-        }
     }
     else
     {
         DecoderDecodeVideo( p_dec, p_block );
     }
-
-    if( b_flush && p_owner->p_vout )
-        vout_Flush( p_owner->p_vout, VLC_TS_INVALID+1 );
 }
 
 static void DecoderPlayAudio( decoder_t *p_dec, block_t *p_audio,
@@ -1150,7 +1131,7 @@ static void DecoderDecodeAudio( decoder_t *p_dec, block_t *p_block )
 
 /* This function process a audio block
  */
-static void DecoderProcessAudio( decoder_t *p_dec, block_t *p_block, bool b_flush )
+static void DecoderProcessAudio( decoder_t *p_dec, block_t *p_block )
 {
     decoder_owner_sys_t *p_owner = p_dec->p_owner;
 
@@ -1158,9 +1139,6 @@ static void DecoderProcessAudio( decoder_t *p_dec, block_t *p_block, bool b_flus
     {
         block_t *p_packetized_block;
         decoder_t *p_packetizer = p_owner->p_packetizer;
-
-        if( b_flush )
-            FlushPacketizer( p_packetizer );
 
         while( (p_packetized_block =
                 p_packetizer->pf_packetize( p_packetizer, p_block ? &p_block : NULL )) )
@@ -1191,22 +1169,11 @@ static void DecoderProcessAudio( decoder_t *p_dec, block_t *p_block, bool b_flus
                 p_packetized_block = p_next;
             }
         }
-        /* The packetizer does not output a block that tell the decoder to flush
-         * do it ourself */
-        if( b_flush )
-        {
-            block_t *p_null = DecoderBlockFlushNew();
-            if( p_null )
-                DecoderDecodeAudio( p_dec, p_null );
-        }
     }
     else
     {
         DecoderDecodeAudio( p_dec, p_block );
     }
-
-    if( b_flush && p_owner->p_aout )
-        aout_DecFlush( p_owner->p_aout, false );
 }
 
 static void DecoderPlaySpu( decoder_t *p_dec, subpicture_t *p_subpic )
@@ -1248,7 +1215,7 @@ static void DecoderPlaySpu( decoder_t *p_dec, subpicture_t *p_subpic )
 
 /* This function process a subtitle block
  */
-static void DecoderProcessSpu( decoder_t *p_dec, block_t *p_block, bool b_flush )
+static void DecoderProcessSpu( decoder_t *p_dec, block_t *p_block )
 {
     decoder_owner_sys_t *p_owner = p_dec->p_owner;
 
@@ -1284,17 +1251,6 @@ static void DecoderProcessSpu( decoder_t *p_dec, block_t *p_block, bool b_flush 
         {
             subpicture_Delete( p_spu );
         }
-        if( p_vout )
-            vlc_object_release( p_vout );
-    }
-
-    if( b_flush && p_owner->p_spu_vout )
-    {
-        p_vout = input_resource_HoldVout( p_owner->p_resource );
-
-        if( p_vout && p_owner->p_spu_vout == p_vout )
-            vout_FlushSubpictureChannel( p_vout, p_owner->i_spu_channel );
-
         if( p_vout )
             vlc_object_release( p_vout );
     }
@@ -1338,30 +1294,67 @@ static void DecoderProcess( decoder_t *p_dec, block_t *p_block )
         p_block->i_flags &= ~BLOCK_FLAG_CORE_PRIVATE_MASK;
     }
 
-#ifdef ENABLE_SOUT
-    if( p_owner->b_packetizer )
+    if (b_flush)
     {
-        DecoderProcessSout( p_dec, p_block, b_flush );
+        if ( p_block )
+        {
+            block_Release( p_block );
+            p_block = NULL;
+        }
+
+        if ( p_owner->p_packetizer )
+            p_owner->p_packetizer->pf_flush( p_owner->p_packetizer );
+        p_dec->pf_flush( p_dec );
+
+        if( p_owner->p_vout )
+            vout_Flush( p_owner->p_vout, VLC_TS_0 );
+        if( p_owner->p_aout )
+            aout_DecFlush( p_owner->p_aout, false );
+        if( p_owner->p_spu_vout )
+        {
+            vout_thread_t *p_vout = input_resource_HoldVout( p_owner->p_resource );
+
+            if( p_vout && p_owner->p_spu_vout == p_vout )
+                vout_FlushSubpictureChannel( p_vout, p_owner->i_spu_channel );
+
+            if( p_vout )
+                vlc_object_release( p_vout );
+        }
+#ifdef ENABLE_SOUT
+        if ( p_owner->p_sout_input )
+        {
+            msg_Warn(p_dec, "%ld flushing sout", GetCurrentThreadId());
+            sout_InputFlush( p_owner->p_sout_input );
+        }
+#endif
     }
     else
-#endif
     {
-        if( p_dec->fmt_out.i_cat == AUDIO_ES )
+#ifdef ENABLE_SOUT
+        if( p_owner->b_packetizer )
         {
-            DecoderProcessAudio( p_dec, p_block, b_flush );
-        }
-        else if( p_dec->fmt_out.i_cat == VIDEO_ES )
-        {
-            DecoderProcessVideo( p_dec, p_block, b_flush );
-        }
-        else if( p_dec->fmt_out.i_cat == SPU_ES )
-        {
-            DecoderProcessSpu( p_dec, p_block, b_flush );
+            DecoderProcessSout( p_dec, p_block );
         }
         else
+#endif
         {
-            msg_Err( p_dec, "unknown ES format" );
-            p_dec->b_error = true;
+            if( p_dec->fmt_out.i_cat == AUDIO_ES )
+            {
+                DecoderProcessAudio( p_dec, p_block );
+            }
+            else if( p_dec->fmt_out.i_cat == VIDEO_ES )
+            {
+                DecoderProcessVideo( p_dec, p_block );
+            }
+            else if( p_dec->fmt_out.i_cat == SPU_ES )
+            {
+                DecoderProcessSpu( p_dec, p_block );
+            }
+            else
+            {
+                msg_Err( p_dec, "unknown ES format" );
+                p_dec->b_error = true;
+            }
         }
     }
 }
@@ -1464,7 +1457,7 @@ static void *DecoderThread( void *p_data )
         }
 
         if ( p_block )
-            msg_Dbg(p_dec, "%ld dequeued block %p %" PRId64 " disconti:%d flush:%d", GetCurrentThreadId(), p_block, p_block->i_dts, p_block->i_flags & BLOCK_FLAG_DISCONTINUITY, p_block->i_flags & BLOCK_FLAG_FLUSH );
+            msg_Dbg(p_dec, "%ld dequeued block %p %" PRId64 " disconti:%d flush:%d", GetCurrentThreadId(), p_block, p_block->i_dts, p_block->i_flags & BLOCK_FLAG_DISCONTINUITY, p_block->i_flags & BLOCK_FLAG_CORE_FLUSH );
         else
             msg_Dbg(p_dec, "%ld dequeued NO BLOCK!", GetCurrentThreadId() );
 

@@ -149,6 +149,7 @@ struct decoder_sys_t
 
 static block_t *Packetize( decoder_t *, block_t ** );
 static block_t *PacketizeAVC1( decoder_t *, block_t ** );
+static int Flush( decoder_t * );
 static block_t *GetCc( decoder_t *p_dec, bool pb_present[4] );
 
 static void PacketizeReset( void *p_private, bool b_broken );
@@ -354,6 +355,7 @@ static int Open( vlc_object_t *p_this )
 
     /* CC are the same for H264/AVC in T35 sections (ETSI TS 101 154)  */
     p_dec->pf_get_cc = GetCc;
+    p_dec->pf_flush = Flush;
 
     /* */
     p_sys->i_cc_pts = VLC_TS_INVALID;
@@ -394,6 +396,13 @@ static void Close( vlc_object_t *p_this )
     free( p_sys );
 }
 
+static int Flush( decoder_t *p_dec )
+{
+    decoder_sys_t *p_sys = p_dec->p_sys;
+
+    return packetizer_Flush( &p_sys->packetizer );
+}
+
 /****************************************************************************
  * Packetize: the whole thing
  * Search for the startcodes 3 or more bytes
@@ -420,18 +429,9 @@ static block_t *PacketizeAVC1( decoder_t *p_dec, block_t **pp_block )
 
     if( !pp_block || !*pp_block )
         return NULL;
-
-    if( unlikely( (*pp_block)->i_flags&(BLOCK_FLAG_DISCONTINUITY|BLOCK_FLAG_CORRUPTED) ) )
+    if( (*pp_block)->i_flags&(BLOCK_FLAG_CORRUPTED) )
     {
-        const bool b_broken = ( (*pp_block)->i_flags&BLOCK_FLAG_CORRUPTED ) != 0;
-        p_sys->packetizer.i_state = STATE_NOSYNC;
-        block_BytestreamEmpty( &p_sys->packetizer.bytestream );
-        p_sys->packetizer.i_offset = 0;
-        p_sys->packetizer.pf_reset( p_sys->packetizer.p_private, b_broken );
-        if( b_broken )
-        {
-            block_Release( *pp_block );
-        }
+        block_Release( *pp_block );
         return NULL;
     }
 

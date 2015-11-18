@@ -58,6 +58,7 @@ struct decoder_sys_t
 };
 
 static block_t * Packetize( decoder_t *, block_t ** );
+static int Flush ( decoder_t * );
 
 /*****************************************************************************
  * OpenPacketizer: probe the packetizer and return score
@@ -110,6 +111,7 @@ int OpenPacketizer( vlc_object_t *p_this )
         return VLC_ENOMEM;
     }
     p_dec->pf_packetize = Packetize;
+    p_dec->pf_flush = Flush;
     p_sys->p_parser_ctx = p_ctx;
     p_sys->p_codec_ctx = p_codec_ctx;
     p_sys->i_offset = 0;
@@ -130,6 +132,13 @@ void ClosePacketizer( vlc_object_t *p_this )
     free( p_dec->p_sys );
 }
 
+static int Flush ( decoder_t *p_dec )
+{
+    /* reopen as there's no clean way to flush avparser */
+    ClosePacketizer( VLC_OBJECT( p_dec ) );
+    return OpenPacketizer( VLC_OBJECT( p_dec ) );
+}
+
 /*****************************************************************************
  * Packetize: packetize a frame
  *****************************************************************************/
@@ -139,16 +148,6 @@ static block_t *Packetize ( decoder_t *p_dec, block_t **pp_block )
 
     if( pp_block == NULL || *pp_block == NULL )
         return NULL;
-    if( (*pp_block)->i_flags&(BLOCK_FLAG_DISCONTINUITY) )
-    {
-        /* reopen as there's no clean way to flush avparser */
-        ClosePacketizer( p_dec );
-        if ( OpenPacketizer( p_dec ) != VLC_SUCCESS )
-        {
-            block_Release( *pp_block );
-            return NULL;
-        }
-    }
     if( (*pp_block)->i_flags&(BLOCK_FLAG_CORRUPTED) )
     {
         block_Release( *pp_block );
