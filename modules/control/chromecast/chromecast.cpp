@@ -571,7 +571,19 @@ void intf_sys_t::InputUpdated( input_thread_t *p_input )
         int i_port = var_InheritInteger(p_intf, CONTROL_CFG_PREFIX "http-port");
 
         std::stringstream ssout;
-        ssout << "#cc_sout{http-port=" << i_port << ",mux=" << muxer << ",mime=" << mime << "}";
+        ssout << "#";
+        if ( !canRemux )
+        {
+            /* TODO: provide audio samplerate and channels */
+            ssout << "transcode{acodec=mpga";
+            if ( canDisplay )
+            {
+                /* TODO: provide maxwidth,maxheight */
+                ssout << ",vcodec=h264";
+            }
+            ssout << "}:";
+        }
+        ssout << "cc_sout{http-port=" << i_port << ",mux=" << muxer << ",mime=" << mime << "}";
         s_sout = ssout.str();
 
         std::stringstream chromecast_url;
