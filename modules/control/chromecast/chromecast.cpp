@@ -479,7 +479,9 @@ bool intf_sys_t::canDecodeAudio( es_format_t *p_es )
         p_es->i_codec == VLC_FOURCC('l', 'a', 'a', 'c') ||
         p_es->i_codec == VLC_FOURCC('s', 'a', 'a', 'c') ||
         p_es->i_codec == VLC_CODEC_MPGA ||
-        p_es->i_codec == VLC_CODEC_MP3)
+        p_es->i_codec == VLC_CODEC_MP3 ||
+        p_es->i_codec == VLC_CODEC_A52 ||
+        p_es->i_codec == VLC_CODEC_EAC3)
         return true;
     return false;
 }
