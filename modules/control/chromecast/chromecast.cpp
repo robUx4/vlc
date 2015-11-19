@@ -488,13 +488,38 @@ void intf_sys_t::InputUpdated( input_thread_t *p_input )
             /* TODO
              * select the right ES
              */
+            es_format_t *p_es;
             if ( canDisplay )
             {
-
+                for (int i=0; i<p_item->i_es; ++i)
+                {
+                    p_es = p_item->es[i];
+                    if (p_es->i_cat == AUDIO_ES)
+                    {
+                    }
+                    else if (p_es->i_cat == VIDEO_ES)
+                    {
+                    }
+                    else
+                    {
+                        p_es->i_priority = ES_PRIORITY_SELECTABLE_MIN;
+                    }
+                }
             }
             else
             {
-
+                /* audio only */
+                for (int i=0; i<p_item->i_es; ++i)
+                {
+                    p_es = p_item->es[i];
+                    if (p_es->i_cat == AUDIO_ES)
+                    {
+                    }
+                    else
+                    {
+                        p_es->i_priority = ES_PRIORITY_SELECTABLE_MIN;
+                    }
+                }
             }
         }
 
