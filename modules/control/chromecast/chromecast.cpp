@@ -1265,16 +1265,20 @@ std::string intf_sys_t::GetMediaInformation()
 {
     std::stringstream ss;
 
-    /* TODO: extract the metadata from p_sys->p_input */
-
     input_item_t * p_item = input_GetItem(p_input);
     if ( p_item )
     {
-        char *psz_name = input_item_GetName( p_item );
+        char *psz_name = input_item_GetTitleFbName( p_item );
         ss << "\"metadata\":{"
-           << " \"metadataType\":0,"
-           << " \"title\":\"" << psz_name << "\""
-           << "},";
+           << " \"metadataType\":0"
+           << ",\"title\":\"" << psz_name << "\"";
+
+        char *psz_arturl = input_item_GetArtworkURL( p_item );
+        if ( psz_arturl && !strncmp(psz_arturl, "http", 4))
+            ss << ",\"images\":[\"" << psz_arturl << "\"]";
+        free( psz_arturl );
+
+        ss << "},";
         free( psz_name );
     }
 
