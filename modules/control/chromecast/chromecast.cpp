@@ -287,6 +287,9 @@ private:
     void msgPlayerSeek(const std::string & currentTime);
 
     std::string GetMediaInformation();
+
+    bool canDecodeVideo( es_format_t * );
+    bool canDecodeAudio( es_format_t * );
 };
 
 #define IP_TEXT N_("Chromecast IP address")
@@ -461,6 +464,27 @@ static int PlaylistEvent( vlc_object_t *p_this, char const *psz_var,
     return VLC_SUCCESS;
 }
 
+bool intf_sys_t::canDecodeVideo( es_format_t *p_es )
+{
+    if (p_es->i_codec == VLC_CODEC_H264 || p_es->i_codec == VLC_CODEC_VP8)
+        return true;
+    return false;
+}
+
+bool intf_sys_t::canDecodeAudio( es_format_t *p_es )
+{
+    if (p_es->i_codec == VLC_CODEC_VORBIS ||
+        p_es->i_codec == VLC_CODEC_MP4A ||
+        p_es->i_codec == VLC_FOURCC('h', 'a', 'a', 'c') ||
+        p_es->i_codec == VLC_FOURCC('l', 'a', 'a', 'c') ||
+        p_es->i_codec == VLC_FOURCC('s', 'a', 'a', 'c') ||
+        p_es->i_codec == VLC_CODEC_MPGA ||
+        p_es->i_codec == VLC_CODEC_MP3)
+        return true;
+    return false;
+}
+
+
 void intf_sys_t::InputUpdated( input_thread_t *p_input )
 {
     vlc_mutex_locker locker(&lock);
@@ -482,13 +506,14 @@ void intf_sys_t::InputUpdated( input_thread_t *p_input )
 
         assert(!p_input->b_preparsing);
 
+        bool canRemux = false;
+        bool canDoDirect = false;
+
         input_item_t * p_item = input_GetItem(p_input);
         if ( p_item )
         {
-            /* TODO
-             * select the right ES
-             */
             es_format_t *p_es;
+            canRemux = true;
             if ( canDisplay )
             {
                 for (int i=0; i<p_item->i_es; ++i)
@@ -496,13 +521,24 @@ void intf_sys_t::InputUpdated( input_thread_t *p_input )
                     p_es = p_item->es[i];
                     if (p_es->i_cat == AUDIO_ES)
                     {
+                        if (!canDecodeAudio( p_es ))
+                        {
+                            msg_Dbg( p_intf, "can't remux audio track %d codec %4.4s", p_es->i_id, (const char*)&p_es->i_codec );
+                            canRemux = false;
+                        }
                     }
                     else if (p_es->i_cat == VIDEO_ES)
                     {
+                        if (!canDecodeVideo( p_es ))
+                        {
+                            msg_Dbg( p_intf, "can't remux video track %d codec %4.4s", p_es->i_id, (const char*)&p_es->i_codec );
+                            canRemux = false;
+                        }
                     }
                     else
                     {
                         p_es->i_priority = ES_PRIORITY_SELECTABLE_MIN;
+                        msg_Dbg( p_intf, "disable non audio/video track %d codec %4.4s", p_es->i_id, (const char*)&p_es->i_codec );
                     }
                 }
             }
@@ -514,10 +550,16 @@ void intf_sys_t::InputUpdated( input_thread_t *p_input )
                     p_es = p_item->es[i];
                     if (p_es->i_cat == AUDIO_ES)
                     {
+                        if (!canDecodeAudio( p_es ))
+                        {
+                            msg_Dbg( p_intf, "can't remux audio track %d codec %4.4s", p_es->i_id, (const char*)&p_es->i_codec );
+                            canRemux = false;
+                        }
                     }
                     else
                     {
                         p_es->i_priority = ES_PRIORITY_SELECTABLE_MIN;
+                        msg_Dbg( p_intf, "disable non audio track %d codec %4.4s", p_es->i_id, (const char*)&p_es->i_codec );
                     }
                 }
             }
@@ -531,11 +573,15 @@ void intf_sys_t::InputUpdated( input_thread_t *p_input )
         s_sout = ssout.str();
 
         std::stringstream chromecast_url;
-#if 1
-        chromecast_url << "http://" << serverIP << ":" << i_port << "/stream\"";
-#else
-        chromecast_url << input_item_GetURI(p_item) << "\"";
-#endif
+        if ( canDoDirect && canRemux )
+        {
+            char *psz_uri = input_item_GetURI(p_item);
+            chromecast_url << psz_uri << "\"";
+            msg_Dbg( p_intf, "using direct URL: %s", psz_uri );
+            free( psz_uri );
+        }
+        else
+            chromecast_url << "http://" << serverIP << ":" << i_port << "/stream\"";
         s_chromecast_url = chromecast_url.str();
 
         var_Create( p_input->p_parent, SOUT_INTF_ADDRESS, VLC_VAR_ADDRESS );
