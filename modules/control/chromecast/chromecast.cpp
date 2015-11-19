@@ -258,6 +258,8 @@ struct intf_sys_t
     void msgReceiverGetStatus();
     void msgPlayerGetStatus();
 
+    void InputUpdated( input_thread_t * );
+
 private:
     int sendMessage(castchannel::CastMessage &msg);
 
@@ -275,6 +277,8 @@ private:
     unsigned i_requestId;
 
     std::atomic<bool> b_header_done;
+    std::string       s_sout;
+    std::string       s_chromecast_url;
 
     void msgPlayerLoad();
     void msgPlayerStop();
@@ -452,19 +456,25 @@ static int PlaylistEvent( vlc_object_t *p_this, char const *psz_var,
     VLC_UNUSED(p_this);
     VLC_UNUSED(psz_var);
 
-    vlc_mutex_locker locker(&p_sys->lock);
-    assert(p_sys->p_input != p_input);
+    p_sys->InputUpdated( p_input );
+
+    return VLC_SUCCESS;
+}
+
+void intf_sys_t::InputUpdated( input_thread_t *p_input )
+{
+    vlc_mutex_locker locker(&lock);
+    assert(this->p_input != p_input);
 
     msg_Dbg(p_intf, "PlaylistEvent input changed");
 
-    if( p_sys->p_input != NULL )
+    if( this->p_input != NULL )
     {
-        assert( p_sys->p_input == oldval.p_address );
-        var_DelCallback( p_sys->p_input, "intf-event", InputEvent, p_intf );
-        var_SetAddress( p_sys->p_input->p_parent, SOUT_INTF_ADDRESS, NULL );
+        var_DelCallback( this->p_input, "intf-event", InputEvent, p_intf );
+        var_SetAddress( this->p_input->p_parent, SOUT_INTF_ADDRESS, NULL );
     }
 
-    p_sys->p_input = p_input;
+    this->p_input = p_input;
 
     if( p_input != NULL )
     {
@@ -472,37 +482,43 @@ static int PlaylistEvent( vlc_object_t *p_this, char const *psz_var,
 
         assert(!p_input->b_preparsing);
 
+        input_item_t * p_item = input_GetItem(p_input);
+        if ( p_item )
+        {
+            /* TODO
+             * select the right ES
+             */
+            if ( canDisplay )
+            {
+
+            }
+            else
+            {
+
+            }
+        }
+
+        /* TODO define the sout and the URL to send */
+        int i_port = var_InheritInteger(p_intf, CONTROL_CFG_PREFIX "http-port");
+
+        std::stringstream ssout;
+        ssout << "#cc_sout{http-port=" << i_port << ",mux=" << muxer << ",mime=" << mime << "}";
+        s_sout = ssout.str();
+
+        std::stringstream chromecast_url;
+#if 1
+        chromecast_url << "http://" << serverIP << ":" << i_port << "/stream\"";
+#else
+        chromecast_url << input_item_GetURI(p_item) << "\"";
+#endif
+        s_chromecast_url = chromecast_url.str();
+
         var_Create( p_input->p_parent, SOUT_INTF_ADDRESS, VLC_VAR_ADDRESS );
         var_SetAddress( p_input->p_parent, SOUT_INTF_ADDRESS, p_intf );
 
-        std::stringstream ss;
-#if 1
-        ss << "#cc_sout{http-port=" << var_InheritInteger(p_intf, CONTROL_CFG_PREFIX "http-port")
-           << ",mux=" << p_intf->p_sys->muxer
-           << ",mime=" << p_sys->mime << "}";
-#else
-# if 0
-        ss << "standard{dst=:" << var_InheritInteger(p_intf, CONTROL_CFG_PREFIX "http-port") << "/stream"
-           << ",mux=" << psz_var_mux
-           << ",access=simplehttpd{mime=" << psz_var_mime << "}}";
-# else
-#  if 0
-        ss << "#standard{dst=:" << var_InheritInteger(p_intf, CONTROL_CFG_PREFIX "http-port") << "/stream"
-           << ",mux=" << p_intf->p_sys->muxer
-           << ",access=cc_access{mime=" << p_intf->p_sys->mime << "}}";
-#  else
-        ss << "#cc_sout{dst=:" << var_InheritInteger(p_intf, CONTROL_CFG_PREFIX "http-port") << "/stream"
-           << ",mux=" << p_intf->p_sys->muxer
-           << ",access=cc_access{mime=" << p_intf->p_sys->mime << "}}";
-#  endif
-# endif
-#endif
-        var_SetString( p_input, "sout", ss.str().c_str() );
-
+        var_SetString( p_input, "sout", s_sout.c_str() );
         var_SetString( p_input, "demux-filter", "cc_demux" );
     }
-
-    return VLC_SUCCESS;
 }
 
 void intf_sys_t::sendPlayerCmd()
@@ -1250,9 +1266,7 @@ std::string intf_sys_t::GetMediaInformation()
     std::stringstream ss;
 
     /* TODO: extract the metadata from p_sys->p_input */
-    int i_port = var_InheritInteger(p_intf, CONTROL_CFG_PREFIX "http-port");
 
-#if 1
     input_item_t * p_item = input_GetItem(p_input);
     if ( p_item )
     {
@@ -1263,15 +1277,10 @@ std::string intf_sys_t::GetMediaInformation()
            << "},";
         free( psz_name );
     }
-#endif
-    ss << "\"contentId\":\"";
-#if 1
-    ss <<   "http://" << serverIP << ":" << i_port << "/stream\"";
-#else
-    ss <<   input_item_GetURI(p_item) << "\"";
-#endif
-    ss << ",\"streamType\":\"LIVE\","
-       << "\"contentType\":\"" << mime << "\"";
+
+    ss << "\"contentId\":\"" << s_chromecast_url
+       << ",\"streamType\":\"LIVE\""
+       << ",\"contentType\":\"" << mime << "\"";
 
     return ss.str();
 }
