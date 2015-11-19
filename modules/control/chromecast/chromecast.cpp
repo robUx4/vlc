@@ -44,6 +44,7 @@
 #include <vlc_interrupt.h>
 #include <vlc_demux.h>
 #include <vlc_sout.h>
+#include <vlc_access.h>
 
 #include <atomic>
 #include <cassert>
@@ -141,6 +142,7 @@ struct intf_sys_t
         ,playback_start_chromecast(-1.0)
         ,playback_start_local(0)
         ,canPause(false)
+        ,canDisplay(false)
         ,i_sock_fd(-1)
         ,p_creds(NULL)
         ,p_tls(NULL)
@@ -185,6 +187,11 @@ struct intf_sys_t
         this->canPause = canPause;
     }
 
+    void setCanDisplay(bool canDisplay) {
+        vlc_mutex_locker locker(&lock);
+        this->canDisplay = canDisplay;
+    }
+
     bool isFinishedPlaying() {
         vlc_mutex_locker locker(&lock);
         return conn_status == CHROMECAST_DEAD || (playerState == "BUFFERING" && play_status != PLAYER_SEEK_SENT);
@@ -221,6 +228,7 @@ struct intf_sys_t
     mtime_t     playback_start_chromecast;
     mtime_t     playback_start_local;
     bool        canPause;
+    bool        canDisplay;
 
     int i_sock_fd;
     vlc_tls_creds_t *p_creds;
@@ -1459,6 +1467,15 @@ static void* chromecastThread(void* p_this)
     p_sys->conn_status = CHROMECAST_TLS_CONNECTED;
 
     p_sys->msgAuth();
+
+    /* HACK: determine if this is a Chromecast Audio */
+    std::stringstream s_video_test;
+    s_video_test << "http://" << p_sys->deviceIP << ":8008/apps/YouTube";
+    access_t *p_test_app = vlc_access_NewMRL( VLC_OBJECT(p_intf), s_video_test.str().c_str() );
+    p_sys->setCanDisplay( p_test_app != NULL );
+    if ( p_test_app )
+        vlc_access_Delete( p_test_app );
+
     vlc_restorecancel(canc);
 
     while (1)
