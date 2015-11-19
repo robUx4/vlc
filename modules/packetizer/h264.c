@@ -149,8 +149,8 @@ struct decoder_sys_t
 
 static block_t *Packetize( decoder_t *, block_t ** );
 static block_t *PacketizeAVC1( decoder_t *, block_t ** );
-static int Flush( decoder_t * );
 static block_t *GetCc( decoder_t *p_dec, bool pb_present[4] );
+static void PacketizeFlush( decoder_t * );
 
 static void PacketizeReset( void *p_private, bool b_broken );
 static block_t *PacketizeParse( void *p_private, bool *pb_ts_used, block_t * );
@@ -355,7 +355,7 @@ static int Open( vlc_object_t *p_this )
 
     /* CC are the same for H264/AVC in T35 sections (ETSI TS 101 154)  */
     p_dec->pf_get_cc = GetCc;
-    p_dec->pf_flush = Flush;
+    p_dec->pf_flush = PacketizeFlush;
 
     /* */
     p_sys->i_cc_pts = VLC_TS_INVALID;
@@ -396,11 +396,11 @@ static void Close( vlc_object_t *p_this )
     free( p_sys );
 }
 
-static int Flush( decoder_t *p_dec )
+static void PacketizeFlush( decoder_t *p_dec )
 {
     decoder_sys_t *p_sys = p_dec->p_sys;
 
-    return packetizer_Flush( &p_sys->packetizer );
+    packetizer_Flush( &p_sys->packetizer );
 }
 
 /****************************************************************************

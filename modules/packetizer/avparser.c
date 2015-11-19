@@ -58,7 +58,17 @@ struct decoder_sys_t
 };
 
 static block_t * Packetize( decoder_t *, block_t ** );
-static int Flush ( decoder_t * );
+
+/*****************************************************************************
+ * FlushPacketizer: reopen as there's no clean way to flush avparser
+ *****************************************************************************/
+static void FlushPacketizer( decoder_t *p_dec )
+{
+    ClosePacketizer( VLC_OBJECT( p_dec ) );
+    int res = OpenPacketizer( VLC_OBJECT( p_dec ) );
+    if ( res != VLC_SUCCESS )
+        msg_Err( p_dec, "failed to flush with error %d", res );
+}
 
 /*****************************************************************************
  * OpenPacketizer: probe the packetizer and return score
@@ -111,7 +121,7 @@ int OpenPacketizer( vlc_object_t *p_this )
         return VLC_ENOMEM;
     }
     p_dec->pf_packetize = Packetize;
-    p_dec->pf_flush = Flush;
+    p_dec->pf_flush = FlushPacketizer;
     p_sys->p_parser_ctx = p_ctx;
     p_sys->p_codec_ctx = p_codec_ctx;
     p_sys->i_offset = 0;
@@ -130,13 +140,6 @@ void ClosePacketizer( vlc_object_t *p_this )
     av_parser_close( p_dec->p_sys->p_parser_ctx );
     es_format_Clean( &p_dec->fmt_out );
     free( p_dec->p_sys );
-}
-
-static int Flush ( decoder_t *p_dec )
-{
-    /* reopen as there's no clean way to flush avparser */
-    ClosePacketizer( VLC_OBJECT( p_dec ) );
-    return OpenPacketizer( VLC_OBJECT( p_dec ) );
 }
 
 /*****************************************************************************

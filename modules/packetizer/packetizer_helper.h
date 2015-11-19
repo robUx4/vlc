@@ -93,13 +93,12 @@ static inline void packetizer_Clean( packetizer_t *p_pack )
     block_BytestreamRelease( &p_pack->bytestream );
 }
 
-static inline int packetizer_Flush( packetizer_t *p_pack )
+static inline void packetizer_Flush( packetizer_t *p_pack )
 {
     p_pack->i_state = STATE_NOSYNC;
     block_BytestreamEmpty( &p_pack->bytestream );
     p_pack->i_offset = 0;
     p_pack->pf_reset( p_pack->p_private, true );
-    return VLC_SUCCESS;
 }
 
 static inline block_t *packetizer_Packetize( packetizer_t *p_pack, block_t **pp_block )

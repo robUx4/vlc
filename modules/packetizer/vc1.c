@@ -120,7 +120,7 @@ typedef enum
 } idu_type_t;
 
 static block_t *Packetize( decoder_t *p_dec, block_t **pp_block );
-static int Flush( decoder_t * );
+static void Flush( decoder_t * );
 
 static void PacketizeReset( void *p_private, bool b_broken );
 static block_t *PacketizeParse( void *p_private, bool *pb_ts_used, block_t * );
@@ -259,11 +259,11 @@ static block_t *Packetize( decoder_t *p_dec, block_t **pp_block )
     return p_au;
 }
 
-static int Flush( decoder_t *p_dec )
+static void Flush( decoder_t *p_dec )
 {
     decoder_sys_t *p_sys = p_dec->p_sys;
 
-    return packetizer_Flush( &p_sys->packetizer );
+    packetizer_Flush( &p_sys->packetizer );
 }
 
 static void PacketizeReset( void *p_private, bool b_broken )
