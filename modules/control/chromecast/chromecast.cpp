@@ -63,6 +63,9 @@
 static const char MDNS_CHROMECAST[] = "._googlecast._tcp.local";
 #endif
 
+#define DEFAULT_TRANSCODE_AUDIO   VLC_CODEC_MP3
+#define DEFAULT_TRANSCODE_VIDEO   VLC_CODEC_H264
+
 static int Open(vlc_object_t *);
 static void Close(vlc_object_t *);
 static int DemuxOpen(vlc_object_t *);
@@ -510,6 +513,7 @@ void intf_sys_t::InputUpdated( input_thread_t *p_input )
 
         bool canRemux = false;
         bool canDoDirect = false;
+        vlc_fourcc_t i_codec_video = 0, i_codec_audio = 0;
 
         input_item_t * p_item = input_GetItem(p_input);
         if ( p_item )
@@ -528,6 +532,8 @@ void intf_sys_t::InputUpdated( input_thread_t *p_input )
                             msg_Dbg( p_intf, "can't remux audio track %d codec %4.4s", p_es->i_id, (const char*)&p_es->i_codec );
                             canRemux = false;
                         }
+                        else if (i_codec_audio == 0)
+                            i_codec_audio = p_es->i_codec;
                     }
                     else if (p_es->i_cat == VIDEO_ES)
                     {
@@ -536,6 +542,8 @@ void intf_sys_t::InputUpdated( input_thread_t *p_input )
                             msg_Dbg( p_intf, "can't remux video track %d codec %4.4s", p_es->i_id, (const char*)&p_es->i_codec );
                             canRemux = false;
                         }
+                        else if (i_codec_video == 0)
+                            i_codec_video = p_es->i_codec;
                     }
                     else
                     {
@@ -557,6 +565,8 @@ void intf_sys_t::InputUpdated( input_thread_t *p_input )
                             msg_Dbg( p_intf, "can't remux audio track %d codec %4.4s", p_es->i_id, (const char*)&p_es->i_codec );
                             canRemux = false;
                         }
+                        else if (i_codec_audio == 0)
+                            i_codec_audio = p_es->i_codec;
                     }
                     else
                     {
@@ -574,12 +584,31 @@ void intf_sys_t::InputUpdated( input_thread_t *p_input )
         ssout << "#";
         if ( !canRemux )
         {
+            if ( i_codec_audio == 0 )
+                i_codec_audio = DEFAULT_TRANSCODE_AUDIO;
+            /* avcodec AAC encoder is experimental */
+            if ( i_codec_audio == VLC_CODEC_MP4A ||
+                 i_codec_audio == VLC_FOURCC('h', 'a', 'a', 'c') ||
+                 i_codec_audio == VLC_FOURCC('l', 'a', 'a', 'c') ||
+                 i_codec_audio == VLC_FOURCC('s', 'a', 'a', 'c'))
+                i_codec_audio = DEFAULT_TRANSCODE_AUDIO;
+
+            if ( i_codec_video == 0 )
+                i_codec_video = DEFAULT_TRANSCODE_VIDEO;
+
             /* TODO: provide audio samplerate and channels */
-            ssout << "transcode{acodec=mpga";
+            ssout << "transcode{acodec=";
+            char s_fourcc[5];
+            vlc_fourcc_to_char( i_codec_audio, s_fourcc );
+            s_fourcc[4] = '\0';
+            ssout << s_fourcc;
             if ( canDisplay )
             {
                 /* TODO: provide maxwidth,maxheight */
-                ssout << ",vcodec=h264";
+                ssout << ",vcodec=";
+                vlc_fourcc_to_char( i_codec_video, s_fourcc );
+                s_fourcc[4] = '\0';
+                ssout << s_fourcc;
             }
             ssout << "}:";
         }
