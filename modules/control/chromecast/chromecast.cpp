@@ -584,6 +584,10 @@ void intf_sys_t::InputUpdated( input_thread_t *p_input )
             }
             ssout << "}:";
         }
+        if (mime == "video/x-matroska" && canDisplay && i_codec_audio == VLC_CODEC_VORBIS && i_codec_video == VLC_CODEC_VP8 )
+            mime == "video/webm";
+        if (mime == "video/x-matroska" && !canDisplay )
+            mime == "audio/x-matroska";
         ssout << "cc_sout{http-port=" << i_port << ",mux=" << muxer << ",mime=" << mime << "}";
         s_sout = ssout.str();
 
