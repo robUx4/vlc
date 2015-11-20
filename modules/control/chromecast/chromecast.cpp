@@ -282,6 +282,8 @@ private:
     std::atomic<bool> b_header_done;
     std::string       s_sout;
     std::string       s_chromecast_url;
+    bool              canRemux;
+    bool              canDoDirect;
 
     void msgPlayerLoad();
     void msgPlayerStop();
@@ -511,8 +513,8 @@ void intf_sys_t::InputUpdated( input_thread_t *p_input )
 
         assert(!p_input->b_preparsing);
 
-        bool canRemux = false;
-        bool canDoDirect = false;
+        canRemux = false;
+        canDoDirect = false;
         vlc_fourcc_t i_codec_video = 0, i_codec_audio = 0;
 
         input_item_t * p_item = input_GetItem(p_input);
@@ -590,18 +592,6 @@ void intf_sys_t::InputUpdated( input_thread_t *p_input )
             mime == "audio/x-matroska";
         ssout << "cc_sout{http-port=" << i_port << ",mux=" << muxer << ",mime=" << mime << "}";
         s_sout = ssout.str();
-
-        std::stringstream chromecast_url;
-        if ( canDoDirect && canRemux )
-        {
-            char *psz_uri = input_item_GetURI(p_item);
-            chromecast_url << psz_uri << "\"";
-            msg_Dbg( p_intf, "using direct URL: %s", psz_uri );
-            free( psz_uri );
-        }
-        else
-            chromecast_url << "http://" << serverIP << ":" << i_port << "/stream\"";
-        s_chromecast_url = chromecast_url.str();
 
         var_Create( p_input->p_parent, SOUT_INTF_ADDRESS, VLC_VAR_ADDRESS );
         var_SetAddress( p_input->p_parent, SOUT_INTF_ADDRESS, p_intf );
@@ -1370,9 +1360,26 @@ std::string intf_sys_t::GetMediaInformation()
 
         ss << "},";
         free( psz_name );
+
+        std::stringstream chromecast_url;
+        if ( canDoDirect && canRemux )
+        {
+            char *psz_uri = input_item_GetURI(p_item);
+            chromecast_url << psz_uri;
+            msg_Dbg( p_intf, "using direct URL: %s", psz_uri );
+            free( psz_uri );
+        }
+        else
+        {
+            int i_port = var_InheritInteger(p_intf, CONTROL_CFG_PREFIX "http-port");
+            chromecast_url << "http://" << serverIP << ":" << i_port << "/stream";
+        }
+        s_chromecast_url = chromecast_url.str();
+
+        msg_Dbg(p_intf,"s_chromecast_url: %s", s_chromecast_url.c_str());
     }
 
-    ss << "\"contentId\":\"" << s_chromecast_url
+    ss << "\"contentId\":\"" << s_chromecast_url << "\""
        << ",\"streamType\":\"LIVE\""
        << ",\"contentType\":\"" << mime << "\"";
 
