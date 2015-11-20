@@ -621,6 +621,7 @@ void intf_sys_t::sendPlayerCmd()
     {
     case OPENING_S:
         if (!mediaSessionId.empty()) {
+            msg_Dbg(p_intf, "opening when a session was still opened:%s", mediaSessionId.c_str());
             msgPlayerStop();
             mediaSessionId = "";
         }
@@ -653,7 +654,8 @@ void intf_sys_t::sendPlayerCmd()
 
             /* TODO reset the sout as we'll need another one for the next load */
             var_SetString( p_input, "sout", NULL );
-            play_status = PLAYER_IDLE;
+            mediaSessionId = ""; // it doesn't seem to send a status update like it should
+            play_status = PLAYER_IDLE; /* TODO: may not be needed */
         }
         break;
     default:
