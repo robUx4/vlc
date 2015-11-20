@@ -156,6 +156,7 @@ struct intf_sys_t
         ,i_seektime(-1.0)
         ,i_app_requestId(0)
         ,i_requestId(0)
+        ,i_sout_id(0)
         ,b_header_done(false)
     {
         p_interrupt = vlc_interrupt_create();
@@ -278,6 +279,7 @@ private:
 
     unsigned i_app_requestId;
     unsigned i_requestId;
+    unsigned i_sout_id;
 
     std::atomic<bool> b_header_done;
     std::string       s_sout;
@@ -590,7 +592,7 @@ void intf_sys_t::InputUpdated( input_thread_t *p_input )
             mime == "video/webm";
         if (mime == "video/x-matroska" && !canDisplay )
             mime == "audio/x-matroska";
-        ssout << "cc_sout{http-port=" << i_port << ",mux=" << muxer << ",mime=" << mime << "}";
+        ssout << "cc_sout{http-port=" << i_port << ",mux=" << muxer << ",mime=" << mime << ",uid=" << i_sout_id++ << "}";
         s_sout = ssout.str();
 
         var_Create( p_input->p_parent, SOUT_INTF_ADDRESS, VLC_VAR_ADDRESS );
@@ -653,7 +655,7 @@ void intf_sys_t::sendPlayerCmd()
             msgPlayerStop();
 
             /* TODO reset the sout as we'll need another one for the next load */
-            var_SetString( p_input, "sout", NULL );
+            //var_SetString( p_input, "sout", NULL );
             mediaSessionId = ""; // it doesn't seem to send a status update like it should
             play_status = PLAYER_IDLE; /* TODO: may not be needed */
         }
