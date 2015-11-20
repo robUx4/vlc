@@ -58,6 +58,7 @@ struct decoder_sys_t
 };
 
 static block_t * Packetize( decoder_t *, block_t ** );
+static block_t * PacketizeClosed( decoder_t *, block_t ** );
 
 /*****************************************************************************
  * FlushPacketizer: reopen as there's no clean way to flush avparser
@@ -65,9 +66,13 @@ static block_t * Packetize( decoder_t *, block_t ** );
 static void FlushPacketizer( decoder_t *p_dec )
 {
     ClosePacketizer( VLC_OBJECT( p_dec ) );
+    p_dec->p_sys = NULL;
     int res = OpenPacketizer( VLC_OBJECT( p_dec ) );
     if ( res != VLC_SUCCESS )
+    {
         msg_Err( p_dec, "failed to flush with error %d", res );
+        p_dec->pf_packetize = PacketizeClosed;
+    }
 }
 
 /*****************************************************************************
@@ -191,6 +196,16 @@ out:
     p_sys->i_offset = 0;
     block_Release( *pp_block );
     *pp_block = NULL;
+    return NULL;
+}
+
+/*****************************************************************************
+ * PacketizeClosed: packetizer called after a flush failed
+ *****************************************************************************/
+static block_t *PacketizeClosed ( decoder_t *p_dec, block_t **pp_block )
+{
+    if( pp_block != NULL && *pp_block != NULL )
+        block_Release( *pp_block );
     return NULL;
 }
 
