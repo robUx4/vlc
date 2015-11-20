@@ -518,66 +518,38 @@ void intf_sys_t::InputUpdated( input_thread_t *p_input )
         input_item_t * p_item = input_GetItem(p_input);
         if ( p_item )
         {
-            es_format_t *p_es;
             canRemux = true;
-            if ( canDisplay )
+            for (int i=0; i<p_item->i_es; ++i)
             {
-                for (int i=0; i<p_item->i_es; ++i)
+                es_format_t *p_es = p_item->es[i];
+                if (p_es->i_cat == AUDIO_ES)
                 {
-                    p_es = p_item->es[i];
-                    if (p_es->i_cat == AUDIO_ES)
+                    if (!canDecodeAudio( p_es ))
                     {
-                        if (!canDecodeAudio( p_es ))
-                        {
-                            msg_Dbg( p_intf, "can't remux audio track %d codec %4.4s", p_es->i_id, (const char*)&p_es->i_codec );
-                            canRemux = false;
-                        }
-                        else if (i_codec_audio == 0)
-                            i_codec_audio = p_es->i_codec;
+                        msg_Dbg( p_intf, "can't remux audio track %d codec %4.4s", p_es->i_id, (const char*)&p_es->i_codec );
+                        canRemux = false;
                     }
-                    else if (p_es->i_cat == VIDEO_ES)
-                    {
-                        if (!canDecodeVideo( p_es ))
-                        {
-                            msg_Dbg( p_intf, "can't remux video track %d codec %4.4s", p_es->i_id, (const char*)&p_es->i_codec );
-                            canRemux = false;
-                        }
-                        else if (i_codec_video == 0)
-                            i_codec_video = p_es->i_codec;
-                    }
-                    else
-                    {
-                        p_es->i_priority = ES_PRIORITY_SELECTABLE_MIN;
-                        msg_Dbg( p_intf, "disable non audio/video track %d codec %4.4s", p_es->i_id, (const char*)&p_es->i_codec );
-                    }
+                    else if (i_codec_audio == 0)
+                        i_codec_audio = p_es->i_codec;
                 }
-            }
-            else
-            {
-                /* audio only */
-                for (int i=0; i<p_item->i_es; ++i)
+                else if (canDisplay && p_es->i_cat == VIDEO_ES)
                 {
-                    p_es = p_item->es[i];
-                    if (p_es->i_cat == AUDIO_ES)
+                    if (!canDecodeVideo( p_es ))
                     {
-                        if (!canDecodeAudio( p_es ))
-                        {
-                            msg_Dbg( p_intf, "can't remux audio track %d codec %4.4s", p_es->i_id, (const char*)&p_es->i_codec );
-                            canRemux = false;
-                        }
-                        else if (i_codec_audio == 0)
-                            i_codec_audio = p_es->i_codec;
+                        msg_Dbg( p_intf, "can't remux video track %d codec %4.4s", p_es->i_id, (const char*)&p_es->i_codec );
+                        canRemux = false;
                     }
-                    else
-                    {
-                        p_es->i_priority = ES_PRIORITY_SELECTABLE_MIN;
-                        msg_Dbg( p_intf, "disable non audio track %d codec %4.4s", p_es->i_id, (const char*)&p_es->i_codec );
-                    }
+                    else if (i_codec_video == 0)
+                        i_codec_video = p_es->i_codec;
+                }
+                else
+                {
+                    p_es->i_priority = ES_PRIORITY_NOT_SELECTABLE;
+                    msg_Dbg( p_intf, "disable non audio/video track %d codec %4.4s", p_es->i_id, (const char*)&p_es->i_codec );
                 }
             }
         }
 
-        /* TODO define the sout and the URL to send */
         int i_port = var_InheritInteger(p_intf, CONTROL_CFG_PREFIX "http-port");
 
         std::stringstream ssout;
