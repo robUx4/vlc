@@ -348,6 +348,10 @@ vlc_module_begin ()
         add_string(SOUT_CFG_PREFIX "mime", "video/x-matroska", MIME_TEXT, MIME_LONGTEXT, false)
         add_string(SOUT_CFG_PREFIX "mux", "avformat{mux=matroska}", MUXER_TEXT, MUXER_LONGTEXT, false)
 
+    /* sout access to detect when the muxer header has been pushed to HTTP
+     * after that we get the Chromecast status to find if it's ready to receive
+     * our data
+     */
     add_submodule()
         set_shortname( "cc_access" )
         set_category( CAT_SOUT )
@@ -356,7 +360,6 @@ vlc_module_begin ()
         set_capability("sout access", 0)
         add_shortcut("cc_access")
         set_callbacks( SoutAccessOpen, SoutAccessClose )
-        add_integer(SOUT_CFG_PREFIX "http-port", HTTP_PORT, HTTP_PORT_TEXT, HTTP_PORT_LONGTEXT, false)
         add_string(SOUT_CFG_PREFIX "mime", "video/x-matroska", MIME_TEXT, MIME_LONGTEXT, false)
 
 vlc_module_end ()
@@ -1710,6 +1713,9 @@ struct demux_sys_t
         }
 
         if (!p_intf->p_sys->isHeaderDone()) {
+            /* while the muxed header has not been generated & pushed
+             * we need to demux anything coming
+             */
             vlc_mutex_unlock(&p_intf->p_sys->lock);
             return p_demux->p_source->pf_demux( p_demux->p_source );
         }
@@ -2290,18 +2296,16 @@ struct sout_access_out_sys_t
         ,p_access(p_access)
         ,p_intf(intf)
         ,b_header_started(false)
-
-        ,i_header_size(0)
     {
         assert(p_access != NULL);
         assert(p_intf != NULL);
-        vlc_object_hold(p_intf);
+        vlc_object_hold( p_intf );
     }
 
     ~sout_access_out_sys_t()
     {
-        sout_AccessOutDelete(p_access);
-        vlc_object_release(p_intf);
+        sout_AccessOutDelete( p_access );
+        vlc_object_release( p_intf );
     }
 
 public:
@@ -2315,8 +2319,6 @@ protected:
     intf_thread_t     * const p_intf;
 
     bool                      b_header_started;
-
-    int i_header_size;
 };
 
 static int AccessOutControl( sout_access_out_t *p_this, int i_query, va_list args )
@@ -2328,13 +2330,6 @@ static int AccessOutSeek( sout_access_out_t *p_this, off_t i_pos )
 {
     return p_this->p_sys->Seek( i_pos );
 }
-
-#if 0
-ssize_t AccessOutRead( sout_access_out_t *p_this, block_t *p_buffer )
-{
-    return p_this->p_sys->Read( p_buffer );
-}
-#endif
 
 ssize_t AccessOutWrite( sout_access_out_t *p_this, block_t *p_buffer )
 {
@@ -2352,8 +2347,8 @@ int SoutAccessOpen(vlc_object_t *p_this)
 
     char *psz_mime = var_GetNonEmptyString( p_access, SOUT_CFG_PREFIX "mime" );
     std::stringstream s_access;
-    s_access << "http{mime=" << psz_mime
-             << ",http-port=" << var_InheritInteger(p_intf, SOUT_CFG_PREFIX "http-port")
+    s_access << "http{"
+             << "mime=" << psz_mime
              << '}';
     free(psz_mime);
 
@@ -2371,11 +2366,13 @@ int SoutAccessOpen(vlc_object_t *p_this)
 
     p_sys = new(std::nothrow) sout_access_out_sys_t(p_access, p_intf, p_saout);
     if (unlikely(p_sys == NULL))
+    {
+        sout_AccessOutDelete( p_saout );
         return VLC_ENOMEM;
+    }
 
     p_access->p_sys = p_sys;
     p_access->pf_seek = AccessOutSeek;
-    //p_access_out->pf_read = AccessOutRead;
     p_access->pf_write = AccessOutWrite;
     p_access->pf_control = AccessOutControl;
 
@@ -2418,7 +2415,6 @@ ssize_t sout_access_out_sys_t::Write( block_t *p_buffer )
                 continue;
             }
 
-            i_header_size += p_buffer->i_buffer;
             b_header_started = true;
             return p_access->pf_write( p_access, p_buffer );
         }
@@ -2426,7 +2422,6 @@ ssize_t sout_access_out_sys_t::Write( block_t *p_buffer )
         if (!p_intf->p_sys->isHeaderDone())
         {
             if ( p_buffer->i_flags & BLOCK_FLAG_HEADER ) {
-                i_header_size += p_buffer->i_buffer;
                 return p_access->pf_write( p_access, p_buffer );
             }
 
