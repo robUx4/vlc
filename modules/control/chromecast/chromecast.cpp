@@ -72,8 +72,6 @@ static int DemuxOpen(vlc_object_t *);
 static void DemuxClose(vlc_object_t *);
 static int SoutOpen(vlc_object_t *);
 static void SoutClose(vlc_object_t *);
-static int SoutAccessOpen(vlc_object_t *);
-static void SoutAccessClose(vlc_object_t *);
 static int PlaylistEvent( vlc_object_t *, char const *,
                           vlc_value_t, vlc_value_t, void * );
 static int InputEvent( vlc_object_t *, char const *,
@@ -342,20 +340,6 @@ vlc_module_begin ()
         add_integer(SOUT_CFG_PREFIX "http-port", HTTP_PORT, HTTP_PORT_TEXT, HTTP_PORT_LONGTEXT, false)
         add_string(SOUT_CFG_PREFIX "mime", "video/x-matroska", MIME_TEXT, MIME_LONGTEXT, false)
         add_string(SOUT_CFG_PREFIX "mux", "avformat{mux=matroska}", MUXER_TEXT, MUXER_LONGTEXT, false)
-
-    /* sout access to detect when the muxer header has been pushed to HTTP
-     * after that we get the Chromecast status to find if it's ready to receive
-     * our data
-     */
-    add_submodule()
-        set_shortname( "cc_access" )
-        set_category( CAT_SOUT )
-        set_subcategory( SUBCAT_SOUT_ACO )
-        set_description( N_( "chromecast sout access filter" ) )
-        set_capability("sout access", 0)
-        add_shortcut("cc_access")
-        set_callbacks( SoutAccessOpen, SoutAccessClose )
-        add_string(SOUT_CFG_PREFIX "mime", "video/x-matroska", MIME_TEXT, MIME_LONGTEXT, false)
 
 vlc_module_end ()
 
@@ -2184,7 +2168,7 @@ int SoutOpen(vlc_object_t *p_this)
        << ",mux=" << psz_var_mux
        << ",access=simplehttpd{mime=" << psz_var_mime << "}}";
 #else
-# if 0
+# if 1
     ss << "http{dst=:" << var_InheritInteger(p_stream, SOUT_CFG_PREFIX "http-port") << "/stream"
        << ",mux=" << psz_var_mux
        << ",access=http{mime=" << psz_var_mime << "}}";
@@ -2230,137 +2214,3 @@ void SoutClose(vlc_object_t *p_this)
     delete p_sout->p_sys;
 }
 
-
-struct sout_access_out_sys_t
-{
-    sout_access_out_sys_t(sout_access_out_t *p_this, intf_thread_t *intf, sout_access_out_t *p_access)
-        :p_this(p_this)
-        ,p_access(p_access)
-        ,p_intf(intf)
-        ,b_header_started(false)
-    {
-        assert(p_access != NULL);
-        assert(p_intf != NULL);
-        vlc_object_hold( p_intf );
-    }
-
-    ~sout_access_out_sys_t()
-    {
-        sout_AccessOutDelete( p_access );
-        vlc_object_release( p_intf );
-    }
-
-public:
-    int Control( int i_query, va_list args );
-    int Seek( off_t i_pos );
-    ssize_t Write( block_t *p_buffer );
-
-protected:
-    sout_access_out_t * const p_this;
-    sout_access_out_t * const p_access;
-    intf_thread_t     * const p_intf;
-
-    bool                      b_header_started;
-};
-
-static int AccessOutControl( sout_access_out_t *p_this, int i_query, va_list args )
-{
-    return p_this->p_sys->Control( i_query, args );
-}
-
-static int AccessOutSeek( sout_access_out_t *p_this, off_t i_pos )
-{
-    return p_this->p_sys->Seek( i_pos );
-}
-
-ssize_t AccessOutWrite( sout_access_out_t *p_this, block_t *p_buffer )
-{
-    return p_this->p_sys->Write( p_buffer );
-}
-
-int SoutAccessOpen(vlc_object_t *p_this)
-{
-    sout_access_out_t *p_access = reinterpret_cast<sout_access_out_t*>(p_this);
-    sout_access_out_sys_t *p_sys = NULL;
-    intf_thread_t *p_intf = NULL;
-    sout_access_out_t *p_saout;
-
-    config_ChainParse( p_access, SOUT_CFG_PREFIX, ppsz_sout_options, p_access->p_cfg );
-
-    char *psz_mime = var_GetNonEmptyString( p_access, SOUT_CFG_PREFIX "mime" );
-    std::stringstream s_access;
-    s_access << "http{"
-             << "mime=" << psz_mime
-             << '}';
-    free(psz_mime);
-
-    p_intf = static_cast<intf_thread_t*>(var_InheritAddress(p_access, SOUT_INTF_ADDRESS));
-    if (p_intf == NULL) {
-        msg_Err(p_access, "Missing the control interface to work");
-        goto error;
-    }
-
-    p_saout = sout_AccessOutNew(p_this, s_access.str().c_str(), p_access->psz_path);
-    if (p_saout == NULL) {
-        msg_Dbg(p_access, "could not create http output");
-        goto error;
-    }
-
-    p_sys = new(std::nothrow) sout_access_out_sys_t(p_access, p_intf, p_saout);
-    if (unlikely(p_sys == NULL))
-    {
-        sout_AccessOutDelete( p_saout );
-        return VLC_ENOMEM;
-    }
-
-    p_access->p_sys = p_sys;
-    p_access->pf_seek = AccessOutSeek;
-    p_access->pf_write = AccessOutWrite;
-    p_access->pf_control = AccessOutControl;
-
-    return VLC_SUCCESS;
-
-error:
-    if (p_saout)
-        sout_AccessOutDelete(p_saout);
-    delete p_sys;
-    return VLC_EGENERIC;
-}
-
-void SoutAccessClose(vlc_object_t *p_this)
-{
-    sout_access_out_t *p_access_out = reinterpret_cast<sout_access_out_t*>(p_this);
-    delete p_access_out->p_sys;
-}
-
-int sout_access_out_sys_t::Control( int i_query, va_list args )
-{
-    return p_access->pf_control( p_access, i_query, args );
-}
-
-int sout_access_out_sys_t::Seek( off_t i_pos )
-{
-    return p_access->pf_seek( p_access, i_pos );
-}
-
-ssize_t sout_access_out_sys_t::Write( block_t *p_buffer )
-{
-    while ( p_buffer != NULL)
-    {
-        if (!b_header_started)
-        {
-            if ( !( p_buffer->i_flags & BLOCK_FLAG_HEADER ) ) {
-                msg_Warn(p_this, "starting to send non header data, discard");
-                block_t *p_next = p_buffer->p_next;
-                block_Release( p_next );
-                p_buffer = p_next;
-                continue;
-            }
-
-            b_header_started = true;
-        }
-
-        return p_access->pf_write( p_access, p_buffer );
-    }
-    return VLC_SUCCESS;
-}
