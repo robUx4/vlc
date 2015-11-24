@@ -283,7 +283,7 @@ private:
     void msgPlayerPause();
     void msgPlayerSeek(const std::string & currentTime);
 
-    std::string GetMediaInformation();
+    std::string GetMedia();
 
     bool canDecodeVideo( es_format_t * );
     bool canDecodeAudio( es_format_t * );
@@ -447,6 +447,8 @@ static int PlaylistEvent( vlc_object_t *p_this, char const *psz_var,
 
     VLC_UNUSED(p_this);
     VLC_UNUSED(psz_var);
+
+    assert( p_sys->p_input == NULL || p_sys->p_input == oldval.p_address );
 
     p_sys->InputUpdated( p_input );
 
@@ -655,20 +657,14 @@ bool intf_sys_t::seekTo(mtime_t pos)
         return false;
 
     assert(playback_start_chromecast != -1.0);
-    //msgPlayerStop();
 
-    //return ( mdate() - date_play_start ) + playback_start_local;
-
-    i_seektime = mdate() + /* playback_start_local +*/ SEEK_FORWARD_OFFSET;
+    i_seektime = mdate() + SEEK_FORWARD_OFFSET /* + playback_start_local */ ;
     const std::string currentTime = std::to_string( double( i_seektime ) / 1000000.0 );
     m_seektime = pos; // + playback_start_chromecast - playback_start_local;
     playback_start_local = pos;
     msg_Dbg( p_intf, "%ld Seeking to %" PRId64 "/%s playback_time:%" PRId64, GetCurrentThreadId(), pos, currentTime.c_str(), playback_start_chromecast);
     play_status = PLAYER_SEEK_SENT;
     msgPlayerSeek( currentTime );
-    //msgPlayerGetStatus();
-    /* TODO first stop then load at a different position */
-    //msgPlayerStop();
 
     return true;
 }
@@ -1260,13 +1256,11 @@ void intf_sys_t::msgAuth()
                  DEFAULT_CHOMECAST_RECEIVER, castchannel::CastMessage_PayloadType_BINARY);
 }
 
-
 void intf_sys_t::msgPing()
 {
     std::string s("{\"type\":\"PING\"}");
     pushMessage(NAMESPACE_HEARTBEAT, s);
 }
-
 
 void intf_sys_t::msgPong()
 {
@@ -1311,17 +1305,7 @@ void intf_sys_t::msgReceiverGetStatus()
     pushMessage(NAMESPACE_RECEIVER, ss.str());
 }
 
-void intf_sys_t::msgPlayerGetStatus()
-{
-    std::stringstream ss;
-    ss << "{\"type\":\"GET_STATUS\","
-       <<  "\"requestId\":" << i_requestId++ << "}";
-
-    assert(!appTransportId.empty());
-    pushMediaPlayerMessage( ss );
-}
-
-std::string intf_sys_t::GetMediaInformation()
+std::string intf_sys_t::GetMedia()
 {
     std::stringstream ss;
 
@@ -1366,17 +1350,25 @@ std::string intf_sys_t::GetMediaInformation()
     return ss.str();
 }
 
+void intf_sys_t::msgPlayerGetStatus()
+{
+    std::stringstream ss;
+    ss << "{\"type\":\"GET_STATUS\","
+       <<  "\"requestId\":" << i_requestId++
+       << "}";
+
+    pushMediaPlayerMessage( ss );
+}
+
 void intf_sys_t::msgPlayerLoad()
 {
-
     std::stringstream ss;
     ss << "{\"type\":\"LOAD\","
-       <<  "\"media\":{" << GetMediaInformation() << "},"
+       <<  "\"media\":{" << GetMedia() << "},"
        <<  "\"autoplay\":\"false\","
        <<  "\"requestId\":" << i_requestId++
        << "}";
 
-    assert(!appTransportId.empty());
     pushMediaPlayerMessage( ss );
 }
 
@@ -1387,9 +1379,9 @@ void intf_sys_t::msgPlayerStop()
     std::stringstream ss;
     ss << "{\"type\":\"STOP\","
        <<  "\"mediaSessionId\":" << mediaSessionId << ","
-       <<  "\"requestId\":" << i_requestId++ << "}";
+       <<  "\"requestId\":" << i_requestId++
+       << "}";
 
-    assert(!appTransportId.empty());
     pushMediaPlayerMessage( ss );
 }
 
@@ -1400,9 +1392,9 @@ void intf_sys_t::msgPlayerPlay()
     std::stringstream ss;
     ss << "{\"type\":\"PLAY\","
        <<  "\"mediaSessionId\":" << mediaSessionId << ","
-       <<  "\"requestId\":" << i_requestId++ << "}";
+       <<  "\"requestId\":" << i_requestId++
+       << "}";
 
-    assert(!appTransportId.empty());
     pushMediaPlayerMessage( ss );
 }
 
@@ -1413,9 +1405,9 @@ void intf_sys_t::msgPlayerPause()
     std::stringstream ss;
     ss << "{\"type\":\"PAUSE\","
        <<  "\"mediaSessionId\":" << mediaSessionId << ","
-       <<  "\"requestId\":" << i_requestId++ << "}";
+       <<  "\"requestId\":" << i_requestId++
+       << "}";
 
-    assert(!appTransportId.empty());
     pushMediaPlayerMessage( ss );
 }
 
@@ -1426,10 +1418,10 @@ void intf_sys_t::msgPlayerSeek(const std::string & currentTime)
     std::stringstream ss;
     ss << "{\"type\":\"SEEK\","
        <<  "\"currentTime\":" << currentTime << ","
-        <<  "\"mediaSessionId\":" << mediaSessionId << ","
-       <<  "\"requestId\":" << i_requestId++ << "}";
+       <<  "\"mediaSessionId\":" << mediaSessionId << ","
+       <<  "\"requestId\":" << i_requestId++
+       << "}";
 
-    assert(!appTransportId.empty());
     pushMediaPlayerMessage( ss );
 }
 
@@ -1713,10 +1705,8 @@ struct demux_sys_t
                 vlc_mutex_unlock(&p_intf->p_sys->lock);
                 return 0;
             }
-            vlc_mutex_unlock(&p_intf->p_sys->lock);
-        } else {
-            vlc_mutex_unlock(&p_intf->p_sys->lock);
         }
+        vlc_mutex_unlock(&p_intf->p_sys->lock);
 
         return p_demux->p_source->pf_demux( p_demux->p_source );
     }
@@ -1971,7 +1961,7 @@ static int DemuxControl( demux_t *p_demux, int i_query, va_list args)
         if (!p_sys->seekTo( pos ))
         {
             msg_Err( p_demux, "failed to seek to %f", pos );
-            return VLC_EGENERIC;
+            ret = VLC_EGENERIC;
         }
         return ret;
     }
