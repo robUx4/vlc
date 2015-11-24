@@ -170,8 +170,14 @@ struct intf_sys_t
     }
 
     mtime_t getPlaybackTime() const {
-        if (date_play_start == -1) {
+        if (date_play_start == -1)
+        {
             msg_Dbg(p_intf, "playback not running using buffering time %" PRId64, playback_start_local);
+            return playback_start_local;
+        }
+        if (playerState == "PAUSED")
+        {
+            msg_Dbg(p_intf, "playback paused using buffering time %" PRId64, playback_start_local);
             return playback_start_local;
         }
         return ( mdate() - date_play_start ) + playback_start_local;
@@ -1150,6 +1156,8 @@ static int processMessage(intf_thread_t *p_intf, const castchannel::CastMessage 
                         p_sys->date_play_start = mdate();
                         msg_Dbg(p_intf, "Playback started with an offset of %" PRId64, p_sys->playback_start_chromecast);
                     }
+                    else if (p_sys->playerState == "PAUSED")
+                        p_sys->playback_start_local += mdate() - p_sys->date_play_start;
                     else {
                         if (p_sys->playerState == "IDLE")
                             p_sys->play_status = PLAYER_IDLE;
