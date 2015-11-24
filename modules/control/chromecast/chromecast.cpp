@@ -78,7 +78,6 @@ static int InputEvent( vlc_object_t *, char const *,
                        vlc_value_t, vlc_value_t, void * );
 static void *chromecastThread(void *data);
 static int connectChromecast(intf_thread_t *p_intf);
-static void disconnectChromecast(intf_thread_t *p_intf);
 
 #define CONTROL_CFG_PREFIX "chromecast-"
 #define SOUT_CFG_PREFIX    "sout-chromecast-"
@@ -169,7 +168,7 @@ struct intf_sys_t
 
     ~intf_sys_t()
     {
-        disconnectChromecast(p_intf);
+        disconnectChromecast();
 
 #ifdef HAVE_MICRODNS
         mdns_cleanup(microdns_ctx);
@@ -306,6 +305,8 @@ private:
 
     bool canDecodeVideo( es_format_t * );
     bool canDecodeAudio( es_format_t * );
+
+    void disconnectChromecast();
 };
 
 #define IP_TEXT N_("Chromecast IP address")
@@ -822,16 +823,14 @@ static int connectChromecast(intf_thread_t *p_intf)
 /**
  * @brief Disconnect from the Chromecast
  */
-static void disconnectChromecast(intf_thread_t *p_intf)
+void intf_sys_t::disconnectChromecast()
 {
-    intf_sys_t *p_sys = p_intf->p_sys;
-
-    if (p_sys->p_tls)
+    if (p_tls)
     {
-        vlc_tls_SessionDelete(p_sys->p_tls);
-        vlc_tls_Delete(p_sys->p_creds);
-        p_sys->p_tls = NULL;
-        p_sys->conn_status = CHROMECAST_DISCONNECTED;
+        vlc_tls_SessionDelete(p_tls);
+        vlc_tls_Delete(p_creds);
+        p_tls = NULL;
+        conn_status = CHROMECAST_DISCONNECTED;
     }
 }
 
