@@ -204,8 +204,6 @@ struct intf_sys_t
 
     void sendPlayerCmd();
 
-    void setHeaderDone();
-
     intf_thread_t  * const p_intf;
     input_thread_t *p_input;
     uint16_t       devicePort;
@@ -1266,11 +1264,6 @@ void intf_sys_t::pushMessage(const std::string & namespace_,
     sendMessage(msg);
 }
 
-void intf_sys_t::setHeaderDone()
-{
-    msgPlayerGetStatus();
-}
-
 /*****************************************************************************
  * Message preparation
  *****************************************************************************/
@@ -2245,7 +2238,6 @@ struct sout_access_out_sys_t
         ,p_access(p_access)
         ,p_intf(intf)
         ,b_header_started(false)
-        ,b_header_done(false)
     {
         assert(p_access != NULL);
         assert(p_intf != NULL);
@@ -2269,7 +2261,6 @@ protected:
     intf_thread_t     * const p_intf;
 
     bool                      b_header_started;
-    bool                      b_header_done;
 };
 
 static int AccessOutControl( sout_access_out_t *p_this, int i_query, va_list args )
@@ -2367,18 +2358,6 @@ ssize_t sout_access_out_sys_t::Write( block_t *p_buffer )
             }
 
             b_header_started = true;
-            return p_access->pf_write( p_access, p_buffer );
-        }
-
-        if (!b_header_done)
-        {
-            if ( p_buffer->i_flags & BLOCK_FLAG_HEADER ) {
-                return p_access->pf_write( p_access, p_buffer );
-            }
-
-            b_header_done = true;
-            p_intf->p_sys->setHeaderDone();
-            /* TODO: wait until the Chromecast is ready to receive the data */
         }
 
         return p_access->pf_write( p_access, p_buffer );
