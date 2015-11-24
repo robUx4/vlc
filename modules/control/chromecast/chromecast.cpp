@@ -178,15 +178,21 @@ struct intf_sys_t
     }
 
     mtime_t getPlaybackTime() const {
-        if (playerState == STATE_PLAYING)
+        switch( playerState )
+        {
+        case STATE_PLAYING:
             return ( mdate() - date_play_start ) + playback_start_local;
 
-        if (playerState == STATE_PAUSED)
-            msg_Dbg(p_intf, "receiver paused using buffering time %" PRId64, playback_start_local);
-        else if (playerState == STATE_BUFFERING)
-            msg_Dbg(p_intf, "receiver buffering using buffering time %" PRId64, playback_start_local);
-        else if (playerState == STATE_IDLE)
+        case STATE_IDLE:
             msg_Dbg(p_intf, "receiver idle using buffering time %" PRId64, playback_start_local);
+            break;
+        case STATE_BUFFERING:
+            msg_Dbg(p_intf, "receiver buffering using buffering time %" PRId64, playback_start_local);
+            break;
+        case STATE_PAUSED:
+            msg_Dbg(p_intf, "receiver paused using buffering time %" PRId64, playback_start_local);
+            break;
+        }
         return playback_start_local;
     }
 
@@ -546,7 +552,7 @@ void intf_sys_t::InputUpdated( input_thread_t *p_input )
                 else
                 {
                     p_es->i_priority = ES_PRIORITY_NOT_SELECTABLE;
-                    msg_Dbg( p_intf, "disable non audio/video track %d codec %4.4s", p_es->i_id, (const char*)&p_es->i_codec );
+                    msg_Dbg( p_intf, "disable non audio/video track %d i_cat:%d codec %4.4s", p_es->i_id, p_es->i_cat, (const char*)&p_es->i_codec );
                 }
             }
         }
@@ -828,7 +834,6 @@ static void disconnectChromecast(intf_thread_t *p_intf)
         p_sys->conn_status = CHROMECAST_DISCONNECTED;
     }
 }
-
 
 /**
  * @brief Send a message to the Chromecast
@@ -1155,14 +1160,14 @@ static int processMessage(intf_thread_t *p_intf, const castchannel::CastMessage 
 
             if (p_sys->playerState != oldPlayerState)
             {
-                if (p_sys->playerState == STATE_BUFFERING)
+                switch( p_sys->playerState )
                 {
+                case STATE_BUFFERING:
                     p_sys->playback_start_chromecast = mtime_t( double( status[0]["currentTime"] ) * 1000000.0 );
                     msg_Dbg(p_intf, "Playback pending with an offset of %" PRId64, p_sys->playback_start_chromecast);
-                    //p_sys->date_play_start = -1;
-                }
-                else if (p_sys->playerState == STATE_PLAYING)
-                {
+                    break;
+
+                case STATE_PLAYING:
                     /* TODO reset demux PCR ? */
                     if (unlikely(p_sys->playback_start_chromecast == -1.0)) {
                         msg_Warn(p_intf, "start playing without buffering");
@@ -1171,12 +1176,16 @@ static int processMessage(intf_thread_t *p_intf, const castchannel::CastMessage 
                     p_sys->play_status = PLAYER_PLAYBACK_SENT;
                     p_sys->date_play_start = mdate();
                     msg_Dbg(p_intf, "Playback started with an offset of %" PRId64, p_sys->playback_start_chromecast);
-                }
-                else if (p_sys->playerState == STATE_PAUSED)
+                    break;
+
+                case STATE_PAUSED:
                     p_sys->playback_start_local += mdate() - p_sys->date_play_start;
-                else {
+                    break;
+
+                default:
                     p_sys->play_status = PLAYER_IDLE;
                     p_sys->date_play_start = -1;
+                    break;
                 }
             }
 
