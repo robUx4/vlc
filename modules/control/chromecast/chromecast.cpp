@@ -317,6 +317,9 @@ vlc_module_begin ()
     add_string(CONTROL_CFG_PREFIX "muxer", "avformat{mux=matroska}", MUXER_TEXT, MUXER_LONGTEXT, false)
     set_callbacks( Open, Close )
 
+    /* demuxer wrapper to report the playback time from the chromecast, rather than the
+     * one from the underlying demuxer
+     */
     add_submodule()
         set_shortname( "cc_demux" )
         set_category( CAT_INPUT )
@@ -337,9 +340,6 @@ vlc_module_begin ()
         set_capability("sout stream", 0)
         add_shortcut("cc_sout")
         set_callbacks( SoutOpen, SoutClose )
-        add_integer(SOUT_CFG_PREFIX "http-port", HTTP_PORT, HTTP_PORT_TEXT, HTTP_PORT_LONGTEXT, false)
-        add_string(SOUT_CFG_PREFIX "mime", "video/x-matroska", MIME_TEXT, MIME_LONGTEXT, false)
-        add_string(SOUT_CFG_PREFIX "mux", "avformat{mux=matroska}", MUXER_TEXT, MUXER_LONGTEXT, false)
 
 vlc_module_end ()
 
@@ -2052,7 +2052,7 @@ void DemuxClose(vlc_object_t *p_this)
 struct sout_stream_sys_t
 {
     sout_stream_sys_t(sout_stream_t *stream, intf_thread_t *intf, sout_stream_t *sout)
-        :p_out(sout)
+        :p_wrapped(sout)
         ,p_intf(intf)
         ,p_stream(stream)
         ,b_header_started(false)
@@ -2063,19 +2063,16 @@ struct sout_stream_sys_t
 
     ~sout_stream_sys_t()
     {
-        sout_StreamChainDelete(p_out, p_out);
+        sout_StreamChainDelete(p_wrapped, p_wrapped);
         vlc_object_release(p_intf);
     }
 
-    int sendBlock(sout_stream_id_sys_t *id, block_t *p_buffer);
-
-public:
     bool isFinishedPlaying() const {
         /* check if the Chromecast to be done playing */
         return p_intf->p_sys->isFinishedPlaying();
     }
 
-    sout_stream_t * const p_out;
+    sout_stream_t * const p_wrapped;
 
 protected:
     intf_thread_t * const p_intf;
@@ -2088,37 +2085,22 @@ protected:
  *****************************************************************************/
 static sout_stream_id_sys_t *Add(sout_stream_t *p_stream, const es_format_t *p_fmt)
 {
-    sout_stream_sys_t *p_sys = p_stream->p_sys;
-    return p_sys->p_out->pf_add(p_sys->p_out, p_fmt);
+    return sout_StreamIdAdd( p_stream->p_sys->p_wrapped, p_fmt );
 }
-
 
 static void Del(sout_stream_t *p_stream, sout_stream_id_sys_t *id)
 {
-    sout_stream_sys_t *p_sys = p_stream->p_sys;
-
-    p_sys->p_out->pf_del(p_sys->p_out, id);
+    sout_StreamIdDel( p_stream->p_sys->p_wrapped, id );
 }
 
-
-static int Send(sout_stream_t *p_stream, sout_stream_id_sys_t *id,
-                block_t *p_buffer)
+static int Send(sout_stream_t *p_stream, sout_stream_id_sys_t *id, block_t *p_buffer)
 {
-    sout_stream_sys_t *p_sys = p_stream->p_sys;
-    return p_sys->sendBlock(id, p_buffer);
+    return sout_StreamIdSend( p_stream->p_sys->p_wrapped, id, p_buffer );
 }
 
 static int Flush( sout_stream_t *p_stream, sout_stream_id_sys_t *id )
 {
-    sout_stream_sys_t *p_sys = p_stream->p_sys;
-
-    return sout_StreamFlush( p_sys->p_out, id );
-}
-
-int sout_stream_sys_t::sendBlock(sout_stream_id_sys_t *id,
-                                 block_t *p_buffer)
-{
-    return p_out->pf_send(p_out, id, p_buffer);
+    return sout_StreamFlush( p_stream->p_sys->p_wrapped, id );
 }
 
 static int Control(sout_stream_t *p_stream, int i_query, va_list args)
@@ -2132,12 +2114,8 @@ static int Control(sout_stream_t *p_stream, int i_query, va_list args)
         return VLC_SUCCESS;
     }
 
-    return p_sys->p_out->pf_control(p_sys->p_out, i_query, args);
+    return p_sys->p_wrapped->pf_control( p_sys->p_wrapped, i_query, args );
 }
-
-static const char *const ppsz_sout_options[] = {
-    "http-port", "mux", "mime", NULL
-};
 
 int SoutOpen(vlc_object_t *p_this)
 {
@@ -2147,8 +2125,6 @@ int SoutOpen(vlc_object_t *p_this)
     sout_stream_sys_t *p_sys = NULL;
     sout_stream_t *p_sout = NULL;
     std::stringstream ss;
-
-    config_ChainParse(p_stream, SOUT_CFG_PREFIX, ppsz_sout_options, p_stream->p_cfg);
 
     p_intf = static_cast<intf_thread_t*>(var_InheritAddress(p_stream, SOUT_INTF_ADDRESS));
     if (p_intf == NULL) {
@@ -2163,21 +2139,9 @@ int SoutOpen(vlc_object_t *p_this)
     if (psz_var_mime == NULL || !psz_var_mime[0])
         goto error;
 
-#if 0
-    ss << "standard{dst=:" << var_InheritInteger(p_stream, SOUT_CFG_PREFIX "http-port") << "/stream"
-       << ",mux=" << psz_var_mux
-       << ",access=simplehttpd{mime=" << psz_var_mime << "}}";
-#else
-# if 1
     ss << "http{dst=:" << var_InheritInteger(p_stream, SOUT_CFG_PREFIX "http-port") << "/stream"
        << ",mux=" << psz_var_mux
        << ",access=http{mime=" << psz_var_mime << "}}";
-# else
-    ss << "http{dst=:" << var_InheritInteger(p_stream, SOUT_CFG_PREFIX "http-port") << "/stream"
-       << ",mux=" << psz_var_mux
-       << ",access=cc_access{mime=" << psz_var_mime << "}}";
-# endif
-#endif
 
     p_sout = sout_StreamChainNew( p_stream->p_sout, ss.str().c_str(), NULL, NULL);
     if (p_sout == NULL) {
@@ -2213,4 +2177,3 @@ void SoutClose(vlc_object_t *p_this)
     sout_stream_t *p_sout = reinterpret_cast<sout_stream_t*>(p_this);
     delete p_sout->p_sys;
 }
-
