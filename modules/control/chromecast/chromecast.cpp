@@ -157,7 +157,6 @@ struct intf_sys_t
         ,i_app_requestId(0)
         ,i_requestId(0)
         ,i_sout_id(0)
-        ,b_header_done(false)
     {
         p_interrupt = vlc_interrupt_create();
     }
@@ -204,10 +203,6 @@ struct intf_sys_t
     bool seekTo(mtime_t pos);
 
     void sendPlayerCmd();
-
-    bool isHeaderDone() const {
-        return b_header_done;
-    }
 
     void setHeaderDone();
 
@@ -281,7 +276,6 @@ private:
     unsigned i_requestId;
     unsigned i_sout_id;
 
-    std::atomic<bool> b_header_done;
     std::string       s_sout;
     std::string       s_chromecast_url;
     bool              canRemux;
@@ -1274,7 +1268,6 @@ void intf_sys_t::pushMessage(const std::string & namespace_,
 
 void intf_sys_t::setHeaderDone()
 {
-    b_header_done = true;
     msgPlayerGetStatus();
 }
 
@@ -2252,6 +2245,7 @@ struct sout_access_out_sys_t
         ,p_access(p_access)
         ,p_intf(intf)
         ,b_header_started(false)
+        ,b_header_done(false)
     {
         assert(p_access != NULL);
         assert(p_intf != NULL);
@@ -2275,6 +2269,7 @@ protected:
     intf_thread_t     * const p_intf;
 
     bool                      b_header_started;
+    bool                      b_header_done;
 };
 
 static int AccessOutControl( sout_access_out_t *p_this, int i_query, va_list args )
@@ -2375,12 +2370,13 @@ ssize_t sout_access_out_sys_t::Write( block_t *p_buffer )
             return p_access->pf_write( p_access, p_buffer );
         }
 
-        if (!p_intf->p_sys->isHeaderDone())
+        if (!b_header_done)
         {
             if ( p_buffer->i_flags & BLOCK_FLAG_HEADER ) {
                 return p_access->pf_write( p_access, p_buffer );
             }
 
+            b_header_done = true;
             p_intf->p_sys->setHeaderDone();
             /* TODO: wait until the Chromecast is ready to receive the data */
         }
