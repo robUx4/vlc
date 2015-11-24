@@ -336,6 +336,9 @@ vlc_module_begin ()
         add_shortcut( "cc_demux" )
         set_callbacks( DemuxOpen, DemuxClose )
 
+    /* sout wrapper that can tell when the Chromecast is finished playing
+     * rather than when data are finished sending
+     */
     add_submodule()
         set_shortname( "cc_sout" )
         set_category(CAT_SOUT)
@@ -1712,14 +1715,6 @@ struct demux_sys_t
             return 0;
         }
 
-        if (!p_intf->p_sys->isHeaderDone()) {
-            /* while the muxed header has not been generated & pushed
-             * we need to demux anything coming
-             */
-            vlc_mutex_unlock(&p_intf->p_sys->lock);
-            return p_demux->p_source->pf_demux( p_demux->p_source );
-        }
-
         /* hold the data while seeking */
         /* wait until the client is buffering for seeked data */
         if (p_intf->p_sys->i_seektime != -1.0)
@@ -2153,45 +2148,6 @@ static int Flush( sout_stream_t *p_stream, sout_stream_id_sys_t *id )
 int sout_stream_sys_t::sendBlock(sout_stream_id_sys_t *id,
                                  block_t *p_buffer)
 {
-#if 0
-    if (!b_header_started)
-    {
-        if ( !( p_buffer->i_flags & BLOCK_FLAG_HEADER ) ) {
-            msg_Warn(p_stream, "starting to send non header data, discard");
-#if 0
-            return VLC_SUCCESS;
-#else
-            return p_out->pf_send(p_out, id, p_buffer);
-#endif
-        }
-
-        b_header_started = true;
-        return p_out->pf_send(p_out, id, p_buffer);
-    }
-
-    if (!p_intf->p_sys->isHeaderDone())
-    {
-        if ( p_buffer->i_flags & BLOCK_FLAG_HEADER ) {
-            return p_out->pf_send(p_out, id, p_buffer);
-        }
-
-        p_intf->p_sys->setHeaderDone();
-        /* TODO: wait until the Chromecast is ready to receive the data */
-    }
-
-#if 0
-    /* hold the data while seeking */
-    vlc_mutex_lock(&p_intf->p_sys->lock);
-    /* wait until the client is buffering for seeked data */
-    if (p_intf->p_sys->m_seektime != -1.0)
-    {
-        msg_Dbg(p_stream, "waiting for Chromecast seek");
-        vlc_cond_wait(&p_intf->p_sys->seekCommandCond, &p_intf->p_sys->lock);
-        msg_Dbg(p_stream, "finished waiting for Chromecast seek");
-    }
-    vlc_mutex_unlock(&p_intf->p_sys->lock);
-#endif
-#endif
     return p_out->pf_send(p_out, id, p_buffer);
 }
 
