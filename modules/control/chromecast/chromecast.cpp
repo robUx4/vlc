@@ -146,6 +146,7 @@ struct intf_sys_t
 #ifdef HAVE_MICRODNS
         ,microdns_ctx(NULL)
 #endif
+        ,playerState(STATE_IDLE)
         ,date_play_start(-1)
         ,playback_start_chromecast(-1.0)
         ,playback_start_local(0)
@@ -177,17 +178,16 @@ struct intf_sys_t
     }
 
     mtime_t getPlaybackTime() const {
-        if (date_play_start == -1)
-        {
-            msg_Dbg(p_intf, "playback not running using buffering time %" PRId64, playback_start_local);
-            return playback_start_local;
-        }
+        if (playerState == STATE_PLAYING)
+            return ( mdate() - date_play_start ) + playback_start_local;
+
         if (playerState == STATE_PAUSED)
-        {
-            msg_Dbg(p_intf, "playback paused using buffering time %" PRId64, playback_start_local);
-            return playback_start_local;
-        }
-        return ( mdate() - date_play_start ) + playback_start_local;
+            msg_Dbg(p_intf, "receiver paused using buffering time %" PRId64, playback_start_local);
+        else if (playerState == STATE_BUFFERING)
+            msg_Dbg(p_intf, "receiver buffering using buffering time %" PRId64, playback_start_local);
+        else if (playerState == STATE_IDLE)
+            msg_Dbg(p_intf, "receiver idle using buffering time %" PRId64, playback_start_local);
+        return playback_start_local;
     }
 
     double getPlaybackPosition(mtime_t i_length) const {
@@ -1159,7 +1159,7 @@ static int processMessage(intf_thread_t *p_intf, const castchannel::CastMessage 
                 {
                     p_sys->playback_start_chromecast = mtime_t( double( status[0]["currentTime"] ) * 1000000.0 );
                     msg_Dbg(p_intf, "Playback pending with an offset of %" PRId64, p_sys->playback_start_chromecast);
-                    p_sys->date_play_start = -1;
+                    //p_sys->date_play_start = -1;
                 }
                 else if (p_sys->playerState == STATE_PLAYING)
                 {
@@ -1175,8 +1175,7 @@ static int processMessage(intf_thread_t *p_intf, const castchannel::CastMessage 
                 else if (p_sys->playerState == STATE_PAUSED)
                     p_sys->playback_start_local += mdate() - p_sys->date_play_start;
                 else {
-                    if (p_sys->playerState == STATE_IDLE)
-                        p_sys->play_status = PLAYER_IDLE;
+                    p_sys->play_status = PLAYER_IDLE;
                     p_sys->date_play_start = -1;
                 }
             }
@@ -1648,10 +1647,12 @@ struct demux_sys_t
     }
 
     mtime_t getPlaybackTime() {
+        vlc_mutex_locker locker(&p_intf->p_sys->lock);
         return p_intf->p_sys->getPlaybackTime();
     }
 
     double getPlaybackPosition() {
+        vlc_mutex_locker locker(&p_intf->p_sys->lock);
         return p_intf->p_sys->getPlaybackPosition(i_length);
     }
 
