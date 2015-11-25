@@ -154,11 +154,11 @@ struct intf_sys_t
         ,i_sock_fd(-1)
         ,p_creds(NULL)
         ,p_tls(NULL)
-        ,conn_status(CHROMECAST_DISCONNECTED)
         ,play_status(PLAYER_IDLE)
         ,i_supportedMediaCommands(15)
         ,m_seektime(-1.0)
         ,i_seektime(-1.0)
+        ,conn_status(CHROMECAST_DISCONNECTED)
         ,i_app_requestId(0)
         ,i_requestId(0)
         ,i_sout_id(0)
@@ -247,7 +247,6 @@ struct intf_sys_t
     vlc_tls_creds_t *p_creds;
     vlc_tls_t *p_tls;
 
-    enum connection_status conn_status;
     enum player_status     play_status;
     int                    i_supportedMediaCommands;
     /* internal seek time */
@@ -273,6 +272,20 @@ struct intf_sys_t
 
     void InputUpdated( input_thread_t * );
 
+    connection_status getConnectionStatus() const
+    {
+        return conn_status;
+    }
+    void setConnectionStatus(connection_status status)
+    {
+        if (conn_status != status)
+        {
+            msg_Dbg(p_intf, "change Chromecast connection status from %d to %d", conn_status, status);
+            conn_status = status;
+        }
+        vlc_cond_broadcast(&loadCommandCond);
+    }
+
 private:
     int sendMessage(castchannel::CastMessage &msg);
 
@@ -285,6 +298,8 @@ private:
         assert(!appTransportId.empty());
         pushMessage(NAMESPACE_MEDIA, payload.str(), appTransportId);
     }
+
+    enum connection_status conn_status;
 
     unsigned i_app_requestId;
     unsigned i_requestId;
@@ -515,6 +530,18 @@ void intf_sys_t::InputUpdated( input_thread_t *p_input )
 
     if( p_input != NULL )
     {
+        while (conn_status == CHROMECAST_DISCONNECTED)
+        {
+            msg_Dbg(p_intf, "InputUpdated waiting for Chromecast connection, current %d", conn_status);
+            vlc_cond_wait(&loadCommandCond, &lock);
+        }
+
+        if (conn_status == CHROMECAST_DEAD)
+        {
+            msg_Warn(p_intf, "no Chromecast hook possible");
+            return;
+        }
+
         var_AddCallback( p_input, "intf-event", InputEvent, p_intf );
 
         assert(!p_input->b_preparsing);
@@ -601,6 +628,8 @@ void intf_sys_t::InputUpdated( input_thread_t *p_input )
 
         var_Create( p_input->p_parent, SOUT_INTF_ADDRESS, VLC_VAR_ADDRESS );
         var_SetAddress( p_input->p_parent, SOUT_INTF_ADDRESS, p_intf );
+
+        msg_Dbg(p_intf, "force sout to %s", s_sout.c_str());
 
         var_SetString( p_input, "sout", s_sout.c_str() );
         var_SetString( p_input, "demux-filter", "cc_demux" );
@@ -830,7 +859,7 @@ void intf_sys_t::disconnectChromecast()
         vlc_tls_SessionDelete(p_tls);
         vlc_tls_Delete(p_creds);
         p_tls = NULL;
-        conn_status = CHROMECAST_DISCONNECTED;
+        setConnectionStatus(CHROMECAST_DISCONNECTED);
     }
 }
 
@@ -1005,7 +1034,7 @@ static int processMessage(intf_thread_t *p_intf, const castchannel::CastMessage 
         else
         {
             vlc_mutex_locker locker(&p_sys->lock);
-            p_sys->conn_status = CHROMECAST_AUTHENTICATED;
+            p_sys->setConnectionStatus(CHROMECAST_AUTHENTICATED);
             p_sys->msgConnect();
             p_sys->msgReceiverGetStatus();
         }
@@ -1068,12 +1097,11 @@ static int processMessage(intf_thread_t *p_intf, const castchannel::CastMessage 
             if ( p_app )
             {
                 if (!p_sys->appTransportId.empty()
-                        && p_sys->conn_status == CHROMECAST_AUTHENTICATED)
+                        && p_sys->getConnectionStatus() == CHROMECAST_AUTHENTICATED)
                 {
-                    p_sys->conn_status = CHROMECAST_APP_STARTED;
+                    p_sys->setConnectionStatus(CHROMECAST_APP_STARTED);
                     p_sys->msgConnect(p_sys->appTransportId);
                     p_sys->sendPlayerCmd();
-                    vlc_cond_signal(&p_sys->loadCommandCond);
                 }
                 else
                 {
@@ -1083,13 +1111,12 @@ static int processMessage(intf_thread_t *p_intf, const castchannel::CastMessage 
             }
             else
             {
-                switch(p_sys->conn_status)
+                switch(p_sys->getConnectionStatus())
                 {
                 /* If the app is no longer present */
                 case CHROMECAST_APP_STARTED:
                     msg_Warn(p_intf, "app is no longer present. closing");
                     p_sys->msgReceiverClose();
-                    vlc_cond_signal(&p_sys->loadCommandCond);
                     break;
 
                 case CHROMECAST_AUTHENTICATED:
@@ -1226,8 +1253,7 @@ static int processMessage(intf_thread_t *p_intf, const castchannel::CastMessage 
         {
             msg_Warn(p_intf, "received close message");
             vlc_mutex_locker locker(&p_sys->lock);
-            p_sys->conn_status = CHROMECAST_DEAD;
-            vlc_cond_signal(&p_sys->loadCommandCond);
+            p_sys->setConnectionStatus(CHROMECAST_DEAD);
             vlc_cond_signal(&p_sys->seekCommandCond);
         }
         else
@@ -1316,7 +1342,7 @@ void intf_sys_t::msgReceiverClose()
     pushMessage(NAMESPACE_CONNECTION, s, appTransportId);
 
     appTransportId = "";
-    conn_status = CHROMECAST_TLS_CONNECTED;
+    setConnectionStatus(CHROMECAST_TLS_CONNECTED);
 }
 
 void intf_sys_t::msgReceiverLaunchApp()
@@ -1541,8 +1567,7 @@ static void* chromecastThread(void* p_this)
             if (mdns_strerror(err, err_str, sizeof(err_str)) == 0)
                 msg_Err(p_intf, "Failed to look for the target Name: %s", err_str);
             vlc_mutex_lock(&p_sys->lock);
-            p_sys->conn_status = CHROMECAST_DEAD;
-            vlc_cond_signal(&p_sys->loadCommandCond);
+            p_sys->setConnectionStatus(CHROMECAST_DEAD);
             vlc_mutex_unlock(&p_sys->lock);
             vlc_restorecancel(canc);
             return NULL;
@@ -1556,8 +1581,7 @@ static void* chromecastThread(void* p_this)
         canc = vlc_savecancel();
         msg_Err(p_intf, "Could not connect the Chromecast");
         vlc_mutex_lock(&p_sys->lock);
-        p_sys->conn_status = CHROMECAST_DEAD;
-        vlc_cond_signal(&p_sys->loadCommandCond);
+        p_sys->setConnectionStatus(CHROMECAST_DEAD);
         vlc_mutex_unlock(&p_sys->lock);
         vlc_restorecancel(canc);
         return NULL;
@@ -1569,8 +1593,7 @@ static void* chromecastThread(void* p_this)
         canc = vlc_savecancel();
         msg_Err(p_intf, "Cannot get local IP address");
         vlc_mutex_lock(&p_sys->lock);
-        p_sys->conn_status = CHROMECAST_DEAD;
-        vlc_cond_signal(&p_sys->loadCommandCond);
+        p_sys->setConnectionStatus(CHROMECAST_DEAD);
         vlc_mutex_unlock(&p_sys->lock);
         vlc_restorecancel(canc);
         return NULL;
@@ -1580,7 +1603,7 @@ static void* chromecastThread(void* p_this)
     p_sys->serverIP = psz_localIP;
 
     vlc_mutex_lock(&p_sys->lock);
-    p_sys->conn_status = CHROMECAST_TLS_CONNECTED;
+    p_sys->setConnectionStatus(CHROMECAST_TLS_CONNECTED);
     vlc_mutex_unlock(&p_sys->lock);
 
     p_sys->msgAuth();
@@ -1614,8 +1637,7 @@ static void* chromecastThread(void* p_this)
         {
             msg_Err(p_intf, "The connection to the Chromecast died (receiving).");
             vlc_mutex_locker locker(&p_sys->lock);
-            p_sys->conn_status = CHROMECAST_DEAD;
-            vlc_cond_signal(&p_sys->loadCommandCond);
+            p_sys->setConnectionStatus(CHROMECAST_DEAD);
             break;
         }
 
@@ -1632,7 +1654,7 @@ static void* chromecastThread(void* p_this)
             processMessage(p_intf, msg);
         }
 
-        if ( p_sys->conn_status == CHROMECAST_DEAD )
+        if ( p_sys->getConnectionStatus() == CHROMECAST_DEAD )
             break;
 
         vlc_restorecancel(canc);
@@ -1699,8 +1721,8 @@ struct demux_sys_t
         {
             mutex_cleanup_push(&p_intf->p_sys->lock);
 
-            while (p_intf->p_sys->conn_status != CHROMECAST_APP_STARTED &&
-                   p_intf->p_sys->conn_status != CHROMECAST_DEAD)
+            while (p_intf->p_sys->getConnectionStatus() != CHROMECAST_APP_STARTED &&
+                   p_intf->p_sys->getConnectionStatus() != CHROMECAST_DEAD)
                 vlc_cond_wait(&p_intf->p_sys->loadCommandCond, &p_intf->p_sys->lock);
 
             vlc_cleanup_pop();
@@ -1709,7 +1731,7 @@ struct demux_sys_t
             msg_Dbg(p_demux, "ready to demux");
         }
 
-        if (p_intf->p_sys->conn_status != CHROMECAST_APP_STARTED) {
+        if (p_intf->p_sys->getConnectionStatus() != CHROMECAST_APP_STARTED) {
             vlc_mutex_unlock(&p_intf->p_sys->lock);
             return 0;
         }
@@ -1737,8 +1759,8 @@ struct demux_sys_t
             p_intf->p_sys->m_seektime = -1.0;
             p_intf->p_sys->i_seektime = -1.0;
 
-            if (p_intf->p_sys->conn_status != CHROMECAST_APP_STARTED) {
-                msg_Warn(p_demux, "cannot seek as the Chromecast app is not running %d", p_intf->p_sys->conn_status);
+            if (p_intf->p_sys->getConnectionStatus() != CHROMECAST_APP_STARTED) {
+                msg_Warn(p_demux, "cannot seek as the Chromecast app is not running %d", p_intf->p_sys->getConnectionStatus());
                 vlc_mutex_unlock(&p_intf->p_sys->lock);
                 return 0;
             }
