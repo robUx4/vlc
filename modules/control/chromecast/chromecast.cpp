@@ -1579,7 +1579,9 @@ static void* chromecastThread(void* p_this)
     canc = vlc_savecancel();
     p_sys->serverIP = psz_localIP;
 
+    vlc_mutex_lock(&p_sys->lock);
     p_sys->conn_status = CHROMECAST_TLS_CONNECTED;
+    vlc_mutex_unlock(&p_sys->lock);
 
     p_sys->msgAuth();
 
