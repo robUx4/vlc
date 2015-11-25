@@ -284,7 +284,7 @@ struct intf_sys_t
     }
 
 private:
-    int sendMessage(castchannel::CastMessage &msg);
+    int sendMessage(const castchannel::CastMessage &msg);
 
     void pushMessage(const std::string & namespace_,
                       const std::string & payload,
@@ -323,8 +323,8 @@ private:
 
     std::string GetMedia();
 
-    bool canDecodeVideo( es_format_t * );
-    bool canDecodeAudio( es_format_t * );
+    bool canDecodeVideo( const es_format_t * ) const;
+    bool canDecodeAudio( const es_format_t * ) const;
 
     void processMessage(const castchannel::CastMessage &msg);
 
@@ -497,14 +497,14 @@ static int PlaylistEvent( vlc_object_t *p_this, char const *psz_var,
     return VLC_SUCCESS;
 }
 
-bool intf_sys_t::canDecodeVideo( es_format_t *p_es )
+bool intf_sys_t::canDecodeVideo( const es_format_t *p_es ) const
 {
     if (p_es->i_codec == VLC_CODEC_H264 || p_es->i_codec == VLC_CODEC_VP8)
         return true;
     return false;
 }
 
-bool intf_sys_t::canDecodeAudio( es_format_t *p_es )
+bool intf_sys_t::canDecodeAudio( const es_format_t *p_es ) const
 {
     if (p_es->i_codec == VLC_CODEC_VORBIS ||
         p_es->i_codec == VLC_CODEC_MP4A ||
@@ -875,7 +875,7 @@ void intf_sys_t::disconnectChromecast()
  * @param msg the CastMessage to send
  * @return vlc error code
  */
-int intf_sys_t::sendMessage(castchannel::CastMessage &msg)
+int intf_sys_t::sendMessage(const castchannel::CastMessage &msg)
 {
     int i_size = msg.ByteSize();
     uint8_t *p_data = new(std::nothrow) uint8_t[PACKET_HEADER_LEN + i_size];
