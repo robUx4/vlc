@@ -537,11 +537,13 @@ void intf_sys_t::InputUpdated( input_thread_t *p_input )
 
     if( p_input != NULL )
     {
+        mutex_cleanup_push(&lock);
         while (conn_status == CHROMECAST_DISCONNECTED)
         {
             msg_Dbg(p_intf, "InputUpdated waiting for Chromecast connection, current %d", conn_status);
             vlc_cond_wait(&loadCommandCond, &lock);
         }
+        vlc_cleanup_pop();
 
         if (conn_status == CHROMECAST_DEAD)
         {
@@ -1721,11 +1723,9 @@ struct demux_sys_t
         if (!demuxReady)
         {
             mutex_cleanup_push(&p_intf->p_sys->lock);
-
             while (p_intf->p_sys->getConnectionStatus() != CHROMECAST_APP_STARTED &&
                    p_intf->p_sys->getConnectionStatus() != CHROMECAST_DEAD)
                 vlc_cond_wait(&p_intf->p_sys->loadCommandCond, &p_intf->p_sys->lock);
-
             vlc_cleanup_pop();
 
             demuxReady = true;
@@ -1751,12 +1751,15 @@ struct demux_sys_t
                 return 0;
             }
 
+            mutex_cleanup_push(&p_intf->p_sys->lock);
             while (p_intf->p_sys->playback_start_chromecast < p_intf->p_sys->i_seektime)
             {
                 msg_Dbg(p_demux, "%ld waiting for Chromecast seek", GetCurrentThreadId());
                 vlc_cond_wait(&p_intf->p_sys->seekCommandCond, &p_intf->p_sys->lock);
                 msg_Dbg(p_demux, "%ld finished waiting for Chromecast seek", GetCurrentThreadId());
             }
+            vlc_cleanup_pop();
+
             p_intf->p_sys->m_seektime = -1.0;
             p_intf->p_sys->i_seektime = -1.0;
 
