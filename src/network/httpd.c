@@ -1077,6 +1077,9 @@ void httpd_HostDelete(httpd_host_t *host)
     host->i_ref--;
     if (host->i_ref == 0)
         delete = true;
+    vlc_tls_Delete(host->p_tls);
+    net_ListenClose(host->fds);
+    host->nfd = 0;
     vlc_mutex_unlock(&host->lock);
     if (!delete) {
         /* still used */
@@ -1104,8 +1107,6 @@ void httpd_HostDelete(httpd_host_t *host)
         /* TODO */
     }
 
-    vlc_tls_Delete(host->p_tls);
-    net_ListenClose(host->fds);
     vlc_cond_destroy(&host->wait);
     vlc_mutex_destroy(&host->lock);
     vlc_object_release(host);
