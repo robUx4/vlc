@@ -870,7 +870,7 @@ void intf_sys_t::disconnectChromecast()
  */
 int intf_sys_t::sendMessage(castchannel::CastMessage &msg)
 {
-    uint32_t i_size = msg.ByteSize();
+    int i_size = msg.ByteSize();
     uint8_t *p_data = new(std::nothrow) uint8_t[PACKET_HEADER_LEN + i_size];
     if (p_data == NULL)
         return VLC_ENOMEM;
