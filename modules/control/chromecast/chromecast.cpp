@@ -279,8 +279,8 @@ struct intf_sys_t
         {
             msg_Dbg(p_intf, "change Chromecast connection status from %d to %d", conn_status, status);
             conn_status = status;
+            vlc_cond_broadcast(&loadCommandCond);
         }
-        vlc_cond_broadcast(&loadCommandCond);
     }
 
 private:
