@@ -163,7 +163,7 @@ struct intf_sys_t
         ,i_requestId(0)
         ,i_sout_id(0)
     {
-        p_interrupt = vlc_interrupt_create();
+        //p_interrupt = vlc_interrupt_create();
     }
 
     ~intf_sys_t()
@@ -173,7 +173,7 @@ struct intf_sys_t
 #ifdef HAVE_MICRODNS
         mdns_cleanup(microdns_ctx);
 #endif
-        vlc_interrupt_destroy(p_interrupt);
+        //vlc_interrupt_destroy(p_interrupt);
     }
 
     mtime_t getPlaybackTime() const {
@@ -254,7 +254,7 @@ struct intf_sys_t
     /* seek time with Chromecast relative timestamp */
     mtime_t                i_seektime;
 
-    vlc_interrupt_t *p_interrupt;
+    //vlc_interrupt_t *p_interrupt;
     vlc_mutex_t  lock;
     vlc_cond_t   loadCommandCond;
     vlc_cond_t   seekCommandCond;
@@ -1543,7 +1543,7 @@ static void* chromecastThread(void* p_this)
     intf_thread_t *p_intf = reinterpret_cast<intf_thread_t*>(p_this);
     intf_sys_t *p_sys = p_intf->p_sys;
 
-    vlc_interrupt_set(p_sys->p_interrupt);
+    //vlc_interrupt_set(p_sys->p_interrupt);
 
 #ifdef HAVE_MICRODNS
     if (p_sys->microdns_ctx != NULL)
