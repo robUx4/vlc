@@ -1027,6 +1027,7 @@ static httpd_host_t *httpd_HostCreate(vlc_object_t *p_this,
         goto error;
     }
     for (host->nfd = 0; host->fds[host->nfd] != -1; host->nfd++);
+    msg_Dbg(host, "listening on %d interfaces", host->nfd);
 
     host->port     = port;
     host->i_url    = 0;
