@@ -1030,7 +1030,7 @@ static int processMessage(intf_thread_t *p_intf, const castchannel::CastMessage 
         }
         else
         {
-            msg_Err(p_intf, "Heartbeat command not supported: %s", type.c_str());
+            msg_Warn(p_intf, "Heartbeat command not supported: %s", type.c_str());
             i_ret = -1;
         }
 
@@ -1202,11 +1202,14 @@ static int processMessage(intf_thread_t *p_intf, const castchannel::CastMessage 
             msg_Err(p_intf, "Media load failed");
             vlc_mutex_locker locker(&p_sys->lock);
             p_sys->msgReceiverClose();
-            vlc_cond_signal(&p_sys->loadCommandCond);
+        }
+        else if (type == "INVALID_REQUEST")
+        {
+            msg_Dbg(p_intf, "We sent an invalid request reason:%s", (*p_data)["reason"].operator const char *());
         }
         else
         {
-            msg_Err(p_intf, "Media command not supported: %s",
+            msg_Warn(p_intf, "Media command not supported: %s",
                     msg.payload_utf8().c_str());
             i_ret = -1;
         }
