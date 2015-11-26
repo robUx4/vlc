@@ -133,29 +133,19 @@ int poll(struct pollfd *fds, unsigned nfds, int timeout)
     DWORD ret = WSA_WAIT_FAILED;
     for (unsigned i = 0; i < nfds; i++)
     {
-        SOCKET fd = fds[i].fd;
         long mask = FD_CLOSE;
-        fd_set fds_read, fds_write, fds_err;
-
-        FD_ZERO(&fds_read);
-        FD_ZERO(&fds_write);
-        FD_ZERO(&fds_err);
-        FD_SET(fd, &fds_err);
 
         if (fds[i].events & (POLLRDNORM|POLLIN))
-        {
             mask |= FD_READ | FD_ACCEPT | FD_OOB;
-            FD_SET(fd, &fds_read);
-        }
+
         if (fds[i].events & (POLLWRNORM|POLLOUT))
-        {
             mask |= FD_WRITE | FD_CONNECT;
-            FD_SET(fd, &fds_write);
-        }
+
         if (fds[i].events & (POLLRDBAND|POLLPRI))
             mask |= FD_OOB;
 
-        fds[i].revents = 0;
+        /* discard the events we're looking for, keep the other ones */
+        fds[i].revents ^= fds[i].events;
 
         evts[i] = WSACreateEvent();
         if (evts[i] == WSA_INVALID_EVENT)
@@ -167,82 +157,17 @@ int poll(struct pollfd *fds, unsigned nfds, int timeout)
             return -1;
         }
 
-        struct timeval tv = { 0, 0 };
-        /* By its horrible design, WSAEnumNetworkEvents() only enumerates
-         * events that were not already signaled (i.e. it is edge-triggered).
-         * WSAPoll() would be better in this respect, but worse in others.
-         * So use WSAEnumNetworkEvents() after manually checking for pending
-         * events. */
-        if (select(0,
-                   fds_read.fd_count ? &fds_read : NULL,
-                   fds_write.fd_count ? &fds_write : NULL,
-                   fds_err.fd_count ? &fds_err : NULL,
-                   &tv) > 0)
-        {
-#if 1 && !defined(NDEBUG)
-            wchar_t dbg[256];
-            wsprintf(dbg,L"poll() some events detected\n", i);
-            OutputDebugString(dbg);
-#endif
-            if (FD_ISSET(fd, &fds_read))
-                fds[i].revents |= fds[i].events & (POLLRDNORM|POLLIN);
-            if (FD_ISSET(fd, &fds_write))
-                fds[i].revents |= fds[i].events & (POLLWRNORM|POLLOUT);
-            if (FD_ISSET(fd, &fds_err))
-                /* To add pain to injury, POLLERR and POLLPRI cannot be
-                 * distinguished here. */
-                fds[i].revents |= POLLERR | (fds[i].events & (POLLRDBAND|POLLPRI));
-        }
-
-        if (i == 2)
-        {
-#if 1 && !defined(NDEBUG)
-            wchar_t dbg[256];
-            wsprintf(dbg,L"poll() mask %08x from events:%08x\n", mask, fds[i].events);
-            OutputDebugString(dbg);
-#endif
-        }
-        int i_wselect = WSAEventSelect(fds[i].fd, evts[i], mask);
-        if (i_wselect != 0)
-        {
-            int i_last_error = WSAGetLastError();
-#if 1 && !defined(NDEBUG)
-            wchar_t dbg[256];
-            wsprintf(dbg,L"poll() mask failed err:%d WSAGetLastError:%d forcing POLLNVAL\n", i_wselect, i_last_error, mask);
-            OutputDebugString(dbg);
-#endif
-            if (i_wselect == SOCKET_ERROR && i_last_error == WSAENOTSOCK)
-                fds[i].revents |= POLLNVAL;
-        }
+        if (!WSAEventSelect(fds[i].fd, evts[i], mask) && WSAGetLastError() == WSAENOTSOCK)
+            fds[i].revents |= POLLNVAL;
 
         if (fds[i].revents != 0 && ret == WSA_WAIT_FAILED)
         {
-#if 1 && !defined(NDEBUG)
-            wchar_t dbg[256];
-            wsprintf(dbg,L"poll() event %08x detected on socket %i\n", fds[i].revents, i);
-            OutputDebugString(dbg);
-#endif
             ret = WSA_WAIT_EVENT_0 + i;
         }
     }
 
     if (ret == WSA_WAIT_FAILED)
-    {
-        wchar_t dbg[256];
-#if 1 && !defined(NDEBUG)
-        if (to == INFINITE) {
-        wsprintf(dbg,L"wait needed in poll() timeout:%d", to);
-        OutputDebugString(dbg);
-        }
-#endif
         ret = WSAWaitForMultipleEvents(nfds, evts, FALSE, to, TRUE);
-#if 1 && !defined(NDEBUG)
-        if (to == INFINITE) {
-        wsprintf(dbg,L" - finished ret:%d\n", ret);
-        OutputDebugString(dbg);
-        }
-#endif
-    }
 
     unsigned count = 0;
     for (unsigned i = 0; i < nfds; i++)
