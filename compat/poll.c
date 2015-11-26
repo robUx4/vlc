@@ -109,160 +109,197 @@ int (poll) (struct pollfd *fds, unsigned nfds, int timeout)
 # include <windows.h>
 # include <winsock2.h>
 
-static int wait_ms(int timeout_ms);
-static long tvdiff(struct timeval newer, struct timeval older);
-static struct timeval tvnow(void);
-
 int poll(struct pollfd *fds, unsigned nfds, int timeout)
 {
-    struct timeval pending_tv;
-    struct timeval *ptimeout;
-    fd_set fds_read;
-    fd_set fds_write;
-    fd_set fds_err;
-    SOCKET maxfd;
+    DWORD to = (timeout >= 0) ? (DWORD)timeout : INFINITE;
 
-    struct timeval initial_tv = {0, 0};
-    BOOL fds_none = TRUE;
-    unsigned int i;
-    int pending_ms = 0;
-    int error;
-    int r;
-
-    if (fds) {
-        for (i = 0; i < nfds; i++) {
-            if (fds[i].fd != INVALID_SOCKET) {
-                fds_none = FALSE;
-                break;
-            }
+    if (nfds == 0)
+    {    /* WSAWaitForMultipleEvents() does not allow zero events */
+        if (SleepEx(to, TRUE))
+        {
+            errno = EINTR;
+            return -1;
         }
-    }
-    if (fds_none) {
-        return wait_ms(timeout);
+        return 0;
     }
 
-    if (timeout > 0) {
-        pending_ms = timeout;
-        initial_tv = tvnow();
+    WSAEVENT *evts = malloc(nfds * sizeof (WSAEVENT));
+    if (evts == NULL)
+    {
+        errno = ENOMEM;
+        return -1; /* ENOMEM */
     }
 
-    FD_ZERO(&fds_read);
-    FD_ZERO(&fds_write);
-    FD_ZERO(&fds_err);
-    maxfd = INVALID_SOCKET;
+    DWORD ret = WSA_WAIT_FAILED;
+    for (unsigned i = 0; i < nfds; i++)
+    {
+        SOCKET fd = fds[i].fd;
+        long mask = FD_CLOSE;
+        fd_set fds_read, fds_write, fds_err;
 
-    for (i = 0; i < nfds; i++) {
+        FD_ZERO(&fds_read);
+        FD_ZERO(&fds_write);
+        FD_ZERO(&fds_err);
+        FD_SET(fd, &fds_err);
+
+        if (fds[i].events & (POLLRDNORM|POLLIN))
+        {
+            mask |= FD_READ | FD_ACCEPT | FD_OOB;
+            FD_SET(fd, &fds_read);
+        }
+        if (fds[i].events & (POLLWRNORM|POLLOUT))
+        {
+            mask |= FD_WRITE | FD_CONNECT;
+            FD_SET(fd, &fds_write);
+        }
+        if (fds[i].events & (POLLRDBAND|POLLPRI))
+            mask |= FD_OOB;
+
         fds[i].revents = 0;
-        if (fds[i].fd == INVALID_SOCKET)
-            continue;
-        if (fds[i].events & (POLLIN|POLLOUT|POLLPRI|POLLRDNORM|POLLWRNORM|POLLRDBAND)) {
-            if (fds[i].fd > maxfd)
-                maxfd = fds[i].fd;
-            if (fds[i].events & (POLLRDNORM|POLLIN))
-                FD_SET(fds[i].fd, &fds_read);
-            if (fds[i].events & (POLLWRNORM|POLLOUT))
-                FD_SET(fds[i].fd, &fds_write);
-            if (fds[i].events & (POLLRDBAND|POLLPRI))
-                FD_SET(fds[i].fd, &fds_err);
-        }
-    }
 
-    /* WinSock select() can't handle zero events. */
-    if (!fds_read.fd_count && !fds_write.fd_count && !fds_err.fd_count) {
-        return wait_ms(timeout);
-    }
-
-    ptimeout = (timeout < 0) ? NULL : &pending_tv;
-
-    do {
-        if (timeout > 0) {
-            pending_tv.tv_sec = pending_ms / 1000;
-            pending_tv.tv_usec = (pending_ms % 1000) * 1000;
+        evts[i] = WSACreateEvent();
+        if (evts[i] == WSA_INVALID_EVENT)
+        {
+            while (i > 0)
+                WSACloseEvent(evts[--i]);
+            free(evts);
+            errno = ENOMEM;
+            return -1;
         }
-        else if (!timeout) {
-            pending_tv.tv_sec = 0;
-            pending_tv.tv_usec = 0;
-        }
-        r = select(maxfd + 1,
-                   /* WinSock select() can't handle fd_sets with zero bits set, so
-                      don't give it such arguments.
-                   */
+
+        struct timeval tv = { 0, 0 };
+        /* By its horrible design, WSAEnumNetworkEvents() only enumerates
+         * events that were not already signaled (i.e. it is edge-triggered).
+         * WSAPoll() would be better in this respect, but worse in others.
+         * So use WSAEnumNetworkEvents() after manually checking for pending
+         * events. */
+        if (select(0,
                    fds_read.fd_count ? &fds_read : NULL,
                    fds_write.fd_count ? &fds_write : NULL,
                    fds_err.fd_count ? &fds_err : NULL,
-                   ptimeout);
-        if (r != -1)
-            break;
-        error = WSAGetLastError();
-        if (error && error != EINTR)
-            break;
-        if (timeout > 0) {
-            pending_ms = timeout - (int)tvdiff(tvnow(), initial_tv);
-            if (pending_ms <= 0) {
-                r = 0;  /* Simulate a "call timed out" case */
-                break;
-            }
-        }
-    } while (r == -1);
-
-    if (r < 0)
-        return -1;
-    if (r == 0)
-        return 0;
-
-    r = 0;
-    for (i = 0; i < nfds; i++) {
-        fds[i].revents = 0;
-        if (fds[i].fd == INVALID_SOCKET)
-            continue;
-        if (FD_ISSET(fds[i].fd, &fds_read))
-            fds[i].revents |= POLLIN;
-        if (FD_ISSET(fds[i].fd, &fds_write))
-            fds[i].revents |= POLLOUT;
-        if (FD_ISSET(fds[i].fd, &fds_err))
-            fds[i].revents |= POLLPRI;
-        if (fds[i].revents != 0)
-            r++;
-    }
-
-    return r;
-}
-
-static int wait_ms(int timeout)
-{
-    int r = 0;
-    if (timeout < 0)
-    {
-        WSASetLastError( EINVAL );
-        r = -1;
-    }
-    else if (timeout > 0 && SleepEx( timeout, TRUE ))
-    {
-        WSASetLastError( EINTR );
-        r = -1;
-    }
-    return r;
-}
-
-static long tvdiff(struct timeval newer, struct timeval older)
-{
-    return (newer.tv_sec-older.tv_sec)*1000 + (long)(newer.tv_usec-older.tv_usec)/1000;
-}
-
-static struct timeval tvnow(void)
-{
-    struct timeval now;
-#if !defined(_WIN32_WINNT) || !defined(_WIN32_WINNT_VISTA) || \
-    (_WIN32_WINNT < _WIN32_WINNT_VISTA)
-    DWORD milliseconds = GetTickCount();
-    now.tv_sec = milliseconds / 1000;
-    now.tv_usec = (milliseconds % 1000) * 1000;
-#else
-    ULONGLONG milliseconds = GetTickCount64();
-    now.tv_sec = (long) (milliseconds / 1000);
-    now.tv_usec = (long) (milliseconds % 1000) * 1000;
+                   &tv) > 0)
+        {
+#if 1 && !defined(NDEBUG)
+            wchar_t dbg[256];
+            wsprintf(dbg,L"poll() some events detected\n", i);
+            OutputDebugString(dbg);
 #endif
+            if (FD_ISSET(fd, &fds_read))
+                fds[i].revents |= fds[i].events & (POLLRDNORM|POLLIN);
+            if (FD_ISSET(fd, &fds_write))
+                fds[i].revents |= fds[i].events & (POLLWRNORM|POLLOUT);
+            if (FD_ISSET(fd, &fds_err))
+                /* To add pain to injury, POLLERR and POLLPRI cannot be
+                 * distinguished here. */
+                fds[i].revents |= POLLERR | (fds[i].events & (POLLRDBAND|POLLPRI));
+        }
 
-    return now;
+        if (i == 2)
+        {
+#if 1 && !defined(NDEBUG)
+            wchar_t dbg[256];
+            wsprintf(dbg,L"poll() mask %08x from events:%08x\n", mask, fds[i].events);
+            OutputDebugString(dbg);
+#endif
+        }
+        int i_wselect = WSAEventSelect(fds[i].fd, evts[i], mask);
+        if (i_wselect != 0)
+        {
+            int i_last_error = WSAGetLastError();
+#if 1 && !defined(NDEBUG)
+            wchar_t dbg[256];
+            wsprintf(dbg,L"poll() mask failed err:%d WSAGetLastError:%d forcing POLLNVAL\n", i_wselect, i_last_error, mask);
+            OutputDebugString(dbg);
+#endif
+            if (i_wselect == SOCKET_ERROR && i_last_error == WSAENOTSOCK)
+                fds[i].revents |= POLLNVAL;
+        }
+
+        if (fds[i].revents != 0 && ret == WSA_WAIT_FAILED)
+        {
+#if 1 && !defined(NDEBUG)
+            wchar_t dbg[256];
+            wsprintf(dbg,L"poll() event %08x detected on socket %i\n", fds[i].revents, i);
+            OutputDebugString(dbg);
+#endif
+            ret = WSA_WAIT_EVENT_0 + i;
+        }
+    }
+
+    if (ret == WSA_WAIT_FAILED)
+    {
+        wchar_t dbg[256];
+#if 1 && !defined(NDEBUG)
+        if (to == INFINITE) {
+        wsprintf(dbg,L"wait needed in poll() timeout:%d", to);
+        OutputDebugString(dbg);
+        }
+#endif
+        ret = WSAWaitForMultipleEvents(nfds, evts, FALSE, to, TRUE);
+#if 1 && !defined(NDEBUG)
+        if (to == INFINITE) {
+        wsprintf(dbg,L" - finished ret:%d\n", ret);
+        OutputDebugString(dbg);
+        }
+#endif
+    }
+
+    unsigned count = 0;
+    for (unsigned i = 0; i < nfds; i++)
+    {
+        WSANETWORKEVENTS ne;
+
+        if (WSAEnumNetworkEvents(fds[i].fd, evts[i], &ne))
+            memset(&ne, 0, sizeof (ne));
+        WSAEventSelect(fds[i].fd, evts[i], 0);
+        WSACloseEvent(evts[i]);
+
+        if (ne.lNetworkEvents & FD_CONNECT)
+        {
+            fds[i].revents |= POLLWRNORM;
+            if (ne.iErrorCode[FD_CONNECT_BIT] != 0)
+                fds[i].revents |= POLLERR;
+        }
+        if (ne.lNetworkEvents & FD_CLOSE)
+        {
+            fds[i].revents |= (fds[i].events & POLLRDNORM) | POLLHUP;
+            if (ne.iErrorCode[FD_CLOSE_BIT] != 0)
+                fds[i].revents |= POLLERR;
+        }
+        if (ne.lNetworkEvents & FD_ACCEPT)
+        {
+            fds[i].revents |= POLLRDNORM;
+            if (ne.iErrorCode[FD_ACCEPT_BIT] != 0)
+                fds[i].revents |= POLLERR;
+        }
+        if (ne.lNetworkEvents & FD_OOB)
+        {
+            fds[i].revents |= POLLPRI;
+            if (ne.iErrorCode[FD_OOB_BIT] != 0)
+                fds[i].revents |= POLLERR;
+        }
+        if (ne.lNetworkEvents & FD_READ)
+        {
+            fds[i].revents |= POLLRDNORM;
+            if (ne.iErrorCode[FD_READ_BIT] != 0)
+                fds[i].revents |= POLLERR;
+        }
+        if (ne.lNetworkEvents & FD_WRITE)
+        {
+            fds[i].revents |= POLLWRNORM;
+            if (ne.iErrorCode[FD_WRITE_BIT] != 0)
+                fds[i].revents |= POLLERR;
+        }
+        count += fds[i].revents != 0;
+    }
+
+    free(evts);
+
+    if (count == 0 && ret == WSA_WAIT_IO_COMPLETION)
+    {
+        errno = EINTR;
+        return -1;
+    }
+    return count;
 }
 #endif
