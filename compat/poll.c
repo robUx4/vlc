@@ -157,13 +157,12 @@ int poll(struct pollfd *fds, unsigned nfds, int timeout)
             return -1;
         }
 
-        if (!WSAEventSelect(fds[i].fd, evts[i], mask) && WSAGetLastError() == WSAENOTSOCK)
+        if (WSAEventSelect(fds[i].fd, evts[i], mask)
+         && WSAGetLastError() == WSAENOTSOCK)
             fds[i].revents |= POLLNVAL;
 
         if (fds[i].revents != 0 && ret == WSA_WAIT_FAILED)
-        {
             ret = WSA_WAIT_EVENT_0 + i;
-        }
     }
 
     if (ret == WSA_WAIT_FAILED)
