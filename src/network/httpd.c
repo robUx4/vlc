@@ -2032,7 +2032,7 @@ static void httpdLoop(httpd_host_t *host)
 
         assert (fd == host->fds[nfd]);
 
-        if (ufd[nfd].revents == 0)
+        if (ufd[nfd].revents == 0 || ufd[nfd].revents & (POLLERR|POLLHUP) != 0)
             continue;
 
         /* */
