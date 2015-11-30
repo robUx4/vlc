@@ -2038,7 +2038,10 @@ static void httpdLoop(httpd_host_t *host)
         /* */
         fd = vlc_accept (fd, NULL, NULL, true);
         if (fd == -1)
+        {
+            msg_Warn(host, "accept failed: %s", vlc_strerror_c(net_errno));
             continue;
+        }
         setsockopt (fd, SOL_SOCKET, SO_REUSEADDR,
                 &(int){ 1 }, sizeof(int));
 
