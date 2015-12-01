@@ -177,16 +177,17 @@ int poll(struct pollfd *fds, unsigned nfds, int timeout)
         if (select(0, &rdset, &wrset, &exset, &tv) > 0)
         {
             if (FD_ISSET(fd, &rdset))
-                fds[i].revents |= fds[i].events & POLLRDNORM;
+                fds[i].revents |= POLLRDNORM;
             if (FD_ISSET(fd, &wrset))
-                fds[i].revents |= fds[i].events & POLLWRNORM;
+                fds[i].revents |= POLLWRNORM;
             if (FD_ISSET(fd, &exset))
                 /* To add pain to injury, POLLERR and POLLPRI cannot be
                  * distinguished here. */
-                fds[i].revents |= POLLERR | (fds[i].events & POLLPRI);
+                fds[i].revents |= POLLPRI | POLLERR;
         }
 
-        if (fds[i].revents != 0 && ret == WSA_WAIT_FAILED)
+        /* only report the events requested, plus the special ones */
+        if (fds[i].revents & (fds[i].events | POLLERR | POLLNVAL) && ret == WSA_WAIT_FAILED)
             ret = WSA_WAIT_EVENT_0 + i;
     }
 
@@ -210,7 +211,7 @@ int poll(struct pollfd *fds, unsigned nfds, int timeout)
             }
             if (ne.lNetworkEvents & FD_CLOSE)
             {
-                fds[i].revents |= (fds[i].events & POLLRDNORM) | POLLHUP;
+                fds[i].revents |= POLLRDNORM | POLLHUP;
                 if (ne.iErrorCode[FD_CLOSE_BIT] != 0)
                     fds[i].revents |= POLLERR;
             }
@@ -247,6 +248,9 @@ int poll(struct pollfd *fds, unsigned nfds, int timeout)
         /* unhook the event before we close it, otherwise the socket may fail */
         WSAEventSelect(fds[i].fd, evts[i], 0);
         WSACloseEvent(evts[i]);
+
+        /* only report the events requested, plus the special ones */
+        fds[i].revents &= fds[i].events | POLLERR | POLLHUP | POLLNVAL;
 
         count += fds[i].revents != 0;
     }
