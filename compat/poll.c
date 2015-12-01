@@ -192,7 +192,7 @@ int poll(struct pollfd *fds, unsigned nfds, int timeout)
     }
 
     unsigned count = 0;
-    if (ret == WSA_WAIT_FAILED)
+    if (ret == WSA_WAIT_FAILED && to > 0)
     {
         ret = WSAWaitForMultipleEvents(nfds, evts, FALSE, to, TRUE);
 
