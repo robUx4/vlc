@@ -1491,6 +1491,7 @@ static bool ControlIsSeekRequest( int i_type )
     case INPUT_CONTROL_NAV_DOWN:
     case INPUT_CONTROL_NAV_LEFT:
     case INPUT_CONTROL_NAV_RIGHT:
+    case INPUT_CONTROL_NAV_POPUP:
         return true;
     default:
         return false;
@@ -1967,6 +1968,7 @@ static bool Control( input_thread_t *p_input,
         case INPUT_CONTROL_NAV_DOWN:
         case INPUT_CONTROL_NAV_LEFT:
         case INPUT_CONTROL_NAV_RIGHT:
+        case INPUT_CONTROL_NAV_POPUP:
             demux_Control( p_input->p->master->p_demux, i_type
                            - INPUT_CONTROL_NAV_ACTIVATE + DEMUX_NAV_ACTIVATE );
             break;

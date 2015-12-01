@@ -272,7 +272,7 @@ static size_t httpd_HtmlError (char **body, int code, const char *url)
     const char *errname = httpd_ReasonFromCode (code);
     assert (errname);
 
-    char *url_Encoded = convert_xml_special_chars (url ? url : "");
+    char *url_Encoded = vlc_xml_encode (url ? url : "");
 
     int res = asprintf (body,
         "<?xml version=\"1.0\" encoding=\"ascii\" ?>\n"
@@ -2195,13 +2195,16 @@ static void httpdLoop(httpd_host_t *host)
 
         assert (fd == host->fds[nfd]);
 
-        if (ufd[nfd].revents == 0)
+        if (ufd[nfd].revents == 0 || ufd[nfd].revents & (POLLERR|POLLHUP) != 0)
             continue;
 
         /* */
         fd = vlc_accept (fd, NULL, NULL, true);
         if (fd == -1)
+        {
+            msg_Warn(host, "accept failed: %s", vlc_strerror_c(net_errno));
             continue;
+        }
         setsockopt (fd, SOL_SOCKET, SO_REUSEADDR,
                 &(int){ 1 }, sizeof(int));
 

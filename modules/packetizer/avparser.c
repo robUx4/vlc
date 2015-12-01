@@ -207,6 +207,7 @@ out:
  *****************************************************************************/
 static block_t *PacketizeClosed ( decoder_t *p_dec, block_t **pp_block )
 {
+    (void) p_dec;
     if( pp_block != NULL && *pp_block != NULL )
         block_Release( *pp_block );
     return NULL;
