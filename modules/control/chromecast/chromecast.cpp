@@ -1203,7 +1203,7 @@ void intf_sys_t::processMessage(const castchannel::CastMessage &msg)
                 receiverState = RECEIVER_BUFFERING;
             else if (newPlayerState == "PAUSED")
                 receiverState = RECEIVER_PAUSED;
-            else
+            else if (!newPlayerState.empty())
                 msg_Warn(p_intf, "Unknown Chromecast state %s", newPlayerState.c_str());
 
             std::string mediaSessionId = std::to_string((json_int_t) status[0]["mediaSessionId"]);
