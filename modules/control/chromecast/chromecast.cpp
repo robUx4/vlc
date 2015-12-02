@@ -1219,7 +1219,7 @@ void intf_sys_t::processMessage(const castchannel::CastMessage &msg)
                 switch( receiverState )
                 {
                 case RECEIVER_BUFFERING:
-                    playback_start_chromecast = mtime_t( double( status[0]["currentTime"] ) * 1000000.0 );
+                    playback_start_chromecast = (1 + mtime_t( double( status[0]["currentTime"] ) ) ) * 1000000L;
                     msg_Dbg(p_intf, "Playback pending with an offset of %" PRId64, playback_start_chromecast);
                     break;
 
@@ -1227,7 +1227,7 @@ void intf_sys_t::processMessage(const castchannel::CastMessage &msg)
                     /* TODO reset demux PCR ? */
                     if (unlikely(playback_start_chromecast == -1.0)) {
                         msg_Warn(p_intf, "start playing without buffering");
-                        playback_start_chromecast = mtime_t( double( status[0]["currentTime"] ) * 1000000.0 );
+                        playback_start_chromecast = (1 + mtime_t( double( status[0]["currentTime"] ) ) ) * 1000000L;
                     }
                     currentStopped = false;
                     setPlayerStatus(CMD_PLAYBACK_SENT);
