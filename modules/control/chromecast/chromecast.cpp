@@ -717,13 +717,14 @@ void intf_sys_t::sendPlayerCmd()
         break;
     case END_S:
 #if 0
-        if (!mediaSessionId.empty()) {
+        /* the MediaPlayer app doesn't like to be stopped, it won't restart after that */
+        if (!mediaSessionId.empty() /* && receiverState == RECEIVER_BUFFERING */) {
             msgPlayerStop();
 
             /* TODO reset the sout as we'll need another one for the next load */
             //var_SetString( p_input, "sout", NULL );
-            mediaSessionId = ""; // it doesn't seem to send a status update like it should
-            setPlayerStatus(NO_CMD_PENDING); /* TODO: may not be needed */
+            //mediaSessionId = ""; // it doesn't seem to send a status update like it should
+            //setPlayerStatus(NO_CMD_PENDING); /* TODO: may not be needed */
         }
 #endif
         break;
