@@ -157,6 +157,7 @@ struct intf_sys_t
         ,playback_start_local(0)
         ,canPause(false)
         ,canDisplay(DISPLAY_UNKNOWN)
+        ,currentStopped(true)
         ,i_sock_fd(-1)
         ,p_creds(NULL)
         ,p_tls(NULL)
@@ -249,6 +250,7 @@ struct intf_sys_t
     mtime_t     playback_start_local;
     bool        canPause;
     receiver_display  canDisplay;
+    bool              currentStopped;
 
     int i_sock_fd;
     vlc_tls_creds_t *p_creds;
@@ -681,17 +683,22 @@ void intf_sys_t::sendPlayerCmd()
     {
     case OPENING_S:
         if (!mediaSessionId.empty()) {
-            msg_Dbg(p_intf, "opening when a session was still opened:%s", mediaSessionId.c_str());
+            msg_Warn(p_intf, "opening when a session was still opened:%s", mediaSessionId.c_str());
+#if 0
             msgPlayerStop();
-            mediaSessionId = "";
+#endif
+            //mediaSessionId = "";
         }
+        else
         //playback_start_chromecast = -1.0;
-        playback_start_local = 0;
-        msgPlayerLoad();
-        setPlayerStatus(CMD_LOAD_SENT);
+        if (cmd_status == NO_CMD_PENDING) {
+            playback_start_local = 0;
+            msgPlayerLoad();
+            setPlayerStatus(CMD_LOAD_SENT);
+        }
         break;
     case PLAYING_S:
-        if (!mediaSessionId.empty()) {
+        if (!mediaSessionId.empty() && receiverState != RECEIVER_IDLE && currentStopped) {
             msgPlayerPlay();
             setPlayerStatus(CMD_PLAYBACK_SENT);
         } else if (cmd_status == NO_CMD_PENDING) {
@@ -700,7 +707,7 @@ void intf_sys_t::sendPlayerCmd()
         }
         break;
     case PAUSE_S:
-        if (!mediaSessionId.empty()) {
+        if (!mediaSessionId.empty() && receiverState != RECEIVER_IDLE && currentStopped) {
             msgPlayerPause();
             setPlayerStatus(CMD_PLAYBACK_SENT);
         } else if (cmd_status == NO_CMD_PENDING) {
@@ -709,6 +716,7 @@ void intf_sys_t::sendPlayerCmd()
         }
         break;
     case END_S:
+#if 0
         if (!mediaSessionId.empty()) {
             msgPlayerStop();
 
@@ -717,6 +725,7 @@ void intf_sys_t::sendPlayerCmd()
             mediaSessionId = ""; // it doesn't seem to send a status update like it should
             setPlayerStatus(NO_CMD_PENDING); /* TODO: may not be needed */
         }
+#endif
         break;
     default:
         //msgClose();
@@ -1183,8 +1192,10 @@ void intf_sys_t::processMessage(const castchannel::CastMessage &msg)
             receiver_state oldPlayerState = receiverState;
             std::string newPlayerState = status[0]["playerState"].operator const char *();
 
-            if (newPlayerState == "IDLE")
+            if (newPlayerState == "IDLE") {
                 receiverState = RECEIVER_IDLE;
+                mediaSessionId = ""; // this session is not valid anymore
+            }
             else if (newPlayerState == "PLAYING")
                 receiverState = RECEIVER_PLAYING;
             else if (newPlayerState == "BUFFERING")
@@ -1204,6 +1215,7 @@ void intf_sys_t::processMessage(const castchannel::CastMessage &msg)
 
             if (receiverState != oldPlayerState)
             {
+                msg_Dbg(p_intf, "change Chromecast player state from %d to %d", oldPlayerState, receiverState);
                 switch( receiverState )
                 {
                 case RECEIVER_BUFFERING:
@@ -1217,6 +1229,7 @@ void intf_sys_t::processMessage(const castchannel::CastMessage &msg)
                         msg_Warn(p_intf, "start playing without buffering");
                         playback_start_chromecast = mtime_t( double( status[0]["currentTime"] ) * 1000000.0 );
                     }
+                    currentStopped = false;
                     setPlayerStatus(CMD_PLAYBACK_SENT);
                     date_play_start = mdate();
                     msg_Dbg(p_intf, "Playback started with an offset of %" PRId64, playback_start_chromecast);
@@ -1226,8 +1239,11 @@ void intf_sys_t::processMessage(const castchannel::CastMessage &msg)
                     playback_start_local += mdate() - date_play_start;
                     break;
 
+                case RECEIVER_IDLE:
+                    currentStopped = true;
                 default:
                     setPlayerStatus(NO_CMD_PENDING);
+                    sendPlayerCmd();
                     date_play_start = -1;
                     break;
                 }
@@ -1739,8 +1755,9 @@ struct demux_sys_t
         if (!demuxReady)
         {
             mutex_cleanup_push(&p_intf->p_sys->lock);
-            while (p_intf->p_sys->getConnectionStatus() != CHROMECAST_APP_STARTED &&
-                   p_intf->p_sys->getConnectionStatus() != CHROMECAST_DEAD)
+            while ((p_intf->p_sys->getConnectionStatus() != CHROMECAST_APP_STARTED &&
+                   p_intf->p_sys->getConnectionStatus() != CHROMECAST_DEAD) ||
+                   !p_intf->p_sys->currentStopped)
                 vlc_cond_wait(&p_intf->p_sys->loadCommandCond, &p_intf->p_sys->lock);
             vlc_cleanup_pop();
 
