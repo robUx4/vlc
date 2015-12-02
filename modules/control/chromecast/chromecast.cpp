@@ -92,18 +92,18 @@ enum connection_status {
     CHROMECAST_DEAD,
 };
 
-enum player_status {
-    PLAYER_IDLE,
-    PLAYER_LOAD_SENT,
-    PLAYER_PLAYBACK_SENT,
-    PLAYER_SEEK_SENT,
+enum command_status {
+    NO_CMD_PENDING,
+    CMD_LOAD_SENT,
+    CMD_PLAYBACK_SENT,
+    CMD_SEEK_SENT,
 };
 
-enum player_state {
-    STATE_IDLE,
-    STATE_PLAYING,
-    STATE_BUFFERING,
-    STATE_PAUSED,
+enum receiver_state {
+    RECEIVER_IDLE,
+    RECEIVER_PLAYING,
+    RECEIVER_BUFFERING,
+    RECEIVER_PAUSED,
 };
 
 enum receiver_display {
@@ -151,7 +151,7 @@ struct intf_sys_t
 #ifdef HAVE_MICRODNS
         ,microdns_ctx(NULL)
 #endif
-        ,playerState(STATE_IDLE)
+        ,receiverState(RECEIVER_IDLE)
         ,date_play_start(-1)
         ,playback_start_chromecast(-1.0)
         ,playback_start_local(0)
@@ -160,7 +160,7 @@ struct intf_sys_t
         ,i_sock_fd(-1)
         ,p_creds(NULL)
         ,p_tls(NULL)
-        ,play_status(PLAYER_IDLE)
+        ,cmd_status(NO_CMD_PENDING)
         ,i_supportedMediaCommands(15)
         ,m_seektime(-1.0)
         ,i_seektime(-1.0)
@@ -183,18 +183,18 @@ struct intf_sys_t
     }
 
     mtime_t getPlaybackTime() const {
-        switch( playerState )
+        switch( receiverState )
         {
-        case STATE_PLAYING:
+        case RECEIVER_PLAYING:
             return ( mdate() - date_play_start ) + playback_start_local;
 
-        case STATE_IDLE:
+        case RECEIVER_IDLE:
             msg_Dbg(p_intf, "receiver idle using buffering time %" PRId64, playback_start_local);
             break;
-        case STATE_BUFFERING:
+        case RECEIVER_BUFFERING:
             msg_Dbg(p_intf, "receiver buffering using buffering time %" PRId64, playback_start_local);
             break;
-        case STATE_PAUSED:
+        case RECEIVER_PAUSED:
             msg_Dbg(p_intf, "receiver paused using buffering time %" PRId64, playback_start_local);
             break;
         }
@@ -220,7 +220,7 @@ struct intf_sys_t
 
     bool isFinishedPlaying() {
         vlc_mutex_locker locker(&lock);
-        return conn_status == CHROMECAST_DEAD || (playerState == STATE_BUFFERING && play_status != PLAYER_SEEK_SENT);
+        return conn_status == CHROMECAST_DEAD || (receiverState == RECEIVER_BUFFERING && cmd_status != CMD_SEEK_SENT);
     }
 
     bool seekTo(mtime_t pos);
@@ -242,7 +242,7 @@ struct intf_sys_t
 
     std::string appTransportId;
     std::string mediaSessionId;
-    player_state playerState;
+    receiver_state receiverState;
 
     mtime_t     date_play_start;
     mtime_t     playback_start_chromecast;
@@ -254,7 +254,7 @@ struct intf_sys_t
     vlc_tls_creds_t *p_creds;
     vlc_tls_t *p_tls;
 
-    enum player_status     play_status;
+    enum command_status    cmd_status;
     int                    i_supportedMediaCommands;
     /* internal seek time */
     mtime_t                m_seektime;
@@ -679,24 +679,24 @@ void intf_sys_t::sendPlayerCmd()
         //playback_start_chromecast = -1.0;
         playback_start_local = 0;
         msgPlayerLoad();
-        play_status = PLAYER_LOAD_SENT;
+        cmd_status = CMD_LOAD_SENT;
         break;
     case PLAYING_S:
         if (!mediaSessionId.empty()) {
             msgPlayerPlay();
-            play_status = PLAYER_PLAYBACK_SENT;
-        } else if (play_status == PLAYER_IDLE) {
+            cmd_status = CMD_PLAYBACK_SENT;
+        } else if (cmd_status == NO_CMD_PENDING) {
             msgPlayerLoad();
-            play_status = PLAYER_LOAD_SENT;
+            cmd_status = CMD_LOAD_SENT;
         }
         break;
     case PAUSE_S:
         if (!mediaSessionId.empty()) {
             msgPlayerPause();
-            play_status = PLAYER_PLAYBACK_SENT;
-        } else if (play_status == PLAYER_IDLE) {
+            cmd_status = CMD_PLAYBACK_SENT;
+        } else if (cmd_status == NO_CMD_PENDING) {
             msgPlayerLoad();
-            play_status = PLAYER_LOAD_SENT;
+            cmd_status = CMD_LOAD_SENT;
         }
         break;
     case END_S:
@@ -706,7 +706,7 @@ void intf_sys_t::sendPlayerCmd()
             /* TODO reset the sout as we'll need another one for the next load */
             //var_SetString( p_input, "sout", NULL );
             mediaSessionId = ""; // it doesn't seem to send a status update like it should
-            play_status = PLAYER_IDLE; /* TODO: may not be needed */
+            cmd_status = NO_CMD_PENDING; /* TODO: may not be needed */
         }
         break;
     default:
@@ -728,7 +728,7 @@ bool intf_sys_t::seekTo(mtime_t pos)
     m_seektime = pos; // + playback_start_chromecast - playback_start_local;
     playback_start_local = pos;
     msg_Dbg( p_intf, "%ld Seeking to %" PRId64 "/%s playback_time:%" PRId64, GetCurrentThreadId(), pos, currentTime.c_str(), playback_start_chromecast);
-    play_status = PLAYER_SEEK_SENT;
+    cmd_status = CMD_SEEK_SENT;
     msgPlayerSeek( currentTime );
 
     return true;
@@ -1171,17 +1171,17 @@ void intf_sys_t::processMessage(const castchannel::CastMessage &msg)
             vlc_mutex_locker locker(&lock);
             i_supportedMediaCommands = status[0]["supportedMediaCommands"].operator json_int_t();
 
-            player_state oldPlayerState = playerState;
+            receiver_state oldPlayerState = receiverState;
             std::string newPlayerState = status[0]["playerState"].operator const char *();
 
             if (newPlayerState == "IDLE")
-                playerState = STATE_IDLE;
+                receiverState = RECEIVER_IDLE;
             else if (newPlayerState == "PLAYING")
-                playerState = STATE_PLAYING;
+                receiverState = RECEIVER_PLAYING;
             else if (newPlayerState == "BUFFERING")
-                playerState = STATE_BUFFERING;
+                receiverState = RECEIVER_BUFFERING;
             else if (newPlayerState == "PAUSED")
-                playerState = STATE_PAUSED;
+                receiverState = RECEIVER_PAUSED;
             else
                 msg_Warn(p_intf, "Unknown Chromecast state %s", newPlayerState.c_str());
 
@@ -1193,44 +1193,44 @@ void intf_sys_t::processMessage(const castchannel::CastMessage &msg)
 
             this->mediaSessionId = mediaSessionId;
 
-            if (playerState != oldPlayerState)
+            if (receiverState != oldPlayerState)
             {
-                switch( playerState )
+                switch( receiverState )
                 {
-                case STATE_BUFFERING:
+                case RECEIVER_BUFFERING:
                     playback_start_chromecast = mtime_t( double( status[0]["currentTime"] ) * 1000000.0 );
                     msg_Dbg(p_intf, "Playback pending with an offset of %" PRId64, playback_start_chromecast);
                     break;
 
-                case STATE_PLAYING:
+                case RECEIVER_PLAYING:
                     /* TODO reset demux PCR ? */
                     if (unlikely(playback_start_chromecast == -1.0)) {
                         msg_Warn(p_intf, "start playing without buffering");
                         playback_start_chromecast = mtime_t( double( status[0]["currentTime"] ) * 1000000.0 );
                     }
-                    play_status = PLAYER_PLAYBACK_SENT;
+                    cmd_status = CMD_PLAYBACK_SENT;
                     date_play_start = mdate();
                     msg_Dbg(p_intf, "Playback started with an offset of %" PRId64, playback_start_chromecast);
                     break;
 
-                case STATE_PAUSED:
+                case RECEIVER_PAUSED:
                     playback_start_local += mdate() - date_play_start;
                     break;
 
                 default:
-                    play_status = PLAYER_IDLE;
+                    cmd_status = NO_CMD_PENDING;
                     date_play_start = -1;
                     break;
                 }
             }
 
-            if (playerState == STATE_BUFFERING && i_seektime != -1.0)
+            if (receiverState == RECEIVER_BUFFERING && i_seektime != -1.0)
             {
                 msg_Dbg(p_intf, "Chromecast seeking possibly done");
                 vlc_cond_signal( &seekCommandCond );
             }
 
-            if (play_status == PLAYER_LOAD_SENT)
+            if (cmd_status == CMD_LOAD_SENT)
                 sendPlayerCmd();
         }
         else if (type == "LOAD_FAILED")
