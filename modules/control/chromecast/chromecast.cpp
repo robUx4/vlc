@@ -303,6 +303,15 @@ private:
         pushMessage(NAMESPACE_MEDIA, payload.str(), appTransportId);
     }
 
+    void setPlayerStatus(enum command_status status) {
+        if (cmd_status != status)
+        {
+            msg_Dbg(p_intf, "change Chromecast command status from %d to %d", cmd_status, status);
+            cmd_status = status;
+            vlc_cond_broadcast(&loadCommandCond);
+        }
+    }
+
     enum connection_status conn_status;
 
     unsigned i_app_requestId;
@@ -679,24 +688,24 @@ void intf_sys_t::sendPlayerCmd()
         //playback_start_chromecast = -1.0;
         playback_start_local = 0;
         msgPlayerLoad();
-        cmd_status = CMD_LOAD_SENT;
+        setPlayerStatus(CMD_LOAD_SENT);
         break;
     case PLAYING_S:
         if (!mediaSessionId.empty()) {
             msgPlayerPlay();
-            cmd_status = CMD_PLAYBACK_SENT;
+            setPlayerStatus(CMD_PLAYBACK_SENT);
         } else if (cmd_status == NO_CMD_PENDING) {
             msgPlayerLoad();
-            cmd_status = CMD_LOAD_SENT;
+            setPlayerStatus(CMD_LOAD_SENT);
         }
         break;
     case PAUSE_S:
         if (!mediaSessionId.empty()) {
             msgPlayerPause();
-            cmd_status = CMD_PLAYBACK_SENT;
+            setPlayerStatus(CMD_PLAYBACK_SENT);
         } else if (cmd_status == NO_CMD_PENDING) {
             msgPlayerLoad();
-            cmd_status = CMD_LOAD_SENT;
+            setPlayerStatus(CMD_LOAD_SENT);
         }
         break;
     case END_S:
@@ -706,7 +715,7 @@ void intf_sys_t::sendPlayerCmd()
             /* TODO reset the sout as we'll need another one for the next load */
             //var_SetString( p_input, "sout", NULL );
             mediaSessionId = ""; // it doesn't seem to send a status update like it should
-            cmd_status = NO_CMD_PENDING; /* TODO: may not be needed */
+            setPlayerStatus(NO_CMD_PENDING); /* TODO: may not be needed */
         }
         break;
     default:
@@ -728,7 +737,7 @@ bool intf_sys_t::seekTo(mtime_t pos)
     m_seektime = pos; // + playback_start_chromecast - playback_start_local;
     playback_start_local = pos;
     msg_Dbg( p_intf, "%ld Seeking to %" PRId64 "/%s playback_time:%" PRId64, GetCurrentThreadId(), pos, currentTime.c_str(), playback_start_chromecast);
-    cmd_status = CMD_SEEK_SENT;
+    setPlayerStatus(CMD_SEEK_SENT);
     msgPlayerSeek( currentTime );
 
     return true;
@@ -1208,7 +1217,7 @@ void intf_sys_t::processMessage(const castchannel::CastMessage &msg)
                         msg_Warn(p_intf, "start playing without buffering");
                         playback_start_chromecast = mtime_t( double( status[0]["currentTime"] ) * 1000000.0 );
                     }
-                    cmd_status = CMD_PLAYBACK_SENT;
+                    setPlayerStatus(CMD_PLAYBACK_SENT);
                     date_play_start = mdate();
                     msg_Dbg(p_intf, "Playback started with an offset of %" PRId64, playback_start_chromecast);
                     break;
@@ -1218,7 +1227,7 @@ void intf_sys_t::processMessage(const castchannel::CastMessage &msg)
                     break;
 
                 default:
-                    cmd_status = NO_CMD_PENDING;
+                    setPlayerStatus(NO_CMD_PENDING);
                     date_play_start = -1;
                     break;
                 }
