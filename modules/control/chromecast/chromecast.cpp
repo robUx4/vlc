@@ -106,6 +106,12 @@ enum player_state {
     STATE_PAUSED,
 };
 
+enum receiver_display {
+    DISPLAY_UNKNOWN,
+    HAS_VIDEO,
+    AUDIO_ONLY
+};
+
 #define PACKET_MAX_LEN 10 * 1024
 #define PACKET_HEADER_LEN 4
 
@@ -150,7 +156,7 @@ struct intf_sys_t
         ,playback_start_chromecast(-1.0)
         ,playback_start_local(0)
         ,canPause(false)
-        ,canDisplay(false)
+        ,canDisplay(DISPLAY_UNKNOWN)
         ,i_sock_fd(-1)
         ,p_creds(NULL)
         ,p_tls(NULL)
@@ -206,9 +212,10 @@ struct intf_sys_t
         this->canPause = canPause;
     }
 
-    void setCanDisplay(bool canDisplay) {
+    void setCanDisplay(receiver_display canDisplay) {
         vlc_mutex_locker locker(&lock);
         this->canDisplay = canDisplay;
+        vlc_cond_broadcast(&loadCommandCond);
     }
 
     bool isFinishedPlaying() {
@@ -241,7 +248,7 @@ struct intf_sys_t
     mtime_t     playback_start_chromecast;
     mtime_t     playback_start_local;
     bool        canPause;
-    bool        canDisplay;
+    receiver_display  canDisplay;
 
     int i_sock_fd;
     vlc_tls_creds_t *p_creds;
@@ -538,7 +545,7 @@ void intf_sys_t::InputUpdated( input_thread_t *p_input )
     if( p_input != NULL )
     {
         mutex_cleanup_push(&lock);
-        while (conn_status == CHROMECAST_DISCONNECTED)
+        while (canDisplay == DISPLAY_UNKNOWN && conn_status != CHROMECAST_DEAD)
         {
             msg_Dbg(p_intf, "InputUpdated waiting for Chromecast connection, current %d", conn_status);
             vlc_cond_wait(&loadCommandCond, &lock);
@@ -576,7 +583,7 @@ void intf_sys_t::InputUpdated( input_thread_t *p_input )
                     else if (i_codec_audio == 0)
                         i_codec_audio = p_es->i_codec;
                 }
-                else if (canDisplay && p_es->i_cat == VIDEO_ES)
+                else if (canDisplay==HAS_VIDEO && p_es->i_cat == VIDEO_ES)
                 {
                     if (!canDecodeVideo( p_es ))
                     {
@@ -589,7 +596,7 @@ void intf_sys_t::InputUpdated( input_thread_t *p_input )
                 else
                 {
                     p_es->i_priority = ES_PRIORITY_NOT_SELECTABLE;
-                    msg_Dbg( p_intf, "disable non audio/video track %d i_cat:%d codec %4.4s", p_es->i_id, p_es->i_cat, (const char*)&p_es->i_codec );
+                    msg_Dbg( p_intf, "disable non audio/video track %d i_cat:%d codec %4.4s canDisplay:%d", p_es->i_id, p_es->i_cat, (const char*)&p_es->i_codec, canDisplay );
                 }
             }
         }
@@ -618,7 +625,7 @@ void intf_sys_t::InputUpdated( input_thread_t *p_input )
             vlc_fourcc_to_char( i_codec_audio, s_fourcc );
             s_fourcc[4] = '\0';
             ssout << s_fourcc;
-            if ( canDisplay )
+            if ( canDisplay==HAS_VIDEO )
             {
                 /* TODO: provide maxwidth,maxheight */
                 ssout << ",vcodec=";
@@ -628,9 +635,9 @@ void intf_sys_t::InputUpdated( input_thread_t *p_input )
             }
             ssout << "}:";
         }
-        if (mime == "video/x-matroska" && canDisplay && i_codec_audio == VLC_CODEC_VORBIS && i_codec_video == VLC_CODEC_VP8 )
+        if (mime == "video/x-matroska" && canDisplay==HAS_VIDEO && i_codec_audio == VLC_CODEC_VORBIS && i_codec_video == VLC_CODEC_VP8 )
             mime == "video/webm";
-        if (mime == "video/x-matroska" && !canDisplay )
+        if (mime == "video/x-matroska" && !canDisplay==HAS_VIDEO )
             mime == "audio/x-matroska";
         ssout << "cc_sout{http-port=" << i_port << ",mux=" << muxer << ",mime=" << mime << ",uid=" << i_sout_id++ << "}";
         s_sout = ssout.str();
@@ -1602,7 +1609,7 @@ static void* chromecastThread(void* p_this)
     std::stringstream s_video_test;
     s_video_test << "http://" << p_sys->deviceIP << ":8008/apps/YouTube";
     access_t *p_test_app = vlc_access_NewMRL( VLC_OBJECT(p_intf), s_video_test.str().c_str() );
-    p_sys->setCanDisplay( p_test_app != NULL );
+    p_sys->setCanDisplay( p_test_app != NULL ? HAS_VIDEO : AUDIO_ONLY );
     if ( p_test_app )
         vlc_access_Delete( p_test_app );
 
