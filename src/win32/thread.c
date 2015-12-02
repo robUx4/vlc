@@ -453,6 +453,7 @@ struct vlc_thread
 #else
     atomic_bool    killed;
 #endif
+    DWORD          currentId;
     vlc_cleanup_t *cleaners;
 
     void        *(*entry) (void *);
@@ -476,6 +477,7 @@ static unsigned __stdcall vlc_entry (void *p)
 
     TlsSetValue(thread_key, th);
     th->killable = true;
+    th->currentId = GetCurrentThreadId();
     th->data = th->entry (th->data);
     TlsSetValue(thread_key, NULL);
 
@@ -537,6 +539,9 @@ int vlc_clone (vlc_thread_t *p_handle, void *(*entry) (void *),
 
 void vlc_join (vlc_thread_t th, void **result)
 {
+#ifndef NDEBUG
+    DWORD currentId = GetCurrentThreadId();
+#endif
     do
         vlc_testcancel ();
     while (vlc_WaitForSingleObject (th->id, INFINITE) == WAIT_IO_COMPLETION);
@@ -574,11 +579,21 @@ static void CALLBACK vlc_cancel_self (ULONG_PTR self)
 
     if (likely(th != NULL))
         th->killed = true;
+#if 0 && !defined(NDEBUG)
+    wchar_t dbg[256];
+    wsprintf(dbg,L"vlc_cancel_self APC in thread %d\n", GetCurrentThreadId());
+    OutputDebugString(dbg);
+#endif
 }
 #endif
 
 void vlc_cancel (vlc_thread_t th)
 {
+#if 0 && !defined(NDEBUG)
+    wchar_t dbg[256];
+    wsprintf(dbg,L"vlc_cancel thread %d from %d\n", th->id, GetCurrentThreadId());
+    OutputDebugString(dbg);
+#endif
 #if !VLC_WINSTORE_APP
     QueueUserAPC (vlc_cancel_self, th->id, (uintptr_t)th);
 #else
