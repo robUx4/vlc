@@ -134,6 +134,7 @@ ChromecastDialog::ChromecastDialog( intf_thread_t *_p_intf)
 
     CONNECT( ui.mainTab, currentChanged( int ), this, tabChanged( int ) );
 #endif
+    BUTTONACT( ui.refreshButton, refreshOrClear() );
 
     /* General action */
     restoreWidgetPosition( "Messages", QSize( 600, 450 ) );
@@ -331,6 +332,11 @@ void ChromecastDialog::buildTree( QTreeWidgetItem *parentItem,
         buildTree( item, (vlc_object_t *)l->p_values[i].p_address );
     vlc_list_release( l );
 #endif
+}
+
+void ChromecastDialog::refreshOrClear()
+{
+    /* TODO refresh the list of available Chromecasts */
 }
 
 void ChromecastDialog::updateOrClear()

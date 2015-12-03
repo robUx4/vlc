@@ -54,6 +54,8 @@ private:
                              va_list );
 
 private slots:
+    void refreshOrClear();
+
     bool save();
     void updateConfig();
     void changeVerbosity( int );
