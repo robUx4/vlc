@@ -45,6 +45,7 @@
 
 #include <vlc_common.h>
 #include <vlc_input_item.h>
+#include <vlc_services_discovery.h>
 
 #include "dialogs/chromecast.hpp"
 
@@ -78,11 +79,19 @@ MsgEvent::MsgEvent( int type, const vlc_log_t *msg, const char *text )
 }
 #endif
 
+extern "C" void discovery_event_received( const vlc_event_t * p_event, void * user_data )
+{
+    ChromecastDialog *p_this = reinterpret_cast<ChromecastDialog*>(user_data);
+    p_this->discoveryEventReceived( p_event );
+}
+
 ChromecastDialog::ChromecastDialog( intf_thread_t *_p_intf)
                : QVLCFrame( _p_intf )
+               , p_sd( NULL )
+               , b_sd_started( false )
 {
-    setWindowTitle( qtr( "Messages" ) );
-    setWindowRole( "vlc-messages" );
+    setWindowTitle( qtr( "Chromecast Output" ) );
+    setWindowRole( "vlc-chromecast" );
     /* Build Ui */
     ui.setupUi( this );
 #if 0
@@ -137,18 +146,30 @@ ChromecastDialog::ChromecastDialog( intf_thread_t *_p_intf)
     BUTTONACT( ui.refreshButton, refreshOrClear() );
 
     /* General action */
-    restoreWidgetPosition( "Messages", QSize( 600, 450 ) );
+    restoreWidgetPosition( "Chromecast", QSize( 600, 450 ) );
 
     /* Hook up to LibVLC messaging */
-    vlc_LogSet( p_intf->p_libvlc, MsgCallback, this );
+    //vlc_LogSet( p_intf->p_libvlc, MsgCallback, this );
 
     buildTree( NULL, VLC_OBJECT( p_intf->p_libvlc ) );
 }
 
 ChromecastDialog::~ChromecastDialog()
 {
-    saveWidgetPosition( "Messages" );
-    vlc_LogSet( p_intf->p_libvlc, NULL, NULL );
+    if ( p_sd != NULL )
+    {
+        if ( b_sd_started )
+        {
+            vlc_event_manager_t *em = services_discovery_EventManager( p_sd );
+            vlc_event_detach( em, vlc_ServicesDiscoveryItemAdded, discovery_event_received, this);
+            vlc_event_detach( em, vlc_ServicesDiscoveryItemRemoved, discovery_event_received, this);
+            vlc_event_detach( em, vlc_ServicesDiscoveryItemRemoveAll, discovery_event_received, this);
+            vlc_sd_Stop( p_sd );
+        }
+        vlc_sd_Destroy( p_sd );
+    }
+    saveWidgetPosition( "Chromecast" );
+    //vlc_LogSet( p_intf->p_libvlc, NULL, NULL );
 };
 
 void ChromecastDialog::changeVerbosity( int i_verbosity )
@@ -336,7 +357,43 @@ void ChromecastDialog::buildTree( QTreeWidgetItem *parentItem,
 
 void ChromecastDialog::refreshOrClear()
 {
-    /* TODO refresh the list of available Chromecasts */
+    /* refresh the list of available Chromecasts */
+    if ( p_sd == NULL )
+    {
+        msg_Dbg( p_intf, "starting services_discovery chromecast..." );
+        p_sd = vlc_sd_Create( VLC_OBJECT(p_intf), "chromecast" );
+        if( !p_sd )
+        {
+            msg_Err( p_intf, "Could not start chromecast discovery" );
+            return;
+        }
+    }
+
+    vlc_event_manager_t *em = services_discovery_EventManager( p_sd );
+    if ( !b_sd_started )
+    {
+        vlc_event_attach( em, vlc_ServicesDiscoveryItemAdded, discovery_event_received, this );
+        vlc_event_attach( em, vlc_ServicesDiscoveryItemRemoved, discovery_event_received, this );
+        vlc_event_attach( em, vlc_ServicesDiscoveryItemRemoveAll, discovery_event_received, this );
+
+        b_sd_started = vlc_sd_Start( p_sd );
+        if ( !b_sd_started )
+        {
+            vlc_event_detach( em, vlc_ServicesDiscoveryItemAdded, discovery_event_received, this);
+            vlc_event_detach( em, vlc_ServicesDiscoveryItemRemoved, discovery_event_received, this);
+            vlc_event_detach( em, vlc_ServicesDiscoveryItemRemoveAll, discovery_event_received, this);
+        }
+    }
+
+}
+
+void ChromecastDialog::discoveryEventReceived( const vlc_event_t * p_event )
+{
+    const char *psz_category = NULL;
+    if ( p_event->type == vlc_ServicesDiscoveryItemAdded )
+    {
+        psz_category = p_event->u.services_discovery_item_added.psz_category;
+    }
 }
 
 void ChromecastDialog::updateOrClear()

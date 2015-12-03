@@ -39,6 +39,10 @@ class MsgEvent;
 class ChromecastDialog : public QVLCFrame, public Singleton<ChromecastDialog>
 {
     Q_OBJECT
+
+public:
+    void discoveryEventReceived( const vlc_event_t * p_event );
+
 private:
     ChromecastDialog( intf_thread_t * );
     virtual ~ChromecastDialog();
@@ -67,6 +71,9 @@ private:
     void buildTree( QTreeWidgetItem *, vlc_object_t * );
 
     friend class    Singleton<ChromecastDialog>;
+    services_discovery_t *p_sd;
+    bool                  b_sd_started;
+
     QPushButton *updateButton;
     QMutex messageLocker;
 #ifndef NDEBUG
