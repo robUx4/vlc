@@ -124,6 +124,7 @@ public slots:
     void mediaCodecDialog();
     void prefsDialog();
     void extendedDialog();
+    void chromecastDialog();
     void synchroDialog();
     void messagesDialog();
     void sendKey( int key );

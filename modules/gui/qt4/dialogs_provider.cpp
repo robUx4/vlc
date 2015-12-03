@@ -153,6 +153,8 @@ void DialogsProvider::customEvent( QEvent *event )
            bookmarksDialog(); break;
         case INTF_DIALOG_EXTENDED:
            extendedDialog(); break;
+        case INTF_DIALOG_CHROMECAST:
+           chromecastDialog(); break;
         case INTF_DIALOG_SENDKEY:
            sendKey( de->i_arg ); break;
 #ifdef ENABLE_VLM
@@ -232,6 +234,10 @@ void DialogsProvider::extendedDialog()
         extDialog->showTab( 0 );
     else
         extDialog->hide();
+}
+
+void DialogsProvider::chromecastDialog()
+{
 }
 
 void DialogsProvider::synchroDialog()
