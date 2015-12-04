@@ -36,12 +36,13 @@ class QTreeWidget;
 class QTreeWidgetItem;
 class MsgEvent;
 
-class ChromecastDialog : public QVLCFrame, public Singleton<ChromecastDialog>
+class ChromecastDialog : public QVLCDialog, public Singleton<ChromecastDialog>
 {
     Q_OBJECT
 
 public:
     void discoveryEventReceived( const vlc_event_t * p_event );
+    void setVisible(bool visible);
 
 private:
     ChromecastDialog( intf_thread_t * );
@@ -59,6 +60,13 @@ private:
 
 private slots:
     void refreshOrClear();
+    void accept();
+    void reject();
+    void close();
+    void done(int);
+    int exec();
+    //void hide();
+    //void show();
 
     bool save();
     void updateConfig();
