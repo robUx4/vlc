@@ -55,31 +55,29 @@ enum {
     MsgEvent_Type = QEvent::User + MsgEventTypeOffset + 1,
 };
 
-#if 0
-class MsgEvent : public QEvent
+class ChromecastReceiver : public QListWidgetItem
 {
 public:
-    MsgEvent( int, const vlc_log_t *, const char * );
+    enum ChromecastType {
+        HAS_VIDEO = UserType,
+        AUDIO_ONLY
+    };
 
-    int priority;
-    uintptr_t object_id;
-    QString object_type;
-    QString header;
-    QString module;
-    QString text;
+    ChromecastReceiver(const char *psz_name, const char *psz_ip, uint16_t i_port, ChromecastType type)
+        : QListWidgetItem( qfu( psz_name ) )
+        , ipAddress( qfu( psz_ip ) )
+        , port(i_port)
+        , type(type)
+    {
+    }
+
+protected:
+    QString ipAddress;
+    uint16_t port;
+    ChromecastType type;
+
+    friend class ChromecastDialog;
 };
-
-MsgEvent::MsgEvent( int type, const vlc_log_t *msg, const char *text )
-    : QEvent( (QEvent::Type)MsgEvent_Type ),
-      priority( type ),
-      object_id( msg->i_object_id ),
-      object_type( qfu(msg->psz_object_type) ),
-      header( qfu(msg->psz_header) ),
-      module( qfu(msg->psz_module) ),
-      text( qfu(text) )
-{
-}
-#endif
 
 extern "C" void discovery_event_received( const vlc_event_t * p_event, void * user_data )
 {
@@ -402,7 +400,16 @@ void ChromecastDialog::show()
 
 void ChromecastDialog::accept()
 {
-    /* TODO get the selected one in the listview if any */
+    /* get the selected one in the listview if any */
+    QListWidgetItem *current = ui.receiversListWidget->currentItem();
+    if (current != NULL)
+    {
+        ChromecastReceiver *item = reinterpret_cast<ChromecastReceiver*>(current);
+        std::string psz_ip   = item->ipAddress.toUtf8().constData();
+        std::string psz_name = item->text().toUtf8().constData();
+        msg_Dbg( p_intf, "selecting Chromecast %s %s:%u", psz_name.c_str(), psz_ip.c_str(), item->port );
+    }
+
     QVLCDialog::accept();
 }
 
@@ -411,9 +418,12 @@ void ChromecastDialog::discoveryEventReceived( const vlc_event_t * p_event )
     const char *psz_category = NULL;
     if ( p_event->type == vlc_ServicesDiscoveryItemAdded )
     {
-        //psz_category = p_event->u.services_discovery_item_added.psz_category;
-        QListWidgetItem *item = new QListWidgetItem( qfu( p_event->u.services_discovery_item_added.p_new_item->psz_name ) );
-        //item->setData( Qt::UserRole, p_value->i_id );
+        /* TODO determine if it's audio-only by checking the YouTube app */
+
+        ChromecastReceiver *item = new ChromecastReceiver( p_event->u.services_discovery_item_added.p_new_item->psz_name,
+                                                           p_event->u.services_discovery_item_added.p_new_item->psz_uri,
+                                                           8009,
+                                                           ChromecastReceiver::HAS_VIDEO);
         ui.receiversListWidget->addItem( item );
     }
 }
