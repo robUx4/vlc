@@ -26,22 +26,8 @@
 # include "config.h"
 #endif
 
-#include <QPlainTextEdit>
-#include <QTextCursor>
-#include <QTextBlock>
-#include <QFileDialog>
-#include <QTextStream>
-#include <QMessageBox>
-#include <QTabWidget>
-#include <QTreeWidget>
-#include <QTreeWidgetItem>
 #include <QListWidget>
 #include <QListWidgetItem>
-#include <QMutex>
-#include <QLineEdit>
-#include <QScrollBar>
-#include <QMutex>
-#include <QMutexLocker>
 
 #include <assert.h>
 
@@ -51,10 +37,6 @@
 
 #include "dialogs/chromecast.hpp"
 
-enum {
-    MsgEvent_Type = QEvent::User + MsgEventTypeOffset + 1,
-};
-
 class ChromecastReceiver : public QListWidgetItem
 {
 public:
@@ -63,7 +45,8 @@ public:
         AUDIO_ONLY
     };
 
-    ChromecastReceiver(const char *psz_name, const char *psz_ip, uint16_t i_port, ChromecastType type)
+    ChromecastReceiver(const char *psz_name, const char *psz_ip,
+                       uint16_t i_port, ChromecastType type)
         : QListWidgetItem( qfu( psz_name ) )
         , ipAddress( qfu( psz_ip ) )
         , port(i_port)
@@ -108,189 +91,6 @@ ChromecastDialog::~ChromecastDialog()
     if ( p_sd != NULL )
         vlc_sd_Destroy( p_sd );
 };
-
-void ChromecastDialog::changeVerbosity( int i_verbosity )
-{
-    verbosity = i_verbosity;
-}
-
-void ChromecastDialog::updateConfig()
-{
-    getSettings()->beginGroup( "Messages" );
-#if 0
-    getSettings()->setValue( "messages-filter", ui.filterEdit->text() );
-#endif
-    getSettings()->endGroup();
-}
-
-void ChromecastDialog::filterMessages()
-{
-    QMutexLocker locker( &messageLocker );
-#if 0
-    QPlainTextEdit *messages = ui.messages;
-    QTextBlock block = messages->document()->firstBlock();
-
-    while( block.isValid() )
-    {
-        block.setVisible( matchFilter( block.text().toLower() ) );
-        block = block.next();
-    }
-
-    /* Consider the whole QTextDocument as dirty now */
-    messages->document()->markContentsDirty( 0, messages->document()->characterCount() );
-
-    /* FIXME This solves a bug (Qt?) with the viewport not resizing the
-       vertical scroll bar when one or more QTextBlock are hidden */
-    QSize vsize = messages->viewport()->size();
-    messages->viewport()->resize( vsize + QSize( 1, 1 ) );
-    messages->viewport()->resize( vsize );
-#endif
-}
-
-bool ChromecastDialog::matchFilter( const QString& text )
-{
-#if 0
-    const QString& filter = ui.filterEdit->text();
-
-    if( filter.isEmpty() || text.contains( filter.toLower() ) )
-        return true;
-#endif
-    return false;
-}
-
-void ChromecastDialog::sinkMessage( const MsgEvent *msg )
-{
-    QMutexLocker locker( &messageLocker );
-
-#if 0
-    QPlainTextEdit *messages = ui.messages;
-    /* Only scroll if the viewport is at the end.
-       Don't bug user by auto-changing/losing viewport on insert(). */
-    bool b_autoscroll = ( messages->verticalScrollBar()->value()
-                          + messages->verticalScrollBar()->pageStep()
-                          >= messages->verticalScrollBar()->maximum() );
-
-    /* Copy selected text to the clipboard */
-    if( messages->textCursor().hasSelection() )
-        messages->copy();
-
-    /* Fix selected text bug */
-    if( !messages->textCursor().atEnd() ||
-         messages->textCursor().anchor() != messages->textCursor().position() )
-         messages->moveCursor( QTextCursor::End );
-
-    /* Start a new logic block so we can hide it on-demand */
-    messages->textCursor().insertBlock();
-
-    QString buf = QString( "<i><font color='darkblue'>%1</font>" ).arg( msg->module );
-
-    switch ( msg->priority )
-    {
-        case VLC_MSG_INFO:
-            buf += "<font color='blue'> info: </font>";
-            break;
-        case VLC_MSG_ERR:
-            buf += "<font color='red'> error: </font>";
-            break;
-        case VLC_MSG_WARN:
-            buf += "<font color='green'> warning: </font>";
-            break;
-        case VLC_MSG_DBG:
-        default:
-            buf += "<font color='grey'> debug: </font>";
-            break;
-    }
-
-    /* Insert the prefix */
-    messages->textCursor().insertHtml( buf /* + "</i>" */ );
-
-    /* Insert the message */
-    messages->textCursor().insertHtml( msg->text );
-
-    /* Pass the new message thru the filter */
-    QTextBlock b = messages->document()->lastBlock();
-    b.setVisible( matchFilter( b.text() ) );
-
-    /* Tell the QTextDocument to recompute the size of the given area */
-    messages->document()->markContentsDirty( b.position(), b.length() );
-
-    if ( b_autoscroll ) messages->ensureCursorVisible();
-#endif
-}
-
-void ChromecastDialog::customEvent( QEvent *event )
-{
-#if 0
-    MsgEvent *msge = static_cast<MsgEvent *>(event);
-
-    assert( msge );
-    sinkMessage( msge );
-#endif
-}
-
-bool ChromecastDialog::save()
-{
-    QString saveLogFileName = QFileDialog::getSaveFileName(
-            this, qtr( "Save log file as..." ),
-            QVLCUserDir( VLC_DOCUMENTS_DIR ),
-            qtr( "Texts / Logs (*.log *.txt);; All (*.*) ") );
-
-    if( !saveLogFileName.isNull() )
-    {
-        QFile file( saveLogFileName );
-        if ( !file.open( QFile::WriteOnly | QFile::Text ) ) {
-            QMessageBox::warning( this, qtr( "Application" ),
-                    qtr( "Cannot write to file %1:\n%2." )
-                    .arg( saveLogFileName )
-                    .arg( file.errorString() ) );
-            return false;
-        }
-
-        QTextStream out( &file );
-
-#if 0
-        QTextBlock block = ui.messages->document()->firstBlock();
-        while( block.isValid() )
-        {
-            if( block.isVisible() )
-                out << block.text() << "\n";
-
-            block = block.next();
-        }
-#endif
-        return true;
-    }
-    return false;
-}
-
-void ChromecastDialog::buildTree( QTreeWidgetItem *parentItem,
-                                vlc_object_t *p_obj )
-{
-    QTreeWidgetItem *item;
-
-#if 0
-    if( parentItem )
-        item = new QTreeWidgetItem( parentItem );
-    else
-        item = new QTreeWidgetItem( ui.modulesTree );
-
-    char *name = vlc_object_get_name( p_obj );
-    item->setText( 0, QString("%1%2 (0x%3)")
-                   .arg( qfu( p_obj->psz_object_type ) )
-                   .arg( ( name != NULL )
-                         ? QString( " \"%1\"" ).arg( qfu( name ) )
-                             : "" )
-                   .arg( (uintptr_t)p_obj, 0, 16 )
-                 );
-    free( name );
-    item->setExpanded( true );
-
-    vlc_list_t *l = vlc_list_children( p_obj );
-    for( int i=0; i < l->i_count; i++ )
-        buildTree( item, (vlc_object_t *)l->p_values[i].p_address );
-    vlc_list_release( l );
-#endif
-}
 
 void ChromecastDialog::refreshOrClear()
 {
@@ -386,18 +186,6 @@ void ChromecastDialog::setVisible(bool visible)
     }
 }
 
-#if 0
-void ChromecastDialog::hide()
-{
-    QVLCDialog::hide();
-}
-
-void ChromecastDialog::show()
-{
-    QVLCDialog::show();
-}
-#endif
-
 void ChromecastDialog::accept()
 {
     /* get the selected one in the listview if any */
@@ -415,7 +203,6 @@ void ChromecastDialog::accept()
 
 void ChromecastDialog::discoveryEventReceived( const vlc_event_t * p_event )
 {
-    const char *psz_category = NULL;
     if ( p_event->type == vlc_ServicesDiscoveryItemAdded )
     {
         /* TODO determine if it's audio-only by checking the YouTube app */
@@ -427,78 +214,3 @@ void ChromecastDialog::discoveryEventReceived( const vlc_event_t * p_event )
         ui.receiversListWidget->addItem( item );
     }
 }
-
-void ChromecastDialog::updateOrClear()
-{
-#if 0
-    if( ui.mainTab->currentIndex() == 1)
-    {
-        ui.modulesTree->clear();
-        buildTree( NULL, VLC_OBJECT( p_intf->p_libvlc ) );
-    }
-    else if( ui.mainTab->currentIndex() == 0 )
-        ui.messages->clear();
-#ifndef NDEBUG
-    else
-        updatePLTree();
-#endif
-#endif
-}
-
-void ChromecastDialog::tabChanged( int i )
-{
-    updateButton->setIcon( i != 0 ? QIcon(":/update") : QIcon(":/toolbar/clear") );
-    updateButton->setToolTip( i != 0 ? qtr("Update the tree")
-                                     : qtr("Clear the messages") );
-}
-
-void ChromecastDialog::MsgCallback( void *self, int type, const vlc_log_t *item,
-                                  const char *format, va_list ap )
-{
-    ChromecastDialog *dialog = (ChromecastDialog *)self;
-    char *str;
-#if HAS_QT5
-    int verbosity = dialog->verbosity.load();
-#else
-    int verbosity = dialog->verbosity;
-#endif
-
-    if( verbosity < 0 || verbosity < (type - VLC_MSG_ERR)
-     || unlikely(vasprintf( &str, format, ap ) == -1) )
-        return;
-
-    int canc = vlc_savecancel();
-#if 0
-    QApplication::postEvent( dialog, new MsgEvent( type, item, str ) );
-#endif
-    vlc_restorecancel( canc );
-    free( str );
-}
-
-#ifndef NDEBUG
-static QTreeWidgetItem * PLWalk( playlist_item_t *p_node )
-{
-    QTreeWidgetItem *current = new QTreeWidgetItem();
-    current->setText( 0, qfu( p_node->p_input->psz_name ) );
-    current->setToolTip( 0, qfu( p_node->p_input->psz_uri ) );
-    current->setText( 1, QString("%1").arg( p_node->i_id ) );
-    current->setText( 2, QString("%1").arg( p_node->p_input->i_id ) );
-    current->setText( 3, QString("0x%1").arg( p_node->i_flags, 0, 16 ) );
-    current->setText( 4, QString("0x%1").arg(  p_node->p_input->i_type, 0, 16 ) );
-    for ( int i = 0; p_node->i_children > 0 && i < p_node->i_children; i++ )
-        current->addChild( PLWalk( p_node->pp_children[ i ] ) );
-    return current;
-}
-
-void ChromecastDialog::updatePLTree()
-{
-    playlist_t *p_playlist = THEPL;
-    pldebugTree->clear();
-    PL_LOCK;
-    pldebugTree->addTopLevelItem( PLWalk( p_playlist->p_root_category ) );
-    PL_UNLOCK;
-    pldebugTree->expandAll();
-    for ( int i=0; i< 5; i++ )
-        pldebugTree->resizeColumnToContents( i );
-}
-#endif

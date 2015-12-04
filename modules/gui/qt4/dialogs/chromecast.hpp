@@ -49,14 +49,7 @@ private:
     virtual ~ChromecastDialog();
 
     Ui::chromecastWidget ui;
-    static void sinkMessage( void *, vlc_log_t *, unsigned );
-    void customEvent( QEvent * );
     void sinkMessage( const MsgEvent * );
-    bool matchFilter( const QString& );
-
-    QAtomicInt verbosity;
-    static void MsgCallback( void *, int, const vlc_log_t *, const char *,
-                             va_list );
 
 private slots:
     void refreshOrClear();
@@ -65,29 +58,12 @@ private slots:
     void close();
     void done(int);
     int exec();
-    //void hide();
-    //void show();
-
-    bool save();
-    void updateConfig();
-    void changeVerbosity( int );
-    void updateOrClear();
-    void tabChanged( int );
-    void filterMessages();
 
 private:
-    void buildTree( QTreeWidgetItem *, vlc_object_t * );
 
     friend class    Singleton<ChromecastDialog>;
     services_discovery_t *p_sd;
     bool                  b_sd_started;
-
-    QPushButton *updateButton;
-    QMutex messageLocker;
-#ifndef NDEBUG
-    QTreeWidget *pldebugTree;
-    void updatePLTree();
-#endif
 };
 
 
