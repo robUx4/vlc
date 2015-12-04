@@ -35,6 +35,8 @@
 #include <QTabWidget>
 #include <QTreeWidget>
 #include <QTreeWidgetItem>
+#include <QListWidget>
+#include <QListWidgetItem>
 #include <QMutex>
 #include <QLineEdit>
 #include <QScrollBar>
@@ -409,7 +411,10 @@ void ChromecastDialog::discoveryEventReceived( const vlc_event_t * p_event )
     const char *psz_category = NULL;
     if ( p_event->type == vlc_ServicesDiscoveryItemAdded )
     {
-        psz_category = p_event->u.services_discovery_item_added.psz_category;
+        //psz_category = p_event->u.services_discovery_item_added.psz_category;
+        QListWidgetItem *item = new QListWidgetItem( qfu( p_event->u.services_discovery_item_added.p_new_item->psz_name ) );
+        //item->setData( Qt::UserRole, p_value->i_id );
+        ui.receiversListWidget->addItem( item );
     }
 }
 

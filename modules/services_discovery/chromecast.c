@@ -143,7 +143,10 @@ static void new_entry_callback( void *p_this, int i_status, const struct rr_entr
                 }
                 msg_Dbg(p_sd, "Found Chromecast '%s' %s:%d", psz_device_name, deviceIP, devicePort);
 
-                // TODO services_discovery_AddItem (sd, item, _("Local drives"));
+                input_item_t *item = input_item_NewWithTypeExt (deviceIP, psz_device_name,
+                                               0, NULL, 0, -1, ITEM_TYPE_RENDERER, true);
+
+                services_discovery_AddItem (p_sd, item, _("Chromecast"));
 
                 free( deviceIP );
             }

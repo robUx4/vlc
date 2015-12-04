@@ -39,7 +39,7 @@
     </layout>
    </item>
    <item>
-    <widget class="QListView" name="receiversListView">
+    <widget class="QListWidget" name="receiversListWidget">
      <property name="sizePolicy">
       <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
        <horstretch>0</horstretch>
