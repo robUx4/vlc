@@ -70,6 +70,8 @@ static int PlaylistEvent( vlc_object_t *, char const *,
                           vlc_value_t, vlc_value_t, void * );
 static int InputEvent( vlc_object_t *, char const *,
                        vlc_value_t, vlc_value_t, void * );
+static int IpChangedEvent( vlc_object_t *, char const *,
+                           vlc_value_t, vlc_value_t, void * );
 static void *chromecastThread(void *data);
 static int connectChromecast(intf_thread_t *p_intf);
 
@@ -402,6 +404,7 @@ int Open(vlc_object_t *p_this)
         msg_Err(p_intf, "No Chromecast receiver IP/Name provided");
         goto error;
     }
+    var_AddCallback( pl_Get(p_intf), CONTROL_CFG_PREFIX "ip", IpChangedEvent, p_intf );
 
     psz_mime = var_InheritString(p_intf, CONTROL_CFG_PREFIX "mime");
     if (psz_mime == NULL)
@@ -451,6 +454,7 @@ void Close(vlc_object_t *p_this)
 
     p_sys->msgReceiverClose();
 
+    var_DelCallback( pl_Get(p_intf), CONTROL_CFG_PREFIX "ip", IpChangedEvent, p_intf );
     var_DelCallback( pl_Get(p_intf), "input-current", PlaylistEvent, p_intf );
 
     if( p_sys->p_input != NULL )
@@ -464,6 +468,21 @@ void Close(vlc_object_t *p_this)
     vlc_cond_destroy(&p_sys->loadCommandCond);
 
     delete p_sys;
+}
+
+static int IpChangedEvent(vlc_object_t *p_this, char const *psz_var,
+                          vlc_value_t oldval, vlc_value_t val, void *p_data )
+{
+    intf_thread_t *p_intf = static_cast<intf_thread_t *>(p_data);
+    intf_sys_t *p_sys = p_intf->p_sys;
+
+    if (p_sys->deviceIP != val.psz_string)
+    {
+        /* TODO: the IP changed */
+        /* disconnect the current Chromecast */
+        /* connect the new Chromecast if needed */
+    }
+    return VLC_SUCCESS;
 }
 
 static int PlaylistEvent( vlc_object_t *p_this, char const *psz_var,
