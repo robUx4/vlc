@@ -428,7 +428,7 @@ int Open(vlc_object_t *p_this)
             free(psz_nameChromecast);
         }
     }
-    if (p_sys->microdns_ctx == NULL && p_sys->deviceIP.empty())
+    if ( ( p_sys->microdns_ctx == NULL || p_sys->nameChromecast.empty() ) && p_sys->deviceIP.empty())
 #endif /* HAVE_MICRODNS */
     {
         msg_Err(p_intf, "No Chromecast receiver IP/Name provided");
