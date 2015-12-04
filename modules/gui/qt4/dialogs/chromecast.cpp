@@ -196,6 +196,19 @@ void ChromecastDialog::accept()
         std::string psz_ip   = item->ipAddress.toUtf8().constData();
         std::string psz_name = item->text().toUtf8().constData();
         msg_Dbg( p_intf, "selecting Chromecast %s %s:%u", psz_name.c_str(), psz_ip.c_str(), item->port );
+
+        /* set the chromecast control */
+        vlc_object_t *p_parent = p_intf->p_parent;
+        while (p_parent && strcmp(p_parent->psz_object_type, "playlist"))
+            p_parent = p_parent->p_parent;
+        if (p_parent != NULL)
+        {
+            if( !var_Type( p_parent, "chromecast-ip" ) )
+                /* Don't recreate the same variable over and over and over... */
+                var_Create( p_parent, "chromecast-ip", VLC_VAR_STRING );
+            var_SetString( p_parent, "chromecast-ip", psz_ip.c_str() );
+            intf_Create( reinterpret_cast<playlist_t*>( p_parent ), "chromecast");
+        }
     }
 
     QVLCDialog::accept();
