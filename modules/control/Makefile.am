@@ -75,10 +75,6 @@ libctrl_chromecast_plugin_la_SOURCES = control/chromecast/cast_channel.proto con
 nodist_libctrl_chromecast_plugin_la_SOURCES = control/chromecast/cast_channel.pb.cc
 libctrl_chromecast_plugin_la_CPPFLAGS = $(AM_CPPFLAGS) -Icontrol/chromecast $(CHROMECAST_CFLAGS)
 libctrl_chromecast_plugin_la_LIBADD = $(CHROMECAST_LIBS) $(SOCKET_LIBS)
-if HAVE_MICRODNS
-libctrl_chromecast_plugin_la_CPPFLAGS += $(MICRODNS_CFLAGS)
-libctrl_chromecast_plugin_la_LIBADD += $(MICRODNS_LIBS)
-endif
 CLEANFILES += $(nodist_libctrl_chromecast_plugin_la_SOURCES)
 
 if BUILD_CHROMECAST

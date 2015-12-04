@@ -57,12 +57,6 @@
 
 #include "../../misc/webservices/json.h"
 
-#ifdef HAVE_MICRODNS
-# include <microdns/microdns.h>
-
-static const char MDNS_CHROMECAST[] = "._googlecast._tcp.local";
-#endif
-
 #define DEFAULT_TRANSCODE_AUDIO   VLC_CODEC_MP3
 #define DEFAULT_TRANSCODE_VIDEO   VLC_CODEC_H264
 
@@ -148,9 +142,6 @@ struct intf_sys_t
         :p_intf(intf)
         ,p_input(NULL)
         ,devicePort(8009)
-#ifdef HAVE_MICRODNS
-        ,microdns_ctx(NULL)
-#endif
         ,receiverState(RECEIVER_IDLE)
         ,date_play_start(-1)
         ,playback_start_chromecast(-1.0)
@@ -177,9 +168,6 @@ struct intf_sys_t
     {
         disconnectChromecast();
 
-#ifdef HAVE_MICRODNS
-        mdns_cleanup(microdns_ctx);
-#endif
         //vlc_interrupt_destroy(p_interrupt);
     }
 
@@ -235,11 +223,6 @@ struct intf_sys_t
     std::string    serverIP;
     std::string    mime;
     std::string    muxer;
-#ifdef HAVE_MICRODNS
-    struct mdns_ctx *microdns_ctx;
-    mtime_t         i_timeout;
-    std::string     nameChromecast; /* name we're looking for */
-#endif
 
     std::string appTransportId;
     std::string mediaSessionId;
@@ -369,9 +352,6 @@ vlc_module_begin ()
     set_capability( "interface", 0 )
     add_shortcut("chromecast")
     add_string(CONTROL_CFG_PREFIX "ip", "", IP_TEXT, IP_LONGTEXT, false)
-#ifdef HAVE_MICRODNS
-    add_string(CONTROL_CFG_PREFIX "target", "", TARGET_TEXT, TARGET_LONGTEXT, false)
-#endif
     add_integer(CONTROL_CFG_PREFIX "http-port", HTTP_PORT, HTTP_PORT_TEXT, HTTP_PORT_LONGTEXT, false)
     add_string(CONTROL_CFG_PREFIX "mime", "video/x-matroska", MIME_TEXT, MIME_LONGTEXT, false)
     add_string(CONTROL_CFG_PREFIX "muxer", "avformat{mux=matroska}", MUXER_TEXT, MUXER_LONGTEXT, false)
@@ -418,18 +398,6 @@ int Open(vlc_object_t *p_this)
         free(psz_ipChromecast);
     }
     else
-#ifdef HAVE_MICRODNS
-    if (mdns_init(&p_sys->microdns_ctx, MDNS_ADDR_IPV4, MDNS_PORT) >= 0)
-    {
-        char *psz_nameChromecast = var_InheritString(p_intf, CONTROL_CFG_PREFIX "target");
-        if (psz_nameChromecast != NULL)
-        {
-            p_sys->nameChromecast = psz_nameChromecast;
-            free(psz_nameChromecast);
-        }
-    }
-    if ( ( p_sys->microdns_ctx == NULL || p_sys->nameChromecast.empty() ) && p_sys->deviceIP.empty())
-#endif /* HAVE_MICRODNS */
     {
         msg_Err(p_intf, "No Chromecast receiver IP/Name provided");
         goto error;
@@ -1514,59 +1482,6 @@ void intf_sys_t::msgPlayerSeek(const std::string & currentTime)
     pushMediaPlayerMessage( ss );
 }
 
-
-#ifdef HAVE_MICRODNS
-static bool mdnsShouldStop(void *p_callback_cookie)
-{
-    intf_thread_t *p_intf = reinterpret_cast<intf_thread_t*>(p_callback_cookie);
-    intf_sys_t *p_sys = p_intf->p_sys;
-
-    vlc_testcancel();
-
-    return !p_sys->deviceIP.empty() || mdate() > p_sys->i_timeout;
-}
-
-static void mdnsCallback(void *p_callback_cookie, int i_status, const struct rr_entry *p_entry)
-{
-    intf_thread_t *p_intf = reinterpret_cast<intf_thread_t*>(p_callback_cookie);
-    intf_sys_t *p_sys = p_intf->p_sys;
-
-    if (i_status < 0)
-    {
-        char err_str[128];
-        if (mdns_strerror(i_status, err_str, sizeof(err_str)) == 0)
-        {
-            msg_Dbg(p_intf, "mDNS lookup error: %s", err_str);
-        }
-    }
-    else if (p_entry != NULL && p_entry->next != NULL)
-    {
-        std::string deviceName = p_entry->next->name;
-        if (deviceName.length() >= strlen(MDNS_CHROMECAST))
-        {
-            std::string serviceName = deviceName.substr(deviceName.length() - strlen(MDNS_CHROMECAST));
-            deviceName = deviceName.substr(0, deviceName.length() - strlen(MDNS_CHROMECAST));
-            if (serviceName == MDNS_CHROMECAST &&
-                    (p_sys->nameChromecast.empty() ||
-                     !strncasecmp(deviceName.c_str(), p_sys->nameChromecast.c_str(), p_sys->nameChromecast.length())))
-            {
-                while (p_entry != NULL)
-                {
-                    if (p_entry->type == RR_A)
-                        p_sys->deviceIP = p_entry->data.A.addr_str;
-                    else if (p_entry->type == RR_AAAA)
-                        p_sys->deviceIP = p_entry->data.AAAA.addr_str;
-                    else if (p_entry->type == RR_SRV)
-                        p_sys->devicePort = p_entry->data.SRV.port;
-                    p_entry = p_entry->next;
-                }
-                msg_Dbg(p_intf, "Found %s:%d for target %s", p_sys->deviceIP.c_str(), p_sys->devicePort, deviceName.c_str());
-            }
-        }
-    }
-}
-#endif /* HAVE_MICRODNS */
-
 /*****************************************************************************
  * Chromecast thread
  *****************************************************************************/
@@ -1577,26 +1492,6 @@ static void* chromecastThread(void* p_this)
     intf_sys_t *p_sys = p_intf->p_sys;
 
     //vlc_interrupt_set(p_sys->p_interrupt);
-
-#ifdef HAVE_MICRODNS
-    if (p_sys->microdns_ctx != NULL)
-    {
-        int err;
-        p_sys->i_timeout = mdate() + TIMEOUT_MDNS_IP;
-        if ((err = mdns_listen(p_sys->microdns_ctx, MDNS_CHROMECAST+1, 2, &mdnsShouldStop, &mdnsCallback, p_intf)) < 0)
-        {
-            char err_str[128];
-            canc = vlc_savecancel();
-            if (mdns_strerror(err, err_str, sizeof(err_str)) == 0)
-                msg_Err(p_intf, "Failed to look for the target Name: %s", err_str);
-            vlc_mutex_lock(&p_sys->lock);
-            p_sys->setConnectionStatus(CHROMECAST_DEAD);
-            vlc_mutex_unlock(&p_sys->lock);
-            vlc_restorecancel(canc);
-            return NULL;
-        }
-    }
-#endif /* HAVE_MICRODNS */
 
     p_sys->i_sock_fd = connectChromecast(p_intf);
     if (p_sys->i_sock_fd < 0)
