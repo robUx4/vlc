@@ -72,6 +72,7 @@ ChromecastDialog::ChromecastDialog( intf_thread_t *_p_intf)
                : QVLCDialog( (QWidget*)_p_intf->p_sys->p_mi, _p_intf )
                , p_sd( NULL )
                , b_sd_started( false )
+               , b_interface_loaded( false )
 {
     setWindowTitle( qtr( "Chromecast Output" ) );
     setWindowRole( "vlc-chromecast" );
@@ -207,7 +208,10 @@ void ChromecastDialog::accept()
                 /* Don't recreate the same variable over and over and over... */
                 var_Create( p_parent, "chromecast-ip", VLC_VAR_STRING );
             var_SetString( p_parent, "chromecast-ip", psz_ip.c_str() );
-            intf_Create( reinterpret_cast<playlist_t*>( p_parent ), "chromecast");
+
+            if (!b_interface_loaded &&
+                intf_Create( reinterpret_cast<playlist_t*>( p_parent ), "chromecast") == VLC_SUCCESS)
+                b_interface_loaded = true;
         }
     }
 
