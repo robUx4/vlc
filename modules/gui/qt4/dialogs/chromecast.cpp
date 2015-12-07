@@ -244,5 +244,15 @@ void ChromecastDialog::discoveryEventReceived( const vlc_event_t * p_event )
         if ( p_test_app )
             vlc_access_Delete( p_test_app );
         ui.receiversListWidget->addItem( item );
+
+        vlc_object_t *p_parent = p_intf->p_parent;
+        while (p_parent && strcmp(p_parent->psz_object_type, "playlist"))
+            p_parent = p_parent->p_parent;
+        if (p_parent != NULL)
+        {
+            char *psz_current_ip = var_GetString( p_parent, "chromecast-ip" );
+            if (item->ipAddress == psz_current_ip)
+                ui.receiversListWidget->setCurrentItem( item );
+        }
     }
 }
