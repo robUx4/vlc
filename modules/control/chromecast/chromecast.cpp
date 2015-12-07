@@ -72,7 +72,7 @@ static int InputEvent( vlc_object_t *, char const *,
                        vlc_value_t, vlc_value_t, void * );
 static int IpChangedEvent( vlc_object_t *, char const *,
                            vlc_value_t, vlc_value_t, void * );
-static void *chromecastThread(void *data);
+static void *ChromecastThread(void *data);
 static int connectChromecast(intf_thread_t *p_intf);
 
 #define CONTROL_CFG_PREFIX "chromecast-"
@@ -168,7 +168,7 @@ struct intf_sys_t
 
     ~intf_sys_t()
     {
-        disconnectChromecast();
+        ipChangedEvent( NULL );
 
         //vlc_interrupt_destroy(p_interrupt);
     }
@@ -276,6 +276,8 @@ struct intf_sys_t
             vlc_cond_broadcast(&loadCommandCond);
         }
     }
+
+    void ipChangedEvent(const char *psz_new_ip);
 
 private:
     int sendMessage(const castchannel::CastMessage &msg);
@@ -431,7 +433,7 @@ int Open(vlc_object_t *p_this)
     p_intf->p_sys = p_sys;
 
     // Start the Chromecast event thread.
-    if (vlc_clone(&p_sys->chromecastThread, chromecastThread, p_intf,
+    if (vlc_clone(&p_sys->chromecastThread, ChromecastThread, p_intf,
                   VLC_THREAD_PRIORITY_LOW))
     {
         msg_Err(p_intf, "Could not start the Chromecast talking thread");
@@ -452,16 +454,13 @@ void Close(vlc_object_t *p_this)
     intf_thread_t *p_intf = reinterpret_cast<intf_thread_t*>(p_this);
     intf_sys_t *p_sys = p_intf->p_sys;
 
-    p_sys->msgReceiverClose();
-
     var_DelCallback( pl_Get(p_intf), CONTROL_CFG_PREFIX "ip", IpChangedEvent, p_intf );
     var_DelCallback( pl_Get(p_intf), "input-current", PlaylistEvent, p_intf );
 
     if( p_sys->p_input != NULL )
         var_DelCallback( p_sys->p_input, "intf-event", InputEvent, p_intf );
 
-    vlc_cancel(p_sys->chromecastThread);
-    vlc_join(p_sys->chromecastThread, NULL);
+    p_sys->ipChangedEvent( NULL );
 
     vlc_mutex_destroy(&p_sys->lock);
     vlc_cond_destroy(&p_sys->seekCommandCond);
@@ -473,16 +472,44 @@ void Close(vlc_object_t *p_this)
 static int IpChangedEvent(vlc_object_t *p_this, char const *psz_var,
                           vlc_value_t oldval, vlc_value_t val, void *p_data )
 {
+    VLC_UNUSED( p_this );
+    VLC_UNUSED( psz_var );
+    VLC_UNUSED( oldval );
     intf_thread_t *p_intf = static_cast<intf_thread_t *>(p_data);
-    intf_sys_t *p_sys = p_intf->p_sys;
-
-    if (p_sys->deviceIP != val.psz_string)
-    {
-        /* TODO: the IP changed */
-        /* disconnect the current Chromecast */
-        /* connect the new Chromecast if needed */
-    }
+    p_intf->p_sys->ipChangedEvent( val.psz_string );
     return VLC_SUCCESS;
+}
+
+void intf_sys_t::ipChangedEvent(const char *psz_new_ip)
+{
+    if (deviceIP != psz_new_ip)
+    {
+        if ( !deviceIP.empty() )
+        {
+            /* disconnect the current Chromecast */
+            msgReceiverClose();
+
+            vlc_cancel(chromecastThread);
+            vlc_join(chromecastThread, NULL);
+
+            disconnectChromecast();
+        }
+
+        /* connect the new Chromecast (if needed) */
+        if (psz_new_ip == NULL)
+            deviceIP = "";
+        else
+            deviceIP = psz_new_ip;
+
+        if (!deviceIP.empty())
+        {
+            if (vlc_clone(&chromecastThread, ChromecastThread, p_intf,
+                          VLC_THREAD_PRIORITY_LOW))
+            {
+                msg_Err(p_intf, "Could not start the Chromecast talking thread");
+            }
+        }
+    }
 }
 
 static int PlaylistEvent( vlc_object_t *p_this, char const *psz_var,
@@ -1504,7 +1531,7 @@ void intf_sys_t::msgPlayerSeek(const std::string & currentTime)
 /*****************************************************************************
  * Chromecast thread
  *****************************************************************************/
-static void* chromecastThread(void* p_this)
+static void* ChromecastThread(void* p_this)
 {
     int canc;
     intf_thread_t *p_intf = reinterpret_cast<intf_thread_t*>(p_this);

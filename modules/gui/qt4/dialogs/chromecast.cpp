@@ -126,6 +126,16 @@ int ChromecastDialog::exec()
 
 void ChromecastDialog::reject()
 {
+    /* set the chromecast control */
+    vlc_object_t *p_parent = p_intf->p_parent;
+    while (p_parent && strcmp(p_parent->psz_object_type, "playlist"))
+        p_parent = p_parent->p_parent;
+    if (p_parent != NULL)
+    {
+        if( var_Type( p_parent, "chromecast-ip" ) )
+            var_SetString( p_parent, "chromecast-ip", NULL );
+    }
+
     QVLCDialog::reject();
 }
 
@@ -152,6 +162,30 @@ void ChromecastDialog::setVisible(bool visible)
 
         if ( p_sd != NULL )
         {
+            vlc_object_t *p_parent = p_intf->p_parent;
+            while (p_parent && strcmp(p_parent->psz_object_type, "playlist"))
+                p_parent = p_parent->p_parent;
+            if (p_parent != NULL)
+            {
+                ui.receiversListWidget->setCurrentRow( -1 );
+
+                char *psz_current_ip = var_GetString( p_parent, "chromecast-ip" );
+                if (psz_current_ip != NULL)
+                {
+                    int row = 0;
+                    for ( ; row < ui.receiversListWidget->count(); row++ )
+                    {
+                        ChromecastReceiver *rowItem = reinterpret_cast<ChromecastReceiver*>( ui.receiversListWidget->item( row ) );
+                        if (rowItem->ipAddress == psz_current_ip)
+                        {
+                            ui.receiversListWidget->setCurrentRow( row );
+                            break;
+                        }
+                    }
+                    free( psz_current_ip );
+                }
+            }
+
             if ( !b_sd_started )
             {
                 vlc_event_manager_t *em = services_discovery_EventManager( p_sd );
@@ -253,6 +287,7 @@ void ChromecastDialog::discoveryEventReceived( const vlc_event_t * p_event )
             char *psz_current_ip = var_GetString( p_parent, "chromecast-ip" );
             if (item->ipAddress == psz_current_ip)
                 ui.receiversListWidget->setCurrentItem( item );
+            free( psz_current_ip );
         }
     }
 }
