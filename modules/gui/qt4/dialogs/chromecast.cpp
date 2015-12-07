@@ -222,6 +222,14 @@ void ChromecastDialog::discoveryEventReceived( const vlc_event_t * p_event )
 {
     if ( p_event->type == vlc_ServicesDiscoveryItemAdded )
     {
+        int row = 0;
+        for ( ; row < ui.receiversListWidget->count(); row++ )
+        {
+            ChromecastReceiver *rowItem = reinterpret_cast<ChromecastReceiver*>( ui.receiversListWidget->item( row ) );
+            if (rowItem->ipAddress == p_event->u.services_discovery_item_added.p_new_item->psz_uri)
+                return;
+        }
+
         /* determine if it's audio-only by checking the YouTube app */
         std::stringstream s_video_test;
         s_video_test << "http://"
