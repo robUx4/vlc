@@ -53,7 +53,7 @@ private:
 
 private slots:
     void accept();
-    void reject();
+    void onReject();
     void close();
 
 private:

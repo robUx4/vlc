@@ -82,7 +82,7 @@ ChromecastDialog::ChromecastDialog( intf_thread_t *_p_intf)
     ui.setupUi( this );
 
     CONNECT( ui.buttonBox, accepted(), this, accept() );
-    CONNECT( ui.buttonBox, rejected(), this, reject() );
+    CONNECT( ui.buttonBox, rejected(), this, onReject() );
     CONNECT( ui.receiversListWidget, itemDoubleClicked(QListWidgetItem*), this, accept());
 
     QVLCTools::restoreWidgetPosition( p_intf, "Chromecast", this, QSize( 400 , 440 ) );
@@ -94,7 +94,7 @@ ChromecastDialog::~ChromecastDialog()
         vlc_sd_Destroy( p_sd );
 };
 
-void ChromecastDialog::reject()
+void ChromecastDialog::onReject()
 {
     /* set the chromecast control */
     vlc_object_t *p_parent = p_intf->p_parent;
