@@ -82,6 +82,7 @@ ChromecastDialog::ChromecastDialog( intf_thread_t *_p_intf)
 
     CONNECT( ui.buttonBox, accepted(), this, accept() );
     CONNECT( ui.buttonBox, rejected(), this, reject() );
+    CONNECT( ui.receiversListWidget, itemDoubleClicked(QListWidgetItem*), this, accept());
 
     QVLCTools::restoreWidgetPosition( p_intf, "Chromecast", this, QSize( 400 , 440 ) );
 }
