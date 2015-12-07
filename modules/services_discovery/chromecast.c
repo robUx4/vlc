@@ -173,7 +173,7 @@ void *Run( void *p_this )
 
     int err;
     //int canc = vlc_savecancel();
-    if (( err = mdns_listen( p_sys->microdns_ctx, MDNS_CHROMECAST+1, 60, &should_stop_callback, new_entry_callback, p_sd )) < 0)
+    if (( err = mdns_listen( p_sys->microdns_ctx, MDNS_CHROMECAST+1, 20, &should_stop_callback, new_entry_callback, p_sd )) < 0)
     {
         char err_str[128];
         if (mdns_strerror(err, err_str, sizeof(err_str)) == 0)
