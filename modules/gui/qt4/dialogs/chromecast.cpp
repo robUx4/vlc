@@ -80,7 +80,6 @@ ChromecastDialog::ChromecastDialog( intf_thread_t *_p_intf)
     /* Build Ui */
     ui.setupUi( this );
 
-    BUTTONACT( ui.refreshButton, refreshOrClear() );
     CONNECT( ui.buttonBox, accepted(), this, accept() );
     CONNECT( ui.buttonBox, rejected(), this, reject() );
 
@@ -92,37 +91,6 @@ ChromecastDialog::~ChromecastDialog()
     if ( p_sd != NULL )
         vlc_sd_Destroy( p_sd );
 };
-
-void ChromecastDialog::refreshOrClear()
-{
-    /* refresh the list of available Chromecasts */
-    vlc_event_manager_t *em = services_discovery_EventManager( p_sd );
-    if ( !b_sd_started )
-    {
-        vlc_event_attach( em, vlc_ServicesDiscoveryItemAdded, discovery_event_received, this );
-        vlc_event_attach( em, vlc_ServicesDiscoveryItemRemoved, discovery_event_received, this );
-        vlc_event_attach( em, vlc_ServicesDiscoveryItemRemoveAll, discovery_event_received, this );
-
-        b_sd_started = vlc_sd_Start( p_sd );
-        if ( !b_sd_started )
-        {
-            vlc_event_detach( em, vlc_ServicesDiscoveryItemAdded, discovery_event_received, this);
-            vlc_event_detach( em, vlc_ServicesDiscoveryItemRemoved, discovery_event_received, this);
-            vlc_event_detach( em, vlc_ServicesDiscoveryItemRemoveAll, discovery_event_received, this);
-        }
-    }
-
-}
-
-void ChromecastDialog::done(int reason)
-{
-    QVLCDialog::done(reason);
-}
-
-int ChromecastDialog::exec()
-{
-    return QVLCDialog::exec();
-}
 
 void ChromecastDialog::reject()
 {

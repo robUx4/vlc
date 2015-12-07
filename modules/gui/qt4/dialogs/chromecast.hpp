@@ -52,12 +52,9 @@ private:
     void sinkMessage( const MsgEvent * );
 
 private slots:
-    void refreshOrClear();
     void accept();
     void reject();
     void close();
-    void done(int);
-    int exec();
 
 private:
 
