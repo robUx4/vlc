@@ -17,7 +17,7 @@
    <item>
     <widget class="QLabel" name="label">
      <property name="text">
-      <string>List of Available Chromecasts</string>
+      <string>Available Chromecasts</string>
      </property>
     </widget>
    </item>
