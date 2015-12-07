@@ -48,7 +48,7 @@ public:
     ChromecastReceiver(const char *psz_name, const char *psz_ip,
                        uint16_t i_port, ChromecastType type)
         : QListWidgetItem( type==AUDIO_ONLY ? QIcon( ":/sidebar/music" ) : QIcon( ":/sidebar/movie" ),
-                           qfu( psz_name ) )
+                           qfu( psz_name ).append(" (").append(psz_ip).append(')'))
         , ipAddress( qfu( psz_ip ) )
         , port(i_port)
         , type(type)
