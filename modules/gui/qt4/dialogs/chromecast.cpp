@@ -130,29 +130,27 @@ void ChromecastDialog::setVisible(bool visible)
 
         if ( p_sd != NULL )
         {
+            int row = -1;
             vlc_object_t *p_parent = p_intf->p_parent;
             while (p_parent && strcmp(p_parent->psz_object_type, "playlist"))
                 p_parent = p_parent->p_parent;
             if (p_parent != NULL)
             {
-                ui.receiversListWidget->setCurrentRow( -1 );
-
                 char *psz_current_ip = var_GetString( p_parent, "chromecast-ip" );
                 if (psz_current_ip != NULL)
                 {
-                    int row = 0;
-                    for ( ; row < ui.receiversListWidget->count(); row++ )
+                    for ( row = 0 ; row < ui.receiversListWidget->count(); row++ )
                     {
                         ChromecastReceiver *rowItem = reinterpret_cast<ChromecastReceiver*>( ui.receiversListWidget->item( row ) );
                         if (rowItem->ipAddress == psz_current_ip)
-                        {
-                            ui.receiversListWidget->setCurrentRow( row );
                             break;
-                        }
                     }
                     free( psz_current_ip );
+                    if ( row == ui.receiversListWidget->count() )
+                        row = -1;
                 }
             }
+            ui.receiversListWidget->setCurrentRow( row );
 
             if ( !b_sd_started )
             {
