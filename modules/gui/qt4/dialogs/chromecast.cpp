@@ -28,10 +28,10 @@
 
 #include <QListWidget>
 #include <QListWidgetItem>
-
-#include <assert.h>
+#include <sstream>
 
 #include <vlc_common.h>
+#include <vlc_access.h>
 #include <vlc_input_item.h>
 #include <vlc_services_discovery.h>
 
@@ -222,12 +222,19 @@ void ChromecastDialog::discoveryEventReceived( const vlc_event_t * p_event )
 {
     if ( p_event->type == vlc_ServicesDiscoveryItemAdded )
     {
-        /* TODO determine if it's audio-only by checking the YouTube app */
+        /* determine if it's audio-only by checking the YouTube app */
+        std::stringstream s_video_test;
+        s_video_test << "http://"
+                     << p_event->u.services_discovery_item_added.p_new_item->psz_uri
+                     << ":8008/apps/YouTube";
+        access_t *p_test_app = vlc_access_NewMRL( VLC_OBJECT(p_intf), s_video_test.str().c_str() );
 
         ChromecastReceiver *item = new ChromecastReceiver( p_event->u.services_discovery_item_added.p_new_item->psz_name,
                                                            p_event->u.services_discovery_item_added.p_new_item->psz_uri,
                                                            8009,
-                                                           ChromecastReceiver::HAS_VIDEO);
+                                                           p_test_app ? ChromecastReceiver::HAS_VIDEO : ChromecastReceiver::AUDIO_ONLY);
+        if ( p_test_app )
+            vlc_access_Delete( p_test_app );
         ui.receiversListWidget->addItem( item );
     }
 }
