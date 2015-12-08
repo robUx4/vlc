@@ -2101,9 +2101,9 @@ struct sout_stream_sys_t
     }
 
     sout_stream_t * const p_wrapped;
+    intf_thread_t * const p_intf;
 
 protected:
-    intf_thread_t * const p_intf;
     sout_stream_t * const p_stream;
     bool                  b_header_started;
 };
@@ -2113,6 +2113,11 @@ protected:
  *****************************************************************************/
 static sout_stream_id_sys_t *Add(sout_stream_t *p_stream, const es_format_t *p_fmt)
 {
+    if (p_stream->p_sys->p_intf->p_sys->canDisplay == AUDIO_ONLY)
+    {
+        if (p_fmt->i_cat != AUDIO_ES)
+            return NULL;
+    }
     return sout_StreamIdAdd( p_stream->p_sys->p_wrapped, p_fmt );
 }
 
