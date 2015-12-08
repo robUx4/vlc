@@ -562,6 +562,7 @@ void intf_sys_t::InputUpdated( input_thread_t *p_input )
     {
         var_DelCallback( this->p_input, "intf-event", InputEvent, p_intf );
         var_SetAddress( this->p_input->p_parent, SOUT_INTF_ADDRESS, NULL );
+        var_SetString( this->p_input, "sout", NULL );
     }
 
     this->p_input = p_input;
