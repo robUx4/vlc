@@ -66,7 +66,7 @@ static int DemuxOpen(vlc_object_t *);
 static void DemuxClose(vlc_object_t *);
 static int SoutOpen(vlc_object_t *);
 static void SoutClose(vlc_object_t *);
-static int PlaylistEvent( vlc_object_t *, char const *,
+static int CurrentChanged( vlc_object_t *, char const *,
                           vlc_value_t, vlc_value_t, void * );
 static int InputEvent( vlc_object_t *, char const *,
                        vlc_value_t, vlc_value_t, void * );
@@ -440,8 +440,7 @@ int Open(vlc_object_t *p_this)
         goto error;
     }
 
-    var_AddCallback( pl_Get(p_intf), "input-current", PlaylistEvent, p_intf );
-    p_sys->InputUpdated( playlist_CurrentInput( pl_Get(p_intf) ) );
+    var_AddCallback( pl_Get(p_intf), "input-current", CurrentChanged, p_intf );
 
     return VLC_SUCCESS;
 
@@ -456,7 +455,7 @@ void Close(vlc_object_t *p_this)
     intf_sys_t *p_sys = p_intf->p_sys;
 
     var_DelCallback( pl_Get(p_intf), CONTROL_CFG_PREFIX "ip", IpChangedEvent, p_intf );
-    var_DelCallback( pl_Get(p_intf), "input-current", PlaylistEvent, p_intf );
+    var_DelCallback( pl_Get(p_intf), "input-current", CurrentChanged, p_intf );
 
     if( p_sys->p_input != NULL )
         var_DelCallback( p_sys->p_input, "intf-event", InputEvent, p_intf );
@@ -513,7 +512,7 @@ void intf_sys_t::ipChangedEvent(const char *psz_new_ip)
     }
 }
 
-static int PlaylistEvent( vlc_object_t *p_this, char const *psz_var,
+static int CurrentChanged( vlc_object_t *p_this, char const *psz_var,
                           vlc_value_t oldval, vlc_value_t val, void *p_data )
 {
     intf_thread_t *p_intf = static_cast<intf_thread_t *>(p_data);
@@ -557,7 +556,7 @@ void intf_sys_t::InputUpdated( input_thread_t *p_input )
 {
     vlc_mutex_locker locker(&lock);
 
-    msg_Dbg(p_intf, "PlaylistEvent input changed");
+    msg_Dbg(p_intf, "InputUpdated");
 
     if( this->p_input != NULL )
     {
@@ -1591,6 +1590,8 @@ static void* ChromecastThread(void* p_this)
         vlc_access_Delete( p_test_app );
 
     vlc_restorecancel(canc);
+
+    p_sys->InputUpdated( playlist_CurrentInput( pl_Get(p_intf) ) );
 
     while (1)
     {
