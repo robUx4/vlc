@@ -441,6 +441,7 @@ int Open(vlc_object_t *p_this)
     }
 
     var_AddCallback( pl_Get(p_intf), "input-current", PlaylistEvent, p_intf );
+    p_sys->InputUpdated( playlist_CurrentInput( pl_Get(p_intf) ) );
 
     return VLC_SUCCESS;
 
@@ -555,7 +556,6 @@ bool intf_sys_t::canDecodeAudio( const es_format_t *p_es ) const
 void intf_sys_t::InputUpdated( input_thread_t *p_input )
 {
     vlc_mutex_locker locker(&lock);
-    assert(this->p_input != p_input);
 
     msg_Dbg(p_intf, "PlaylistEvent input changed");
 
