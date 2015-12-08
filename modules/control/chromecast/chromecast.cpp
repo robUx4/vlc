@@ -403,8 +403,7 @@ int Open(vlc_object_t *p_this)
     }
     else
     {
-        msg_Err(p_intf, "No Chromecast receiver IP/Name provided");
-        goto error;
+        msg_Info(p_intf, "No Chromecast receiver IP/Name provided");
     }
     var_AddCallback( pl_Get(p_intf), CONTROL_CFG_PREFIX "ip", IpChangedEvent, p_intf );
 
