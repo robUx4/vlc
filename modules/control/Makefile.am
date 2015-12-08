@@ -79,9 +79,7 @@ CLEANFILES += $(nodist_libctrl_chromecast_plugin_la_SOURCES)
 
 if ENABLE_SOUT
 if BUILD_CHROMECAST
-if HAVE_CXX11
 BUILT_SOURCES += control/chromecast/cast_channel.pb.h
 control_LTLIBRARIES += libctrl_chromecast_plugin.la
-endif
 endif
 endif
