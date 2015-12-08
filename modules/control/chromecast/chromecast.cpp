@@ -756,13 +756,18 @@ bool intf_sys_t::seekTo(mtime_t pos)
 
     assert(playback_start_chromecast != -1.0);
 
+    char current_time[32];
     i_seektime = mdate() + SEEK_FORWARD_OFFSET /* + playback_start_local */ ;
-    const std::string currentTime = std::to_string( double( i_seektime ) / 1000000.0 );
+    if( snprintf( current_time, sizeof(current_time), "%f", double( i_seektime ) / 1000000.0 ) >= (int)sizeof(current_time) )
+    {
+        msg_Err( p_intf, "snprintf() truncated string for mediaSessionId" );
+        current_time[sizeof(current_time) - 1] = '\0';
+    }
     m_seektime = pos; // + playback_start_chromecast - playback_start_local;
     playback_start_local = pos;
-    msg_Dbg( p_intf, "%ld Seeking to %" PRId64 "/%s playback_time:%" PRId64, GetCurrentThreadId(), pos, currentTime.c_str(), playback_start_chromecast);
+    msg_Dbg( p_intf, "%ld Seeking to %" PRId64 "/%s playback_time:%" PRId64, GetCurrentThreadId(), pos, current_time, playback_start_chromecast);
     setPlayerStatus(CMD_SEEK_SENT);
-    msgPlayerSeek( currentTime );
+    msgPlayerSeek( current_time );
 
     return true;
 }
@@ -1220,13 +1225,18 @@ void intf_sys_t::processMessage(const castchannel::CastMessage &msg)
             else if (!newPlayerState.empty())
                 msg_Warn(p_intf, "Unknown Chromecast state %s", newPlayerState.c_str());
 
-            std::string mediaSessionId = std::to_string((json_int_t) status[0]["mediaSessionId"]);
-            if (!mediaSessionId.empty() && !this->mediaSessionId.empty() && mediaSessionId != this->mediaSessionId ) {
+            char session_id[32];
+            if( snprintf( session_id, sizeof(session_id), "%" PRId64, (json_int_t) status[0]["mediaSessionId"] ) >= (int)sizeof(session_id) )
+            {
+                msg_Err( p_intf, "snprintf() truncated string for mediaSessionId" );
+                session_id[sizeof(session_id) - 1] = '\0';
+            }
+            if (!mediaSessionId.empty() && session_id[0] && mediaSessionId != session_id) {
                 msg_Warn(p_intf, "different mediaSessionId detected %s was %s", mediaSessionId.c_str(), this->mediaSessionId.c_str());
                 //p_sys->msgPlayerLoad();
             }
 
-            this->mediaSessionId = mediaSessionId;
+            mediaSessionId = session_id;
 
             if (receiverState != oldPlayerState)
             {
