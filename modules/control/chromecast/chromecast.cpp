@@ -1070,7 +1070,7 @@ extern "C" int recvPacket(intf_thread_t *p_intf, bool &b_msgReceived,
  */
 void intf_sys_t::processMessage(const castchannel::CastMessage &msg)
 {
-    std::string namespace_ = msg.namespace_();
+    const std::string & namespace_ = msg.namespace_();
 
 #ifndef NDEBUG
     msg_Dbg(p_intf,"processMessage: %s->%s %s", namespace_.c_str(), msg.destination_id().c_str(), msg.payload_utf8().c_str());
@@ -1138,8 +1138,12 @@ void intf_sys_t::processMessage(const castchannel::CastMessage &msg)
                 std::string appId(applications[i]["appId"]);
                 if (appId == MEDIA_RECEIVER_APP_ID)
                 {
-                    p_app = &applications[i];
-                    appTransportId = std::string(applications[i]["transportId"]);
+                    const char *pz_transportId = applications[i]["transportId"];
+                    if (pz_transportId != NULL)
+                    {
+                        appTransportId = std::string(pz_transportId);
+                        p_app = &applications[i];
+                    }
                     break;
                 }
                 else if (!appId.empty())
