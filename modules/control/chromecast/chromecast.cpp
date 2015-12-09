@@ -313,6 +313,7 @@ private:
     bool              canRemux;
     bool              canDoDirect;
     bool              b_restart_playback;
+    double            f_restart_position;
 
     void msgPing();
     void msgPong();
@@ -689,7 +690,10 @@ void intf_sys_t::InputUpdated( input_thread_t *p_input )
         else if (conn_status == CHROMECAST_DEAD)
             b_restart_playback = false;
         else if (b_restart_playback)
+        {
             b_restart_playback = false;
+            input_Control( this->p_input, INPUT_SET_POSITION, f_restart_position);
+        }
         else
         {
             char *psz_old_sout = var_GetString( p_input, "sout" );
@@ -1099,7 +1103,10 @@ extern "C" int recvPacket(intf_thread_t *p_intf, bool &b_msgReceived,
 
 void intf_sys_t::initiateRestart()
 {
-    /* TODO save the position */
+    /* save the position */
+    input_thread_t *p_input = playlist_CurrentInput( pl_Get(p_intf) );
+    input_Control(p_input, INPUT_GET_POSITION, &f_restart_position);
+
     msg_Dbg(p_intf, "%ld playlist_Stop()", GetCurrentThreadId());
     playlist_Stop( pl_Get(p_intf) );
 }
@@ -2071,6 +2078,13 @@ static int DemuxControl( demux_t *p_demux, int i_query, va_list args)
         va_copy( ap, args );
         double pos = va_arg( ap, double );
         va_end( ap );
+
+        if (p_sys->getPlaybackTime() == -1.0)
+        {
+            msg_Dbg( p_demux, "seek to %" PRId64 " when the playback didn't start", pos );
+            break; // seek before started, likely on-the-fly restart
+        }
+
         if (!p_sys->seekTo( pos ))
         {
             msg_Err( p_demux, "failed to seek to %f", pos );
@@ -2087,6 +2101,13 @@ static int DemuxControl( demux_t *p_demux, int i_query, va_list args)
         va_copy( ap, args );
         mtime_t pos = va_arg( ap, mtime_t );
         va_end( ap );
+
+        if (p_sys->getPlaybackTime() == -1.0)
+        {
+            msg_Dbg( p_demux, "seek to %" PRId64 " when the playback didn't start", pos );
+            break; // seek before started, likely on-the-fly restart
+        }
+
         if (!p_sys->seekTo( pos ))
         {
             msg_Err( p_demux, "failed to seek to time %" PRId64, pos );
