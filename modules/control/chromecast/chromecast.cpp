@@ -162,6 +162,7 @@ struct intf_sys_t
         ,i_app_requestId(0)
         ,i_requestId(0)
         ,i_sout_id(0)
+        ,b_restart_playback(false)
     {
         //p_interrupt = vlc_interrupt_create();
     }
@@ -311,6 +312,7 @@ private:
     std::string       s_chromecast_url;
     bool              canRemux;
     bool              canDoDirect;
+    bool              b_restart_playback;
 
     void msgPing();
     void msgPong();
@@ -335,6 +337,7 @@ private:
 
     void plugOutputRedirection();
     void unplugOutputRedirection();
+    void initiateRestart();
     void disconnectChromecast();
 };
 
@@ -681,7 +684,34 @@ void intf_sys_t::InputUpdated( input_thread_t *p_input )
         ssout << "cc_sout{http-port=" << i_port << ",mux=" << muxer << ",mime=" << mime << ",uid=" << i_sout_id++ << "}";
         s_sout = ssout.str();
 
-        plugOutputRedirection();
+        if ( playlist_Status( pl_Get(p_intf) ) == PLAYLIST_STOPPED)
+            b_restart_playback = false;
+        else if (conn_status == CHROMECAST_DEAD)
+            b_restart_playback = false;
+        else if (b_restart_playback)
+            b_restart_playback = false;
+        else
+        {
+            char *psz_old_sout = var_GetString( p_input, "sout" );
+            b_restart_playback = !psz_old_sout || !psz_old_sout[0];
+            if (psz_old_sout)
+                free(psz_old_sout);
+        }
+        msg_Dbg( p_intf, "%ld new b_restart_playback:%d", GetCurrentThreadId(), b_restart_playback );
+
+        if ( b_restart_playback )
+        {
+            msg_Dbg( p_intf, "there's no sout defined yet status:%d", playlist_Status( pl_Get(p_intf) ) );
+            if (conn_status == CHROMECAST_APP_STARTED)
+            {
+                /* the MediaApp is already connected we need to stop now */
+                initiateRestart();
+            }
+        }
+        else if (conn_status != CHROMECAST_DEAD)
+        {
+            plugOutputRedirection();
+        }
     }
 }
 
@@ -738,6 +768,12 @@ void intf_sys_t::sendPlayerCmd()
         }
         break;
     case END_S:
+        if ( b_restart_playback )
+        {
+            msg_Dbg( p_intf, "restart playback playlist_Play() b_restart_playback:0" );
+            playlist_Play( pl_Get(p_intf) );
+            //b_restart_playback = false;
+        }
 #if 0
         /* the MediaPlayer app doesn't like to be stopped, it won't restart after that */
         if (!mediaSessionId.empty() /* && receiverState == RECEIVER_BUFFERING */) {
@@ -1061,6 +1097,12 @@ extern "C" int recvPacket(intf_thread_t *p_intf, bool &b_msgReceived,
     return i_ret;
 }
 
+void intf_sys_t::initiateRestart()
+{
+    /* TODO save the position */
+    msg_Dbg(p_intf, "%ld playlist_Stop()", GetCurrentThreadId());
+    playlist_Stop( pl_Get(p_intf) );
+}
 
 /**
  * @brief Process a message received from the Chromecast
@@ -1160,9 +1202,18 @@ void intf_sys_t::processMessage(const castchannel::CastMessage &msg)
                 if (!appTransportId.empty()
                         && getConnectionStatus() == CHROMECAST_AUTHENTICATED)
                 {
-                    setConnectionStatus(CHROMECAST_APP_STARTED);
                     msgConnect(appTransportId);
-                    sendPlayerCmd();
+                    setConnectionStatus(CHROMECAST_APP_STARTED);
+                    if (!b_restart_playback || playlist_Status(pl_Get(p_intf)) == PLAYLIST_STOPPED)
+                    {
+                        /* now we can start the Chromecast playback */
+                        sendPlayerCmd();
+                        b_restart_playback = false;
+                    }
+                    else
+                    {
+                        initiateRestart();
+                    }
                 }
                 else
                 {
