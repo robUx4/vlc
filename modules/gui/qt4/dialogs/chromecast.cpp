@@ -201,20 +201,14 @@ void ChromecastDialog::accept()
         msg_Dbg( p_intf, "selecting Chromecast %s %s:%u", psz_name.c_str(), psz_ip.c_str(), item->port );
 
         /* set the chromecast control */
-        vlc_object_t *p_parent = p_intf->p_parent;
-        while (p_parent && strcmp(p_parent->psz_object_type, "playlist"))
-            p_parent = p_parent->p_parent;
-        if (p_parent != NULL)
-        {
-            if( !var_Type( p_parent, "chromecast-ip" ) )
-                /* Don't recreate the same variable over and over and over... */
-                var_Create( p_parent, "chromecast-ip", VLC_VAR_STRING );
-            var_SetString( p_parent, "chromecast-ip", psz_ip.c_str() );
+        if( !var_Type( pl_Get(p_intf), "chromecast-ip" ) )
+            /* Don't recreate the same variable over and over and over... */
+            var_Create( pl_Get(p_intf), "chromecast-ip", VLC_VAR_STRING );
+        var_SetString( pl_Get(p_intf), "chromecast-ip", psz_ip.c_str() );
 
-            if (!b_interface_loaded &&
-                intf_Create( reinterpret_cast<playlist_t*>( p_parent ), "chromecast") == VLC_SUCCESS)
-                b_interface_loaded = true;
-        }
+        if (!b_interface_loaded &&
+            intf_Create( pl_Get(p_intf), "chromecast") == VLC_SUCCESS)
+            b_interface_loaded = true;
     }
 
     QVLCDialog::accept();
