@@ -333,6 +333,8 @@ private:
 
     void processMessage(const castchannel::CastMessage &msg);
 
+    void plugOutputRedirection();
+    void unplugOutputRedirection();
     void disconnectChromecast();
 };
 
@@ -391,23 +393,16 @@ int Open(vlc_object_t *p_this)
 {
     intf_thread_t *p_intf = reinterpret_cast<intf_thread_t*>(p_this);
     intf_sys_t *p_sys = new(std::nothrow) intf_sys_t(p_intf);
-    char *psz_mime;
     if (unlikely(p_sys == NULL))
         return VLC_ENOMEM;
 
-    char *psz_ipChromecast = var_InheritString(p_intf, CONTROL_CFG_PREFIX "ip");
-    if (psz_ipChromecast != NULL)
-    {
-        p_sys->deviceIP = psz_ipChromecast;
-        free(psz_ipChromecast);
-    }
-    else
-    {
-        msg_Info(p_intf, "No Chromecast receiver IP/Name provided");
-    }
     var_AddCallback( pl_Get(p_intf), CONTROL_CFG_PREFIX "ip", IpChangedEvent, p_intf );
 
-    psz_mime = var_InheritString(p_intf, CONTROL_CFG_PREFIX "mime");
+    char *psz_ipChromecast = var_InheritString(p_intf, CONTROL_CFG_PREFIX "ip");
+    if (psz_ipChromecast == NULL)
+        msg_Info(p_intf, "No Chromecast receiver IP/Name provided");
+
+    char *psz_mime = var_InheritString(p_intf, CONTROL_CFG_PREFIX "mime");
     if (psz_mime == NULL)
     {
         msg_Err(p_intf, "Bad MIME type provided");
@@ -431,15 +426,9 @@ int Open(vlc_object_t *p_this)
 
     p_intf->p_sys = p_sys;
 
-    // Start the Chromecast event thread.
-    if (vlc_clone(&p_sys->chromecastThread, ChromecastThread, p_intf,
-                  VLC_THREAD_PRIORITY_LOW))
-    {
-        msg_Err(p_intf, "Could not start the Chromecast talking thread");
-        goto error;
-    }
-
     var_AddCallback( pl_Get(p_intf), "input-current", CurrentChanged, p_intf );
+
+    p_sys->ipChangedEvent(psz_ipChromecast);
 
     return VLC_SUCCESS;
 
@@ -481,6 +470,8 @@ static int IpChangedEvent(vlc_object_t *p_this, char const *psz_var,
 
 void intf_sys_t::ipChangedEvent(const char *psz_new_ip)
 {
+    if (psz_new_ip == NULL)
+        psz_new_ip = "";
     if (deviceIP != psz_new_ip)
     {
         if ( !deviceIP.empty() )
@@ -495,13 +486,11 @@ void intf_sys_t::ipChangedEvent(const char *psz_new_ip)
         }
 
         /* connect the new Chromecast (if needed) */
-        if (psz_new_ip == NULL)
-            deviceIP = "";
-        else
-            deviceIP = psz_new_ip;
+        deviceIP = psz_new_ip;
 
         if (!deviceIP.empty())
         {
+            // Start the Chromecast event thread.
             if (vlc_clone(&chromecastThread, ChromecastThread, p_intf,
                           VLC_THREAD_PRIORITY_LOW))
             {
@@ -554,25 +543,48 @@ bool intf_sys_t::canDecodeAudio( const es_format_t *p_es ) const
     return false;
 }
 
+void intf_sys_t::unplugOutputRedirection()
+{
+    msg_Dbg( p_intf, "unplug output redirection from input %s", input_GetItem( p_input )->psz_name );
+    var_SetAddress( p_input->p_parent, SOUT_INTF_ADDRESS, NULL );
+    var_SetString( p_input, "demux-filter", NULL );
+    var_SetString( p_input, "sout", NULL );
+}
+
+void intf_sys_t::plugOutputRedirection()
+{
+    msg_Dbg( p_intf, "plug output redirection on input %s", input_GetItem( p_input )->psz_name );
+    if ( !var_Type(p_input->p_parent, SOUT_INTF_ADDRESS) )
+        var_Create( p_input->p_parent, SOUT_INTF_ADDRESS, VLC_VAR_ADDRESS );
+    var_SetAddress( p_input->p_parent, SOUT_INTF_ADDRESS, p_intf );
+    msg_Dbg(p_intf, "force sout to %s", s_sout.c_str());
+    var_SetString( p_input, "sout", s_sout.c_str() );
+    var_SetString( p_input, "demux-filter", "cc_demux" );
+}
 
 void intf_sys_t::InputUpdated( input_thread_t *p_input )
 {
     vlc_mutex_locker locker(&lock);
 
-    msg_Dbg(p_intf, "InputUpdated");
+    if (deviceIP.empty())
+        /* we will connect when we start the thread */
+        p_input = NULL;
+
+    if ( this->p_input == p_input )
+        return;
 
     if( this->p_input != NULL )
     {
         var_DelCallback( this->p_input, "intf-event", InputEvent, p_intf );
-        var_SetAddress( this->p_input->p_parent, SOUT_INTF_ADDRESS, NULL );
-        var_SetString( this->p_input, "demux-filter", NULL );
-        var_SetString( this->p_input, "sout", NULL );
+        unplugOutputRedirection();
     }
 
     this->p_input = p_input;
 
-    if( p_input != NULL )
+    if( this->p_input != NULL )
     {
+        var_AddCallback( p_input, "intf-event", InputEvent, p_intf );
+
         mutex_cleanup_push(&lock);
         while (canDisplay == DISPLAY_UNKNOWN && conn_status != CHROMECAST_DEAD)
         {
@@ -586,8 +598,6 @@ void intf_sys_t::InputUpdated( input_thread_t *p_input )
             msg_Warn(p_intf, "no Chromecast hook possible");
             return;
         }
-
-        var_AddCallback( p_input, "intf-event", InputEvent, p_intf );
 
         assert(!p_input->b_preparsing);
 
@@ -671,13 +681,7 @@ void intf_sys_t::InputUpdated( input_thread_t *p_input )
         ssout << "cc_sout{http-port=" << i_port << ",mux=" << muxer << ",mime=" << mime << ",uid=" << i_sout_id++ << "}";
         s_sout = ssout.str();
 
-        var_Create( p_input->p_parent, SOUT_INTF_ADDRESS, VLC_VAR_ADDRESS );
-        var_SetAddress( p_input->p_parent, SOUT_INTF_ADDRESS, p_intf );
-
-        msg_Dbg(p_intf, "force sout to %s", s_sout.c_str());
-
-        var_SetString( p_input, "sout", s_sout.c_str() );
-        var_SetString( p_input, "demux-filter", "cc_demux" );
+        plugOutputRedirection();
     }
 }
 
