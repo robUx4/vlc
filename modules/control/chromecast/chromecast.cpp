@@ -1106,6 +1106,7 @@ void intf_sys_t::initiateRestart()
     /* save the position */
     input_thread_t *p_input = playlist_CurrentInput( pl_Get(p_intf) );
     input_Control(p_input, INPUT_GET_POSITION, &f_restart_position);
+    msg_Dbg( p_intf, "Current %p position:%f", (void*)p_input, f_restart_position );
 
     msg_Dbg(p_intf, "%ld playlist_Stop()", GetCurrentThreadId());
 #if 0
