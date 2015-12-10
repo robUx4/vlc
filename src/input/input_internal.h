@@ -89,7 +89,7 @@ struct input_thread_private_t
     /* Current state */
     int         i_state;
     bool        is_running;
-    bool        is_stopped;
+    atomic_bool is_stopped;
     bool        b_recording;
     int         i_rate;
 

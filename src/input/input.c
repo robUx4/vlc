@@ -510,12 +510,7 @@ static void *Preparse( void *obj )
 bool input_Stopped( input_thread_t *input )
 {
     input_thread_private_t *sys = input->p;
-    bool ret;
-
-    vlc_mutex_lock( &sys->lock_control );
-    ret = sys->is_stopped;
-    vlc_mutex_unlock( &sys->lock_control );
-    return ret;
+    return sys->is_stopped;
 }
 
 /*****************************************************************************
