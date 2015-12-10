@@ -1110,6 +1110,7 @@ void intf_sys_t::initiateRestart()
 
     msg_Dbg(p_intf, "%ld playlist_Stop()", GetCurrentThreadId());
 #if 0
+    plugOutputRedirection();
     input_Control( p_input, INPUT_RESTART_OUTPUT );
 #elif 0
     input_Control( p_input, INPUT_RESTART_ES, -VIDEO_ES );
