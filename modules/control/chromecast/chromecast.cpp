@@ -1108,7 +1108,16 @@ void intf_sys_t::initiateRestart()
     input_Control(p_input, INPUT_GET_POSITION, &f_restart_position);
 
     msg_Dbg(p_intf, "%ld playlist_Stop()", GetCurrentThreadId());
+#if 0
+    input_Control( p_input, INPUT_RESTART_OUTPUT );
+#elif 0
+    input_Control( p_input, INPUT_RESTART_ES, -VIDEO_ES );
+    input_Control( p_input, INPUT_RESTART_ES, -AUDIO_ES );
+    input_Control( p_input, INPUT_RESTART_ES, -SPU_ES );
+    input_Control( p_input, INPUT_SET_POSITION, f_restart_position );
+#else
     playlist_Stop( pl_Get(p_intf) );
+#endif
 }
 
 /**
