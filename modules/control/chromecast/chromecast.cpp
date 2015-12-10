@@ -213,7 +213,7 @@ struct intf_sys_t
 
     bool isFinishedPlaying() {
         vlc_mutex_locker locker(&lock);
-        return conn_status == CHROMECAST_DEAD || (receiverState == RECEIVER_BUFFERING && cmd_status != CMD_SEEK_SENT);
+        return deviceIP.empty() || conn_status == CHROMECAST_DEAD || (receiverState == RECEIVER_BUFFERING && cmd_status != CMD_SEEK_SENT);
     }
 
     bool seekTo(mtime_t pos);
