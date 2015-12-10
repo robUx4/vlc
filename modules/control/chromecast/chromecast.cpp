@@ -2092,7 +2092,7 @@ static int DemuxControl( demux_t *p_demux, int i_query, va_list args)
 
         if (p_sys->getPlaybackTime() == -1.0)
         {
-            msg_Dbg( p_demux, "seek to %" PRId64 " when the playback didn't start", pos );
+            msg_Dbg( p_demux, "seek to %f when the playback didn't start", pos );
             break; // seek before started, likely on-the-fly restart
         }
 
