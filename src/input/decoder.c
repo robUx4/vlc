@@ -1297,7 +1297,7 @@ static void DecoderProcessFlush( decoder_t *p_dec )
     }
 
 #ifdef ENABLE_SOUT
-    if ( p_owner->p_sout != NULL )
+    if ( p_owner->p_sout_input != NULL )
     {
         //msg_Warn(p_dec, "%ld flushing sout", GetCurrentThreadId());
         sout_InputFlush( p_owner->p_sout_input );
