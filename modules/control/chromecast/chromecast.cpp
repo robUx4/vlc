@@ -163,6 +163,7 @@ struct intf_sys_t
         ,i_requestId(0)
         ,i_sout_id(0)
         ,b_restart_playback(false)
+        ,b_forcing_position(false)
     {
         //p_interrupt = vlc_interrupt_create();
     }
@@ -218,6 +219,15 @@ struct intf_sys_t
     bool seekTo(mtime_t pos);
 
     void sendPlayerCmd();
+
+    bool forceSeekPosition() const {
+        return b_forcing_position;
+    }
+
+    void resetForcedSeek(mtime_t i_length) {
+        b_forcing_position = false;
+        playback_start_local = i_length * f_restart_position;
+    }
 
     intf_thread_t  * const p_intf;
     input_thread_t *p_input;
@@ -313,6 +323,7 @@ private:
     bool              canRemux;
     bool              canDoDirect;
     bool              b_restart_playback;
+    bool              b_forcing_position;
     double            f_restart_position;
 
     void msgPing();
@@ -692,7 +703,9 @@ void intf_sys_t::InputUpdated( input_thread_t *p_input )
         else if (b_restart_playback)
         {
             b_restart_playback = false;
+            msg_Dbg( p_intf, "force restart position:%f", f_restart_position );
             input_Control( this->p_input, INPUT_SET_POSITION, f_restart_position);
+            b_forcing_position = true;
         }
         else
         {
@@ -1332,7 +1345,7 @@ void intf_sys_t::processMessage(const castchannel::CastMessage &msg)
                 case RECEIVER_PLAYING:
                     /* TODO reset demux PCR ? */
                     if (unlikely(playback_start_chromecast == -1.0)) {
-                        msg_Warn(p_intf, "start playing without buffering");
+                        msg_Warn(p_intf, "start playing without buffering f_restart_position:%f", f_restart_position );
                         playback_start_chromecast = (1 + mtime_t( double( status[0]["currentTime"] ) ) ) * 1000000L;
                     }
                     currentStopped = false;
@@ -1842,6 +1855,14 @@ struct demux_sys_t
         return p_demux->p_source->pf_demux( p_demux->p_source );
     }
 
+    bool seekViaChromecast() {
+        return !p_intf->p_sys->forceSeekPosition() && getPlaybackTime() != -1.0;
+    }
+
+    void resetForcedSeek() {
+        p_intf->p_sys->resetForcedSeek( i_length );
+    }
+
 protected:
     demux_t       *p_demux;
     intf_thread_t *p_intf;
@@ -2090,9 +2111,10 @@ static int DemuxControl( demux_t *p_demux, int i_query, va_list args)
         double pos = va_arg( ap, double );
         va_end( ap );
 
-        if (p_sys->getPlaybackTime() == -1.0)
+        if (!p_sys->seekViaChromecast())
         {
-            msg_Dbg( p_demux, "seek to %f when the playback didn't start", pos );
+            msg_Dbg( p_demux, "internal seek to %f when the playback didn't start", pos );
+            p_sys->resetForcedSeek( );
             break; // seek before started, likely on-the-fly restart
         }
 
@@ -2113,9 +2135,10 @@ static int DemuxControl( demux_t *p_demux, int i_query, va_list args)
         mtime_t pos = va_arg( ap, mtime_t );
         va_end( ap );
 
-        if (p_sys->getPlaybackTime() == -1.0)
+        if (!p_sys->seekViaChromecast())
         {
-            msg_Dbg( p_demux, "seek to %" PRId64 " when the playback didn't start", pos );
+            msg_Dbg( p_demux, "internal seek to %" PRId64 " when the playback didn't start", pos );
+            p_sys->resetForcedSeek( );
             break; // seek before started, likely on-the-fly restart
         }
 
