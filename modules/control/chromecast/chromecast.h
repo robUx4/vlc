@@ -77,40 +77,8 @@ enum receiver_display {
  *****************************************************************************/
 struct intf_sys_t
 {
-    intf_sys_t(intf_thread_t *intf)
-        :p_intf(intf)
-        ,p_input(NULL)
-        ,devicePort(8009)
-        ,receiverState(RECEIVER_IDLE)
-        ,date_play_start(-1)
-        ,playback_start_chromecast(-1.0)
-        ,playback_start_local(0)
-        ,canPause(false)
-        ,canDisplay(DISPLAY_UNKNOWN)
-        ,currentStopped(true)
-        ,i_sock_fd(-1)
-        ,p_creds(NULL)
-        ,p_tls(NULL)
-        ,cmd_status(NO_CMD_PENDING)
-        ,i_supportedMediaCommands(15)
-        ,m_seektime(-1.0)
-        ,i_seektime(-1.0)
-        ,conn_status(CHROMECAST_DISCONNECTED)
-        ,i_app_requestId(0)
-        ,i_requestId(0)
-        ,i_sout_id(0)
-        ,b_restart_playback(false)
-        ,b_forcing_position(false)
-    {
-        //p_interrupt = vlc_interrupt_create();
-    }
-
-    ~intf_sys_t()
-    {
-        ipChangedEvent( NULL );
-
-        //vlc_interrupt_destroy(p_interrupt);
-    }
+    intf_sys_t(intf_thread_t *intf);
+    ~intf_sys_t();
 
     mtime_t getPlaybackTime() const {
         switch( receiverState )
