@@ -123,6 +123,8 @@ int Open(vlc_object_t *p_this)
     if (unlikely(p_sys == NULL))
         return VLC_ENOMEM;
 
+    msg_Dbg(p_this, "OPENING Chromecast Control Interface");
+
     var_AddCallback( pl_Get(p_intf), CONTROL_CFG_PREFIX "ip", IpChangedEvent, p_intf );
 
     char *psz_ipChromecast = var_InheritString(p_intf, CONTROL_CFG_PREFIX "ip");
@@ -169,6 +171,8 @@ void Close(vlc_object_t *p_this)
     intf_thread_t *p_intf = reinterpret_cast<intf_thread_t*>(p_this);
     intf_sys_t *p_sys = p_intf->p_sys;
 
+    msg_Dbg(p_this, "CLOSING Chromecast Control Interface");
+
     var_DelCallback( pl_Get(p_intf), CONTROL_CFG_PREFIX "ip", IpChangedEvent, p_intf );
     var_DelCallback( pl_Get(p_intf), "input-current", CurrentChanged, p_intf );
 
@@ -198,6 +202,7 @@ void intf_sys_t::ipChangedEvent(const char *psz_new_ip)
         psz_new_ip = "";
     if (deviceIP != psz_new_ip)
     {
+        msg_Dbg(p_intf,"ipChangedEvent '%s' from '%s'", psz_new_ip, deviceIP.c_str());
         if ( !deviceIP.empty() )
         {
             /* disconnect the current Chromecast */
@@ -293,7 +298,7 @@ void intf_sys_t::plugOutputRedirection()
 
 void intf_sys_t::InputUpdated( input_thread_t *p_input )
 {
-    vlc_mutex_locker locker(&lock);
+    msg_Dbg( p_intf, "%ld InputUpdated p_input:%p was:%p b_restart_playback:%d", GetCurrentThreadId(), (void*)p_input, (void*)this->p_input, b_restart_playback );
 
     if (deviceIP.empty())
         /* we will connect when we start the thread */
@@ -510,7 +515,7 @@ void intf_sys_t::sendPlayerCmd()
     case END_S:
         if ( b_restart_playback )
         {
-            msg_Dbg( p_intf, "restart playback playlist_Play() b_restart_playback:0" );
+            msg_Dbg( p_intf, "restart playback p_input:%p playlist_Play() b_restart_playback:1 position:%f", (void*)p_input, f_restart_position );
             playlist_Play( pl_Get(p_intf) );
             //b_restart_playback = false;
         }
@@ -634,7 +639,7 @@ static int InputEvent( vlc_object_t *p_this, char const *psz_var,
     {
     case INPUT_EVENT_STATE:
         {
-            msg_Info(p_this, "playback state changed %d", (int)var_GetInteger( p_input, "state" ));
+            msg_Info(p_this, "%ld playback state changed %d", GetCurrentThreadId(), (int)var_GetInteger( p_input, "state" ));
             vlc_mutex_locker locker(&p_sys->lock);
             p_sys->sendPlayerCmd();
         }
