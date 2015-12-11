@@ -1235,7 +1235,7 @@ void intf_sys_t::msgReceiverClose()
     pushMessage(NAMESPACE_CONNECTION, s, appTransportId);
 
     appTransportId = "";
-    setConnectionStatus(CHROMECAST_TLS_CONNECTED);
+    setConnectionStatus( deviceIP.empty() ? CHROMECAST_DISCONNECTED : CHROMECAST_TLS_CONNECTED );
 }
 
 void intf_sys_t::msgReceiverLaunchApp()
@@ -1387,6 +1387,8 @@ static void* ChromecastThread(void* p_this)
     intf_sys_t *p_sys = p_intf->p_sys;
 
     //vlc_interrupt_set(p_sys->p_interrupt);
+
+    p_sys->setConnectionStatus( CHROMECAST_DISCONNECTED );
 
     p_sys->i_sock_fd = connectChromecast(p_intf);
     if (p_sys->i_sock_fd < 0)
