@@ -448,7 +448,7 @@ void intf_sys_t::InputUpdated( input_thread_t *p_input )
         if ( b_restart_playback )
         {
             msg_Dbg( p_intf, "there's no sout defined yet status:%d", playlist_Status( pl_Get(p_intf) ) );
-            if (conn_status == CHROMECAST_APP_STARTED)
+            if (deviceIP.empty() || conn_status == CHROMECAST_APP_STARTED)
             {
                 /* the MediaApp is already connected we need to stop now */
                 initiateRestart();
@@ -458,6 +458,10 @@ void intf_sys_t::InputUpdated( input_thread_t *p_input )
         {
             plugOutputRedirection();
         }
+    }
+    else if ( !b_restart_playback )
+    {
+        initiateRestart();
     }
 }
 
@@ -847,6 +851,12 @@ void intf_sys_t::initiateRestart()
 {
     /* save the position */
     input_thread_t *p_input = playlist_CurrentInput( pl_Get(p_intf) );
+    if (p_input == NULL)
+    {
+        msg_Warn( p_intf, "cannot restart non playing source" );
+        return;
+    }
+    b_restart_playback = true;
     input_Control(p_input, INPUT_GET_POSITION, &f_restart_position);
     msg_Dbg( p_intf, "Current %p position:%f", (void*)p_input, f_restart_position );
 
