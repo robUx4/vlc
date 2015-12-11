@@ -72,6 +72,12 @@ enum receiver_display {
     AUDIO_ONLY
 };
 
+enum restart_state {
+    RESTART_NONE,
+    RESTART_STOPPING,
+    RESTART_STARTING,
+};
+
 /*****************************************************************************
  * intf_sys_t: description and status of interface
  *****************************************************************************/
@@ -151,6 +157,7 @@ struct intf_sys_t
     mtime_t     playback_start_local;
     bool        canPause;
     receiver_display  canDisplay;
+    restart_state     restartState;
     bool              currentStopped;
 
     int i_sock_fd;
@@ -194,6 +201,8 @@ struct intf_sys_t
     }
 
     void ipChangedEvent(const char *psz_new_ip);
+    bool finishRestart();
+    void stateChangedForRestart( input_thread_t * );
 
 private:
     int sendMessage(const castchannel::CastMessage &msg);

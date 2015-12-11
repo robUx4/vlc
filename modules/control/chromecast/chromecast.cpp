@@ -195,6 +195,7 @@ intf_sys_t::intf_sys_t(intf_thread_t *intf)
     ,playback_start_local(0)
     ,canPause(false)
     ,canDisplay(DISPLAY_UNKNOWN)
+    ,restartState(RESTART_NONE)
     ,currentStopped(true)
     ,i_sock_fd(-1)
     ,p_creds(NULL)
@@ -337,8 +338,18 @@ void intf_sys_t::InputUpdated( input_thread_t *p_input )
     msg_Dbg( p_intf, "%ld InputUpdated p_input:%p was:%p b_restart_playback:%d", GetCurrentThreadId(), (void*)p_input, (void*)this->p_input, b_restart_playback );
 
     if (deviceIP.empty())
+    {
+        if ( restartState == RESTART_STARTING && p_input != NULL )
+        {
+            b_restart_playback = false;
+            restartState = RESTART_NONE;
+            msg_Dbg( p_intf, "force restart position:%f", f_restart_position );
+            input_Control( p_input, INPUT_SET_POSITION, f_restart_position);
+            b_forcing_position = true;
+        }
         /* we will connect when we start the thread */
         p_input = NULL;
+    }
 
     if ( this->p_input == p_input )
     {
@@ -469,6 +480,7 @@ void intf_sys_t::InputUpdated( input_thread_t *p_input )
         else if (b_restart_playback)
         {
             b_restart_playback = false;
+            restartState = RESTART_NONE;
             msg_Dbg( p_intf, "force restart position:%f", f_restart_position );
             input_Control( this->p_input, INPUT_SET_POSITION, f_restart_position);
             b_forcing_position = true;
@@ -556,12 +568,6 @@ void intf_sys_t::sendPlayerCmd()
         }
         break;
     case END_S:
-        if ( b_restart_playback )
-        {
-            msg_Dbg( p_intf, "restart playback p_input:%p playlist_Play() b_restart_playback:1 position:%f", (void*)p_input, f_restart_position );
-            playlist_Play( pl_Get(p_intf) );
-            //b_restart_playback = false;
-        }
 #if 0
         /* the MediaPlayer app doesn't like to be stopped, it won't restart after that */
         if (!mediaSessionId.empty() /* && receiverState == RECEIVER_BUFFERING */) {
@@ -885,6 +891,49 @@ extern "C" int recvPacket(intf_thread_t *p_intf, bool &b_msgReceived,
     return i_ret;
 }
 
+void intf_sys_t::stateChangedForRestart( input_thread_t *p_input )
+{
+    msg_Dbg(p_intf, "%ld RestartAfterEnd state changed %d", GetCurrentThreadId(), (int)var_GetInteger( p_input, "state" ));
+    if ( var_GetInteger( p_input, "state" ) == END_S )
+    {
+        msg_Info(p_intf, "RestartAfterEnd play this file again" );
+        if ( finishRestart() )
+        {
+            restartState = RESTART_STARTING;
+            /* no need to unhook the callback it will be when the input is destroyed */
+            //var_DelCallback( p_input, "intf-event", RestartAfterEnd, p_intf );
+        }
+    }
+}
+
+static int RestartAfterEnd( vlc_object_t *p_this, char const *psz_var,
+                            vlc_value_t oldval, vlc_value_t val, void *p_data )
+{
+    VLC_UNUSED( oldval );
+    VLC_UNUSED( psz_var );
+    input_thread_t *p_input = reinterpret_cast<input_thread_t*>(p_this);
+    intf_thread_t *p_intf = static_cast<intf_thread_t*>(p_data);
+
+    if( val.i_int == INPUT_EVENT_STATE )
+    {
+        p_intf->p_sys->stateChangedForRestart( p_input );
+    }
+
+    return VLC_SUCCESS;
+}
+
+bool intf_sys_t::finishRestart()
+{
+    if ( b_restart_playback )
+    {
+        msg_Dbg( p_intf, "restart playback p_input:%p playlist_Play() b_restart_playback:1 position:%f", (void*)p_input, f_restart_position );
+        playlist_Play( pl_Get(p_intf) );
+        //b_restart_playback = false;
+        return true;
+    }
+    return false;
+}
+
 void intf_sys_t::initiateRestart()
 {
     /* save the position */
@@ -894,10 +943,12 @@ void intf_sys_t::initiateRestart()
         msg_Warn( p_intf, "cannot restart non playing source" );
         return;
     }
+    var_AddCallback( p_input, "intf-event", RestartAfterEnd, p_intf );
     b_restart_playback = true;
     input_Control(p_input, INPUT_GET_POSITION, &f_restart_position);
     msg_Dbg( p_intf, "Current %p position:%f", (void*)p_input, f_restart_position );
 
+    restartState = RESTART_STOPPING;
     msg_Dbg(p_intf, "%ld playlist_Stop()", GetCurrentThreadId());
 #if 0
     plugOutputRedirection();
