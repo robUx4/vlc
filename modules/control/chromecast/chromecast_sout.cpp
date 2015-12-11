@@ -1,11 +1,9 @@
 /*****************************************************************************
- * chromecast.cpp: Chromecast module for vlc
+ * chromecast.cpp: Chromecast sout module for vlc
  *****************************************************************************
- * Copyright © 2014-2015 VideoLAN
+ * Copyright © 2015 VideoLAN
  *
- * Authors: Adrien Maglo <magsoft@videolan.org>
- *          Jean-Baptiste Kempf <jb@videolan.org>
- *          Steve Lhomme <robux4@videolabs.io>
+ * Authors: Steve Lhomme <robux4@videolabs.io>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU Lesser General Public License as published by
@@ -30,62 +28,23 @@
 # include "config.h"
 #endif
 
-#ifdef HAVE_POLL
-# include <poll.h>
-#endif
+#include "chromecast.h"
 
 #include <vlc_common.h>
 #include <vlc_plugin.h>
-#include <vlc_interface.h>
-#include <vlc_playlist.h>
-#include <vlc_input.h>
-#include <vlc_network.h>
-#include <vlc_tls.h>
-#include <vlc_interrupt.h>
-#include <vlc_demux.h>
 #include <vlc_sout.h>
-#include <vlc_access.h>
 
-#include <atomic>
 #include <cassert>
 #include <sstream>
-#include <queue>
-
-#include "chromecast.h"
 
 static int SoutOpen(vlc_object_t *);
 static void SoutClose(vlc_object_t *);
 
-#define CONTROL_CFG_PREFIX "chromecast-"
 #define SOUT_CFG_PREFIX    "sout-chromecast-"
-#define SOUT_INTF_ADDRESS  "sout-chromecast-intf"
 
-#define PACKET_MAX_LEN 10 * 1024
-#define PACKET_HEADER_LEN 4
-
-/* deadline regarding pings sent from receiver */
-#define PING_WAIT_TIME 6000
-#define PING_WAIT_RETRIES 0
-/* deadline regarding pong we expect after pinging the receiver */
-#define PONG_WAIT_TIME 500
-#define PONG_WAIT_RETRIES 2
-
-#define TIMEOUT_LOAD_CMD  (6 * CLOCK_FREQ)
-#define TIMEOUT_MDNS_IP   (4 * CLOCK_FREQ)
-
-#define IP_TEXT N_("Chromecast IP address")
-#define IP_LONGTEXT N_("This sets the IP adress of the Chromecast receiver.")
-#define TARGET_TEXT N_("Chromecast Name")
-#define TARGET_LONGTEXT N_("This sets the name of the Chromecast receiver.")
-#define MIME_TEXT N_("MIME content type")
-#define MIME_LONGTEXT N_("This sets the media MIME content type sent to the Chromecast.")
-#define MUXER_TEXT N_("Output muxer address")
-#define MUXER_LONGTEXT N_("Output muxer chromecast interface.")
-
+/* sout wrapper that can tell when the Chromecast is finished playing
+ * rather than when data are finished sending */
 vlc_module_begin ()
-    /* sout wrapper that can tell when the Chromecast is finished playing
-     * rather than when data are finished sending
-     */
     set_shortname( "cc_sout" )
     set_category(CAT_SOUT)
     set_subcategory(SUBCAT_SOUT_STREAM)
@@ -93,7 +52,6 @@ vlc_module_begin ()
     set_capability("sout stream", 0)
     add_shortcut("cc_sout")
     set_callbacks( SoutOpen, SoutClose )
-
 vlc_module_end ()
 
 struct sout_stream_sys_t

@@ -29,36 +29,19 @@
 #ifndef VLC_CHROMECAST_H
 #define VLC_CHROMECAST_H
 
-#ifdef HAVE_CONFIG_H
-# include "config.h"
-#endif
-
-#ifdef HAVE_POLL
-# include <poll.h>
-#endif
-
 #include <vlc_common.h>
 #include <vlc_plugin.h>
 #include <vlc_interface.h>
-#include <vlc_playlist.h>
-#include <vlc_input.h>
-#include <vlc_network.h>
 #include <vlc_tls.h>
-#include <vlc_interrupt.h>
-#include <vlc_demux.h>
-#include <vlc_sout.h>
-#include <vlc_access.h>
 
-#include <atomic>
-#include <cassert>
 #include <sstream>
-#include <queue>
 
-#include <google/protobuf/io/zero_copy_stream_impl.h>
-#include <google/protobuf/io/coded_stream.h>
 #include "cast_channel.pb.h"
 
-#include "../../misc/webservices/json.h"
+#define SOUT_INTF_ADDRESS  "sout-chromecast-intf"
+
+// Media player Chromecast app id
+static const std::string DEFAULT_CHOMECAST_RECEIVER = "receiver-0";
 
 // Status
 enum connection_status {
@@ -88,22 +71,6 @@ enum receiver_display {
     HAS_VIDEO,
     AUDIO_ONLY
 };
-
-#define PACKET_MAX_LEN 10 * 1024
-#define PACKET_HEADER_LEN 4
-
-// Media player Chromecast app id
-static const std::string DEFAULT_CHOMECAST_RECEIVER = "receiver-0";
-
-/* deadline regarding pings sent from receiver */
-#define PING_WAIT_TIME 6000
-#define PING_WAIT_RETRIES 0
-/* deadline regarding pong we expect after pinging the receiver */
-#define PONG_WAIT_TIME 500
-#define PONG_WAIT_RETRIES 2
-
-#define TIMEOUT_LOAD_CMD  (6 * CLOCK_FREQ)
-#define TIMEOUT_MDNS_IP   (4 * CLOCK_FREQ)
 
 /*****************************************************************************
  * intf_sys_t: description and status of interface

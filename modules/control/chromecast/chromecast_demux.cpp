@@ -1,11 +1,9 @@
 /*****************************************************************************
- * chromecast.cpp: Chromecast module for vlc
+ * chromecast.cpp: Chromecast demux filter module for vlc
  *****************************************************************************
- * Copyright © 2014-2015 VideoLAN
+ * Copyright © 2015 VideoLAN
  *
- * Authors: Adrien Maglo <magsoft@videolan.org>
- *          Jean-Baptiste Kempf <jb@videolan.org>
- *          Steve Lhomme <robux4@videolabs.io>
+ * Authors: Steve Lhomme <robux4@videolabs.io>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU Lesser General Public License as published by
@@ -30,54 +28,16 @@
 # include "config.h"
 #endif
 
-#ifdef HAVE_POLL
-# include <poll.h>
-#endif
+#include "chromecast.h"
 
 #include <vlc_common.h>
 #include <vlc_plugin.h>
-#include <vlc_interface.h>
-#include <vlc_playlist.h>
-#include <vlc_input.h>
-#include <vlc_network.h>
-#include <vlc_tls.h>
-#include <vlc_interrupt.h>
 #include <vlc_demux.h>
-#include <vlc_sout.h>
-#include <vlc_access.h>
 
-#include <atomic>
 #include <cassert>
-#include <sstream>
-#include <queue>
-
-#include "chromecast.h"
 
 static int DemuxOpen(vlc_object_t *);
 static void DemuxClose(vlc_object_t *);
-
-#define CONTROL_CFG_PREFIX "chromecast-"
-#define SOUT_CFG_PREFIX    "sout-chromecast-"
-#define SOUT_INTF_ADDRESS  "sout-chromecast-intf"
-
-#define PACKET_MAX_LEN 10 * 1024
-#define PACKET_HEADER_LEN 4
-
-/* deadline regarding pings sent from receiver */
-#define PING_WAIT_TIME 6000
-#define PING_WAIT_RETRIES 0
-/* deadline regarding pong we expect after pinging the receiver */
-#define PONG_WAIT_TIME 500
-#define PONG_WAIT_RETRIES 2
-
-#define IP_TEXT N_("Chromecast IP address")
-#define IP_LONGTEXT N_("This sets the IP adress of the Chromecast receiver.")
-#define TARGET_TEXT N_("Chromecast Name")
-#define TARGET_LONGTEXT N_("This sets the name of the Chromecast receiver.")
-#define MIME_TEXT N_("MIME content type")
-#define MIME_LONGTEXT N_("This sets the media MIME content type sent to the Chromecast.")
-#define MUXER_TEXT N_("Output muxer address")
-#define MUXER_LONGTEXT N_("Output muxer chromecast interface.")
 
 vlc_module_begin ()
     set_shortname( "cc_demux" )

@@ -34,6 +34,8 @@
 # include <poll.h>
 #endif
 
+#include "chromecast.h"
+
 #include <vlc_common.h>
 #include <vlc_plugin.h>
 #include <vlc_interface.h>
@@ -41,17 +43,10 @@
 #include <vlc_input.h>
 #include <vlc_network.h>
 #include <vlc_tls.h>
-#include <vlc_interrupt.h>
-#include <vlc_demux.h>
-#include <vlc_sout.h>
 #include <vlc_access.h>
 
-#include <atomic>
 #include <cassert>
 #include <sstream>
-#include <queue>
-
-#include "chromecast.h"
 
 #include "../../misc/webservices/json.h"
 
@@ -70,8 +65,6 @@ static void *ChromecastThread(void *data);
 static int connectChromecast(intf_thread_t *p_intf);
 
 #define CONTROL_CFG_PREFIX "chromecast-"
-#define SOUT_CFG_PREFIX    "sout-chromecast-"
-#define SOUT_INTF_ADDRESS  "sout-chromecast-intf"
 
 #define PACKET_MAX_LEN 10 * 1024
 #define PACKET_HEADER_LEN 4
@@ -88,9 +81,6 @@ static const mtime_t SEEK_FORWARD_OFFSET = 1000000;
 /* deadline regarding pong we expect after pinging the receiver */
 #define PONG_WAIT_TIME 500
 #define PONG_WAIT_RETRIES 2
-
-#define TIMEOUT_LOAD_CMD  (6 * CLOCK_FREQ)
-#define TIMEOUT_MDNS_IP   (4 * CLOCK_FREQ)
 
 static const std::string NAMESPACE_DEVICEAUTH = "urn:x-cast:com.google.cast.tp.deviceauth";
 static const std::string NAMESPACE_CONNECTION = "urn:x-cast:com.google.cast.tp.connection";
