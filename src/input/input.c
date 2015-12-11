@@ -200,7 +200,7 @@ void input_Stop( input_thread_t *p_input )
         ControlRelease( ctrl->i_type, ctrl->val );
     }
     sys->i_control = 0;
-    sys->is_stopped = true;
+    atomic_store( &sys->is_stopped, true );
     vlc_cond_signal( &sys->wait_control );
     vlc_mutex_unlock( &sys->lock_control );
     vlc_interrupt_kill( &sys->interrupt );
@@ -316,7 +316,6 @@ static input_thread_t *Create( vlc_object_t *p_parent, input_item_t *p_item,
     p_input->p->i_title_offset = p_input->p->i_seekpoint_offset = 0;
     p_input->p->i_state = INIT_S;
     p_input->p->is_running = false;
-    p_input->p->is_stopped = false;
     p_input->p->b_recording = false;
     p_input->p->i_rate = INPUT_RATE_DEFAULT;
     memset( &p_input->p->bookmark, 0, sizeof(p_input->p->bookmark) );
@@ -325,6 +324,7 @@ static input_thread_t *Create( vlc_object_t *p_parent, input_item_t *p_item,
     p_input->p->attachment_demux = NULL;
     p_input->p->p_sout   = NULL;
     p_input->p->b_out_pace_control = false;
+    atomic_init( &p_input->p->is_stopped, false );
 
     vlc_gc_incref( p_item ); /* Released in Destructor() */
     p_input->p->p_item = p_item;
@@ -509,8 +509,7 @@ static void *Preparse( void *obj )
 
 bool input_Stopped( input_thread_t *input )
 {
-    input_thread_private_t *sys = input->p;
-    return sys->is_stopped;
+    return atomic_load( &input->p->is_stopped );
 }
 
 /*****************************************************************************
@@ -1365,7 +1364,7 @@ void input_ControlPush( input_thread_t *p_input,
     input_thread_private_t *sys = p_input->p;
 
     vlc_mutex_lock( &sys->lock_control );
-    if( sys->is_stopped )
+    if( input_Stopped( p_input ) )
         ;
     else if( sys->i_control >= INPUT_CONTROL_FIFO_SIZE )
     {
@@ -1434,7 +1433,7 @@ static inline int ControlPop( input_thread_t *p_input,
     while( p_sys->i_control <= 0 ||
            ( b_postpone_seek && ControlIsSeekRequest( p_sys->control[0].i_type ) ) )
     {
-        if( p_sys->is_stopped )
+        if( input_Stopped( p_input ) )
         {
             vlc_mutex_unlock( &p_sys->lock_control );
             return VLC_EGENERIC;
