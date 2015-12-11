@@ -298,6 +298,7 @@ void intf_sys_t::plugOutputRedirection()
 
 void intf_sys_t::InputUpdated( input_thread_t *p_input )
 {
+    vlc_mutex_lock(&lock);
     msg_Dbg( p_intf, "%ld InputUpdated p_input:%p was:%p b_restart_playback:%d", GetCurrentThreadId(), (void*)p_input, (void*)this->p_input, b_restart_playback );
 
     if (deviceIP.empty())
@@ -305,11 +306,16 @@ void intf_sys_t::InputUpdated( input_thread_t *p_input )
         p_input = NULL;
 
     if ( this->p_input == p_input )
+    {
+        vlc_mutex_unlock(&lock);
         return;
+    }
 
     if( this->p_input != NULL )
     {
+        vlc_mutex_unlock(&lock);
         var_DelCallback( this->p_input, "intf-event", InputEvent, p_intf );
+        vlc_mutex_lock(&lock);
         unplugOutputRedirection();
     }
 
@@ -330,6 +336,7 @@ void intf_sys_t::InputUpdated( input_thread_t *p_input )
         if (conn_status == CHROMECAST_DEAD)
         {
             msg_Warn(p_intf, "no Chromecast hook possible");
+            vlc_mutex_unlock(&lock);
             return;
         }
 
@@ -458,6 +465,7 @@ void intf_sys_t::InputUpdated( input_thread_t *p_input )
     {
         initiateRestart();
     }
+    vlc_mutex_unlock(&lock);
 }
 
 void intf_sys_t::sendPlayerCmd()
