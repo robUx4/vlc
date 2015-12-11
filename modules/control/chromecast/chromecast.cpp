@@ -182,9 +182,6 @@ void Close(vlc_object_t *p_this)
     var_DelCallback( pl_Get(p_intf), CONTROL_CFG_PREFIX "ip", IpChangedEvent, p_intf );
     var_DelCallback( pl_Get(p_intf), "input-current", CurrentChanged, p_intf );
 
-    if( p_sys->p_input != NULL )
-        var_DelCallback( p_sys->p_input, "intf-event", InputEvent, p_intf );
-
     p_sys->ipChangedEvent( NULL );
 
     vlc_mutex_destroy(&p_sys->lock);
