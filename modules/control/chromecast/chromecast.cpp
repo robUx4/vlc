@@ -325,7 +325,7 @@ void intf_sys_t::InputUpdated( input_thread_t *p_input )
         var_AddCallback( p_input, "intf-event", InputEvent, p_intf );
 
         mutex_cleanup_push(&lock);
-        while (canDisplay == DISPLAY_UNKNOWN && conn_status != CHROMECAST_DEAD)
+        while (!deviceIP.empty() && canDisplay == DISPLAY_UNKNOWN && conn_status != CHROMECAST_DEAD)
         {
             msg_Dbg(p_intf, "InputUpdated waiting for Chromecast connection, current %d", conn_status);
             vlc_cond_wait(&loadCommandCond, &lock);
@@ -381,44 +381,49 @@ void intf_sys_t::InputUpdated( input_thread_t *p_input )
 
         int i_port = var_InheritInteger(p_intf, CONTROL_CFG_PREFIX "http-port");
 
-        std::stringstream ssout;
-        ssout << "#";
-        if ( !canRemux )
+        if (deviceIP.empty())
+            s_sout = "";
+        else
         {
-            if ( i_codec_audio == 0 )
-                i_codec_audio = DEFAULT_TRANSCODE_AUDIO;
-            /* avcodec AAC encoder is experimental */
-            if ( i_codec_audio == VLC_CODEC_MP4A ||
-                 i_codec_audio == VLC_FOURCC('h', 'a', 'a', 'c') ||
-                 i_codec_audio == VLC_FOURCC('l', 'a', 'a', 'c') ||
-                 i_codec_audio == VLC_FOURCC('s', 'a', 'a', 'c'))
-                i_codec_audio = DEFAULT_TRANSCODE_AUDIO;
-
-            if ( i_codec_video == 0 )
-                i_codec_video = DEFAULT_TRANSCODE_VIDEO;
-
-            /* TODO: provide audio samplerate and channels */
-            ssout << "transcode{acodec=";
-            char s_fourcc[5];
-            vlc_fourcc_to_char( i_codec_audio, s_fourcc );
-            s_fourcc[4] = '\0';
-            ssout << s_fourcc;
-            if ( canDisplay==HAS_VIDEO )
+            std::stringstream ssout;
+            ssout << "#";
+            if ( !canRemux )
             {
-                /* TODO: provide maxwidth,maxheight */
-                ssout << ",vcodec=";
-                vlc_fourcc_to_char( i_codec_video, s_fourcc );
+                if ( i_codec_audio == 0 )
+                    i_codec_audio = DEFAULT_TRANSCODE_AUDIO;
+                /* avcodec AAC encoder is experimental */
+                if ( i_codec_audio == VLC_CODEC_MP4A ||
+                     i_codec_audio == VLC_FOURCC('h', 'a', 'a', 'c') ||
+                     i_codec_audio == VLC_FOURCC('l', 'a', 'a', 'c') ||
+                     i_codec_audio == VLC_FOURCC('s', 'a', 'a', 'c'))
+                    i_codec_audio = DEFAULT_TRANSCODE_AUDIO;
+
+                if ( i_codec_video == 0 )
+                    i_codec_video = DEFAULT_TRANSCODE_VIDEO;
+
+                /* TODO: provide audio samplerate and channels */
+                ssout << "transcode{acodec=";
+                char s_fourcc[5];
+                vlc_fourcc_to_char( i_codec_audio, s_fourcc );
                 s_fourcc[4] = '\0';
                 ssout << s_fourcc;
+                if ( canDisplay==HAS_VIDEO )
+                {
+                    /* TODO: provide maxwidth,maxheight */
+                    ssout << ",vcodec=";
+                    vlc_fourcc_to_char( i_codec_video, s_fourcc );
+                    s_fourcc[4] = '\0';
+                    ssout << s_fourcc;
+                }
+                ssout << "}:";
             }
-            ssout << "}:";
+            if (mime == "video/x-matroska" && canDisplay==HAS_VIDEO && i_codec_audio == VLC_CODEC_VORBIS && i_codec_video == VLC_CODEC_VP8 )
+                mime == "video/webm";
+            if (mime == "video/x-matroska" && !canDisplay==HAS_VIDEO )
+                mime == "audio/x-matroska";
+            ssout << "cc_sout{http-port=" << i_port << ",mux=" << muxer << ",mime=" << mime << ",uid=" << i_sout_id++ << "}";
+            s_sout = ssout.str();
         }
-        if (mime == "video/x-matroska" && canDisplay==HAS_VIDEO && i_codec_audio == VLC_CODEC_VORBIS && i_codec_video == VLC_CODEC_VP8 )
-            mime == "video/webm";
-        if (mime == "video/x-matroska" && !canDisplay==HAS_VIDEO )
-            mime == "audio/x-matroska";
-        ssout << "cc_sout{http-port=" << i_port << ",mux=" << muxer << ",mime=" << mime << ",uid=" << i_sout_id++ << "}";
-        s_sout = ssout.str();
 
         if ( playlist_Status( pl_Get(p_intf) ) == PLAYLIST_STOPPED)
             b_restart_playback = false;
