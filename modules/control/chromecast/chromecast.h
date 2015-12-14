@@ -38,10 +38,13 @@
 
 #include "cast_channel.pb.h"
 
+#define PACKET_HEADER_LEN 4
 #define SOUT_INTF_ADDRESS  "sout-chromecast-intf"
 
 // Media player Chromecast app id
 static const std::string DEFAULT_CHOMECAST_RECEIVER = "receiver-0";
+/* see https://developers.google.com/cast/docs/reference/messages */
+static const std::string NAMESPACE_MEDIA            = "urn:x-cast:com.google.cast.media";
 
 // Status
 enum connection_status {
@@ -122,10 +125,7 @@ struct intf_sys_t
         vlc_cond_broadcast(&loadCommandCond);
     }
 
-    bool isFinishedPlaying() {
-        vlc_mutex_locker locker(&lock);
-        return deviceIP.empty() || conn_status == CHROMECAST_DEAD || (receiverState == RECEIVER_BUFFERING && cmd_status != CMD_SEEK_SENT);
-    }
+    bool isFinishedPlaying();
 
     bool seekTo(mtime_t pos);
 

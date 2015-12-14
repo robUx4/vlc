@@ -30,8 +30,6 @@
 
 #include "chromecast.h"
 
-#include <vlc_common.h>
-#include <vlc_plugin.h>
 #include <vlc_demux.h>
 
 #include <cassert>
@@ -94,11 +92,7 @@ struct demux_sys_t
     bool seekTo(mtime_t i_pos) {
         if (!canSeek)
             return false;
-#if 0 /* TODO */
         return p_intf->p_sys->seekTo(i_pos);
-#else
-        return false;
-#endif
     }
 
     void setLength(mtime_t length) {

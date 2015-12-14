@@ -36,17 +36,12 @@
 
 #include "chromecast.h"
 
-#include <vlc_common.h>
-#include <vlc_plugin.h>
-#include <vlc_interface.h>
 #include <vlc_playlist.h>
 #include <vlc_input.h>
 #include <vlc_network.h>
-#include <vlc_tls.h>
 #include <vlc_access.h>
 
 #include <cassert>
-#include <sstream>
 
 #include "../../misc/webservices/json.h"
 
@@ -67,11 +62,9 @@ static int connectChromecast(intf_thread_t *p_intf);
 #define CONTROL_CFG_PREFIX "chromecast-"
 
 #define PACKET_MAX_LEN 10 * 1024
-#define PACKET_HEADER_LEN 4
 
 // Media player Chromecast app id
 #define MEDIA_RECEIVER_APP_ID "CC1AD845" // Default media player aka DEFAULT_MEDIA_RECEIVER_APPLICATION_ID
-static const mtime_t SEEK_FORWARD_OFFSET = 1000000;
 
 #define HTTP_PORT               8010
 
@@ -86,8 +79,6 @@ static const std::string NAMESPACE_DEVICEAUTH = "urn:x-cast:com.google.cast.tp.d
 static const std::string NAMESPACE_CONNECTION = "urn:x-cast:com.google.cast.tp.connection";
 static const std::string NAMESPACE_HEARTBEAT  = "urn:x-cast:com.google.cast.tp.heartbeat";
 static const std::string NAMESPACE_RECEIVER   = "urn:x-cast:com.google.cast.receiver";
-/* see https://developers.google.com/cast/docs/reference/messages */
-static const std::string NAMESPACE_MEDIA      = "urn:x-cast:com.google.cast.media";
 
 #define IP_TEXT N_("Chromecast IP address")
 #define IP_LONGTEXT N_("This sets the IP adress of the Chromecast receiver.")
@@ -586,30 +577,6 @@ void intf_sys_t::sendPlayerCmd()
     }
 }
 
-bool intf_sys_t::seekTo(mtime_t pos)
-{
-    vlc_mutex_locker locker(&lock);
-    if (conn_status == CHROMECAST_DEAD)
-        return false;
-
-    assert(playback_start_chromecast != -1.0);
-
-    char current_time[32];
-    i_seektime = mdate() + SEEK_FORWARD_OFFSET /* + playback_start_local */ ;
-    if( snprintf( current_time, sizeof(current_time), "%f", double( i_seektime ) / 1000000.0 ) >= (int)sizeof(current_time) )
-    {
-        msg_Err( p_intf, "snprintf() truncated string for mediaSessionId" );
-        current_time[sizeof(current_time) - 1] = '\0';
-    }
-    m_seektime = pos; // + playback_start_chromecast - playback_start_local;
-    playback_start_local = pos;
-    msg_Dbg( p_intf, "%ld Seeking to %" PRId64 "/%s playback_time:%" PRId64, GetCurrentThreadId(), pos, current_time, playback_start_chromecast);
-    setPlayerStatus(CMD_SEEK_SENT);
-    msgPlayerSeek( current_time );
-
-    return true;
-}
-
 static const char *event_names[] = {
     "INPUT_EVENT_STATE",
     /* b_dead is true */
@@ -754,34 +721,6 @@ void intf_sys_t::disconnectChromecast()
         setConnectionStatus(CHROMECAST_DISCONNECTED);
     }
 }
-
-/**
- * @brief Send a message to the Chromecast
- * @param msg the CastMessage to send
- * @return vlc error code
- */
-int intf_sys_t::sendMessage(const castchannel::CastMessage &msg)
-{
-    int i_size = msg.ByteSize();
-    uint8_t *p_data = new(std::nothrow) uint8_t[PACKET_HEADER_LEN + i_size];
-    if (p_data == NULL)
-        return VLC_ENOMEM;
-
-#ifndef NDEBUG
-    msg_Dbg(p_intf, "sendMessage: %s->%s %s", msg.namespace_().c_str(), msg.destination_id().c_str(), msg.payload_utf8().c_str());
-#endif
-
-    SetDWBE(p_data, i_size);
-    msg.SerializeWithCachedSizesToArray(p_data + PACKET_HEADER_LEN);
-
-    int i_ret = tls_Send(p_tls, p_data, PACKET_HEADER_LEN + i_size);
-    delete[] p_data;
-    if (i_ret == PACKET_HEADER_LEN + i_size)
-        return VLC_SUCCESS;
-
-    return VLC_EGENERIC;
-}
-
 
 
 /**
@@ -1249,40 +1188,6 @@ void intf_sys_t::processMessage(const castchannel::CastMessage &msg)
 }
 
 
-/**
- * @brief Build a CastMessage to send to the Chromecast
- * @param namespace_ the message namespace
- * @param payload the payload
- * @param destinationId the destination identifier
- * @param payloadType the payload type (CastMessage_PayloadType_STRING or
- * CastMessage_PayloadType_BINARY
- * @return the generated CastMessage
- */
-void intf_sys_t::pushMessage(const std::string & namespace_,
-                             const std::string & payload,
-                             const std::string & destinationId,
-                             castchannel::CastMessage_PayloadType payloadType)
-{
-    castchannel::CastMessage msg;
-
-    msg.set_protocol_version(castchannel::CastMessage_ProtocolVersion_CASTV2_1_0);
-    msg.set_namespace_(namespace_);
-    msg.set_payload_type(payloadType);
-    msg.set_source_id("sender-vlc");
-    msg.set_destination_id(destinationId);
-    if (payloadType == castchannel::CastMessage_PayloadType_STRING)
-        msg.set_payload_utf8(payload);
-    else // CastMessage_PayloadType_BINARY
-        msg.set_payload_binary(payload);
-
-    vlc_mutex_locker locker(&lock);
-    sendMessage(msg);
-}
-
-void intf_sys_t::pushMediaPlayerMessage(const std::stringstream & payload) {
-    assert(!appTransportId.empty());
-    pushMessage(NAMESPACE_MEDIA, payload.str(), appTransportId);
-}
 
 
 /*****************************************************************************
@@ -1445,20 +1350,6 @@ void intf_sys_t::msgPlayerPause()
 
     std::stringstream ss;
     ss << "{\"type\":\"PAUSE\","
-       <<  "\"mediaSessionId\":" << mediaSessionId << ","
-       <<  "\"requestId\":" << i_requestId++
-       << "}";
-
-    pushMediaPlayerMessage( ss );
-}
-
-void intf_sys_t::msgPlayerSeek(const std::string & currentTime)
-{
-    assert(!mediaSessionId.empty());
-
-    std::stringstream ss;
-    ss << "{\"type\":\"SEEK\","
-       <<  "\"currentTime\":" << currentTime << ","
        <<  "\"mediaSessionId\":" << mediaSessionId << ","
        <<  "\"requestId\":" << i_requestId++
        << "}";

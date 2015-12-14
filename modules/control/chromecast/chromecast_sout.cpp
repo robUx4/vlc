@@ -30,12 +30,9 @@
 
 #include "chromecast.h"
 
-#include <vlc_common.h>
-#include <vlc_plugin.h>
 #include <vlc_sout.h>
 
 #include <cassert>
-#include <sstream>
 
 static int SoutOpen(vlc_object_t *);
 static void SoutClose(vlc_object_t *);

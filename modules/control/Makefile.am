@@ -72,17 +72,24 @@ endif
 
 libctrl_chromecast_plugin_la_SOURCES = control/chromecast/cast_channel.proto \
                                 control/chromecast/chromecast.cpp control/chromecast/chromecast.h \
+                                control/chromecast/chromecast_common.cpp \
                                 misc/webservices/json.h misc/webservices/json.c
 nodist_libctrl_chromecast_plugin_la_SOURCES = control/chromecast/cast_channel.pb.cc
 libctrl_chromecast_plugin_la_CPPFLAGS = $(AM_CPPFLAGS) -Icontrol/chromecast $(CHROMECAST_CFLAGS)
 libctrl_chromecast_plugin_la_LIBADD = $(CHROMECAST_LIBS) $(SOCKET_LIBS)
 CLEANFILES += $(nodist_libctrl_chromecast_plugin_la_SOURCES)
 
-libchromecast_demux_plugin_la_SOURCES = control/chromecast/chromecast_demux.cpp control/chromecast/chromecast.h
+libchromecast_demux_plugin_la_SOURCES = control/chromecast/chromecast_demux.cpp control/chromecast/chromecast.h \
+                                        control/chromecast/chromecast_common.cpp
+nodist_libchromecast_demux_plugin_la_SOURCES = control/chromecast/cast_channel.pb.cc
 libchromecast_demux_plugin_la_CPPFLAGS = $(AM_CPPFLAGS) -Icontrol/chromecast $(CHROMECAST_CFLAGS)
+libchromecast_demux_plugin_la_LIBADD = $(CHROMECAST_LIBS) $(SOCKET_LIBS)
 
-libchromecast_sout_plugin_la_SOURCES = control/chromecast/chromecast_sout.cpp control/chromecast/chromecast.h
+libchromecast_sout_plugin_la_SOURCES = control/chromecast/chromecast_sout.cpp control/chromecast/chromecast.h \
+                                       control/chromecast/chromecast_common.cpp
+nodist_libchromecast_sout_plugin_la_SOURCES = control/chromecast/cast_channel.pb.cc
 libchromecast_sout_plugin_la_CPPFLAGS = $(AM_CPPFLAGS) -Icontrol/chromecast $(CHROMECAST_CFLAGS)
+libchromecast_sout_plugin_la_LIBADD = $(CHROMECAST_LIBS) $(SOCKET_LIBS)
 
 if ENABLE_SOUT
 if BUILD_CHROMECAST
