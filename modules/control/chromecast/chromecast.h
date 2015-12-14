@@ -33,6 +33,7 @@
 #include <vlc_plugin.h>
 #include <vlc_interface.h>
 #include <vlc_tls.h>
+#include <vlc_interrupt.h>
 
 #include <sstream>
 #include <atomic>
@@ -178,6 +179,7 @@ struct intf_sys_t
     vlc_cond_t   loadCommandCond;
     vlc_cond_t   seekCommandCond;
     vlc_thread_t chromecastThread;
+    vlc_interrupt_t *p_interrupt;
 
     void msgAuth();
 

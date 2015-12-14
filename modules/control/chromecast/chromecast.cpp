@@ -214,14 +214,14 @@ intf_sys_t::intf_sys_t(intf_thread_t *intf)
     ,b_restart_playback(false)
     ,b_forcing_position(false)
 {
-    //p_interrupt = vlc_interrupt_create();
+    p_interrupt = vlc_interrupt_create();
 }
 
 intf_sys_t::~intf_sys_t()
 {
     ipChangedEvent( NULL );
 
-    //vlc_interrupt_destroy(p_interrupt);
+    vlc_interrupt_destroy(p_interrupt);
 }
 
 static int IpChangedEvent(vlc_object_t *p_this, char const *psz_var,
@@ -1396,7 +1396,7 @@ static void* ChromecastThread(void* p_this)
     intf_thread_t *p_intf = reinterpret_cast<intf_thread_t*>(p_this);
     intf_sys_t *p_sys = p_intf->p_sys;
 
-    //vlc_interrupt_set(p_sys->p_interrupt);
+    vlc_interrupt_set(p_sys->p_interrupt);
 
     p_sys->setConnectionStatus( CHROMECAST_DISCONNECTED );
 
