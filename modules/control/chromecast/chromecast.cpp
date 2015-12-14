@@ -329,7 +329,7 @@ void intf_sys_t::plugOutputRedirection()
 void intf_sys_t::InputUpdated( input_thread_t *p_input )
 {
     vlc_mutex_lock(&lock);
-    msg_Dbg( p_intf, "%ld InputUpdated p_input:%p was:%p b_restart_playback:%d b_ipChanging:%d playlist_Status:%d", GetCurrentThreadId(), (void*)p_input, (void*)this->p_input, b_restart_playback, b_ipChanging, playlist_Status( pl_Get(p_intf) ) );
+    msg_Dbg( p_intf, "%ld InputUpdated p_input:%p was:%p b_restart_playback:%d b_ipChanging:%d playlist_Status:%d", GetCurrentThreadId(), (void*)p_input, (void*)this->p_input, b_restart_playback, bool(b_ipChanging), playlist_Status( pl_Get(p_intf) ) );
 
     if (deviceIP.empty())
     {
@@ -479,7 +479,7 @@ void intf_sys_t::InputUpdated( input_thread_t *p_input )
             input_Control( this->p_input, INPUT_SET_POSITION, f_restart_position);
             b_forcing_position = true;
         }
-        else if ( !b_ipChanging )
+        else if ( !input_HasESOut( p_input ) || !b_ipChanging )
         {
             msg_Dbg( p_intf, "no need to restart to set the sout" );
             b_restart_playback = false;

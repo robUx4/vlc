@@ -1276,6 +1276,11 @@ error:
     return VLC_EGENERIC;
 }
 
+bool input_HasESOut( input_thread_t * p_input )
+{
+    return p_input->p->p_es_out != NULL;
+}
+
 /*****************************************************************************
  * End: end the input thread
  *****************************************************************************/

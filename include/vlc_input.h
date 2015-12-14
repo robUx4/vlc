@@ -512,6 +512,7 @@ VLC_API int input_vaControl( input_thread_t *, int i_query, va_list  );
 VLC_API int input_Control( input_thread_t *, int i_query, ...  );
 
 VLC_API void input_Close( input_thread_t * );
+VLC_API bool input_HasESOut( input_thread_t * );
 
 /**
  * Create a new input_thread_t and start it.

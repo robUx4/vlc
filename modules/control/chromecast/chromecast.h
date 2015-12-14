@@ -35,6 +35,7 @@
 #include <vlc_tls.h>
 
 #include <sstream>
+#include <atomic>
 
 #include "cast_channel.pb.h"
 
@@ -147,7 +148,7 @@ struct intf_sys_t
     std::string    serverIP;
     std::string    mime;
     std::string    muxer;
-    bool           b_ipChanging;
+    std::atomic_bool  b_ipChanging;
 
     std::string appTransportId;
     std::string mediaSessionId;
