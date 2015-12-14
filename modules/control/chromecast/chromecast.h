@@ -147,6 +147,7 @@ struct intf_sys_t
     std::string    serverIP;
     std::string    mime;
     std::string    muxer;
+    bool           b_ipChanging;
 
     std::string appTransportId;
     std::string mediaSessionId;

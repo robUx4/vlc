@@ -180,6 +180,7 @@ intf_sys_t::intf_sys_t(intf_thread_t *intf)
     :p_intf(intf)
     ,p_input(NULL)
     ,devicePort(8009)
+    ,b_ipChanging(false)
     ,receiverState(RECEIVER_IDLE)
     ,date_play_start(-1)
     ,playback_start_chromecast(-1.0)
@@ -229,6 +230,7 @@ void intf_sys_t::ipChangedEvent(const char *psz_new_ip)
         psz_new_ip = "";
     if (deviceIP != psz_new_ip)
     {
+        b_ipChanging = true;
         msg_Dbg(p_intf,"ipChangedEvent '%s' from '%s'", psz_new_ip, deviceIP.c_str());
         if ( !deviceIP.empty() )
         {
@@ -257,6 +259,7 @@ void intf_sys_t::ipChangedEvent(const char *psz_new_ip)
         {
             InputUpdated( NULL );
         }
+        b_ipChanging = false;
     }
 }
 
@@ -326,7 +329,7 @@ void intf_sys_t::plugOutputRedirection()
 void intf_sys_t::InputUpdated( input_thread_t *p_input )
 {
     vlc_mutex_lock(&lock);
-    msg_Dbg( p_intf, "%ld InputUpdated p_input:%p was:%p b_restart_playback:%d", GetCurrentThreadId(), (void*)p_input, (void*)this->p_input, b_restart_playback );
+    msg_Dbg( p_intf, "%ld InputUpdated p_input:%p was:%p b_restart_playback:%d b_ipChanging:%d playlist_Status:%d", GetCurrentThreadId(), (void*)p_input, (void*)this->p_input, b_restart_playback, b_ipChanging, playlist_Status( pl_Get(p_intf) ) );
 
     if (deviceIP.empty())
     {
@@ -464,7 +467,7 @@ void intf_sys_t::InputUpdated( input_thread_t *p_input )
             s_sout = ssout.str();
         }
 
-        if ( playlist_Status( pl_Get(p_intf) ) == PLAYLIST_STOPPED)
+        if ( playlist_Status( pl_Get(p_intf) ) == PLAYLIST_STOPPED )
             b_restart_playback = false;
         else if (conn_status == CHROMECAST_DEAD)
             b_restart_playback = false;
@@ -476,10 +479,17 @@ void intf_sys_t::InputUpdated( input_thread_t *p_input )
             input_Control( this->p_input, INPUT_SET_POSITION, f_restart_position);
             b_forcing_position = true;
         }
+        else if ( !b_ipChanging )
+        {
+            msg_Dbg( p_intf, "no need to restart to set the sout" );
+            b_restart_playback = false;
+        }
         else
         {
             char *psz_old_sout = var_GetString( p_input, "sout" );
             b_restart_playback = !psz_old_sout || !psz_old_sout[0];
+            if ( b_restart_playback )
+                msg_Dbg( p_intf, "there's no sout defined yet status:%d", playlist_Status( pl_Get(p_intf) ) );
             if (psz_old_sout)
                 free(psz_old_sout);
         }
@@ -487,7 +497,6 @@ void intf_sys_t::InputUpdated( input_thread_t *p_input )
 
         if ( b_restart_playback )
         {
-            msg_Dbg( p_intf, "there's no sout defined yet status:%d", playlist_Status( pl_Get(p_intf) ) );
             if (deviceIP.empty() || conn_status == CHROMECAST_APP_STARTED)
             {
                 /* the MediaApp is already connected we need to stop now */
