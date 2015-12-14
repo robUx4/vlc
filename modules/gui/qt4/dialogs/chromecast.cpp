@@ -37,6 +37,8 @@
 
 #include "dialogs/chromecast.hpp"
 
+#define VAR_CHROMECAST_IP  "chromecast-ip"
+
 class ChromecastReceiver : public QListWidgetItem
 {
 public:
@@ -97,13 +99,11 @@ ChromecastDialog::~ChromecastDialog()
 void ChromecastDialog::onReject()
 {
     /* set the chromecast control */
-    vlc_object_t *p_parent = p_intf->p_parent;
-    while (p_parent && strcmp(p_parent->psz_object_type, "playlist"))
-        p_parent = p_parent->p_parent;
-    if (p_parent != NULL)
+    playlist_t *p_playlist = pl_Get( p_intf );
+    if (p_playlist != NULL)
     {
-        if( var_Type( p_parent, "chromecast-ip" ) )
-            var_SetString( p_parent, "chromecast-ip", NULL );
+        if( var_Type( p_playlist, VAR_CHROMECAST_IP ) )
+            var_SetString( p_playlist, VAR_CHROMECAST_IP, NULL );
     }
 
     QVLCDialog::reject();
@@ -133,12 +133,10 @@ void ChromecastDialog::setVisible(bool visible)
         if ( p_sd != NULL )
         {
             int row = -1;
-            vlc_object_t *p_parent = p_intf->p_parent;
-            while (p_parent && strcmp(p_parent->psz_object_type, "playlist"))
-                p_parent = p_parent->p_parent;
-            if (p_parent != NULL)
+            playlist_t *p_playlist = pl_Get( p_intf );
+            if (p_playlist != NULL)
             {
-                char *psz_current_ip = var_GetString( p_parent, "chromecast-ip" );
+                char *psz_current_ip = var_GetString( p_playlist, VAR_CHROMECAST_IP );
                 if (psz_current_ip != NULL)
                 {
                     for ( row = 0 ; row < ui.receiversListWidget->count(); row++ )
@@ -201,10 +199,10 @@ void ChromecastDialog::accept()
         msg_Dbg( p_intf, "selecting Chromecast %s %s:%u", psz_name.c_str(), psz_ip.c_str(), item->port );
 
         /* set the chromecast control */
-        if( !var_Type( pl_Get(p_intf), "chromecast-ip" ) )
+        if( !var_Type( pl_Get(p_intf), VAR_CHROMECAST_IP ) )
             /* Don't recreate the same variable over and over and over... */
-            var_Create( pl_Get(p_intf), "chromecast-ip", VLC_VAR_STRING );
-        var_SetString( pl_Get(p_intf), "chromecast-ip", psz_ip.c_str() );
+            var_Create( pl_Get(p_intf), VAR_CHROMECAST_IP, VLC_VAR_STRING );
+        var_SetString( pl_Get(p_intf), VAR_CHROMECAST_IP, psz_ip.c_str() );
 
         if (!b_interface_loaded &&
             intf_Create( pl_Get(p_intf), "chromecast") == VLC_SUCCESS)
@@ -241,12 +239,10 @@ void ChromecastDialog::discoveryEventReceived( const vlc_event_t * p_event )
             vlc_access_Delete( p_test_app );
         ui.receiversListWidget->addItem( item );
 
-        vlc_object_t *p_parent = p_intf->p_parent;
-        while (p_parent && strcmp(p_parent->psz_object_type, "playlist"))
-            p_parent = p_parent->p_parent;
-        if (p_parent != NULL)
+        playlist_t *p_playlist = pl_Get( p_intf );
+        if (p_playlist != NULL)
         {
-            char *psz_current_ip = var_GetString( p_parent, "chromecast-ip" );
+            char *psz_current_ip = var_GetString( p_playlist, VAR_CHROMECAST_IP );
             if (item->ipAddress == psz_current_ip)
                 ui.receiversListWidget->setCurrentItem( item );
             free( psz_current_ip );

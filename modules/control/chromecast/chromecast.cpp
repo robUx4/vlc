@@ -75,6 +75,8 @@ static int connectChromecast(intf_thread_t *p_intf);
 #define PONG_WAIT_TIME 500
 #define PONG_WAIT_RETRIES 2
 
+#define VAR_CHROMECAST_IP  "chromecast-ip"
+
 static const std::string NAMESPACE_DEVICEAUTH = "urn:x-cast:com.google.cast.tp.deviceauth";
 static const std::string NAMESPACE_CONNECTION = "urn:x-cast:com.google.cast.tp.connection";
 static const std::string NAMESPACE_HEARTBEAT  = "urn:x-cast:com.google.cast.tp.heartbeat";
@@ -110,17 +112,22 @@ vlc_module_end ()
 int Open(vlc_object_t *p_this)
 {
     intf_thread_t *p_intf = reinterpret_cast<intf_thread_t*>(p_this);
+    playlist_t *p_playlist = pl_Get( p_intf );
     intf_sys_t *p_sys = new(std::nothrow) intf_sys_t(p_intf);
+    char *psz_ipChromecast = NULL;
     if (unlikely(p_sys == NULL))
         return VLC_ENOMEM;
 
     msg_Dbg(p_this, "OPENING Chromecast Control Interface");
 
-    var_AddCallback( pl_Get(p_intf), CONTROL_CFG_PREFIX "ip", IpChangedEvent, p_intf );
-
-    char *psz_ipChromecast = var_InheritString(p_intf, CONTROL_CFG_PREFIX "ip");
+    psz_ipChromecast = var_InheritString(p_intf, CONTROL_CFG_PREFIX "ip");
     if (psz_ipChromecast == NULL)
         msg_Info(p_intf, "No Chromecast receiver IP/Name provided");
+
+    if( !var_Type( p_playlist, VAR_CHROMECAST_IP ) )
+        /* Don't recreate the same variable over and over and over... */
+        var_Create( p_playlist, VAR_CHROMECAST_IP, VLC_VAR_STRING );
+    var_SetString( p_playlist, VAR_CHROMECAST_IP, psz_ipChromecast );
 
     char *psz_mime = var_InheritString(p_intf, CONTROL_CFG_PREFIX "mime");
     if (psz_mime == NULL)
@@ -146,13 +153,16 @@ int Open(vlc_object_t *p_this)
 
     p_intf->p_sys = p_sys;
 
-    var_AddCallback( pl_Get(p_intf), "input-current", CurrentChanged, p_intf );
+    var_AddCallback( p_playlist, "input-current", CurrentChanged, p_intf );
 
     p_sys->ipChangedEvent(psz_ipChromecast);
+
+    var_AddCallback( p_playlist, VAR_CHROMECAST_IP, IpChangedEvent, p_intf );
 
     return VLC_SUCCESS;
 
 error:
+    free(psz_ipChromecast);
     delete p_sys;
     return VLC_EGENERIC;
 }
@@ -160,12 +170,13 @@ error:
 void Close(vlc_object_t *p_this)
 {
     intf_thread_t *p_intf = reinterpret_cast<intf_thread_t*>(p_this);
+    playlist_t *p_playlist = pl_Get( p_intf );
     intf_sys_t *p_sys = p_intf->p_sys;
 
     msg_Dbg(p_this, "CLOSING Chromecast Control Interface");
 
-    var_DelCallback( pl_Get(p_intf), CONTROL_CFG_PREFIX "ip", IpChangedEvent, p_intf );
-    var_DelCallback( pl_Get(p_intf), "input-current", CurrentChanged, p_intf );
+    var_DelCallback( p_playlist, VAR_CHROMECAST_IP, IpChangedEvent, p_intf );
+    var_DelCallback( p_playlist, "input-current", CurrentChanged, p_intf );
 
     p_sys->ipChangedEvent( NULL );
 
