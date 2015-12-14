@@ -1278,7 +1278,11 @@ error:
 
 bool input_HasESOut( input_thread_t * p_input )
 {
-    return p_input->p->p_es_out != NULL;
+    bool result;
+    vlc_mutex_lock( &p_input->p->lock_control );
+    result = p_input->p->p_es_out != NULL;
+    vlc_mutex_unlock( &p_input->p->lock_control );
+    return result;
 }
 
 /*****************************************************************************
