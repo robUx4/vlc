@@ -467,7 +467,9 @@ void intf_sys_t::InputUpdated( input_thread_t *p_input )
             s_sout = ssout.str();
         }
 
-        if ( playlist_Status( pl_Get(p_intf) ) == PLAYLIST_STOPPED )
+        playlist_t *p_playlist = pl_Get( p_intf );
+        PL_LOCK;
+        if ( playlist_Status( p_playlist ) == PLAYLIST_STOPPED )
             b_restart_playback = false;
         else if (conn_status == CHROMECAST_DEAD)
             b_restart_playback = false;
@@ -489,11 +491,12 @@ void intf_sys_t::InputUpdated( input_thread_t *p_input )
             char *psz_old_sout = var_GetString( p_input, "sout" );
             b_restart_playback = !psz_old_sout || !psz_old_sout[0];
             if ( b_restart_playback )
-                msg_Dbg( p_intf, "there's no sout defined yet status:%d", playlist_Status( pl_Get(p_intf) ) );
+                msg_Dbg( p_intf, "there's no sout defined yet status:%d", playlist_Status( p_playlist ) );
             if (psz_old_sout)
                 free(psz_old_sout);
         }
         msg_Dbg( p_intf, "%ld new b_restart_playback:%d", GetCurrentThreadId(), b_restart_playback );
+        PL_UNLOCK;
 
         if ( b_restart_playback )
         {
@@ -842,6 +845,8 @@ extern "C" int recvPacket(intf_thread_t *p_intf, bool &b_msgReceived,
 void intf_sys_t::stateChangedForRestart( input_thread_t *p_input )
 {
     msg_Dbg(p_intf, "%ld RestartAfterEnd state changed %d", GetCurrentThreadId(), (int)var_GetInteger( p_input, "state" ));
+    playlist_t *p_playlist = pl_Get( p_intf );
+    PL_LOCK;
     if ( var_GetInteger( p_input, "state" ) == END_S )
     {
         msg_Info(p_intf, "RestartAfterEnd play this file again" );
@@ -852,6 +857,7 @@ void intf_sys_t::stateChangedForRestart( input_thread_t *p_input )
             //var_DelCallback( p_input, "intf-event", RestartAfterEnd, p_intf );
         }
     }
+    PL_UNLOCK;
 }
 
 static int RestartAfterEnd( vlc_object_t *p_this, char const *psz_var,
@@ -885,10 +891,13 @@ bool intf_sys_t::finishRestart()
 void intf_sys_t::initiateRestart()
 {
     /* save the position */
-    input_thread_t *p_input = playlist_CurrentInput( pl_Get(p_intf) );
+    playlist_t *p_playlist = pl_Get( p_intf );
+    PL_LOCK;
+    input_thread_t *p_input = playlist_CurrentInput( p_playlist );
     if (p_input == NULL)
     {
         msg_Warn( p_intf, "cannot restart non playing source" );
+        PL_UNLOCK;
         return;
     }
     var_AddCallback( p_input, "intf-event", RestartAfterEnd, p_intf );
@@ -907,8 +916,9 @@ void intf_sys_t::initiateRestart()
     input_Control( p_input, INPUT_RESTART_ES, -SPU_ES );
     input_Control( p_input, INPUT_SET_POSITION, f_restart_position );
 #else
-    playlist_Stop( pl_Get(p_intf) );
+    playlist_Stop( p_playlist );
 #endif
+    PL_UNLOCK;
 }
 
 /**
@@ -1422,7 +1432,10 @@ static void* ChromecastThread(void* p_this)
 
     vlc_restorecancel(canc);
 
-    p_sys->InputUpdated( playlist_CurrentInput( pl_Get(p_intf) ) );
+    playlist_t *p_playlist = pl_Get( p_intf );
+    PL_LOCK;
+    p_sys->InputUpdated( playlist_CurrentInput( p_playlist ) );
+    PL_UNLOCK;
 
     while (1)
     {
