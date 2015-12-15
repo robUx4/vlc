@@ -165,6 +165,8 @@ int Open(vlc_object_t *p_this)
 
     var_AddCallback( p_playlist, VAR_CHROMECAST_IP, IpChangedEvent, p_intf );
 
+    msg_Dbg(p_this, "OPENING Chromecast done");
+
     return VLC_SUCCESS;
 
 error:
@@ -191,6 +193,8 @@ void Close(vlc_object_t *p_this)
     vlc_mutex_destroy(&p_sys->lock);
     vlc_cond_destroy(&p_sys->seekCommandCond);
     vlc_cond_destroy(&p_sys->loadCommandCond);
+
+    msg_Dbg(p_this, "CLOSING Chromecast Done");
 
     delete p_sys;
 }
