@@ -557,8 +557,8 @@ void libvlc_InternalDestroy( libvlc_int_t *p_libvlc )
     vlc_object_internals_t *internals = vlc_internals(p_libvlc);
     int refcount = atomic_load(&internals->refs);
     if (refcount > 1) {
-        while (internals) {
-            vlc_Log(NULL, VLC_MSG_DBG, "libvlc", NULL, 0, "libvlc_InternalDestroy", "remaining ref %s count:%d", internals->psz_name ? internals->psz_name : "???", internals->refs);
+       while (internals) {
+            vlc_Log(NULL, VLC_MSG_DBG, "libvlc", NULL, 0, "libvlc_InternalDestroy", "remaining ref %s count:%d p_this:%p", internals->psz_name ? internals->psz_name : "???", internals->refs, (void*)internals);
             internals = internals->first;
         }
     }
