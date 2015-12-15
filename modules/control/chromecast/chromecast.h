@@ -208,6 +208,9 @@ struct intf_sys_t
     bool finishRestart();
     void stateChangedForRestart( input_thread_t * );
 
+    void msgPlayerSetVolume(float volume);
+    void msgPlayerSetMute(bool mute);
+
 private:
     int sendMessage(const castchannel::CastMessage &msg);
 

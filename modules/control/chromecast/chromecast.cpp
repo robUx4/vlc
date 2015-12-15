@@ -52,6 +52,10 @@ static int Open(vlc_object_t *);
 static void Close(vlc_object_t *);
 static int CurrentChanged( vlc_object_t *, char const *,
                           vlc_value_t, vlc_value_t, void * );
+static int MuteChanged( vlc_object_t *, char const *,
+                          vlc_value_t, vlc_value_t, void * );
+static int VolumeChanged( vlc_object_t *, char const *,
+                          vlc_value_t, vlc_value_t, void * );
 static int InputEvent( vlc_object_t *, char const *,
                        vlc_value_t, vlc_value_t, void * );
 static int IpChangedEvent( vlc_object_t *, char const *,
@@ -154,6 +158,8 @@ int Open(vlc_object_t *p_this)
     p_intf->p_sys = p_sys;
 
     var_AddCallback( p_playlist, "input-current", CurrentChanged, p_intf );
+    var_AddCallback( p_playlist, "mute", MuteChanged, p_intf );
+    var_AddCallback( p_playlist, "volume", VolumeChanged, p_intf );
 
     p_sys->ipChangedEvent(psz_ipChromecast);
 
@@ -177,6 +183,8 @@ void Close(vlc_object_t *p_this)
 
     var_DelCallback( p_playlist, VAR_CHROMECAST_IP, IpChangedEvent, p_intf );
     var_DelCallback( p_playlist, "input-current", CurrentChanged, p_intf );
+    var_DelCallback( p_playlist, "mute", MuteChanged, p_intf );
+    var_DelCallback( p_playlist, "volume", VolumeChanged, p_intf );
 
     p_sys->ipChangedEvent( NULL );
 
@@ -272,6 +280,36 @@ void intf_sys_t::ipChangedEvent(const char *psz_new_ip)
         }
         b_ipChanging = false;
     }
+}
+
+static int MuteChanged( vlc_object_t *p_this, char const *psz_var,
+                          vlc_value_t oldval, vlc_value_t val, void *p_data )
+{
+    VLC_UNUSED( p_this );
+    VLC_UNUSED( psz_var );
+    VLC_UNUSED( oldval );
+    intf_thread_t *p_intf = static_cast<intf_thread_t *>(p_data);
+    intf_sys_t *p_sys = p_intf->p_sys;
+
+    if (!p_sys->mediaSessionId.empty())
+        p_sys->msgPlayerSetMute( val.b_bool );
+
+    return VLC_SUCCESS;
+}
+
+static int VolumeChanged( vlc_object_t *p_this, char const *psz_var,
+                          vlc_value_t oldval, vlc_value_t val, void *p_data )
+{
+    VLC_UNUSED( p_this );
+    VLC_UNUSED( psz_var );
+    VLC_UNUSED( oldval );
+    intf_thread_t *p_intf = static_cast<intf_thread_t *>(p_data);
+    intf_sys_t *p_sys = p_intf->p_sys;
+
+    if ( !p_sys->mediaSessionId.empty() )
+        p_sys->msgPlayerSetVolume( val.f_float );
+
+    return VLC_SUCCESS;
 }
 
 static int CurrentChanged( vlc_object_t *p_this, char const *psz_var,
@@ -1032,7 +1070,9 @@ void intf_sys_t::processMessage(const castchannel::CastMessage &msg)
                 {
                     msgConnect(appTransportId);
                     setConnectionStatus(CHROMECAST_APP_STARTED);
-                    if (!b_restart_playback || playlist_Status(pl_Get(p_intf)) == PLAYLIST_STOPPED)
+
+                    playlist_t *p_playlist = pl_Get( p_intf );
+                    if (!b_restart_playback || playlist_Status( p_playlist ) == PLAYLIST_STOPPED)
                     {
                         /* now we can start the Chromecast playback */
                         sendPlayerCmd();
@@ -1135,6 +1175,12 @@ void intf_sys_t::processMessage(const castchannel::CastMessage &msg)
                 switch( receiverState )
                 {
                 case RECEIVER_BUFFERING:
+                    if (!mediaSessionId.empty())
+                    {
+                        playlist_t *p_playlist = pl_Get( p_intf );
+                        msgPlayerSetMute( var_GetBool( p_playlist, "mute") );
+                        msgPlayerSetVolume( var_GetFloat( p_playlist, "volume") );
+                    }
                     playback_start_chromecast = (1 + mtime_t( double( status[0]["currentTime"] ) ) ) * 1000000L;
                     msg_Dbg(p_intf, "Playback pending with an offset of %" PRId64, playback_start_chromecast);
                     break;
@@ -1380,6 +1426,37 @@ void intf_sys_t::msgPlayerPause()
 
     std::stringstream ss;
     ss << "{\"type\":\"PAUSE\","
+       <<  "\"mediaSessionId\":" << mediaSessionId << ","
+       <<  "\"requestId\":" << i_requestId++
+       << "}";
+
+    pushMediaPlayerMessage( ss );
+}
+
+void intf_sys_t::msgPlayerSetVolume(float f_volume)
+{
+    assert(!mediaSessionId.empty());
+
+    if ( f_volume < 0.0 || f_volume > 1.0)
+        return;
+
+    std::stringstream ss;
+    ss << "{\"type\":\"SET_VOLUME\","
+       <<  "\"volume\":{\"level\":" << f_volume << "},"
+       <<  "\"mediaSessionId\":" << mediaSessionId << ","
+       <<  "\"requestId\":" << i_requestId++
+       << "}";
+
+    pushMediaPlayerMessage( ss );
+}
+
+void intf_sys_t::msgPlayerSetMute(bool b_mute)
+{
+    assert(!mediaSessionId.empty());
+
+    std::stringstream ss;
+    ss << "{\"type\":\"SET_VOLUME\","
+       <<  "\"volume\":{\"muted\":" << ( b_mute ? "true" : "false" ) << "},"
        <<  "\"mediaSessionId\":" << mediaSessionId << ","
        <<  "\"requestId\":" << i_requestId++
        << "}";
