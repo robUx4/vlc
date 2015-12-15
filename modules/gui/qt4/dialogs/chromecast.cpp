@@ -32,7 +32,6 @@
 
 #include <vlc_common.h>
 #include <vlc_access.h>
-#include <vlc_input_item.h>
 #include <vlc_services_discovery.h>
 
 #include "dialogs/chromecast.hpp"
@@ -71,7 +70,7 @@ extern "C" void discovery_event_received( const vlc_event_t * p_event, void * us
     p_this->discoveryEventReceived( p_event );
 }
 
-ChromecastDialog::ChromecastDialog( intf_thread_t *_p_intf)
+ChromecastDialog::ChromecastDialog( intf_thread_t *_p_intf )
                : QVLCDialog( (QWidget*)_p_intf->p_sys->p_mi, _p_intf )
                , p_sd( NULL )
                , b_sd_started( false )

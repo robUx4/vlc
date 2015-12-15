@@ -27,7 +27,7 @@
 #include "util/qvlcframe.hpp"
 #include "util/singleton.hpp"
 #include "ui/chromecast.h"
-#include <stdarg.h>
+
 #include <QMutex>
 #include <QAtomicInt>
 
