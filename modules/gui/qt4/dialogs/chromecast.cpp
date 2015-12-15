@@ -75,7 +75,6 @@ ChromecastDialog::ChromecastDialog( intf_thread_t *_p_intf)
                : QVLCDialog( (QWidget*)_p_intf->p_sys->p_mi, _p_intf )
                , p_sd( NULL )
                , b_sd_started( false )
-               , b_interface_loaded( false )
 {
     setWindowTitle( qtr( "Chromecast Output" ) );
     setWindowRole( "vlc-chromecast" );
@@ -199,14 +198,33 @@ void ChromecastDialog::accept()
         msg_Dbg( p_intf, "selecting Chromecast %s %s:%u", psz_name.c_str(), psz_ip.c_str(), item->port );
 
         /* set the chromecast control */
-        if( !var_Type( pl_Get(p_intf), VAR_CHROMECAST_IP ) )
+        playlist_t *p_playlist = pl_Get(p_intf);
+        if( !var_Type( p_playlist, VAR_CHROMECAST_IP ) )
             /* Don't recreate the same variable over and over and over... */
-            var_Create( pl_Get(p_intf), VAR_CHROMECAST_IP, VLC_VAR_STRING );
-        var_SetString( pl_Get(p_intf), VAR_CHROMECAST_IP, psz_ip.c_str() );
+            var_Create( p_playlist, VAR_CHROMECAST_IP, VLC_VAR_STRING );
+        var_SetString( p_playlist, VAR_CHROMECAST_IP, psz_ip.c_str() );
 
-        if (!b_interface_loaded &&
-            intf_Create( pl_Get(p_intf), "chromecast") == VLC_SUCCESS)
-            b_interface_loaded = true;
+        bool chromecast_loaded = false;
+        vlc_list_t *l = vlc_list_children( p_playlist );
+        for( int i=0; i < l->i_count; i++ )
+        {
+            vlc_object_t *p_obj = (vlc_object_t *)l->p_values[i].p_address;
+            if ( p_obj->psz_object_type == std::string("interface") )
+            {
+                char *psz_name = vlc_object_get_name( p_obj );
+                if ( psz_name && psz_name == std::string("ctrl_chromecast") )
+                {
+                    chromecast_loaded = true;
+                    free(psz_name);
+                    break;
+                }
+                free(psz_name);
+            }
+        }
+        vlc_list_release( l );
+
+        if ( !chromecast_loaded )
+            intf_Create( p_playlist, "chromecast");
     }
 
     QVLCDialog::accept();

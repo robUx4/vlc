@@ -61,7 +61,6 @@ private:
     friend class    Singleton<ChromecastDialog>;
     services_discovery_t *p_sd;
     bool                  b_sd_started;
-    bool                  b_interface_loaded;
 };
 
 
