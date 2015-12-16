@@ -1223,7 +1223,8 @@ void intf_sys_t::processMessage(const castchannel::CastMessage &msg)
                     break;
 
                 case RECEIVER_PAUSED:
-                    playback_start_local += mdate() - date_play_start;
+                    if (date_play_start != -1)
+                        playback_start_local += mdate() - date_play_start;
                     break;
 
                 case RECEIVER_IDLE:
