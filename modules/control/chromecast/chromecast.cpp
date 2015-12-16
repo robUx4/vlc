@@ -976,6 +976,7 @@ void intf_sys_t::restartDoStop()
     b_restart_playback = true;
     input_Control(p_input, INPUT_GET_POSITION, &f_restart_position);
     msg_Dbg( p_intf, "Current %p position:%f", (void*)p_input, f_restart_position );
+    vlc_object_release(p_input);
 
     restartState = RESTART_STOPPING;
     msg_Dbg(p_intf, "%ld playlist_Stop()", GetCurrentThreadId());
@@ -1547,9 +1548,10 @@ static void* ChromecastThread(void* p_this)
     vlc_restorecancel(canc);
 
     playlist_t *p_playlist = pl_Get( p_intf );
-    PL_LOCK;
-    p_sys->InputUpdated( playlist_CurrentInput( p_playlist ) );
-    PL_UNLOCK;
+    input_thread_t *p_input = playlist_CurrentInput( p_playlist );
+    p_sys->InputUpdated( p_input );
+    if ( p_input != NULL )
+        vlc_object_release( p_input );
 
     while (1)
     {
