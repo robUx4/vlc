@@ -601,7 +601,7 @@ void intf_sys_t::sendPlayerCmd()
         return;
     }
 
-    msg_Dbg( p_intf, "sendPlayerCmd input_state:%d mediaSessionId:'%s' cmd_status:%d", var_GetInteger( p_input, "state" ), mediaSessionId.c_str(), cmd_status );
+    msg_Dbg( p_intf, "sendPlayerCmd input_state:%d mediaSessionId:'%s' cmd_status:%d", (int)var_GetInteger( p_input, "state" ), mediaSessionId.c_str(), cmd_status );
     switch( var_GetInteger( p_input, "state" ) )
     {
     case OPENING_S:
@@ -915,9 +915,9 @@ extern "C" int recvPacket(intf_thread_t *p_intf, bool &b_msgReceived,
 
 void intf_sys_t::stateChangedForRestart( input_thread_t *p_input )
 {
-    msg_Dbg(p_intf, "%ld RestartAfterEnd state changed %d", GetCurrentThreadId(), (int)var_GetInteger( p_input, "state" ));
     playlist_t *p_playlist = pl_Get( p_intf );
     PL_LOCK;
+    msg_Dbg(p_intf, "%ld RestartAfterEnd state changed %d", GetCurrentThreadId(), (int)var_GetInteger( p_input, "state" ));
     if ( var_GetInteger( p_input, "state" ) == END_S )
     {
         msg_Info(p_intf, "%ld RestartAfterEnd play this file again", GetCurrentThreadId() );
@@ -971,7 +971,7 @@ void intf_sys_t::restartDoStop()
         PL_UNLOCK;
         return;
     }
-    msg_Dbg(p_intf, "add callback for %p on p_input:%p", RestartAfterEnd, p_input);
+    msg_Dbg(p_intf, "add RestartAfterEnd callback %p on p_input:%p", RestartAfterEnd, p_input);
     var_AddCallback( p_input, "intf-event", RestartAfterEnd, p_intf );
     b_restart_playback = true;
     input_Control(p_input, INPUT_GET_POSITION, &f_restart_position);
@@ -1095,7 +1095,7 @@ void intf_sys_t::processMessage(const castchannel::CastMessage &msg)
                     setConnectionStatus(CHROMECAST_APP_STARTED);
 
                     playlist_t *p_playlist = pl_Get( p_intf );
-                    msg_Dbg( p_intf, "app started b_restart_playback:%d playlist_Status:%d input_state:%d", b_restart_playback, playlist_Status( p_playlist ), var_GetInteger( p_input, "state" ) );
+                    msg_Dbg( p_intf, "app started b_restart_playback:%d playlist_Status:%d input_state:%d", b_restart_playback, playlist_Status( p_playlist ), (int)var_GetInteger( p_input, "state" ) );
                     if (!b_restart_playback || playlist_Status( p_playlist ) == PLAYLIST_STOPPED)
                     {
                         /* now we can start the Chromecast playback */
