@@ -115,6 +115,7 @@ struct demux_sys_t
         }
 
         if (p_intf->p_sys->getConnectionStatus() != CHROMECAST_APP_STARTED) {
+            msg_Dbg(p_demux, "app not started:%d, don't demux currentStopped:%d", p_intf->p_sys->getConnectionStatus(), p_intf->p_sys->currentStopped);
             vlc_mutex_unlock(&p_intf->p_sys->lock);
             return 0;
         }

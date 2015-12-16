@@ -271,6 +271,7 @@ void intf_sys_t::ipChangedEvent(const char *psz_new_ip)
 
         if (!deviceIP.empty())
         {
+            msg_Dbg(p_intf,"ipChangedEvent need_restart:%d", need_restart);
             // Start the Chromecast event thread.
             if (vlc_clone(&chromecastThread, ChromecastThread, p_intf,
                           VLC_THREAD_PRIORITY_LOW))
@@ -573,12 +574,6 @@ void intf_sys_t::InputUpdated( input_thread_t *p_input )
 
 void intf_sys_t::sendPlayerCmd()
 {
-    if (conn_status != CHROMECAST_APP_STARTED)
-    {
-        msg_Dbg(p_intf, "don't send playback command until the app is started");
-        return;
-    }
-
     if (!p_input)
     {
         msg_Warn(p_intf, "no input");
@@ -587,6 +582,13 @@ void intf_sys_t::sendPlayerCmd()
 
     assert(!p_input->b_preparsing);
 
+    if (conn_status != CHROMECAST_APP_STARTED)
+    {
+        msg_Dbg(p_intf, "don't send playback command until the app is started");
+        return;
+    }
+
+    msg_Dbg( p_intf, "sendPlayerCmd input_state:%d mediaSessionId:'%s' cmd_status:%d", var_GetInteger( p_input, "state" ), mediaSessionId.c_str(), cmd_status );
     switch( var_GetInteger( p_input, "state" ) )
     {
     case OPENING_S:
@@ -902,7 +904,7 @@ void intf_sys_t::stateChangedForRestart( input_thread_t *p_input )
     PL_LOCK;
     if ( var_GetInteger( p_input, "state" ) == END_S )
     {
-        msg_Info(p_intf, "RestartAfterEnd play this file again" );
+        msg_Info(p_intf, "%ld RestartAfterEnd play this file again", GetCurrentThreadId() );
         if ( finishRestart() )
         {
             restartState = RESTART_STARTING;
@@ -953,6 +955,7 @@ void intf_sys_t::initiateRestart()
         PL_UNLOCK;
         return;
     }
+    msg_Dbg(p_intf, "add callback for %p on p_input:%p", RestartAfterEnd, p_input);
     var_AddCallback( p_input, "intf-event", RestartAfterEnd, p_intf );
     b_restart_playback = true;
     input_Control(p_input, INPUT_GET_POSITION, &f_restart_position);
@@ -1076,6 +1079,7 @@ void intf_sys_t::processMessage(const castchannel::CastMessage &msg)
                     setConnectionStatus(CHROMECAST_APP_STARTED);
 
                     playlist_t *p_playlist = pl_Get( p_intf );
+                    msg_Dbg( p_intf, "app started b_restart_playback:%d playlist_Status:%d input_state:%d", b_restart_playback, playlist_Status( p_playlist ), var_GetInteger( p_input, "state" ) );
                     if (!b_restart_playback || playlist_Status( p_playlist ) == PLAYLIST_STOPPED)
                     {
                         /* now we can start the Chromecast playback */
