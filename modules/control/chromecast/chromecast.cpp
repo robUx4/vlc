@@ -915,8 +915,8 @@ extern "C" int recvPacket(intf_thread_t *p_intf, bool &b_msgReceived,
 
 void intf_sys_t::stateChangedForRestart( input_thread_t *p_input )
 {
-    playlist_t *p_playlist = pl_Get( p_intf );
-    PL_LOCK;
+    //playlist_t *p_playlist = pl_Get( p_intf );
+    //PL_LOCK;
     msg_Dbg(p_intf, "%ld RestartAfterEnd state changed %d", GetCurrentThreadId(), (int)var_GetInteger( p_input, "state" ));
     if ( var_GetInteger( p_input, "state" ) == END_S )
     {
@@ -928,7 +928,7 @@ void intf_sys_t::stateChangedForRestart( input_thread_t *p_input )
             //var_DelCallback( p_input, "intf-event", RestartAfterEnd, p_intf );
         }
     }
-    PL_UNLOCK;
+    //PL_UNLOCK;
 }
 
 static int RestartAfterEnd( vlc_object_t *p_this, char const *psz_var,
