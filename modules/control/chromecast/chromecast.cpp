@@ -795,6 +795,7 @@ void intf_sys_t::disconnectChromecast()
         vlc_tls_Delete(p_creds);
         p_tls = NULL;
         setConnectionStatus(CHROMECAST_DISCONNECTED);
+        setPlayerStatus(NO_CMD_PENDING);
     }
 }
 
