@@ -796,6 +796,8 @@ void intf_sys_t::disconnectChromecast()
         p_tls = NULL;
         setConnectionStatus(CHROMECAST_DISCONNECTED);
         setPlayerStatus(NO_CMD_PENDING);
+        setCurrentStopped( true );
+        receiverState = RECEIVER_IDLE;
     }
 }
 
