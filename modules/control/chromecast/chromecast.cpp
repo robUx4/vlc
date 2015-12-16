@@ -557,7 +557,7 @@ void intf_sys_t::InputUpdated( input_thread_t *p_input )
             if (deviceIP.empty() || conn_status == CHROMECAST_APP_STARTED)
             {
                 /* the MediaApp is already connected we need to stop now */
-                initiateRestart();
+                restartDoStop();
             }
         }
         else if (conn_status != CHROMECAST_DEAD)
@@ -567,7 +567,7 @@ void intf_sys_t::InputUpdated( input_thread_t *p_input )
     }
     else if ( !b_restart_playback )
     {
-        initiateRestart();
+        restartDoStop();
     }
     vlc_mutex_unlock(&lock);
 }
@@ -905,7 +905,7 @@ void intf_sys_t::stateChangedForRestart( input_thread_t *p_input )
     if ( var_GetInteger( p_input, "state" ) == END_S )
     {
         msg_Info(p_intf, "%ld RestartAfterEnd play this file again", GetCurrentThreadId() );
-        if ( finishRestart() )
+        if ( restartDoPlay() )
         {
             restartState = RESTART_STARTING;
             /* no need to unhook the callback it will be when the input is destroyed */
@@ -931,7 +931,7 @@ static int RestartAfterEnd( vlc_object_t *p_this, char const *psz_var,
     return VLC_SUCCESS;
 }
 
-bool intf_sys_t::finishRestart()
+bool intf_sys_t::restartDoPlay()
 {
     if ( b_restart_playback )
     {
@@ -943,7 +943,7 @@ bool intf_sys_t::finishRestart()
     return false;
 }
 
-void intf_sys_t::initiateRestart()
+void intf_sys_t::restartDoStop()
 {
     /* save the position */
     playlist_t *p_playlist = pl_Get( p_intf );
@@ -1088,7 +1088,7 @@ void intf_sys_t::processMessage(const castchannel::CastMessage &msg)
                     }
                     else
                     {
-                        initiateRestart();
+                        restartDoStop();
                     }
                 }
                 else

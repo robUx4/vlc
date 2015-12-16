@@ -205,7 +205,6 @@ struct intf_sys_t
     }
 
     void ipChangedEvent(const char *psz_new_ip);
-    bool finishRestart();
     void stateChangedForRestart( input_thread_t * );
 
     void msgPlayerSetVolume(float volume);
@@ -267,8 +266,10 @@ private:
 
     void plugOutputRedirection();
     void unplugOutputRedirection();
-    void initiateRestart();
     void disconnectChromecast();
+
+    void restartDoStop();
+    bool restartDoPlay();
 };
 
 #endif /* VLC_CHROMECAST_H */
