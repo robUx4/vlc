@@ -254,6 +254,7 @@ void intf_sys_t::ipChangedEvent(const char *psz_new_ip)
     if (deviceIP != psz_new_ip)
     {
         b_ipChanging = true;
+        const bool need_restart = !deviceIP.empty() && psz_new_ip[0];
         msg_Dbg(p_intf,"ipChangedEvent '%s' from '%s'", psz_new_ip, deviceIP.c_str());
         if ( !deviceIP.empty() )
         {
@@ -272,7 +273,10 @@ void intf_sys_t::ipChangedEvent(const char *psz_new_ip)
         if (!deviceIP.empty())
         {
             msg_Dbg(p_intf,"ipChangedEvent need_restart:%d", need_restart);
-            // Start the Chromecast event thread.
+            if (need_restart)
+                InputUpdated( NULL );
+
+            // Start the new Chromecast event thread.
             if (vlc_clone(&chromecastThread, ChromecastThread, p_intf,
                           VLC_THREAD_PRIORITY_LOW))
             {
