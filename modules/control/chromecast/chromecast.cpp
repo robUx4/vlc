@@ -572,6 +572,15 @@ void intf_sys_t::InputUpdated( input_thread_t *p_input )
     vlc_mutex_unlock(&lock);
 }
 
+void intf_sys_t::setCurrentStopped(bool stopped) {
+    if (currentStopped != stopped)
+    {
+        msg_Dbg(p_intf, "change current file stopped, now %d", stopped);
+        currentStopped = stopped;
+        vlc_cond_broadcast(&loadCommandCond);
+    }
+}
+
 void intf_sys_t::sendPlayerCmd()
 {
     if (!p_input)
@@ -1199,7 +1208,7 @@ void intf_sys_t::processMessage(const castchannel::CastMessage &msg)
                         msg_Warn(p_intf, "start playing without buffering f_restart_position:%f", f_restart_position );
                         playback_start_chromecast = (1 + mtime_t( double( status[0]["currentTime"] ) ) ) * 1000000L;
                     }
-                    currentStopped = false;
+                    setCurrentStopped( false );
                     setPlayerStatus(CMD_PLAYBACK_SENT);
                     date_play_start = mdate();
                     msg_Dbg(p_intf, "Playback started with an offset of %" PRId64, playback_start_chromecast);
@@ -1210,7 +1219,7 @@ void intf_sys_t::processMessage(const castchannel::CastMessage &msg)
                     break;
 
                 case RECEIVER_IDLE:
-                    currentStopped = true;
+                    setCurrentStopped( false );
                 default:
                     setPlayerStatus(NO_CMD_PENDING);
                     sendPlayerCmd();

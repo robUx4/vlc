@@ -267,6 +267,7 @@ private:
     void plugOutputRedirection();
     void unplugOutputRedirection();
     void disconnectChromecast();
+    void setCurrentStopped(bool);
 
     void restartDoStop();
     bool restartDoPlay();
