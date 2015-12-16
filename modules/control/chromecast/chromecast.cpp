@@ -1122,6 +1122,7 @@ void intf_sys_t::processMessage(const castchannel::CastMessage &msg)
                 case CHROMECAST_AUTHENTICATED:
                     msg_Dbg(p_intf, "Chromecast was running no app, launch media_app");
                     appTransportId = "";
+                    receiverState = RECEIVER_IDLE;
                     msgReceiverLaunchApp();
                     break;
 
