@@ -1190,14 +1190,24 @@ void intf_sys_t::processMessage(const castchannel::CastMessage &msg)
                 switch( receiverState )
                 {
                 case RECEIVER_BUFFERING:
-                    if (!mediaSessionId.empty())
+                    if ( double(status[0]["currentTime"]) == 0.0 )
                     {
-                        playlist_t *p_playlist = pl_Get( p_intf );
-                        msgPlayerSetMute( var_GetBool( p_playlist, "mute") );
-                        msgPlayerSetVolume( var_GetFloat( p_playlist, "volume") );
+                        receiverState = oldPlayerState;
+                        msg_Dbg(p_intf, "Invalid buffering time, keep previous state %d", oldPlayerState);
                     }
-                    playback_start_chromecast = (1 + mtime_t( double( status[0]["currentTime"] ) ) ) * 1000000L;
-                    msg_Dbg(p_intf, "Playback pending with an offset of %" PRId64, playback_start_chromecast);
+                    else
+                    {
+                        if (!mediaSessionId.empty())
+                        {
+                            playlist_t *p_playlist = pl_Get( p_intf );
+                            msgPlayerSetMute( var_GetBool( p_playlist, "mute") );
+                            msgPlayerSetVolume( var_GetFloat( p_playlist, "volume") );
+                        }
+
+                        playback_start_chromecast = (1 + mtime_t( double( status[0]["currentTime"] ) ) ) * 1000000L;
+                        msg_Dbg(p_intf, "Playback pending with an offset of %" PRId64, playback_start_chromecast);
+                    }
+                    date_play_start = -1;
                     break;
 
                 case RECEIVER_PLAYING:
@@ -1213,8 +1223,23 @@ void intf_sys_t::processMessage(const castchannel::CastMessage &msg)
                     break;
 
                 case RECEIVER_PAUSED:
-                    if (date_play_start != -1)
+                    if (!mediaSessionId.empty())
+                    {
+                        playlist_t *p_playlist = pl_Get( p_intf );
+                        msgPlayerSetMute( var_GetBool( p_playlist, "mute") );
+                        msgPlayerSetVolume( var_GetFloat( p_playlist, "volume") );
+                    }
+
+                    playback_start_chromecast = (1 + mtime_t( double( status[0]["currentTime"] ) ) ) * 1000000L;
+                    msg_Dbg(p_intf, "Playback paused with an offset of %" PRId64 " date_play_start:%" PRId64, playback_start_chromecast, date_play_start);
+
+                    if (date_play_start != -1 && oldPlayerState == RECEIVER_PLAYING)
+                    {
+                        /* this is a pause generated remotely */
                         playback_start_local += mdate() - date_play_start;
+                        msg_Dbg(p_intf, "updated playback_start_local:%" PRId64, playback_start_local);
+                    }
+                    date_play_start = -1;
                     break;
 
                 case RECEIVER_IDLE:
