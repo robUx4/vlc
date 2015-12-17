@@ -95,7 +95,7 @@ nodist_libchromecast_demux_plugin_la_SOURCES = stream_out/chromecast/cast_channe
 libchromecast_demux_plugin_la_CPPFLAGS = $(AM_CPPFLAGS) -Istream_out/chromecast $(CHROMECAST_CFLAGS)
 libchromecast_demux_plugin_la_LIBADD = $(CHROMECAST_LIBS) $(SOCKET_LIBS)
 
-libchromecast_sout_plugin_la_SOURCES = stream_out/chromecast/chromecast_sout.cpp stream_out/chromecast/chromecast.h \
+libchromecast_sout_plugin_la_SOURCES = stream_out/chromecast/cast.cpp stream_out/chromecast/chromecast.h \
                                        stream_out/chromecast/chromecast_common.cpp
 nodist_libchromecast_sout_plugin_la_SOURCES = stream_out/chromecast/cast_channel.pb.cc
 libchromecast_sout_plugin_la_CPPFLAGS = $(AM_CPPFLAGS) -Istream_out/chromecast $(CHROMECAST_CFLAGS)
