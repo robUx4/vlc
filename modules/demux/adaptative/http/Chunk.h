@@ -47,13 +47,11 @@ namespace adaptative
                 virtual ~AbstractChunkSource();
                 virtual block_t *   readBlock       () = 0;
                 virtual block_t *   read            (size_t) = 0;
-                void                setParentChunk  (AbstractChunk *);
+                virtual bool        hasMoreData     () const = 0;
                 void                setBytesRange   (const BytesRange &);
                 const BytesRange &  getBytesRange   () const;
-                size_t              getContentLength() const;
 
             protected:
-                AbstractChunk      *parentChunk;
                 size_t              contentLength;
                 BytesRange          bytesRange;
         };
@@ -64,7 +62,7 @@ namespace adaptative
                 virtual ~AbstractChunk();
 
                 size_t              getBytesRead            () const;
-                size_t              getBytesToRead          () const;
+                bool                isEmpty                 () const;
 
                 virtual block_t *   readBlock       ();
                 virtual block_t *   read            (size_t);
@@ -87,6 +85,7 @@ namespace adaptative
 
                 virtual block_t *   readBlock       (); /* impl */
                 virtual block_t *   read            (size_t); /* impl */
+                virtual bool        hasMoreData     () const; /* impl */
 
                 static const size_t CHUNK_SIZE = 32768;
 
@@ -96,6 +95,7 @@ namespace adaptative
                 HTTPConnectionManager *connManager;
                 size_t              consumed; /* read pointer */
                 bool                prepared;
+                bool                eof;
 
             private:
                 bool init(const std::string &);
@@ -115,6 +115,7 @@ namespace adaptative
                 virtual ~HTTPChunkBufferedSource();
                 virtual block_t *  readBlock       (); /* reimpl */
                 virtual block_t *  read            (size_t); /* reimpl */
+                virtual bool       hasMoreData     () const; /* impl */
 
             protected:
                 virtual bool       prepare(); /* reimpl */
@@ -126,6 +127,7 @@ namespace adaptative
                 block_t           **pp_tail;
                 size_t              buffered; /* read cache size */
                 bool                done;
+                bool                eof;
                 mtime_t             downloadstart;
                 vlc_mutex_t         lock;
                 vlc_cond_t          avail;

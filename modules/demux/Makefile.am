@@ -166,7 +166,8 @@ demux_LTLIBRARIES += libes_plugin.la
 libh264_plugin_la_SOURCES = demux/mpeg/h264.c
 demux_LTLIBRARIES += libh264_plugin.la
 
-libhevc_plugin_la_SOURCES = demux/mpeg/hevc.c demux/mpeg/mpeg_parser_helpers.h
+libhevc_plugin_la_SOURCES = demux/mpeg/hevc.c packetizer/hevc_nal.h \
+                            packetizer/hevc_nal.c packetizer/hxxx_nal.h
 demux_LTLIBRARIES += libhevc_plugin.la
 
 libmkv_plugin_la_SOURCES = \
@@ -197,6 +198,7 @@ libmp4_plugin_la_SOURCES = demux/mp4/mp4.c demux/mp4/mp4.h \
                            demux/mp4/libmp4.c demux/mp4/libmp4.h \
                            demux/mp4/id3genres.h demux/mp4/languages.h \
                            demux/asf/asfpacket.c demux/asf/asfpacket.h \
+                           demux/mp4/avci.h \
                            demux/mp4/essetup.c demux/mp4/meta.c
 libmp4_plugin_la_LIBADD = $(LIBM)
 libmp4_plugin_la_LDFLAGS = $(AM_LDFLAGS)

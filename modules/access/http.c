@@ -148,11 +148,11 @@ struct access_sys_t
     /* */
     int        i_code;
     const char *psz_protocol;
-    int        i_version;
 
     char       *psz_mime;
     char       *psz_pragma;
     char       *psz_location;
+    bool i_version;
     bool b_mms;
     bool b_icecast;
 #ifdef HAVE_ZLIB_H
@@ -646,21 +646,11 @@ static ssize_t Read( access_t *p_access, uint8_t *p_buffer, size_t i_len )
     if( ReadData( p_access, &i_read, p_buffer, i_len ) )
         goto fatal;
 
-    if( i_read <= 0 )
+    if( i_read < 0 )
+        return -1; /* EINTR / EAGAIN */
+
+    if( i_read == 0 )
     {
-        /*
-         * I very much doubt that this will work.
-         * If i_read == 0, the connection *IS* dead, so the only
-         * sensible thing to do is Disconnect() and then retry.
-         * Otherwise, I got recv() completely wrong. -- Courmisch
-         */
-        if( p_sys->b_continuous )
-        {
-            Request( p_access, 0 );
-            p_sys->b_continuous = false;
-            i_read = Read( p_access, p_buffer, i_len );
-            p_sys->b_continuous = true;
-        }
         Disconnect( p_access );
         if( p_sys->b_reconnect )
         {
@@ -996,7 +986,7 @@ static int Connect( access_t *p_access, uint64_t i_tell )
         if( p_sys->b_proxy )
         {
             char *psz;
-            unsigned i_status = 0;
+            unsigned i_status;
 
             if( p_sys->i_version == 0 )
             {
@@ -1006,9 +996,8 @@ static int Connect( access_t *p_access, uint64_t i_tell )
             }
 
             WriteHeaders( p_access,
-                          "CONNECT %s:%d HTTP/1.%d\r\nHost: %s:%d\r\n\r\n",
+                          "CONNECT %s:%d HTTP/1.1\r\nHost: %s:%d\r\n\r\n",
                           p_sys->url.psz_host, p_sys->url.i_port,
-                          p_sys->i_version,
                           p_sys->url.psz_host, p_sys->url.i_port);
 
             psz = net_Gets( p_access, p_sys->fd );
@@ -1019,7 +1008,8 @@ static int Connect( access_t *p_access, uint64_t i_tell )
                 return -1;
             }
 
-            sscanf( psz, "HTTP/%*u.%*u %3u", &i_status );
+            if( sscanf( psz, "HTTP/1.%*u %3u", &i_status ) != 1 )
+                i_status = 0;
             free( psz );
 
             if( ( i_status / 100 ) != 2 )

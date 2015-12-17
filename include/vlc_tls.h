@@ -43,7 +43,9 @@ struct vlc_tls
     void *sys;
     int fd;
 
-    struct virtual_socket_t sock;
+    ssize_t (*recv)(struct vlc_tls *, void *, size_t);
+    ssize_t (*send)(struct vlc_tls *, const void *, size_t);
+    void (*close)(vlc_tls_t *);
 };
 
 /**
@@ -71,8 +73,6 @@ VLC_API vlc_tls_t *vlc_tls_ClientSessionCreate (vlc_tls_creds_t *, int fd,
 
 vlc_tls_t *vlc_tls_SessionCreate (vlc_tls_creds_t *, int fd, const char *host,
                                   const char *const *alpn);
-int vlc_tls_SessionHandshake (vlc_tls_t *, const char *host, const char *serv,
-                              char ** /*restrict*/ alp);
 VLC_API void vlc_tls_SessionDelete (vlc_tls_t *);
 
 VLC_API int vlc_tls_Read(vlc_tls_t *, void *buf, size_t len, bool waitall);
@@ -94,7 +94,6 @@ struct vlc_tls_creds
                  const char *const *alpn);
     int  (*handshake) (vlc_tls_t *, const char *host, const char *service,
                        char ** /*restrict*/ alp);
-    void (*close) (vlc_tls_t *);
 };
 
 /**
@@ -117,6 +116,12 @@ VLC_API vlc_tls_creds_t *vlc_tls_ClientCreate (vlc_object_t *);
  */
 vlc_tls_creds_t *vlc_tls_ServerCreate (vlc_object_t *,
                                        const char *cert, const char *key);
+
+static inline int vlc_tls_SessionHandshake (vlc_tls_creds_t *crd,
+                                            vlc_tls_t *tls)
+{
+    return crd->handshake (tls, NULL, NULL, NULL);
+}
 
 /**
  * Releases TLS credentials.
