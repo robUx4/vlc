@@ -36,10 +36,11 @@
 
 #include "chromecast.h"
 
-#include <vlc_playlist.h>
+#include <vlc_access.h>
 #include <vlc_input.h>
 #include <vlc_network.h>
-#include <vlc_access.h>
+#include <vlc_playlist.h>
+#include <vlc_url.h>
 
 #include <cassert>
 
@@ -58,7 +59,7 @@ static int VolumeChanged( vlc_object_t *, char const *,
                           vlc_value_t, vlc_value_t, void * );
 static int InputEvent( vlc_object_t *, char const *,
                        vlc_value_t, vlc_value_t, void * );
-static int IpChangedEvent( vlc_object_t *, char const *,
+static int AddrChangedEvent( vlc_object_t *, char const *,
                            vlc_value_t, vlc_value_t, void * );
 static void *ChromecastThread(void *data);
 static int connectChromecast(intf_thread_t *p_intf);
@@ -79,7 +80,7 @@ static int connectChromecast(intf_thread_t *p_intf);
 #define PONG_WAIT_TIME 500
 #define PONG_WAIT_RETRIES 2
 
-#define VAR_CHROMECAST_IP  "chromecast-ip"
+#define VAR_CHROMECAST_ADDR  "chromecast-addr"
 
 static const std::string NAMESPACE_DEVICEAUTH = "urn:x-cast:com.google.cast.tp.deviceauth";
 static const std::string NAMESPACE_CONNECTION = "urn:x-cast:com.google.cast.tp.connection";
@@ -105,7 +106,7 @@ vlc_module_begin ()
     set_description( N_("Chromecast interface") )
     set_capability( "interface", 0 )
     add_shortcut("chromecast")
-    add_string(CONTROL_CFG_PREFIX "ip", "", IP_TEXT, IP_LONGTEXT, false)
+    add_string(CONTROL_CFG_PREFIX "addr", "", IP_TEXT, IP_LONGTEXT, false)
     add_integer(CONTROL_CFG_PREFIX "http-port", HTTP_PORT, HTTP_PORT_TEXT, HTTP_PORT_LONGTEXT, false)
     add_string(CONTROL_CFG_PREFIX "mime", "video/x-matroska", MIME_TEXT, MIME_LONGTEXT, false)
     add_string(CONTROL_CFG_PREFIX "muxer", "avformat{mux=matroska}", MUXER_TEXT, MUXER_LONGTEXT, false)
@@ -118,20 +119,33 @@ int Open(vlc_object_t *p_this)
     intf_thread_t *p_intf = reinterpret_cast<intf_thread_t*>(p_this);
     playlist_t *p_playlist = pl_Get( p_intf );
     intf_sys_t *p_sys = new(std::nothrow) intf_sys_t(p_intf);
-    char *psz_ipChromecast = NULL;
+    char *psz_addrChromecast = NULL;
     if (unlikely(p_sys == NULL))
         return VLC_ENOMEM;
 
     msg_Dbg(p_this, "OPENING Chromecast Control Interface");
 
-    psz_ipChromecast = var_InheritString(p_intf, CONTROL_CFG_PREFIX "ip");
-    if (psz_ipChromecast == NULL)
+    std::stringstream receiver_addr;
+    psz_addrChromecast = var_InheritString(p_intf, CONTROL_CFG_PREFIX "addr");
+    if (psz_addrChromecast == NULL)
         msg_Info(p_intf, "No Chromecast receiver IP/Name provided");
+    else
+    {
+        vlc_url_t url;
+        vlc_UrlParse(&url, psz_addrChromecast);
+        free(psz_addrChromecast);
+        if (url.psz_host && url.psz_host[0])
+        {
+            int i_port = url.i_port ? url.i_port : 8009;
+            receiver_addr << url.psz_host << ':' << i_port;
+        }
+        vlc_UrlClean(&url);
+    }
 
-    if( !var_Type( p_playlist, VAR_CHROMECAST_IP ) )
+    if( !var_Type( p_playlist, VAR_CHROMECAST_ADDR ) )
         /* Don't recreate the same variable over and over and over... */
-        var_Create( p_playlist, VAR_CHROMECAST_IP, VLC_VAR_STRING );
-    var_SetString( p_playlist, VAR_CHROMECAST_IP, psz_ipChromecast );
+        var_Create( p_playlist, VAR_CHROMECAST_ADDR, VLC_VAR_STRING );
+    var_SetString( p_playlist, VAR_CHROMECAST_ADDR, receiver_addr.str().c_str() );
 
     char *psz_mime = var_InheritString(p_intf, CONTROL_CFG_PREFIX "mime");
     if (psz_mime == NULL)
@@ -161,16 +175,15 @@ int Open(vlc_object_t *p_this)
     var_AddCallback( p_playlist, "mute", MuteChanged, p_intf );
     var_AddCallback( p_playlist, "volume", VolumeChanged, p_intf );
 
-    p_sys->ipChangedEvent(psz_ipChromecast);
+    p_sys->ipChangedEvent( receiver_addr.str().c_str() );
 
-    var_AddCallback( p_playlist, VAR_CHROMECAST_IP, IpChangedEvent, p_intf );
+    var_AddCallback( p_playlist, VAR_CHROMECAST_ADDR, AddrChangedEvent, p_intf );
 
     msg_Dbg(p_this, "OPENING Chromecast done");
 
     return VLC_SUCCESS;
 
 error:
-    free(psz_ipChromecast);
     delete p_sys;
     return VLC_EGENERIC;
 }
@@ -183,7 +196,7 @@ void Close(vlc_object_t *p_this)
 
     msg_Dbg(p_this, "CLOSING Chromecast Control Interface");
 
-    var_DelCallback( p_playlist, VAR_CHROMECAST_IP, IpChangedEvent, p_intf );
+    var_DelCallback( p_playlist, VAR_CHROMECAST_ADDR, AddrChangedEvent, p_intf );
     var_DelCallback( p_playlist, "input-current", CurrentChanged, p_intf );
     var_DelCallback( p_playlist, "mute", MuteChanged, p_intf );
     var_DelCallback( p_playlist, "volume", VolumeChanged, p_intf );
@@ -235,7 +248,7 @@ intf_sys_t::~intf_sys_t()
     vlc_interrupt_destroy(p_interrupt);
 }
 
-static int IpChangedEvent(vlc_object_t *p_this, char const *psz_var,
+static int AddrChangedEvent(vlc_object_t *p_this, char const *psz_var,
                           vlc_value_t oldval, vlc_value_t val, void *p_data )
 {
     VLC_UNUSED( p_this );
@@ -265,7 +278,11 @@ void intf_sys_t::ipChangedEvent(const char *psz_new_ip)
         }
 
         /* connect the new Chromecast (if needed) */
-        deviceIP = psz_new_ip;
+        vlc_url_t url;
+        vlc_UrlParse(&url, psz_new_ip);
+        deviceIP = url.psz_host ? url.psz_host : "";
+        devicePort = url.i_port ? url.i_port : 8009;
+        vlc_UrlClean(&url);
 
         InputUpdated( NULL );
 

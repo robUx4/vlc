@@ -142,8 +142,10 @@ static void new_entry_callback( void *p_this, int i_status, const struct rr_entr
                     p_entry = p_entry->next;
                 }
                 msg_Dbg(p_sd, "Found Chromecast '%s' %s:%d", psz_device_name, deviceIP, devicePort);
+                char deviceURI[64];
+                snprintf(deviceURI, sizeof(deviceURI), "chromecast://%s:%d", deviceIP, devicePort);
 
-                input_item_t *item = input_item_NewWithTypeExt (deviceIP, psz_device_name,
+                input_item_t *item = input_item_NewWithTypeExt (deviceURI, psz_device_name,
                                                0, NULL, 0, -1, ITEM_TYPE_RENDERER, true);
 
                 services_discovery_AddItem (p_sd, item, _("Chromecast"));
@@ -158,9 +160,7 @@ static void new_entry_callback( void *p_this, int i_status, const struct rr_entr
 
 static bool should_stop_callback( void *p_this )
 {
-    services_discovery_t *p_sd = ( services_discovery_t* )p_this;
-    services_discovery_sys_t *p_sys = p_sd->p_sys;
-
+    VLC_UNUSED(p_this);
     vlc_testcancel();
 
     return false;

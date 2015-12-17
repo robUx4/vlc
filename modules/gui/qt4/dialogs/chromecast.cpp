@@ -33,10 +33,11 @@
 #include <vlc_common.h>
 #include <vlc_access.h>
 #include <vlc_services_discovery.h>
+#include <vlc_url.h>
 
 #include "dialogs/chromecast.hpp"
 
-#define VAR_CHROMECAST_IP  "chromecast-ip"
+#define VAR_CHROMECAST_ADDR  "chromecast-addr"
 
 class ChromecastReceiver : public QListWidgetItem
 {
@@ -98,8 +99,8 @@ void ChromecastDialog::onReject()
 {
     /* set the chromecast control */
     playlist_t *p_playlist = pl_Get( p_intf );
-    if( var_Type( p_playlist, VAR_CHROMECAST_IP ) )
-        var_SetString( p_playlist, VAR_CHROMECAST_IP, NULL );
+    if( var_Type( p_playlist, VAR_CHROMECAST_ADDR ) )
+        var_SetString( p_playlist, VAR_CHROMECAST_ADDR, NULL );
 
     QVLCDialog::reject();
 }
@@ -129,16 +130,22 @@ void ChromecastDialog::setVisible(bool visible)
         {
             int row = -1;
             playlist_t *p_playlist = pl_Get( p_intf );
-            char *psz_current_ip = var_GetString( p_playlist, VAR_CHROMECAST_IP );
+            char *psz_current_ip = var_GetString( p_playlist, VAR_CHROMECAST_ADDR );
             if (psz_current_ip != NULL)
             {
-                for ( row = 0 ; row < ui.receiversListWidget->count(); row++ )
-                {
-                    ChromecastReceiver *rowItem = reinterpret_cast<ChromecastReceiver*>( ui.receiversListWidget->item( row ) );
-                    if (rowItem->ipAddress == psz_current_ip)
-                        break;
-                }
+                vlc_url_t url;
+                vlc_UrlParse(&url, psz_current_ip);
                 free( psz_current_ip );
+                if (url.psz_host)
+                {
+                    for ( row = 0 ; row < ui.receiversListWidget->count(); row++ )
+                    {
+                        ChromecastReceiver *rowItem = reinterpret_cast<ChromecastReceiver*>( ui.receiversListWidget->item( row ) );
+                        if (rowItem->ipAddress == url.psz_host)
+                            break;
+                    }
+                }
+                vlc_UrlClean(&url);
                 if ( row == ui.receiversListWidget->count() )
                     row = -1;
             }
@@ -190,12 +197,15 @@ void ChromecastDialog::accept()
         std::string psz_name = item->text().toUtf8().constData();
         msg_Dbg( p_intf, "selecting Chromecast %s %s:%u", psz_name.c_str(), psz_ip.c_str(), item->port );
 
+        std::stringstream ss;
+        ss << psz_ip << ':' << item->port;
+
         /* set the chromecast control */
         playlist_t *p_playlist = pl_Get(p_intf);
-        if( !var_Type( p_playlist, VAR_CHROMECAST_IP ) )
+        if( !var_Type( p_playlist, VAR_CHROMECAST_ADDR ) )
             /* Don't recreate the same variable over and over and over... */
-            var_Create( p_playlist, VAR_CHROMECAST_IP, VLC_VAR_STRING );
-        var_SetString( p_playlist, VAR_CHROMECAST_IP, psz_ip.c_str() );
+            var_Create( p_playlist, VAR_CHROMECAST_ADDR, VLC_VAR_STRING );
+        var_SetString( p_playlist, VAR_CHROMECAST_ADDR, ss.str().c_str() );
 
         bool chromecast_loaded = false;
         vlc_list_t *l = vlc_list_children( p_playlist );
@@ -227,31 +237,36 @@ void ChromecastDialog::discoveryEventReceived( const vlc_event_t * p_event )
 {
     if ( p_event->type == vlc_ServicesDiscoveryItemAdded )
     {
+        vlc_url_t url;
+        vlc_UrlParse(&url, p_event->u.services_discovery_item_added.p_new_item->psz_uri);
+
         int row = 0;
         for ( ; row < ui.receiversListWidget->count(); row++ )
         {
             ChromecastReceiver *rowItem = reinterpret_cast<ChromecastReceiver*>( ui.receiversListWidget->item( row ) );
-            if (rowItem->ipAddress == p_event->u.services_discovery_item_added.p_new_item->psz_uri)
+            if (rowItem->ipAddress == url.psz_host)
                 return;
         }
 
         /* determine if it's audio-only by checking the YouTube app */
         std::stringstream s_video_test;
+
         s_video_test << "http://"
-                     << p_event->u.services_discovery_item_added.p_new_item->psz_uri
+                     << url.psz_host
                      << ":8008/apps/YouTube";
         access_t *p_test_app = vlc_access_NewMRL( VLC_OBJECT(p_intf), s_video_test.str().c_str() );
 
         ChromecastReceiver *item = new ChromecastReceiver( p_event->u.services_discovery_item_added.p_new_item->psz_name,
-                                                           p_event->u.services_discovery_item_added.p_new_item->psz_uri,
-                                                           8009,
+                                                           url.psz_host,
+                                                           url.i_port ? url.i_port : 8009,
                                                            p_test_app ? ChromecastReceiver::HAS_VIDEO : ChromecastReceiver::AUDIO_ONLY);
+        vlc_UrlClean(&url);
         if ( p_test_app )
             vlc_access_Delete( p_test_app );
         ui.receiversListWidget->addItem( item );
 
         playlist_t *p_playlist = pl_Get( p_intf );
-        char *psz_current_ip = var_GetString( p_playlist, VAR_CHROMECAST_IP );
+        char *psz_current_ip = var_GetString( p_playlist, VAR_CHROMECAST_ADDR );
         if (item->ipAddress == psz_current_ip)
             ui.receiversListWidget->setCurrentItem( item );
         free( psz_current_ip );
