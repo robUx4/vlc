@@ -386,8 +386,8 @@ void intf_sys_t::InputUpdated( input_thread_t *p_input )
             b_restart_playback = false;
             restartState = RESTART_NONE;
             msg_Dbg( p_intf, "force restart position:%f", f_restart_position );
-            input_Control( p_input, INPUT_SET_POSITION, f_restart_position);
             b_forcing_position = true;
+            input_Control( p_input, INPUT_SET_POSITION, f_restart_position);
         }
         /* we will connect when we start the thread */
         p_input = NULL;
@@ -526,8 +526,8 @@ void intf_sys_t::InputUpdated( input_thread_t *p_input )
             b_restart_playback = false;
             restartState = RESTART_NONE;
             msg_Dbg( p_intf, "force restart position:%f", f_restart_position );
-            input_Control( this->p_input, INPUT_SET_POSITION, f_restart_position);
             b_forcing_position = true;
+            input_Control( this->p_input, INPUT_SET_POSITION, f_restart_position);
         }
         else if ( input_HasESOut( p_input ) )
         {
@@ -1209,7 +1209,7 @@ void intf_sys_t::processMessage(const castchannel::CastMessage &msg)
                     setCurrentStopped( false );
                     setPlayerStatus(CMD_PLAYBACK_SENT);
                     date_play_start = mdate();
-                    msg_Dbg(p_intf, "Playback started with an offset of %" PRId64, playback_start_chromecast);
+                    msg_Dbg(p_intf, "Playback started with an offset of %" PRId64 " now:%" PRId64 " playback_start_local:%" PRId64, playback_start_chromecast, date_play_start, playback_start_local);
                     break;
 
                 case RECEIVER_PAUSED:
@@ -1219,6 +1219,7 @@ void intf_sys_t::processMessage(const castchannel::CastMessage &msg)
 
                 case RECEIVER_IDLE:
                     setCurrentStopped( false );
+                    /* fall through */
                 default:
                     setPlayerStatus(NO_CMD_PENDING);
                     sendPlayerCmd();

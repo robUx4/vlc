@@ -110,7 +110,7 @@ struct intf_sys_t
     }
 
     double getPlaybackPosition(mtime_t i_length) const {
-        if( i_length > 0 && date_play_start > 0)
+        if( i_length > 0 && date_play_start != -1)
             return (double) getPlaybackTime() / (double)( i_length );
         return 0.0;
     }
@@ -139,6 +139,7 @@ struct intf_sys_t
     void resetForcedSeek(mtime_t i_length) {
         b_forcing_position = false;
         playback_start_local = i_length * f_restart_position;
+        msg_Dbg(p_intf, "resetForcedSeek playback_start_local:%" PRId64, playback_start_local);
     }
 
     intf_thread_t  * const p_intf;
@@ -153,8 +154,11 @@ struct intf_sys_t
     std::string mediaSessionId;
     receiver_state receiverState;
 
+    /* local date when playback started/resumed */
     mtime_t     date_play_start;
+    /* playback time reported by the receiver, used to wait for seeking point */
     mtime_t     playback_start_chromecast;
+    /* local playback time of the input when playback started/resumed */
     mtime_t     playback_start_local;
     bool        canPause;
     receiver_display  canDisplay;
