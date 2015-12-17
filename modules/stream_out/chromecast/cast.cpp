@@ -1,9 +1,11 @@
 /*****************************************************************************
- * chromecast.cpp: Chromecast sout module for vlc
+ * cast.cpp: Chromecast sout module for vlc
  *****************************************************************************
- * Copyright © 2015 VideoLAN
+ * Copyright © 2014-2015 VideoLAN
  *
- * Authors: Steve Lhomme <robux4@videolabs.io>
+ * Authors: Adrien Maglo <magsoft@videolan.org>
+ *          Jean-Baptiste Kempf <jb@videolan.org>
+ *          Steve Lhomme <robux4@videolabs.io>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU Lesser General Public License as published by
