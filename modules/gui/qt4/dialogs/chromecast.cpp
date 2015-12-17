@@ -98,11 +98,8 @@ void ChromecastDialog::onReject()
 {
     /* set the chromecast control */
     playlist_t *p_playlist = pl_Get( p_intf );
-    if (p_playlist != NULL)
-    {
-        if( var_Type( p_playlist, VAR_CHROMECAST_IP ) )
-            var_SetString( p_playlist, VAR_CHROMECAST_IP, NULL );
-    }
+    if( var_Type( p_playlist, VAR_CHROMECAST_IP ) )
+        var_SetString( p_playlist, VAR_CHROMECAST_IP, NULL );
 
     QVLCDialog::reject();
 }
@@ -132,21 +129,18 @@ void ChromecastDialog::setVisible(bool visible)
         {
             int row = -1;
             playlist_t *p_playlist = pl_Get( p_intf );
-            if (p_playlist != NULL)
+            char *psz_current_ip = var_GetString( p_playlist, VAR_CHROMECAST_IP );
+            if (psz_current_ip != NULL)
             {
-                char *psz_current_ip = var_GetString( p_playlist, VAR_CHROMECAST_IP );
-                if (psz_current_ip != NULL)
+                for ( row = 0 ; row < ui.receiversListWidget->count(); row++ )
                 {
-                    for ( row = 0 ; row < ui.receiversListWidget->count(); row++ )
-                    {
-                        ChromecastReceiver *rowItem = reinterpret_cast<ChromecastReceiver*>( ui.receiversListWidget->item( row ) );
-                        if (rowItem->ipAddress == psz_current_ip)
-                            break;
-                    }
-                    free( psz_current_ip );
-                    if ( row == ui.receiversListWidget->count() )
-                        row = -1;
+                    ChromecastReceiver *rowItem = reinterpret_cast<ChromecastReceiver*>( ui.receiversListWidget->item( row ) );
+                    if (rowItem->ipAddress == psz_current_ip)
+                        break;
                 }
+                free( psz_current_ip );
+                if ( row == ui.receiversListWidget->count() )
+                    row = -1;
             }
             ui.receiversListWidget->setCurrentRow( row );
 
@@ -257,12 +251,9 @@ void ChromecastDialog::discoveryEventReceived( const vlc_event_t * p_event )
         ui.receiversListWidget->addItem( item );
 
         playlist_t *p_playlist = pl_Get( p_intf );
-        if (p_playlist != NULL)
-        {
-            char *psz_current_ip = var_GetString( p_playlist, VAR_CHROMECAST_IP );
-            if (item->ipAddress == psz_current_ip)
-                ui.receiversListWidget->setCurrentItem( item );
-            free( psz_current_ip );
-        }
+        char *psz_current_ip = var_GetString( p_playlist, VAR_CHROMECAST_IP );
+        if (item->ipAddress == psz_current_ip)
+            ui.receiversListWidget->setCurrentItem( item );
+        free( psz_current_ip );
     }
 }
