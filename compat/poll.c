@@ -109,7 +109,6 @@ int (poll) (struct pollfd *fds, unsigned nfds, int timeout)
 # include <windows.h>
 # include <winsock2.h>
 
-
 int poll(struct pollfd *fds, unsigned nfds, int timeout)
 {
     DWORD to = (timeout >= 0) ? (DWORD)timeout : INFINITE;
@@ -165,7 +164,6 @@ int poll(struct pollfd *fds, unsigned nfds, int timeout)
             return -1;
         }
 
-        /* do this before the select() to make sure we don't miss a change */
         if (WSAEventSelect(fds[i].fd, evts[i], mask)
          && WSAGetLastError() == WSAENOTSOCK)
             fds[i].revents |= POLLNVAL;
@@ -179,81 +177,68 @@ int poll(struct pollfd *fds, unsigned nfds, int timeout)
         if (select(0, &rdset, &wrset, &exset, &tv) > 0)
         {
             if (FD_ISSET(fd, &rdset))
-                fds[i].revents |= POLLRDNORM;
+                fds[i].revents |= fds[i].events & POLLRDNORM;
             if (FD_ISSET(fd, &wrset))
-                fds[i].revents |= POLLWRNORM;
+                fds[i].revents |= fds[i].events & POLLWRNORM;
             if (FD_ISSET(fd, &exset))
                 /* To add pain to injury, POLLERR and POLLPRI cannot be
                  * distinguished here. */
-                fds[i].revents |= POLLPRI | POLLERR;
+                fds[i].revents |= POLLERR | (fds[i].events & POLLPRI);
         }
 
-        /* only report the events requested, plus the special ones */
-        if (fds[i].revents & (fds[i].events | POLLERR | POLLNVAL) && ret == WSA_WAIT_FAILED)
+        if (fds[i].revents != 0 && ret == WSA_WAIT_FAILED)
             ret = WSA_WAIT_EVENT_0 + i;
     }
 
-    unsigned count = 0;
-    if (ret == WSA_WAIT_FAILED && to > 0)
-    {
+    if (ret == WSA_WAIT_FAILED)
         ret = WSAWaitForMultipleEvents(nfds, evts, FALSE, to, TRUE);
 
-        for (unsigned i = 0; i < nfds; i++)
-        {
-            WSANETWORKEVENTS ne;
-
-            if (WSAEnumNetworkEvents(fds[i].fd, evts[i], &ne))
-                continue;
-
-            if (ne.lNetworkEvents & FD_CONNECT)
-            {
-                fds[i].revents |= POLLWRNORM;
-                if (ne.iErrorCode[FD_CONNECT_BIT] != 0)
-                    fds[i].revents |= POLLERR;
-            }
-            if (ne.lNetworkEvents & FD_CLOSE)
-            {
-                fds[i].revents |= POLLRDNORM | POLLHUP;
-                if (ne.iErrorCode[FD_CLOSE_BIT] != 0)
-                    fds[i].revents |= POLLERR;
-            }
-            if (ne.lNetworkEvents & FD_ACCEPT)
-            {
-                fds[i].revents |= POLLRDNORM;
-                if (ne.iErrorCode[FD_ACCEPT_BIT] != 0)
-                    fds[i].revents |= POLLERR;
-            }
-            if (ne.lNetworkEvents & FD_OOB)
-            {
-                fds[i].revents |= POLLPRI;
-                if (ne.iErrorCode[FD_OOB_BIT] != 0)
-                    fds[i].revents |= POLLERR;
-            }
-            if (ne.lNetworkEvents & FD_READ)
-            {
-                fds[i].revents |= POLLRDNORM;
-                if (ne.iErrorCode[FD_READ_BIT] != 0)
-                    fds[i].revents |= POLLERR;
-            }
-            if (ne.lNetworkEvents & FD_WRITE)
-            {
-                fds[i].revents |= POLLWRNORM;
-                if (ne.iErrorCode[FD_WRITE_BIT] != 0)
-                    fds[i].revents |= POLLERR;
-            }
-        }
-    }
-
+    unsigned count = 0;
     for (unsigned i = 0; i < nfds; i++)
     {
-        /* events already found with select */
-        /* unhook the event before we close it, otherwise the socket may fail */
+        WSANETWORKEVENTS ne;
+
+        if (WSAEnumNetworkEvents(fds[i].fd, evts[i], &ne))
+            memset(&ne, 0, sizeof (ne));
         WSAEventSelect(fds[i].fd, evts[i], 0);
         WSACloseEvent(evts[i]);
 
-        /* only report the events requested, plus the special ones */
-        fds[i].revents &= fds[i].events | POLLERR | POLLHUP | POLLNVAL;
-
+        if (ne.lNetworkEvents & FD_CONNECT)
+        {
+            fds[i].revents |= POLLWRNORM;
+            if (ne.iErrorCode[FD_CONNECT_BIT] != 0)
+                fds[i].revents |= POLLERR;
+        }
+        if (ne.lNetworkEvents & FD_CLOSE)
+        {
+            fds[i].revents |= (fds[i].events & POLLRDNORM) | POLLHUP;
+            if (ne.iErrorCode[FD_CLOSE_BIT] != 0)
+                fds[i].revents |= POLLERR;
+        }
+        if (ne.lNetworkEvents & FD_ACCEPT)
+        {
+            fds[i].revents |= POLLRDNORM;
+            if (ne.iErrorCode[FD_ACCEPT_BIT] != 0)
+                fds[i].revents |= POLLERR;
+        }
+        if (ne.lNetworkEvents & FD_OOB)
+        {
+            fds[i].revents |= POLLPRI;
+            if (ne.iErrorCode[FD_OOB_BIT] != 0)
+                fds[i].revents |= POLLERR;
+        }
+        if (ne.lNetworkEvents & FD_READ)
+        {
+            fds[i].revents |= POLLRDNORM;
+            if (ne.iErrorCode[FD_READ_BIT] != 0)
+                fds[i].revents |= POLLERR;
+        }
+        if (ne.lNetworkEvents & FD_WRITE)
+        {
+            fds[i].revents |= POLLWRNORM;
+            if (ne.iErrorCode[FD_WRITE_BIT] != 0)
+                fds[i].revents |= POLLERR;
+        }
         count += fds[i].revents != 0;
     }
 

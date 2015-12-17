@@ -754,10 +754,6 @@ static void DecoderProcessSout( decoder_t *p_dec, block_t *p_block )
             block_t *p_next = p_sout_block->p_next;
 
             p_sout_block->p_next = NULL;
-            if (p_sout_block->i_pts == VLC_TS_0)
-                msg_Warn( p_dec, "zero timestamp" );
-            if (p_sout_block->i_pts == VLC_TS_INVALID)
-                msg_Warn( p_dec, "invalid timestamp" );
 
             if( DecoderPlaySout( p_dec, p_sout_block ) == VLC_EGENERIC )
             {
@@ -1498,13 +1494,6 @@ static void *DecoderThread( void *p_data )
             p_owner->b_draining = false;
         }
 
-#if 0 && !defined(NDEBUG)
-        if ( p_block )
-            msg_Dbg(p_dec, "%ld dequeued block %p %" PRId64 " disconti:%d flush:%d", GetCurrentThreadId(), p_block, p_block->i_dts, p_block->i_flags & BLOCK_FLAG_DISCONTINUITY, p_block->i_flags & BLOCK_FLAG_CORE_FLUSH );
-        else
-            msg_Dbg(p_dec, "%ld dequeued NO BLOCK!", GetCurrentThreadId() );
-#endif
-
         vlc_fifo_Unlock( p_owner->p_fifo );
 
         int canc = vlc_savecancel();
@@ -1989,8 +1978,6 @@ void input_DecoderDrain( decoder_t *p_dec )
 void input_DecoderFlush( decoder_t *p_dec )
 {
     decoder_owner_sys_t *p_owner = p_dec->p_owner;
-
-    //msg_Dbg( p_dec, "%ld input_DecoderFlush", GetCurrentThreadId() );
 
     vlc_fifo_Lock( p_owner->p_fifo );
 

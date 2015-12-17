@@ -61,7 +61,6 @@ static void Close( vlc_object_t * );
 #define METACUBE_TEXT N_("Metacube")
 #define METACUBE_LONGTEXT N_("Use the Metacube protocol. Needed for streaming " \
                              "to the Cubemap reflector.")
-#define RATECONTROL_TEXT N_("Use muxers rate control mechanism")
 
 
 vlc_module_begin ()
@@ -79,8 +78,6 @@ vlc_module_begin ()
                 MIME_TEXT, MIME_LONGTEXT, true )
     add_bool( SOUT_CFG_PREFIX "metacube", false,
               METACUBE_TEXT, METACUBE_LONGTEXT, true )
-    add_bool( SOUT_CFG_PREFIX "ratecontrol", false,
-              RATECONTROL_TEXT, RATECONTROL_TEXT, true )
     set_callbacks( Open, Close )
 vlc_module_end ()
 
@@ -89,7 +86,7 @@ vlc_module_end ()
  * Exported prototypes
  *****************************************************************************/
 static const char *const ppsz_sout_options[] = {
-    "user", "pwd", "mime", "metacube", "ratecontrol", NULL
+    "user", "pwd", "mime", "metacube", NULL
 };
 
 static ssize_t Write( sout_access_out_t *, block_t * );
@@ -111,8 +108,6 @@ struct sout_access_out_sys_t
     bool                b_header_complete;
     bool                b_metacube;
     bool                b_has_keyframes;
-    bool                b_muxer_ratecontrol;
-    size_t              i_buf_size; /* min buffer size before blocking output */
 };
 
 /* Definitions for the Metacube2 protocol, used to communicate with Cubemap. */
@@ -262,9 +257,6 @@ static int Open( vlc_object_t *p_this )
     }
 
     p_sys->b_metacube = var_GetBool( p_access, SOUT_CFG_PREFIX "metacube" );
-    p_sys->b_muxer_ratecontrol = var_GetBool( p_access, SOUT_CFG_PREFIX "ratecontrol" );
-    if (p_sys->b_muxer_ratecontrol)
-        p_sys->i_buf_size = 512; //50 * 1024; /* default startup size */
     p_sys->b_has_keyframes = false;
 
     p_sys->p_httpd_stream =
@@ -286,7 +278,7 @@ static int Open( vlc_object_t *p_this )
     if( p_sys->b_metacube )
     {
         httpd_header headers[] = {{ "Content-encoding", "metacube" }};
-        int err = httpd_StreamSetHTTPHeaders( p_sys->p_httpd_stream, headers, ARRAY_SIZE( headers ) );
+        int err = httpd_StreamSetHTTPHeaders( p_sys->p_httpd_stream, headers, sizeof( headers ) / sizeof( httpd_header ) );
         if( err != VLC_SUCCESS )
         {
             free( p_sys );
@@ -331,14 +323,7 @@ static int Control( sout_access_out_t *p_access, int i_query, va_list args )
     switch( i_query )
     {
         case ACCESS_OUT_CONTROLS_PACE:
-            *va_arg( args, bool * ) = p_access->p_sys->b_muxer_ratecontrol;
-            break;
-
-        case ACCESS_OUT_SET_BUFFERSIZE:
-            if (p_access->p_sys->b_muxer_ratecontrol)
-                p_access->p_sys->i_buf_size = va_arg( args, size_t );
-            else
-                p_access->p_sys->i_buf_size = 0;
+            *va_arg( args, bool * ) = false;
             break;
 
         default:
@@ -413,7 +398,6 @@ static ssize_t Write( sout_access_out_t *p_access, block_t *p_buffer )
             }
             else
             {
-                msg_Dbg( p_access, "set HTTPd stream header size:%d", p_sys->i_header_size );
                 httpd_StreamHeader( p_sys->p_httpd_stream, p_sys->p_header,
                                     p_sys->i_header_size );
             }
@@ -442,6 +426,8 @@ static ssize_t Write( sout_access_out_t *p_access, block_t *p_buffer )
             memcpy( hdr.sync, METACUBE2_SYNC, sizeof( METACUBE2_SYNC ) );
             hdr.size = hton32( p_buffer->i_buffer );
             hdr.flags = hton16( 0 );
+            if( p_buffer->i_flags & BLOCK_FLAG_HEADER )
+                hdr.flags |= hton16( METACUBE_FLAGS_HEADER );
             if( p_sys->b_has_keyframes && !( p_buffer->i_flags & BLOCK_FLAG_TYPE_I ) )
                 hdr.flags |= hton16( METACUBE_FLAGS_NOT_SUITABLE_FOR_STREAM_START );
             hdr.csum = hton16( metacube2_compute_crc( &hdr ) );
@@ -455,7 +441,6 @@ static ssize_t Write( sout_access_out_t *p_access, block_t *p_buffer )
         }
 
         /* send data */
-        /* TODO httpd_StreamBlockingSize( p_sys->p_httpd_stream, p_sys->i_buf_size ); */
         i_err = httpd_StreamSend( p_sys->p_httpd_stream, p_buffer );
 
         block_Release( p_buffer );

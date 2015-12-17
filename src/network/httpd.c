@@ -56,19 +56,12 @@
 #   include <sys/socket.h>
 #endif
 
-#define NDEBUG
-
-#if 1 && defined(_WIN32)
+#if defined(_WIN32)
 /* We need HUGE buffer otherwise TCP throughput is very limited */
-#define HTTPD_CL_BUFSIZE (101360+1)
+#define HTTPD_CL_BUFSIZE 100000
 #else
-#define HTTPD_CL_BUFSIZE (10136+1)
+#define HTTPD_CL_BUFSIZE 10000
 #endif
-
-#define HTTPD_STREAM_BODY_BUFFER 5000000
-//#define HTTPD_STREAM_BODY_BUFFER HTTPD_CL_BUFSIZE  /* should be the size of the Chromecast TCP window in all_data/blocking mode */
-//#define HTTPD_STREAM_BODY_BUFFER HTTPD_CL_BUFSIZE  /* should be the size of the Chromecast TCP window in all_data/blocking mode */
-//#define HTTPD_STREAM_BODY_BUFFER 1100
 
 static void httpd_ClientClean(httpd_client_t *cl);
 static void httpd_AppendData(httpd_stream_t *stream, uint8_t *p_data, int i_data);
@@ -634,9 +627,6 @@ static int httpd_StreamCallBack(httpd_callback_sys_t *p_sys,
                                  const httpd_message_t *query)
 {
     httpd_stream_t *stream = (httpd_stream_t*)p_sys;
-#if 1 && !defined(NDEBUG)
-    wchar_t dbg[256];
-#endif
 
     if (!answer || !query || !cl)
         return VLC_SUCCESS;
@@ -645,26 +635,12 @@ static int httpd_StreamCallBack(httpd_callback_sys_t *p_sys,
         int     i_pos;
 
         if (answer->i_body_offset >= stream->i_buffer_pos)
-        {
-#if 0 && !defined(NDEBUG)
-            wchar_t dbg[256];
-            wsprintf(dbg,L"httpd:clbk no data1\n");
-            OutputDebugString(dbg);
-#endif
             return VLC_EGENERIC;    /* wait, no data available */
-        }
 
         if (cl->i_keyframe_wait_to_pass >= 0) {
             if (stream->i_last_keyframe_seen_pos <= cl->i_keyframe_wait_to_pass)
-            {
-#if 1 && !defined(NDEBUG)
-                wchar_t dbg[256];
-                wsprintf(dbg,L"httpd:clbk wait keyframe\n");
-                OutputDebugString(dbg);
-#endif
                 /* still waiting for the next keyframe */
                 return VLC_EGENERIC;
-            }
 
             /* seek to the new keyframe */
             answer->i_body_offset = stream->i_last_keyframe_seen_pos;
@@ -672,43 +648,16 @@ static int httpd_StreamCallBack(httpd_callback_sys_t *p_sys,
         }
 
         if (answer->i_body_offset + stream->i_buffer_size < stream->i_buffer_pos)
-        {
-#ifndef NDEBUG
-            wchar_t dbg[256];
-            wsprintf(dbg,L"httpd: client not fast enough offset:%d buffer:%d\n",answer->i_body_offset,stream->i_buffer_pos);
-            OutputDebugString(dbg);
-#endif
             answer->i_body_offset = stream->i_buffer_last_pos; /* this client isn't fast enough */
-        }
 
         i_pos   = answer->i_body_offset % stream->i_buffer_size;
         int64_t i_write = stream->i_buffer_pos - answer->i_body_offset;
 
         if (i_write > HTTPD_CL_BUFSIZE)
-        {
-#if 1 && !defined(NDEBUG)
-            wchar_t dbg[256];
-            wsprintf(dbg,L"httpd: write %d instead of %d\n",HTTPD_CL_BUFSIZE,i_write);
-            OutputDebugString(dbg);
-#endif
             i_write = HTTPD_CL_BUFSIZE;
-        }
         else if (i_write <= 0)
-        {
-#ifndef NDEBUG
-            wchar_t dbg[256];
-            wsprintf(dbg,L"httpd:clbk no data\n");
-            OutputDebugString(dbg);
-#endif
             return VLC_EGENERIC;    /* wait, no data available */
-        }
 
-#if 1 && !defined(NDEBUG)
-        wsprintf(dbg,L"%d:%ld httpd:clbk fill bdy ", GetCurrentThreadId(), mdate() * 1000 / CLOCK_FREQ);
-        OutputDebugString(dbg);
-        wsprintf(dbg,L"%d - ", i_write);
-        OutputDebugString(dbg);
-#endif
         /* Don't go past the end of the circular buffer */
         i_write = __MIN(i_write, stream->i_buffer_size - i_pos);
 
@@ -722,10 +671,6 @@ static int httpd_StreamCallBack(httpd_callback_sys_t *p_sys,
         memcpy(answer->p_body, &stream->p_buffer[i_pos], i_write);
 
         answer->i_body_offset += i_write;
-#if 1 && !defined(NDEBUG)
-        wsprintf(dbg,L"%d\n", i_write);
-        OutputDebugString(dbg);
-#endif
 
         return VLC_SUCCESS;
     } else {
@@ -755,17 +700,11 @@ static int httpd_StreamCallBack(httpd_callback_sys_t *p_sys,
             cl->b_stream_mode = true;
             vlc_mutex_lock(&stream->lock);
             /* Send the header */
-#if 1 /* DISABLE for specific range request */
             if (stream->i_header > 0) {
                 answer->i_body = stream->i_header;
                 answer->p_body = xmalloc(stream->i_header);
                 memcpy(answer->p_body, stream->p_header, stream->i_header);
-#if !defined(NDEBUG)
-                wsprintf(dbg,L"%d:%ld httpd:sent header %d", GetCurrentThreadId(), mdate() * 1000 / CLOCK_FREQ, stream->i_header);
-                OutputDebugString(dbg);
-#endif
             }
-#endif
             answer->i_body_offset = stream->i_buffer_last_pos;
             if (stream->b_has_keyframes)
                 cl->i_keyframe_wait_to_pass = stream->i_last_keyframe_seen_pos;
@@ -1596,11 +1535,6 @@ static void httpd_ClientRecv(httpd_client_t *cl)
                     }
                 }
             }
-#ifndef NDEBUG
-    wchar_t dbg[256];
-    wsprintf(dbg,L"httpd:rcv query \n");
-    OutputDebugString(dbg);
-#endif
             if (cl->query.i_body > 0) {
                 /* TODO Mhh, handle the case where the client only
                  * sends a request and closes the connection to
@@ -1692,14 +1626,6 @@ static void httpd_ClientSend(httpd_client_t *cl)
 
     i_len = httpd_NetSend(cl, &cl->p_buffer[cl->i_buffer],
                            cl->i_buffer_size - cl->i_buffer);
-#if 1 && !defined(NDEBUG)
-    wchar_t dbg[256];
-    wsprintf(dbg,L"%d:%d httpd:snt ", GetCurrentThreadId(), mdate() * 1000 / CLOCK_FREQ);
-    OutputDebugString(dbg);
-    wsprintf(dbg,L"%d\n", i_len);
-    OutputDebugString(dbg);
-#endif
-
     if (i_len >= 0) {
         cl->i_buffer += i_len;
 
@@ -1727,13 +1653,6 @@ static void httpd_ClientSend(httpd_client_t *cl)
                 cl->answer.p_body = NULL;
             } else /* send finished */
                 cl->i_state = HTTPD_CLIENT_SEND_DONE;
-#if 0
-                if (cl->answer.p_sent_cond != NULL && cl->answer.p_sent_lock != NULL) {
-                    vlc_mutex_lock(cl->answer.p_sent_lock);
-                    vlc_cond_signal(cl->answer.p_sent_cond);
-                    vlc_mutex_unlock(cl->answer.p_sent_lock);
-                }
-#endif
         }
     } else {
 #if defined(_WIN32)
@@ -1803,7 +1722,6 @@ static void httpdLoop(httpd_host_t *host)
 {
     struct pollfd ufd[host->nfd + host->i_client];
     unsigned nfd;
-    wchar_t dbg[256];
     for (nfd = 0; nfd < host->nfd; nfd++) {
         ufd[nfd].fd = host->fds[nfd];
         ufd[nfd].events = POLLIN;
@@ -1820,21 +1738,10 @@ static void httpdLoop(httpd_host_t *host)
     mtime_t now = mdate();
     bool b_low_delay = false;
 
-#if 0 && !defined(NDEBUG)
-        wsprintf(dbg,L"httpd:lop in\n");
-        OutputDebugString(dbg);
-#endif
-
     int canc = vlc_savecancel();
     for (int i_client = 0; i_client < host->i_client; i_client++) {
         int64_t i_offset;
         httpd_client_t *cl = host->client[i_client];
-#if 0 && !defined(NDEBUG)
-        wchar_t dbg[256];
-        wsprintf(dbg,L"httpd:lop in state %d\n",cl->i_state);
-        OutputDebugString(dbg);
-#endif
-
         if (cl->i_ref < 0 || (cl->i_ref == 0 &&
                     (cl->i_state == HTTPD_CLIENT_DEAD ||
                       (cl->i_activity_timeout > 0 &&
@@ -1855,19 +1762,11 @@ static void httpdLoop(httpd_host_t *host)
         switch (cl->i_state) {
             case HTTPD_CLIENT_RECEIVING:
             case HTTPD_CLIENT_TLS_HS_IN:
-#if 0 && !defined(NDEBUG)
-                wsprintf(dbg,L"httpd:receiving\n");
-                OutputDebugString(dbg);
-#endif
                 pufd->events = POLLIN;
                 break;
 
             case HTTPD_CLIENT_SENDING:
             case HTTPD_CLIENT_TLS_HS_OUT:
-#if 1 && !defined(NDEBUG)
-                wsprintf(dbg,L"httpd:sending\n");
-                OutputDebugString(dbg);
-#endif
                 pufd->events = POLLOUT;
                 break;
 
@@ -1944,11 +1843,6 @@ static void httpdLoop(httpd_host_t *host)
 
                             cl->i_buffer = -1;  /* Force the creation of the answer in httpd_ClientSend */
                             cl->i_state = HTTPD_CLIENT_SENDING;
-#if 1 && !defined(NDEBUG)
-                            wchar_t dbg[256];
-                            wsprintf(dbg,L"httpd:lop answr 501\n");
-                            OutputDebugString(dbg);
-#endif
                         }
                         break;
 
@@ -2007,17 +1901,8 @@ static void httpdLoop(httpd_host_t *host)
                             cl->i_buffer = -1;  /* Force the creation of the answer in httpd_ClientSend */
                             httpd_MsgAdd(answer, "Content-Length", "%d", answer->i_body);
                             httpd_MsgAdd(answer, "Content-Type", "%s", "text/html");
-#if 1 && !defined(NDEBUG)
-                            wchar_t dbg[256];
-                            wsprintf(dbg,L"httpd:lop answr 401/404\n");
-                            OutputDebugString(dbg);
-#endif
                         }
 
-#if 1 && !defined(NDEBUG)
-                        wsprintf(dbg,L"httpd:lop sending, was %d\n",cl->i_state);
-                        OutputDebugString(dbg);
-#endif
                         cl->i_state = HTTPD_CLIENT_SENDING;
                     }
                 }
@@ -2025,22 +1910,6 @@ static void httpdLoop(httpd_host_t *host)
             }
 
             case HTTPD_CLIENT_SEND_DONE:
-#if 0
-#if 1 && !defined(NDEBUG)
-                wsprintf(dbg,L"httpd:lop sent done, unlock write\n");
-                OutputDebugString(dbg);
-#endif
-                //vlc_mutex_lock(&host->lock);
-                //vlc_cond_signal(&host->cond_write);
-                //vlc_mutex_unlock(&host->lock);
-#elif 0
-                if (cl->p_sent_cond != NULL && cl->p_sent_lock != NULL) {
-                    vlc_mutex_lock(cl->p_sent_lock);
-                    vlc_cond_signal(cl->p_sent_cond);
-                    vlc_mutex_unlock(cl->p_sent_lock);
-                }
-#endif
-
                 if (!cl->b_stream_mode || cl->answer.i_body_offset == 0) {
                     const char *psz_connection = httpd_MsgGet(&cl->answer, "Connection");
                     const char *psz_query = httpd_MsgGet(&cl->query, "Connection");
@@ -2070,10 +1939,6 @@ static void httpdLoop(httpd_host_t *host)
                         free(cl->p_buffer);
                         cl->p_buffer = xmalloc(cl->i_buffer_size);
                         cl->i_state = HTTPD_CLIENT_RECEIVING;
-#if 1 && !defined(NDEBUG)
-                    wsprintf(dbg,L"httpd:sent header, receiving\n");
-                    OutputDebugString(dbg);
-#endif
                     } else
                         cl->i_state = HTTPD_CLIENT_DEAD;
                     httpd_MsgClean(&cl->answer);
@@ -2088,10 +1953,6 @@ static void httpdLoop(httpd_host_t *host)
                     cl->i_buffer_size = 0;
 
                     cl->i_state = HTTPD_CLIENT_WAITING;
-#if 0 && !defined(NDEBUG)
-                    wsprintf(dbg,L"httpd:sent buffer, waiting\n");
-                    OutputDebugString(dbg);
-#endif
                 }
                 break;
 
@@ -2105,11 +1966,6 @@ static void httpdLoop(httpd_host_t *host)
                 cl->url->catch[i_msg].cb(cl->url->catch[i_msg].p_sys, cl,
                         &cl->answer, &cl->query);
                 if (cl->answer.i_type != HTTPD_MSG_NONE) {
-#if 1 && !defined(NDEBUG)
-                    wchar_t dbg[256];
-                    wsprintf(dbg,L"httpd:lop finished waiting, answer type:%d\n",cl->answer.i_type);
-                    OutputDebugString(dbg);
-#endif
                     /* we have new data, so re-enter send mode */
                     cl->i_buffer      = 0;
                     cl->p_buffer      = cl->answer.p_body;
@@ -2128,17 +1984,9 @@ static void httpdLoop(httpd_host_t *host)
     vlc_mutex_unlock(&host->lock);
     vlc_restorecancel(canc);
 
-#if 0 && !defined(NDEBUG)
-    wsprintf(dbg,L"httpd:lop poll nfd:%d timeout:%d ",nfd, b_low_delay ? 20 : -1);
-    OutputDebugString(dbg);
-#endif
     /* we will wait 20ms (not too big) if HTTPD_CLIENT_WAITING */
     int ret = poll(ufd, nfd, b_low_delay ? 20 : -1);
 
-#if 0 && !defined(NDEBUG)
-    wsprintf(dbg,L"- done\n");
-    OutputDebugString(dbg);
-#endif
     canc = vlc_savecancel();
     vlc_mutex_lock(&host->lock);
     switch(ret) {
@@ -2150,10 +1998,6 @@ static void httpdLoop(httpd_host_t *host)
             }
         case 0:
             vlc_restorecancel(canc);
-#if 0 && !defined(NDEBUG)
-        wsprintf(dbg,L"httpd:lop poll nothing\n");
-        OutputDebugString(dbg);
-#endif
             return;
     }
 
@@ -2165,11 +2009,6 @@ static void httpdLoop(httpd_host_t *host)
         httpd_client_t *cl = host->client[i_client];
         const struct pollfd *pufd = &ufd[nfd];
 
-#if 1 && !defined(NDEBUG)
-        wchar_t dbg[256];
-        wsprintf(dbg,L"%d:httpd:lop state %d\n", GetCurrentThreadId(), cl->i_state);
-        OutputDebugString(dbg);
-#endif
         assert(pufd < &ufd[sizeof(ufd) / sizeof(ufd[0])]);
 
         if (cl->fd != pufd->fd)
@@ -2227,10 +2066,6 @@ static void httpdLoop(httpd_host_t *host)
     }
 
     vlc_restorecancel(canc);
-#if 0 && !defined(NDEBUG)
-    wsprintf(dbg,L"httpd:lop out\n");
-    OutputDebugString(dbg);
-#endif
 }
 
 static void* httpd_HostThread(void *data)

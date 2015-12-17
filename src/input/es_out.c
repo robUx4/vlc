@@ -571,8 +571,6 @@ static void EsOutChangePosition( es_out_t *out )
 {
     es_out_sys_t      *p_sys = out->p_sys;
 
-    msg_Warn(p_sys->p_input, "%ld EsOutChangePosition changing", GetCurrentThreadId());
-
     input_SendEventCache( p_sys->p_input, 0.0 );
 
     for( int i = 0; i < p_sys->i_es; i++ )
