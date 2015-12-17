@@ -663,68 +663,6 @@ void intf_sys_t::sendPlayerCmd()
     }
 }
 
-static const char *event_names[] = {
-    "INPUT_EVENT_STATE",
-    /* b_dead is true */
-    "INPUT_EVENT_DEAD",
-
-    /* "rate" has changed */
-    "INPUT_EVENT_RATE",
-
-    /* At least one of "position" or "time" */
-    "INPUT_EVENT_POSITION",
-
-    /* "length" has changed */
-    "INPUT_EVENT_LENGTH",
-
-    /* A title has been added or removed or selected.
-     * It imply that chapter has changed (not chapter event is sent) */
-    "INPUT_EVENT_TITLE",
-    /* A chapter has been added or removed or selected. */
-    "INPUT_EVENT_CHAPTER",
-
-    /* A program ("program") has been added or removed or selected",
-     * or "program-scrambled" has changed.*/
-    "INPUT_EVENT_PROGRAM",
-    /* A ES has been added or removed or selected */
-    "INPUT_EVENT_ES",
-    /* "teletext-es" has changed */
-    "INPUT_EVENT_TELETEXT",
-
-    /* "record" has changed */
-    "INPUT_EVENT_RECORD",
-
-    /* "INPUT_item_t media has changed */
-    "INPUT_EVENT_ITEM_META",
-    /* "INPUT_item_t info has changed */
-    "INPUT_EVENT_ITEM_INFO",
-    /* "INPUT_item_t name has changed */
-    "INPUT_EVENT_ITEM_NAME",
-    /* "INPUT_item_t epg has changed */
-    "INPUT_EVENT_ITEM_EPG",
-
-    /* Input statistics have been updated */
-    "INPUT_EVENT_STATISTICS",
-    /* At least one of "signal-quality" or "signal-strength" has changed */
-    "INPUT_EVENT_SIGNAL",
-
-    /* "audio-delay" has changed */
-    "INPUT_EVENT_AUDIO_DELAY",
-    /* "spu-delay" has changed */
-    "INPUT_EVENT_SUBTITLE_DELAY",
-
-    /* "bookmark" has changed */
-    "INPUT_EVENT_BOOKMARK",
-
-    /* cache" has changed */
-    "INPUT_EVENT_CACHE",
-
-    /* A audio_output_t object has been created/deleted by *the input* */
-    "INPUT_EVENT_AOUT",
-    /* A vout_thread_t object has been created/deleted by *the input* */
-    "INPUT_EVENT_VOUT",
-};
-
 static int InputEvent( vlc_object_t *p_this, char const *psz_var,
                        vlc_value_t oldval, vlc_value_t val, void *p_data )
 {
@@ -755,8 +693,6 @@ static int InputEvent( vlc_object_t *p_this, char const *psz_var,
         /* discard logs */
         return VLC_SUCCESS;
     }
-
-    msg_Dbg(p_this, "InputEvent %s", event_names[val.i_int]);
 
     return VLC_SUCCESS;
 }

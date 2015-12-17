@@ -42,11 +42,11 @@ enum access_query_e
     ACCESS_CAN_FASTSEEK,    /* arg1= bool*    cannot fail */
     ACCESS_CAN_PAUSE,       /* arg1= bool*    cannot fail */
     ACCESS_CAN_CONTROL_PACE,/* arg1= bool*    cannot fail */
-    ACCESS_GET_SIZE,      /* arg1= uin64_t* */
+    ACCESS_GET_SIZE=6,      /* arg1= uin64_t* */
     ACCESS_IS_DIRECTORY,    /* arg1= bool *, arg2= bool *, res=can fail */
 
     /* */
-    ACCESS_GET_PTS_DELAY,/* arg1= int64_t*       cannot fail */
+    ACCESS_GET_PTS_DELAY = 0x101,/* arg1= int64_t*       cannot fail */
     ACCESS_GET_TITLE_INFO,  /* arg1=input_title_t*** arg2=int*  res=can fail */
     ACCESS_GET_TITLE,       /* arg1=unsigned * res=can fail */
     ACCESS_GET_SEEKPOINT,   /* arg1=unsigned * res=can fail */
@@ -58,17 +58,15 @@ enum access_query_e
     ACCESS_GET_SIGNAL,      /* arg1=double *pf_quality, arg2=double *pf_strength   res=can fail */
 
     /* */
-    ACCESS_SET_PAUSE_STATE, /* arg1= bool           can fail */
+    ACCESS_SET_PAUSE_STATE = 0x200, /* arg1= bool           can fail */
 
     /* */
     ACCESS_SET_TITLE,       /* arg1= int            can fail */
     ACCESS_SET_SEEKPOINT,   /* arg1= int            can fail */
 
-    ACCESS_set_record_state,
-
     /* Special mode for access/demux communication
      * XXX: avoid to use it unless you can't */
-    ACCESS_SET_PRIVATE_ID_STATE, /* arg1= int i_private_data, bool b_selected    res=can fail */
+    ACCESS_SET_PRIVATE_ID_STATE = 0x1000, /* arg1= int i_private_data, bool b_selected    res=can fail */
     ACCESS_SET_PRIVATE_ID_CA,             /* arg1= int i_program_number, uint16_t i_vpid, uint16_t i_apid1, uint16_t i_apid2, uint16_t i_apid3, uint8_t i_length, uint8_t *p_data */
     ACCESS_GET_PRIVATE_ID_STATE,          /* arg1=int i_private_data arg2=bool *          res=can fail */
 };

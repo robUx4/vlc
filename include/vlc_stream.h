@@ -79,11 +79,11 @@ enum stream_query_e
     STREAM_CAN_PAUSE,           /**< arg1= bool *   res=cannot fail*/
     STREAM_CAN_CONTROL_PACE,    /**< arg1= bool *   res=cannot fail*/
     /* */
-    STREAM_GET_SIZE,          /**< arg1= uint64_t *     res=can fail */
+    STREAM_GET_SIZE=6,          /**< arg1= uint64_t *     res=can fail */
     STREAM_IS_DIRECTORY,        /**< arg1= bool *, arg2= bool *, res=can fail*/
 
     /* */
-    STREAM_GET_PTS_DELAY,/**< arg1= int64_t* res=cannot fail */
+    STREAM_GET_PTS_DELAY = 0x101,/**< arg1= int64_t* res=cannot fail */
     STREAM_GET_TITLE_INFO, /**< arg1=input_title_t*** arg2=int* res=can fail */
     STREAM_GET_TITLE,       /**< arg1=unsigned * res=can fail */
     STREAM_GET_SEEKPOINT,   /**< arg1=unsigned * res=can fail */
@@ -91,14 +91,14 @@ enum stream_query_e
     STREAM_GET_CONTENT_TYPE,    /**< arg1= char **         res=can fail */
     STREAM_GET_SIGNAL,      /**< arg1=double *pf_quality, arg2=double *pf_strength   res=can fail */
 
-    STREAM_SET_PAUSE_STATE, /**< arg1= bool        res=can fail */
+    STREAM_SET_PAUSE_STATE = 0x200, /**< arg1= bool        res=can fail */
     STREAM_SET_TITLE,       /**< arg1= int          res=can fail */
     STREAM_SET_SEEKPOINT,   /**< arg1= int          res=can fail */
 
     /* XXX only data read through stream_Read/Block will be recorded */
     STREAM_SET_RECORD_STATE,     /**< arg1=bool, arg2=const char *psz_ext (if arg1 is true)  res=can fail */
 
-    STREAM_SET_PRIVATE_ID_STATE, /* arg1= int i_private_data, bool b_selected    res=can fail */
+    STREAM_SET_PRIVATE_ID_STATE = 0x1000, /* arg1= int i_private_data, bool b_selected    res=can fail */
     STREAM_SET_PRIVATE_ID_CA,             /* arg1= int i_program_number, uint16_t i_vpid, uint16_t i_apid1, uint16_t i_apid2, uint16_t i_apid3, uint8_t i_length, uint8_t *p_data */
     STREAM_GET_PRIVATE_ID_STATE,          /* arg1=int i_private_data arg2=bool *          res=can fail */
     STREAM_GET_PRIVATE_BLOCK, /**< arg1= block_t **b, arg2=bool *eof */
