@@ -203,7 +203,6 @@ intf_sys_t::intf_sys_t(intf_thread_t *intf)
     :p_intf(intf)
     ,p_input(NULL)
     ,devicePort(8009)
-    ,b_ipChanging(false)
     ,receiverState(RECEIVER_IDLE)
     ,date_play_start(-1)
     ,playback_start_chromecast(-1.0)
@@ -253,8 +252,6 @@ void intf_sys_t::ipChangedEvent(const char *psz_new_ip)
         psz_new_ip = "";
     if (deviceIP != psz_new_ip)
     {
-        b_ipChanging = true;
-        const bool need_restart = !deviceIP.empty() && psz_new_ip[0];
         msg_Dbg(p_intf,"ipChangedEvent '%s' from '%s'", psz_new_ip, deviceIP.c_str());
         if ( !deviceIP.empty() )
         {
@@ -270,12 +267,10 @@ void intf_sys_t::ipChangedEvent(const char *psz_new_ip)
         /* connect the new Chromecast (if needed) */
         deviceIP = psz_new_ip;
 
-        if (!deviceIP.empty())
-        {
-            msg_Dbg(p_intf,"ipChangedEvent need_restart:%d", need_restart);
-            if (need_restart)
-                InputUpdated( NULL );
+        InputUpdated( NULL );
 
+        if ( !deviceIP.empty() )
+        {
             // Start the new Chromecast event thread.
             if (vlc_clone(&chromecastThread, ChromecastThread, p_intf,
                           VLC_THREAD_PRIORITY_LOW))
@@ -283,11 +278,6 @@ void intf_sys_t::ipChangedEvent(const char *psz_new_ip)
                 msg_Err(p_intf, "Could not start the Chromecast talking thread");
             }
         }
-        else
-        {
-            InputUpdated( NULL );
-        }
-        b_ipChanging = false;
     }
 }
 
@@ -387,7 +377,7 @@ void intf_sys_t::plugOutputRedirection()
 void intf_sys_t::InputUpdated( input_thread_t *p_input )
 {
     vlc_mutex_lock(&lock);
-    msg_Dbg( p_intf, "%ld InputUpdated p_input:%p was:%p b_restart_playback:%d b_ipChanging:%d playlist_Status:%d", GetCurrentThreadId(), (void*)p_input, (void*)this->p_input, b_restart_playback, bool(b_ipChanging), playlist_Status( pl_Get(p_intf) ) );
+    msg_Dbg( p_intf, "%ld InputUpdated p_input:%p was:%p b_restart_playback:%d playlist_Status:%d", GetCurrentThreadId(), (void*)p_input, (void*)this->p_input, b_restart_playback, playlist_Status( pl_Get(p_intf) ) );
 
     if (deviceIP.empty())
     {
@@ -539,19 +529,18 @@ void intf_sys_t::InputUpdated( input_thread_t *p_input )
             input_Control( this->p_input, INPUT_SET_POSITION, f_restart_position);
             b_forcing_position = true;
         }
-        else if ( !input_HasESOut( p_input ) || !b_ipChanging )
-        {
-            msg_Dbg( p_intf, "no need to restart to set the sout" );
-            b_restart_playback = false;
-        }
-        else
+        else if ( input_HasESOut( p_input ) )
         {
             char *psz_old_sout = var_GetString( p_input, "sout" );
             b_restart_playback = !psz_old_sout || !psz_old_sout[0];
             if ( b_restart_playback )
                 msg_Dbg( p_intf, "there's no sout defined yet status:%d", playlist_Status( p_playlist ) );
-            if (psz_old_sout)
-                free(psz_old_sout);
+            free(psz_old_sout);
+        }
+        else
+        {
+            msg_Dbg( p_intf, "no need to restart to set the sout" );
+            b_restart_playback = false;
         }
         msg_Dbg( p_intf, "%ld new b_restart_playback:%d", GetCurrentThreadId(), b_restart_playback );
         PL_UNLOCK;
@@ -1096,7 +1085,7 @@ void intf_sys_t::processMessage(const castchannel::CastMessage &msg)
                     setConnectionStatus(CHROMECAST_APP_STARTED);
 
                     playlist_t *p_playlist = pl_Get( p_intf );
-                    msg_Dbg( p_intf, "app started b_restart_playback:%d playlist_Status:%d input_state:%d", b_restart_playback, playlist_Status( p_playlist ), (int)var_GetInteger( p_input, "state" ) );
+                    msg_Dbg( p_intf, "app started b_restart_playback:%d playlist_Status:%d", b_restart_playback, playlist_Status( p_playlist ) );
                     if (!b_restart_playback || playlist_Status( p_playlist ) == PLAYLIST_STOPPED)
                     {
                         /* now we can start the Chromecast playback */
