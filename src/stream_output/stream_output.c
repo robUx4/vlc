@@ -566,6 +566,7 @@ int sout_MuxSendBuffer( sout_mux_t *p_mux, sout_input_t *p_input,
 
 int sout_MuxFlush( sout_mux_t *p_mux, sout_input_t *p_input )
 {
+    VLC_UNUSED(p_mux);
     block_FifoEmpty( p_input->p_fifo );
     return VLC_SUCCESS;
 }
