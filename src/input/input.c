@@ -1976,14 +1976,6 @@ static bool Control( input_thread_t *p_input,
                            - INPUT_CONTROL_NAV_ACTIVATE + DEMUX_NAV_ACTIVATE );
             break;
 
-        case INPUT_RESTART_OUTPUT:
-            msg_Err( p_input, "restart output" );
-            const double f_position = var_GetFloat( p_input, "position" );
-            End( p_input );
-            Init( p_input );
-            var_SetFloat( p_input, "position", f_position );
-            break;
-
         default:
             msg_Err( p_input, "not yet implemented" );
             break;

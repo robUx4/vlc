@@ -556,10 +556,6 @@ int input_vaControl( input_thread_t *p_input, int i_query, va_list args )
             return es_out_ControlModifyPcrSystem( p_input->p->p_es_out_display, b_absolute, i_system );
         }
 
-        case INPUT_RESTART_OUTPUT:
-            input_ControlPush( p_input, INPUT_RESTART_OUTPUT, NULL );
-            return VLC_SUCCESS;
-
         default:
             msg_Err( p_input, "unknown query in input_vaControl" );
             return VLC_EGENERIC;

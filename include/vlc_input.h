@@ -492,8 +492,6 @@ enum input_query_e
     /* External clock managments */
     INPUT_GET_PCR_SYSTEM,   /* arg1=mtime_t *, arg2=mtime_t *       res=can fail */
     INPUT_MODIFY_PCR_SYSTEM,/* arg1=int absolute, arg2=mtime_t      res=can fail */
-
-    INPUT_RESTART_OUTPUT,
 };
 
 /** @}*/
