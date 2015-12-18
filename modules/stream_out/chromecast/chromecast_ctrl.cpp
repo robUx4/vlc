@@ -46,8 +46,10 @@
 
 #include "../../misc/webservices/json.h"
 
-#define DEFAULT_TRANSCODE_AUDIO   VLC_CODEC_MP3
-#define DEFAULT_TRANSCODE_VIDEO   VLC_CODEC_H264
+static const int DEFAULT_CHROMECAST_PORT = 8009;
+
+static const vlc_fourcc_t DEFAULT_TRANSCODE_AUDIO = VLC_CODEC_MP3;
+static const vlc_fourcc_t DEFAULT_TRANSCODE_VIDEO = VLC_CODEC_H264;
 
 static int Open(vlc_object_t *);
 static void Close(vlc_object_t *);
@@ -136,7 +138,7 @@ int Open(vlc_object_t *p_this)
         free(psz_addrChromecast);
         if (url.psz_host && url.psz_host[0])
         {
-            int i_port = url.i_port ? url.i_port : 8009;
+            int i_port = url.i_port ? url.i_port : DEFAULT_CHROMECAST_PORT;
             receiver_addr << url.psz_host << ':' << i_port;
         }
         vlc_UrlClean(&url);
@@ -215,7 +217,7 @@ void Close(vlc_object_t *p_this)
 intf_sys_t::intf_sys_t(intf_thread_t *intf)
     :p_intf(intf)
     ,p_input(NULL)
-    ,devicePort(8009)
+    ,devicePort(DEFAULT_CHROMECAST_PORT)
     ,receiverState(RECEIVER_IDLE)
     ,date_play_start(-1)
     ,playback_start_chromecast(-1.0)
@@ -281,7 +283,7 @@ void intf_sys_t::ipChangedEvent(const char *psz_new_ip)
         vlc_url_t url;
         vlc_UrlParse(&url, psz_new_ip);
         deviceIP = url.psz_host ? url.psz_host : "";
-        devicePort = url.i_port ? url.i_port : 8009;
+        devicePort = url.i_port ? url.i_port : DEFAULT_CHROMECAST_PORT;
         vlc_UrlClean(&url);
 
         InputUpdated( NULL );
