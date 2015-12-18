@@ -190,12 +190,12 @@ enum demux_query_e
     /* I. Common queries to access_demux and demux */
     /* POSITION double between 0.0 and 1.0 */
     DEMUX_GET_POSITION = 0x300, /* arg1= double *       res=    */
-    DEMUX_SET_POSITION,         /* arg1= double arg2= bool b_precise    res=can fail    */
+    DEMUX_SET_POSITION,         /* arg1= double         res=can fail    */
 
     /* LENGTH/TIME in microsecond, 0 if unknown */
     DEMUX_GET_LENGTH,           /* arg1= int64_t *      res=    */
     DEMUX_GET_TIME,             /* arg1= int64_t *      res=    */
-    DEMUX_SET_TIME,             /* arg1= int64_t arg2= bool b_precise   res=can fail    */
+    DEMUX_SET_TIME,             /* arg1= int64_t        res=can fail    */
 
     /**
      * \todo Document
