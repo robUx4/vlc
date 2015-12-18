@@ -240,12 +240,15 @@ void ChromecastDialog::discoveryEventReceived( const vlc_event_t * p_event )
         vlc_url_t url;
         vlc_UrlParse(&url, p_event->u.services_discovery_item_added.p_new_item->psz_uri);
 
-        int row = 0;
-        for ( ; row < ui.receiversListWidget->count(); row++ )
+        if (url.psz_host)
         {
-            ChromecastReceiver *rowItem = reinterpret_cast<ChromecastReceiver*>( ui.receiversListWidget->item( row ) );
-            if (rowItem->ipAddress == url.psz_host)
-                return;
+            int row = 0;
+            for ( ; row < ui.receiversListWidget->count(); row++ )
+            {
+                ChromecastReceiver *rowItem = reinterpret_cast<ChromecastReceiver*>( ui.receiversListWidget->item( row ) );
+                if (rowItem->ipAddress == url.psz_host)
+                    return;
+            }
         }
 
         /* determine if it's audio-only by checking the YouTube app */
@@ -267,8 +270,13 @@ void ChromecastDialog::discoveryEventReceived( const vlc_event_t * p_event )
 
         playlist_t *p_playlist = pl_Get( p_intf );
         char *psz_current_ip = var_GetString( p_playlist, VAR_CHROMECAST_ADDR );
-        if (item->ipAddress == psz_current_ip)
-            ui.receiversListWidget->setCurrentItem( item );
-        free( psz_current_ip );
+        if (psz_current_ip)
+        {
+            vlc_UrlParse(&url, psz_current_ip);
+            free( psz_current_ip );
+            if (url.psz_host && item->ipAddress == url.psz_host)
+                ui.receiversListWidget->setCurrentItem( item );
+            vlc_UrlClean(&url);
+        }
     }
 }
