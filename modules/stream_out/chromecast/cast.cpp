@@ -92,32 +92,43 @@ vlc_module_begin ()
 
 vlc_module_end ()
 
+
 /*****************************************************************************
  * Sout callbacks
  *****************************************************************************/
 static sout_stream_id_sys_t *Add(sout_stream_t *p_stream, const es_format_t *p_fmt)
 {
-    if (p_stream->p_sys->p_intf->p_sys->canDisplay == AUDIO_ONLY)
+    sout_stream_sys_t *p_sys = p_stream->p_sys;
+    if (p_sys->p_intf->p_sys->canDisplay == AUDIO_ONLY)
     {
         if (p_fmt->i_cat != AUDIO_ES)
             return NULL;
     }
-    return sout_StreamIdAdd( p_stream->p_sys->p_wrapped, p_fmt );
+    return sout_StreamIdAdd( p_sys->p_wrapped, p_fmt );
 }
+
 
 static void Del(sout_stream_t *p_stream, sout_stream_id_sys_t *id)
 {
-    sout_StreamIdDel( p_stream->p_sys->p_wrapped, id );
+    sout_stream_sys_t *p_sys = p_stream->p_sys;
+
+    sout_StreamIdDel( p_sys->p_wrapped, id );
 }
 
-static int Send(sout_stream_t *p_stream, sout_stream_id_sys_t *id, block_t *p_buffer)
+
+static int Send(sout_stream_t *p_stream, sout_stream_id_sys_t *id,
+                block_t *p_buffer)
 {
-    return sout_StreamIdSend( p_stream->p_sys->p_wrapped, id, p_buffer );
+    sout_stream_sys_t *p_sys = p_stream->p_sys;
+
+    return sout_StreamIdSend( p_sys->p_wrapped, id, p_buffer );
 }
 
 static int Flush( sout_stream_t *p_stream, sout_stream_id_sys_t *id )
 {
-    return sout_StreamFlush( p_stream->p_sys->p_wrapped, id );
+    sout_stream_sys_t *p_sys = p_stream->p_sys;
+
+    return sout_StreamFlush( p_sys->p_wrapped, id );
 }
 
 static int Control(sout_stream_t *p_stream, int i_query, va_list args)
