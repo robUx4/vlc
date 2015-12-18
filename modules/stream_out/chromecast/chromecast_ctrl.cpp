@@ -683,23 +683,11 @@ static int InputEvent( vlc_object_t *p_this, char const *psz_var,
 
     assert(p_input == p_sys->p_input);
 
-    switch( val.i_int )
+    if( val.i_int == INPUT_EVENT_STATE )
     {
-    case INPUT_EVENT_STATE:
-        {
-            msg_Info(p_this, "%ld playback state changed %d", GetCurrentThreadId(), (int)var_GetInteger( p_input, "state" ));
-            vlc_mutex_locker locker(&p_sys->lock);
-            p_sys->sendPlayerCmd();
-        }
-        break;
-    case INPUT_EVENT_POSITION:
-        msg_Info(p_this, "position changed event %f/%" PRId64, var_GetFloat( p_input, "position" ), var_GetInteger( p_input, "time" ));
-        return VLC_SUCCESS;
-
-    case INPUT_EVENT_STATISTICS:
-    case INPUT_EVENT_CACHE:
-        /* discard logs */
-        return VLC_SUCCESS;
+        msg_Info(p_this, "%ld playback state changed %d", GetCurrentThreadId(), (int)var_GetInteger( p_input, "state" ));
+        vlc_mutex_locker locker(&p_sys->lock);
+        p_sys->sendPlayerCmd();
     }
 
     return VLC_SUCCESS;
