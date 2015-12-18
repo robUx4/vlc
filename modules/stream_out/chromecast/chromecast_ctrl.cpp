@@ -265,6 +265,14 @@ void intf_sys_t::ipChangedEvent(const char *psz_new_ip)
 {
     if (psz_new_ip == NULL)
         psz_new_ip = "";
+
+    vlc_url_t url;
+    vlc_UrlParse(&url, psz_new_ip);
+    if (url.psz_host)
+        psz_new_ip = url.psz_host;
+    else
+        psz_new_ip = "";
+
     if (deviceIP != psz_new_ip)
     {
         msg_Dbg(p_intf,"ipChangedEvent '%s' from '%s'", psz_new_ip, deviceIP.c_str());
@@ -280,11 +288,8 @@ void intf_sys_t::ipChangedEvent(const char *psz_new_ip)
         }
 
         /* connect the new Chromecast (if needed) */
-        vlc_url_t url;
-        vlc_UrlParse(&url, psz_new_ip);
-        deviceIP = url.psz_host ? url.psz_host : "";
+        deviceIP = psz_new_ip;
         devicePort = url.i_port ? url.i_port : DEFAULT_CHROMECAST_PORT;
-        vlc_UrlClean(&url);
 
         InputUpdated( NULL );
 
@@ -298,6 +303,7 @@ void intf_sys_t::ipChangedEvent(const char *psz_new_ip)
             }
         }
     }
+    vlc_UrlClean(&url);
 }
 
 static int MuteChanged( vlc_object_t *p_this, char const *psz_var,
