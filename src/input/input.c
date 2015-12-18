@@ -906,7 +906,6 @@ static void StartTitle( input_thread_t * p_input )
         msg_Warn( p_input, "invalid stop-time ignored" );
         p_input->p->i_stop = 0;
     }
-    p_input->p->b_fast_seek = var_GetBool( p_input, "input-fast-seek" );
 }
 
 static void LoadSubtitles( input_thread_t *p_input )
