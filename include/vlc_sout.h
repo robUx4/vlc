@@ -210,8 +210,8 @@ struct sout_stream_t
     void              (*pf_del)( sout_stream_t *, sout_stream_id_sys_t * );
     /* manage a packet */
     int               (*pf_send)( sout_stream_t *, sout_stream_id_sys_t *, block_t* );
-    int               (*pf_flush)( sout_stream_t *, sout_stream_id_sys_t * );
     int               (*pf_control)( sout_stream_t *, int, va_list );
+    int               (*pf_flush)( sout_stream_t *, sout_stream_id_sys_t * );
 
     sout_stream_sys_t *p_sys;
     bool pace_nocontrol;

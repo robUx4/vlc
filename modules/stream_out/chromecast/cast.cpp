@@ -36,22 +36,7 @@
 
 #include <cassert>
 
-static int SoutOpen(vlc_object_t *);
-static void SoutClose(vlc_object_t *);
-
 #define SOUT_CFG_PREFIX    "sout-chromecast-"
-
-/* sout wrapper that can tell when the Chromecast is finished playing
- * rather than when data are finished sending */
-vlc_module_begin ()
-    set_shortname( "cc_sout" )
-    set_category(CAT_SOUT)
-    set_subcategory(SUBCAT_SOUT_STREAM)
-    set_description( N_( "chromecast sout wrapper" ) )
-    set_capability("sout stream", 0)
-    add_shortcut("cc_sout")
-    set_callbacks( SoutOpen, SoutClose )
-vlc_module_end ()
 
 struct sout_stream_sys_t
 {
@@ -83,6 +68,29 @@ protected:
     sout_stream_t * const p_stream;
     bool                  b_header_started;
 };
+
+/*****************************************************************************
+ * Local prototypes
+ *****************************************************************************/
+static int Open(vlc_object_t *);
+static void Close(vlc_object_t *);
+
+/*****************************************************************************
+ * Module descriptor
+ *****************************************************************************/
+
+/* sout wrapper that can tell when the Chromecast is finished playing
+ * rather than when data are finished sending */
+vlc_module_begin ()
+    set_shortname( "cc_sout" )
+    set_description(N_("Chromecast stream output"))
+    set_capability("sout stream", 0)
+    add_shortcut("cc_sout")
+    set_category(CAT_SOUT)
+    set_subcategory(SUBCAT_SOUT_STREAM)
+    set_callbacks(Open, Close)
+
+vlc_module_end ()
 
 /*****************************************************************************
  * Sout callbacks
@@ -126,12 +134,15 @@ static int Control(sout_stream_t *p_stream, int i_query, va_list args)
     return p_sys->p_wrapped->pf_control( p_sys->p_wrapped, i_query, args );
 }
 
-int SoutOpen(vlc_object_t *p_this)
+/*****************************************************************************
+ * Open: connect to the Chromecast and initialize the sout
+ *****************************************************************************/
+int Open(vlc_object_t *p_this)
 {
     sout_stream_t *p_stream = reinterpret_cast<sout_stream_t*>(p_this);
+    sout_stream_sys_t *p_sys = NULL;
     char *psz_var_mux = NULL, *psz_var_mime = NULL;
     intf_thread_t *p_intf = NULL;
-    sout_stream_sys_t *p_sys = NULL;
     sout_stream_t *p_sout = NULL;
     std::stringstream ss;
 
@@ -162,6 +173,7 @@ int SoutOpen(vlc_object_t *p_this)
     if (unlikely(p_sys == NULL))
         return VLC_ENOMEM;
 
+    // Set the sout callbacks.
     p_stream->pf_add     = Add;
     p_stream->pf_del     = Del;
     p_stream->pf_send    = Send;
@@ -181,7 +193,10 @@ error:
     return VLC_EGENERIC;
 }
 
-void SoutClose(vlc_object_t *p_this)
+/*****************************************************************************
+ * Close: destroy interface
+ *****************************************************************************/
+void Close(vlc_object_t *p_this)
 {
     sout_stream_t *p_sout = reinterpret_cast<sout_stream_t*>(p_this);
     delete p_sout->p_sys;
