@@ -53,7 +53,7 @@ enum connection_status {
     CHROMECAST_TLS_CONNECTED,
     CHROMECAST_AUTHENTICATED,
     CHROMECAST_APP_STARTED,
-    CHROMECAST_DEAD,
+    CHROMECAST_CONNECTION_DEAD,
 };
 
 enum command_status {

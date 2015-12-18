@@ -106,7 +106,7 @@ struct demux_sys_t
             msg_Dbg(p_demux, "wait to demux");
             mutex_cleanup_push(&p_intf->p_sys->lock);
             while ((p_intf->p_sys->getConnectionStatus() != CHROMECAST_APP_STARTED &&
-                   p_intf->p_sys->getConnectionStatus() != CHROMECAST_DEAD) ||
+                   p_intf->p_sys->getConnectionStatus() != CHROMECAST_CONNECTION_DEAD) ||
                    !p_intf->p_sys->currentStopped)
                 vlc_cond_wait(&p_intf->p_sys->loadCommandCond, &p_intf->p_sys->lock);
             vlc_cleanup_pop();

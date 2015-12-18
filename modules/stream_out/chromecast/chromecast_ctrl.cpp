@@ -439,14 +439,14 @@ void intf_sys_t::InputUpdated( input_thread_t *p_input )
         var_AddCallback( p_input, "intf-event", InputEvent, p_intf );
 
         mutex_cleanup_push(&lock);
-        while (!deviceIP.empty() && canDisplay == DISPLAY_UNKNOWN && conn_status != CHROMECAST_DEAD)
+        while (!deviceIP.empty() && canDisplay == DISPLAY_UNKNOWN && conn_status != CHROMECAST_CONNECTION_DEAD)
         {
             msg_Dbg(p_intf, "InputUpdated waiting for Chromecast connection, current %d", conn_status);
             vlc_cond_wait(&loadCommandCond, &lock);
         }
         vlc_cleanup_pop();
 
-        if (conn_status == CHROMECAST_DEAD)
+        if (conn_status == CHROMECAST_CONNECTION_DEAD)
         {
             msg_Warn(p_intf, "no Chromecast hook possible");
             vlc_mutex_unlock(&lock);
@@ -544,7 +544,7 @@ void intf_sys_t::InputUpdated( input_thread_t *p_input )
         PL_LOCK;
         if ( playlist_Status( p_playlist ) == PLAYLIST_STOPPED )
             b_restart_playback = false;
-        else if (conn_status == CHROMECAST_DEAD)
+        else if (conn_status == CHROMECAST_CONNECTION_DEAD)
             b_restart_playback = false;
         else if (b_restart_playback)
         {
@@ -578,7 +578,7 @@ void intf_sys_t::InputUpdated( input_thread_t *p_input )
                 restartDoStop();
             }
         }
-        else if (conn_status != CHROMECAST_DEAD)
+        else if (conn_status != CHROMECAST_CONNECTION_DEAD)
         {
             plugOutputRedirection();
         }
@@ -1239,7 +1239,7 @@ void intf_sys_t::processMessage(const castchannel::CastMessage &msg)
         {
             msg_Warn(p_intf, "received close message");
             vlc_mutex_locker locker(&lock);
-            setConnectionStatus(CHROMECAST_DEAD);
+            setConnectionStatus(CHROMECAST_CONNECTION_DEAD);
             vlc_cond_signal(&seekCommandCond);
         }
         else
@@ -1474,7 +1474,7 @@ static void* ChromecastThread(void* p_this)
         canc = vlc_savecancel();
         msg_Err(p_intf, "Could not connect the Chromecast");
         vlc_mutex_lock(&p_sys->lock);
-        p_sys->setConnectionStatus(CHROMECAST_DEAD);
+        p_sys->setConnectionStatus(CHROMECAST_CONNECTION_DEAD);
         vlc_mutex_unlock(&p_sys->lock);
         vlc_restorecancel(canc);
         return NULL;
@@ -1486,7 +1486,7 @@ static void* ChromecastThread(void* p_this)
         canc = vlc_savecancel();
         msg_Err(p_intf, "Cannot get local IP address");
         vlc_mutex_lock(&p_sys->lock);
-        p_sys->setConnectionStatus(CHROMECAST_DEAD);
+        p_sys->setConnectionStatus(CHROMECAST_CONNECTION_DEAD);
         vlc_mutex_unlock(&p_sys->lock);
         vlc_restorecancel(canc);
         return NULL;
@@ -1521,7 +1521,7 @@ static void* ChromecastThread(void* p_this)
     {
         p_sys->handleMessages();
 
-        if ( p_sys->getConnectionStatus() == CHROMECAST_DEAD )
+        if ( p_sys->getConnectionStatus() == CHROMECAST_CONNECTION_DEAD )
             break;
     }
 
@@ -1555,7 +1555,7 @@ void intf_sys_t::handleMessages()
     {
         msg_Err(p_intf, "The connection to the Chromecast died (receiving).");
         vlc_mutex_locker locker(&lock);
-        setConnectionStatus(CHROMECAST_DEAD);
+        setConnectionStatus(CHROMECAST_CONNECTION_DEAD);
         return;
     }
 
