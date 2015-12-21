@@ -46,8 +46,6 @@
 
 #include "../../misc/webservices/json.h"
 
-static const int DEFAULT_CHROMECAST_PORT = 8009;
-
 static const vlc_fourcc_t DEFAULT_TRANSCODE_AUDIO = VLC_CODEC_MP3;
 static const vlc_fourcc_t DEFAULT_TRANSCODE_VIDEO = VLC_CODEC_H264;
 
@@ -70,8 +68,9 @@ static void *ChromecastThread(void *data);
 #define PACKET_MAX_LEN 10 * 1024
 
 // Media player Chromecast app id
-#define MEDIA_RECEIVER_APP_ID "CC1AD845" // Default media player aka DEFAULT_MEDIA_RECEIVER_APPLICATION_ID
+#define APP_ID "CC1AD845" // Default media player aka DEFAULT_MEDIA_RECEIVER_APPLICATION_ID
 
+static const int CHROMECAST_CONTROL_PORT = 8009;
 #define HTTP_PORT               8010
 
 /* deadline regarding pings sent from receiver */
@@ -83,10 +82,10 @@ static void *ChromecastThread(void *data);
 
 #define VAR_CHROMECAST_ADDR  "chromecast-addr-port"
 
-static const std::string NAMESPACE_DEVICEAUTH = "urn:x-cast:com.google.cast.tp.deviceauth";
-static const std::string NAMESPACE_CONNECTION = "urn:x-cast:com.google.cast.tp.connection";
-static const std::string NAMESPACE_HEARTBEAT  = "urn:x-cast:com.google.cast.tp.heartbeat";
-static const std::string NAMESPACE_RECEIVER   = "urn:x-cast:com.google.cast.receiver";
+static const std::string NAMESPACE_DEVICEAUTH       = "urn:x-cast:com.google.cast.tp.deviceauth";
+static const std::string NAMESPACE_CONNECTION       = "urn:x-cast:com.google.cast.tp.connection";
+static const std::string NAMESPACE_HEARTBEAT        = "urn:x-cast:com.google.cast.tp.heartbeat";
+static const std::string NAMESPACE_RECEIVER         = "urn:x-cast:com.google.cast.receiver";
 
 #define IP_TEXT N_("Chromecast IP address")
 #define IP_LONGTEXT N_("This sets the IP adress of the Chromecast receiver.")
@@ -151,7 +150,7 @@ int Open(vlc_object_t *p_this)
         free(psz_addrChromecast);
         if (url.psz_host && url.psz_host[0])
         {
-            int i_port = url.i_port ? url.i_port : DEFAULT_CHROMECAST_PORT;
+            int i_port = url.i_port ? url.i_port : CHROMECAST_CONTROL_PORT;
             receiver_addr << url.psz_host << ':' << i_port;
         }
         vlc_UrlClean(&url);
@@ -226,7 +225,7 @@ void Close(vlc_object_t *p_this)
 intf_sys_t::intf_sys_t(intf_thread_t *intf)
     :p_intf(intf)
     ,p_input(NULL)
-    ,devicePort(DEFAULT_CHROMECAST_PORT)
+    ,devicePort(CHROMECAST_CONTROL_PORT)
     ,receiverState(RECEIVER_IDLE)
     ,date_play_start(-1)
     ,playback_start_chromecast(-1.0)
@@ -243,7 +242,7 @@ intf_sys_t::intf_sys_t(intf_thread_t *intf)
     ,m_seektime(-1.0)
     ,i_seektime(-1.0)
     ,conn_status(CHROMECAST_DISCONNECTED)
-    ,i_app_requestId(0)
+    ,i_receiver_requestId(0)
     ,i_requestId(0)
     ,i_sout_id(0)
     ,b_restart_playback(false)
@@ -298,7 +297,7 @@ void intf_sys_t::ipChangedEvent(const char *psz_new_ip)
 
         /* connect the new Chromecast (if needed) */
         deviceIP = psz_new_ip;
-        devicePort = url.i_port ? url.i_port : DEFAULT_CHROMECAST_PORT;
+        devicePort = url.i_port ? url.i_port : CHROMECAST_CONTROL_PORT;
 
         InputUpdated( NULL );
 
@@ -1013,7 +1012,7 @@ void intf_sys_t::processMessage(const castchannel::CastMessage &msg)
             for (unsigned i = 0; i < applications.u.array.length; ++i)
             {
                 std::string appId(applications[i]["appId"]);
-                if (appId == MEDIA_RECEIVER_APP_ID)
+                if (appId == APP_ID)
                 {
                     const char *pz_transportId = applications[i]["transportId"];
                     if (pz_transportId != NULL)
@@ -1022,13 +1021,6 @@ void intf_sys_t::processMessage(const castchannel::CastMessage &msg)
                         p_app = &applications[i];
                     }
                     break;
-                }
-                else if (!appId.empty())
-                {
-                    /* the app running is not compatible with VLC, launch the compatible one */
-                    //msg_Dbg(p_intf, "Chromecast was running app:%s, launch media_app", appId.c_str());
-                    //appTransportId = "";
-                    //msgReceiverLaunchApp();
                 }
             }
 
@@ -1273,11 +1265,13 @@ void intf_sys_t::msgAuth()
                  DEFAULT_CHOMECAST_RECEIVER, castchannel::CastMessage_PayloadType_BINARY);
 }
 
+
 void intf_sys_t::msgPing()
 {
     std::string s("{\"type\":\"PING\"}");
     pushMessage(NAMESPACE_HEARTBEAT, s);
 }
+
 
 void intf_sys_t::msgPong()
 {
@@ -1308,8 +1302,8 @@ void intf_sys_t::msgReceiverLaunchApp()
 {
     std::stringstream ss;
     ss << "{\"type\":\"LAUNCH\","
-       <<  "\"appId\":\"" << MEDIA_RECEIVER_APP_ID << "\","
-       <<  "\"requestId\":" << i_app_requestId++ << "}";
+       <<  "\"appId\":\"" << APP_ID << "\","
+       <<  "\"requestId\":" << i_receiver_requestId++ << "}";
 
     pushMessage(NAMESPACE_RECEIVER, ss.str());
 }
@@ -1318,7 +1312,7 @@ void intf_sys_t::msgReceiverGetStatus()
 {
     std::stringstream ss;
     ss << "{\"type\":\"GET_STATUS\","
-       <<  "\"requestId\":" << i_app_requestId++ << "}";
+       <<  "\"requestId\":" << i_receiver_requestId++ << "}";
 
     pushMessage(NAMESPACE_RECEIVER, ss.str());
 }
@@ -1574,7 +1568,7 @@ void intf_sys_t::handleMessages()
     {
         castchannel::CastMessage msg;
         msg.ParseFromArray(p_packet + PACKET_HEADER_LEN, i_payloadSize);
-        processMessage( msg );
+        processMessage(msg);
     }
 
     vlc_restorecancel(canc);
