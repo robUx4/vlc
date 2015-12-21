@@ -312,7 +312,14 @@ void intf_sys_t::processMessage(const castchannel::CastMessage &msg)
                     msg_Warn(p_stream, "app is no longer present. closing");
                     msgReceiverClose(appTransportId);
                     setConnectionStatus(CHROMECAST_CONNECTION_DEAD);
-                    // ft
+                    break;
+
+                case CHROMECAST_AUTHENTICATED:
+                    msg_Dbg(p_stream, "Chromecast was running no app, launch media_app");
+                    appTransportId = "";
+                    msgReceiverLaunchApp();
+                    break;
+
                 default:
                     break;
                 }
