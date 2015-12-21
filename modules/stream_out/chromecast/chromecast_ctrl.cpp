@@ -1555,6 +1555,7 @@ void intf_sys_t::handleMessages()
         msg_Err(p_intf, "The connection to the Chromecast died (receiving).");
         vlc_mutex_locker locker(&lock);
         setConnectionStatus(CHROMECAST_CONNECTION_DEAD);
+        vlc_restorecancel(canc);
         return;
     }
 
