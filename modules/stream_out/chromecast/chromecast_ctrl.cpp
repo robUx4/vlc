@@ -944,7 +944,6 @@ void intf_sys_t::restartDoStop()
 
 /**
  * @brief Process a message received from the Chromecast
- * @param p_intf the intf_thread_t structure
  * @param msg the CastMessage to process
  * @return 0 if the message has been successfuly processed else -1
  */
@@ -1264,9 +1263,6 @@ void intf_sys_t::processMessage(const castchannel::CastMessage &msg)
     }
 }
 
-
-
-
 /*****************************************************************************
  * Message preparation
  *****************************************************************************/
@@ -1296,6 +1292,7 @@ void intf_sys_t::msgConnect(const std::string & destinationId)
     std::string s("{\"type\":\"CONNECT\"}");
     pushMessage(NAMESPACE_CONNECTION, s, destinationId);
 }
+
 
 void intf_sys_t::msgReceiverClose()
 {
@@ -1382,6 +1379,7 @@ void intf_sys_t::msgPlayerGetStatus()
 
     pushMediaPlayerMessage( ss );
 }
+
 
 void intf_sys_t::msgPlayerLoad()
 {
@@ -1537,7 +1535,6 @@ static void* ChromecastThread(void* p_this)
 
     return NULL;
 }
-
 
 void intf_sys_t::handleMessages()
 {

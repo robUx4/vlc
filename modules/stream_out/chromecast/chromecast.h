@@ -47,6 +47,7 @@ static const std::string DEFAULT_CHOMECAST_RECEIVER = "receiver-0";
 /* see https://developers.google.com/cast/docs/reference/messages */
 static const std::string NAMESPACE_MEDIA            = "urn:x-cast:com.google.cast.media";
 
+
 // Status
 enum connection_status
 {
@@ -177,7 +178,6 @@ struct intf_sys_t
     /* seek time with Chromecast relative timestamp */
     mtime_t                i_seektime;
 
-    //vlc_interrupt_t *p_interrupt;
     vlc_mutex_t  lock;
     vlc_cond_t   loadCommandCond;
     vlc_cond_t   seekCommandCond;
@@ -185,7 +185,6 @@ struct intf_sys_t
     vlc_interrupt_t *p_interrupt;
 
     void msgAuth();
-
     void msgReceiverClose();
 
     void handleMessages();
@@ -201,7 +200,9 @@ struct intf_sys_t
     {
         if (conn_status != status)
         {
+#ifndef NDEBUG
             msg_Dbg(p_intf, "change Chromecast connection status from %d to %d", conn_status, status);
+#endif
             conn_status = status;
             vlc_cond_broadcast(&loadCommandCond);
         }
@@ -232,8 +233,6 @@ private:
         }
     }
 
-    enum connection_status conn_status;
-
     void msgPing();
     void msgPong();
     void msgConnect(const std::string & destinationId = DEFAULT_CHOMECAST_RECEIVER);
@@ -247,6 +246,8 @@ private:
     void msgPlayerPause();
     void msgPlayerSeek(const std::string & currentTime);
     void msgPlayerGetStatus();
+
+    enum connection_status conn_status;
 
     unsigned i_app_requestId;
     unsigned i_requestId;
