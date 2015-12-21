@@ -36,118 +36,6 @@
 
 #include "transport.h"
 
-ssize_t vlc_https_recv(vlc_tls_t *tls, void *buf, size_t len)
-{
-    struct pollfd ufd;
-    size_t count = 0;
-
-    ufd.fd = tls->fd;
-    ufd.events = POLLIN;
-
-    while (count < len)
-    {
-        int canc = vlc_savecancel();
-        ssize_t val = tls->recv(tls, (char *)buf + count, len - count);
-
-        vlc_restorecancel(canc);
-
-        if (val == 0)
-            break;
-
-        if (val >= 0)
-        {
-            count += val;
-            continue;
-        }
-
-        if (errno != EINTR && errno != EAGAIN)
-            return -1;
-
-        poll(&ufd, 1, -1);
-    }
-
-    return count;
-}
-
-ssize_t vlc_http_recv(int fd, void *buf, size_t len)
-{
-    unsigned count = 0;
-
-    while (count < len)
-    {
-        ssize_t val = recv(fd, (char *)buf + count, len - count, MSG_WAITALL);
-        if (val == 0)
-            break;
-
-        if (val >= 0)
-        {
-            count += val;
-            continue;
-        }
-
-        if (errno != EINTR)
-            return -1;
-    }
-
-    return count;
-}
-
-ssize_t vlc_https_send(vlc_tls_t *tls, const void *buf, size_t len)
-{
-    struct pollfd ufd;
-    size_t count = 0;
-
-    ufd.fd = tls->fd;
-    ufd.events = POLLOUT;
-
-    while (count < len)
-    {
-        int canc = vlc_savecancel();
-        ssize_t val = tls->send(tls, (char *)buf + count, len - count);
-
-        vlc_restorecancel(canc);
-
-        if (val > 0)
-        {
-            count += val;
-            continue;
-        }
-
-        if (val == 0)
-            break;
-
-        if (errno != EINTR && errno != EAGAIN)
-            return -1;
-
-        poll(&ufd, 1, -1);
-    }
-
-    return count;
-}
-
-ssize_t vlc_http_send(int fd, const void *buf, size_t len)
-{
-    size_t count = 0;
-
-    while (count < len)
-    {
-        ssize_t val = send(fd, buf, len, MSG_NOSIGNAL);
-        if (val > 0)
-        {
-            count += val;
-            continue;
-        }
-
-        if (val == 0)
-            break;
-
-        if (errno != EINTR)
-            return -1;
-    }
-
-    return count;
-}
-
 static void cleanup_addrinfo(void *data)
 {
     freeaddrinfo(data);
@@ -208,7 +96,28 @@ static int vlc_tcp_connect(vlc_object_t *obj, const char *name, unsigned port)
 
     vlc_cleanup_pop();
     freeaddrinfo(res);
+
+#ifndef _WIN32
+    fcntl(fd, F_SETFL, fcntl(fd, F_GETFL) | O_NONBLOCK);
+#else
+    ioctlsocket(fd, FIONBIO, &(unsigned long){ 1 });
+#endif
     return fd;
+}
+
+vlc_tls_t *vlc_http_connect(vlc_object_t *obj, const char *name, unsigned port)
+{
+    if (port == 0)
+        port = 80;
+
+    int fd = vlc_tcp_connect(obj, name, port);
+    if (fd == -1)
+        return NULL;
+
+    vlc_tls_t *tls = vlc_tls_DummyCreate(obj, fd);
+    if (tls == NULL)
+        net_Close(fd);
+    return tls;
 }
 
 vlc_tls_t *vlc_https_connect(vlc_tls_creds_t *creds, const char *name,
@@ -217,15 +126,9 @@ vlc_tls_t *vlc_https_connect(vlc_tls_creds_t *creds, const char *name,
     if (port == 0)
         port = 443;
 
-    int fd = vlc_tcp_connect(VLC_OBJECT(creds), name, port);
+    int fd = vlc_tcp_connect(creds->p_parent, name, port);
     if (fd == -1)
         return NULL;
-
-#ifndef _WIN32
-    fcntl(fd, F_SETFL, fcntl(fd, F_GETFL) | O_NONBLOCK);
-#else
-    ioctlsocket(fd, FIONBIO, &(unsigned long){ 1 });
-#endif
 
     /* TLS with ALPN */
     const char *alpn[] = { "h2", "http/1.1", NULL };
@@ -242,20 +145,4 @@ vlc_tls_t *vlc_https_connect(vlc_tls_creds_t *creds, const char *name,
     *two = (alp != NULL) && !strcmp(alp, "h2");
     free(alp);
     return tls;
-}
-
-void vlc_http_disconnect(int fd)
-{
-    shutdown(fd, SHUT_RDWR);
-    net_Close(fd);
-}
-
-void vlc_https_disconnect(vlc_tls_t *tls)
-{
-    int canc = vlc_savecancel();
-    int fd = tls->fd;
-
-    vlc_tls_SessionDelete(tls);
-    vlc_http_disconnect(fd);
-    vlc_restorecancel(canc);
 }

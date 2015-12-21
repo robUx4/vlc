@@ -24,33 +24,14 @@
 #include <stddef.h>
 #include <stdbool.h>
 
+struct vlc_object_t;
 struct vlc_tls;
 struct vlc_tls_creds;
-
-ssize_t vlc_http_recv(int fd, void *buf, size_t len);
-
-/**
- * Receives TLS data.
- *
- * Receives bytes from the peer through a TLS session.
- * @note This may be a cancellation point.
- * The caller is responsible for serializing reads on a given connection.
- */
-ssize_t vlc_https_recv(struct vlc_tls *tls, void *buf, size_t len);
-
-ssize_t vlc_http_send(int fd, const void *buf, size_t len);
-
-/**
- * Sends bytes to a connection.
- * @note This may be a cancellation point.
- * The caller is responsible for serializing writes on a given connection.
- */
-ssize_t vlc_https_send(struct vlc_tls *tls, const void *buf, size_t len);
 
 struct vlc_tls *vlc_https_connect(struct vlc_tls_creds *creds,
                                   const char *name, unsigned port,
                                   bool *restrict two);
-void vlc_http_disconnect(int fd);
-void vlc_https_disconnect(struct vlc_tls *tls);
+struct vlc_tls *vlc_http_connect(struct vlc_object_t *obj,
+                                 const char *name, unsigned port);
 
 #endif

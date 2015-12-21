@@ -23,11 +23,15 @@
 #endif
 
 #include <assert.h>
+#include <errno.h>
 #include <stdlib.h>
+#ifdef HAVE_POLL
+# include <poll.h>
+#endif
 #include <vlc_common.h>
+#include <vlc_tls.h>
 #include "h2frame.h"
 #include "h2output.h"
-#include "transport.h"
 
 #define VLC_H2_MAX_QUEUE (1u << 24)
 
@@ -41,10 +45,11 @@ struct vlc_h2_output
 {
     struct vlc_tls *tls;
 
-    struct vlc_h2_queue prio;
-    struct vlc_h2_queue queue;
-    size_t size;
-    bool failed;
+    struct vlc_h2_queue prio; /*< Priority send queue */
+    struct vlc_h2_queue queue; /*< Normal send queue */
+    size_t size; /*< Total queues depth (bytes) */
+    bool failed; /*< Connection failure flag */
+    bool closing; /*< Connection shutdown pending flag */
 
     vlc_mutex_t lock;
     vlc_cond_t wait;
@@ -122,7 +127,6 @@ static struct vlc_h2_frame *vlc_h2_output_dequeue(struct vlc_h2_output *out)
     size_t len;
 
     vlc_mutex_lock(&out->lock);
-    mutex_cleanup_push(&out->lock);
 
     for (;;)
     {
@@ -134,7 +138,15 @@ static struct vlc_h2_frame *vlc_h2_output_dequeue(struct vlc_h2_output *out)
         if (q->first != NULL)
             break;
 
+        if (unlikely(out->closing))
+        {
+            vlc_mutex_unlock(&out->lock);
+            return NULL;
+        }
+
+        int canc = vlc_savecancel();
         vlc_cond_wait(&out->wait, &out->lock);
+        vlc_restorecancel(canc);
     }
 
     frame = q->first;
@@ -150,7 +162,6 @@ static struct vlc_h2_frame *vlc_h2_output_dequeue(struct vlc_h2_output *out)
     assert(out->size >= len);
     out->size -= len;
 
-    vlc_cleanup_pop();
     vlc_mutex_unlock(&out->lock);
 
     frame->next = NULL;
@@ -169,6 +180,44 @@ static void vlc_h2_output_flush_unlocked(struct vlc_h2_output *out)
         n = f->next;
         free(f);
     }
+}
+
+/**
+ * Sends bytes to a connection.
+ * @note This may be a cancellation point.
+ * The caller is responsible for serializing writes on a given connection.
+ */
+static ssize_t vlc_https_send(vlc_tls_t *tls, const void *buf, size_t len)
+{
+    struct pollfd ufd;
+    size_t count = 0;
+
+    ufd.fd = tls->fd;
+    ufd.events = POLLOUT;
+
+    while (count < len)
+    {
+        int canc = vlc_savecancel();
+        ssize_t val = tls->send(tls, (char *)buf + count, len - count);
+
+        vlc_restorecancel(canc);
+
+        if (val > 0)
+        {
+            count += val;
+            continue;
+        }
+
+        if (val == 0)
+            break;
+
+        if (errno != EINTR && errno != EAGAIN)
+            return count ? (ssize_t)count : -1;
+
+        poll(&ufd, 1, -1);
+    }
+
+    return count;
 }
 
 /**
@@ -202,26 +251,27 @@ static void *vlc_h2_output_thread(void *data)
     struct vlc_h2_output *out = data;
     struct vlc_h2_frame *frame;
 
-    do
+    while ((frame = vlc_h2_output_dequeue(out)) != NULL)
     {
-        frame = vlc_h2_output_dequeue(out);
-        vlc_h2_frame_dump((vlc_object_t *)(out->tls), frame, "out");
-    }
-    while (vlc_h2_frame_send(out->tls, frame) == 0);
+        vlc_h2_frame_dump(out->tls->obj, frame, "out");
 
-    vlc_mutex_lock(&out->lock);
-    /* The connection can fail asynchronously. For the sake of simplicity, the
-     * caller will be notified only on the next attempt to send something. */
-    out->failed = true;
-    /* At this point, the caller will not touch the queue at all - until this
-     * thread terminates. So the lock is no longer needed here. */
-    vlc_mutex_unlock(&out->lock);
-    /* Lets not retain frames in memory useless in the mean time. */
-    vlc_h2_output_flush_unlocked(out);
-    out->prio.first = NULL;
-    out->prio.last = &out->prio.first;
-    out->queue.first = NULL;
-    out->queue.last = &out->queue.first;
+        if (vlc_h2_frame_send(out->tls, frame))
+        {   /* The connection failed asynchronously. The caller will be
+             * notified at the next attempt to queue (as with TCP sockets). */
+            vlc_mutex_lock(&out->lock);
+            out->failed = true;
+            vlc_mutex_unlock(&out->lock);
+
+            /* The caller will leave the queues alone from now on until this
+             * thread ends. The queues are flushed to free memory. */
+            vlc_h2_output_flush_unlocked(out);
+            out->prio.first = NULL;
+            out->prio.last = &out->prio.first;
+            out->queue.first = NULL;
+            out->queue.last = &out->queue.first;
+            break;
+        }
+    }
 
     return NULL;
 }
@@ -256,6 +306,7 @@ struct vlc_h2_output *vlc_h2_output_create(struct vlc_tls *tls, bool client)
     out->queue.last = &out->queue.first;
     out->size = 0;
     out->failed = false;
+    out->closing = false;
 
     vlc_mutex_init(&out->lock);
     vlc_cond_init(&out->wait);
@@ -274,11 +325,18 @@ struct vlc_h2_output *vlc_h2_output_create(struct vlc_tls *tls, bool client)
 
 void vlc_h2_output_destroy(struct vlc_h2_output *out)
 {
+    vlc_mutex_lock(&out->lock);
+    out->closing = true;
+    vlc_cond_signal(&out->wait);
+    vlc_mutex_unlock(&out->lock);
+
     vlc_cancel(out->thread);
     vlc_join(out->thread, NULL);
 
     vlc_cond_destroy(&out->wait);
     vlc_mutex_destroy(&out->lock);
+    /* Flush queues in case the thread was terminated within poll() and some
+     * packets were still queued. */
     vlc_h2_output_flush_unlocked(out);
     free(out);
 }

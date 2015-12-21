@@ -32,63 +32,29 @@
 
 #include <vlc_common.h>
 #include <vlc_block.h>
-#include <vlc_url.h>
 #include <vlc_strings.h>
 #include "message.h"
-#include "connmgr.h"
+#include "resource.h"
 #include "file.h"
 
 #pragma GCC visibility push(default)
 
 struct vlc_http_file
 {
-    struct vlc_http_mgr *manager;
+    struct vlc_http_resource resource;
     struct vlc_http_msg *resp;
-    char *host;
-    unsigned port;
-    char *authority;
-    char *path;
-    char *agent;
-    char *referrer;
-
     uintmax_t offset;
 };
 
-static struct vlc_http_msg *vlc_http_file_req(const struct vlc_http_file *file,
-                                              uintmax_t offset)
+static int vlc_http_file_req(struct vlc_http_msg *req,
+                             const struct vlc_http_resource *res, void *opaque)
 {
-    struct vlc_http_msg *req;
-    const char *str;
-
-    req = vlc_http_req_create("GET", "https", file->authority, file->path);
-    if (unlikely(req == NULL))
-        return NULL;
-
-    /* Content negotiation */
-    vlc_http_msg_add_header(req, "Accept", "*/*");
-
-    /* NOTE (TODO): Accept-Encoding should be used to allow compression.
-     * Unforunately, some servers do not send byte ranges when compression
-     * is enabled - so a separate HEAD request would be required first. */
-
-    const char *lang = vlc_gettext("C");
-    if (strcmp(lang, "C"))
-        vlc_http_msg_add_header(req, "Accept-Language",
-                                "%s, *;q=0.5", lang);
-
-    /* Authentication */
-    /* TODO: authentication */
-
-    /* Request context */
-    if (file->agent != NULL)
-        vlc_http_msg_add_agent(req, file->agent);
-
-    if (file->referrer != NULL) /* TODO: validate URL */
-        vlc_http_msg_add_header(req, "Referer", "%s", file->referrer);
+    struct vlc_http_file *file = (struct vlc_http_file *)res;
+    const uintmax_t *offset = opaque;
 
     if (file->resp != NULL)
     {
-        str = vlc_http_msg_get_header(file->resp, "ETag");
+        const char *str = vlc_http_msg_get_header(file->resp, "ETag");
         if (str != NULL)
         {
             if (!memcmp(str, "W/", 2))
@@ -103,59 +69,42 @@ static struct vlc_http_msg *vlc_http_file_req(const struct vlc_http_file *file,
         }
     }
 
-    if (vlc_http_msg_add_header(req, "Range", "bytes=%ju-", offset)
-     && offset != 0)
-        goto error;
-    /* TODO: vlc_http_msg_add_header(req, "TE", "deflate, gzip");*/
-    /* TODO: Cookies */
-    return req;
-error:
-    vlc_http_msg_destroy(req);
-    return NULL;
+    if (vlc_http_msg_add_header(req, "Range", "bytes=%ju-", *offset)
+     && *offset != 0)
+        return -1;
+    return 0;
 }
 
 static struct vlc_http_msg *vlc_http_file_open(struct vlc_http_file *file,
                                                uintmax_t offset)
 {
-    struct vlc_http_msg *req = vlc_http_file_req(file, offset);
-    if (unlikely(req == NULL))
-        return NULL;
+    struct vlc_http_msg *resp;
 
-    struct vlc_http_msg *resp = vlc_https_request(file->manager, file->host,
-                                                  file->port, req);
-    vlc_http_msg_destroy(req);
-
-    resp = vlc_http_msg_get_final(resp);
+    resp = vlc_http_res_open(&file->resource, vlc_http_file_req, &offset);
     if (resp == NULL)
         return NULL;
 
     int status = vlc_http_msg_get_status(resp);
-    if (status < 200 || status >= 599)
-        goto fail;
-
     if (status == 206)
     {
         const char *str = vlc_http_msg_get_header(resp, "Content-Range");
         if (str == NULL)
-        {   /* A multipart/byteranges response. This is not what we asked for
+            /* A multipart/byteranges response. This is not what we asked for
              * and we do not support it. */
-            errno = EINVAL;
             goto fail;
-        }
 
         uintmax_t start, end;
         if (sscanf(str, "bytes %ju-%ju", &start, &end) != 2
          || start != offset || start > end)
-        {   /* A single range response is what we asked for, but not at that
+            /* A single range response is what we asked for, but not at that
              * start offset. */
-            errno = EINVAL;
             goto fail;
-        }
     }
 
     return resp;
 fail:
     vlc_http_msg_destroy(resp);
+    errno = EIO;
     return NULL;
 }
 
@@ -163,78 +112,26 @@ void vlc_http_file_destroy(struct vlc_http_file *file)
 {
     if (file->resp != NULL)
         vlc_http_msg_destroy(file->resp);
-
-    free(file->referrer);
-    free(file->agent);
-    free(file->path);
-    free(file->authority);
-    free(file->host);
+    vlc_http_res_deinit(&file->resource);
     free(file);
-}
-
-static char *vlc_http_authority(const char *host, unsigned port)
-{
-    static const char *const formats[4] = { "%s", "[%s]", "%s:%u", "[%s]:%u" };
-    const bool brackets = strchr(host, ':') != NULL;
-    const char *fmt = formats[brackets + 2 * (port != 0)];
-    char *authority;
-
-    if (unlikely(asprintf(&authority, fmt, host, port) == -1))
-        return NULL;
-    return authority;
 }
 
 struct vlc_http_file *vlc_http_file_create(struct vlc_http_mgr *mgr,
                                            const char *uri, const char *ua,
                                            const char *ref)
 {
-    vlc_url_t url;
-
-    vlc_UrlParse(&url, uri);
-    if (url.psz_protocol == NULL
-     || vlc_ascii_strcasecmp(url.psz_protocol, "https")
-     || url.psz_host == NULL)
-    {
-        vlc_UrlClean(&url);
-        return NULL;
-    }
-
     struct vlc_http_file *file = malloc(sizeof (*file));
     if (unlikely(file == NULL))
+        return NULL;
+
+    if (vlc_http_res_init(&file->resource, mgr, uri, ua, ref))
     {
-        vlc_UrlClean(&url);
+        free(file);
         return NULL;
     }
 
-    file->host = strdup(url.psz_host);
-    file->port = url.i_port;
-    file->authority = vlc_http_authority(url.psz_host, url.i_port);
-    file->agent = (ua != NULL) ? strdup(ua) : NULL;
-    file->referrer = (ref != NULL) ? strdup(ref) : NULL;
-
-    const char *path = url.psz_path;
-    if (path == NULL)
-        path = "/";
-
-    if (url.psz_option != NULL)
-    {
-        if (asprintf(&file->path, "%s?%s", path, url.psz_option) == -1)
-            file->path = NULL;
-    }
-    else
-        file->path = strdup(path);
-
-    vlc_UrlClean(&url);
-    file->manager = mgr;
     file->resp = NULL;
     file->offset = 0;
-
-    if (unlikely(file->host == NULL || file->authority == NULL
-              || file->path == NULL))
-    {
-        vlc_http_file_destroy(file);
-        file = NULL;
-    }
     return file;
 }
 
@@ -251,39 +148,9 @@ int vlc_http_file_get_status(struct vlc_http_file *file)
 
 char *vlc_http_file_get_redirect(struct vlc_http_file *file)
 {
-    int status = vlc_http_file_get_status(file);
-
-    /* TODO: if (status == 426 Upgrade Required) */
-
-    /* Location header is only meaningful for 201 and 3xx */
-    if (status != 201 && (status / 100) != 3)
+    if (vlc_http_file_get_status(file) < 0)
         return NULL;
-    if (status == 304 /* Not Modified */
-     || status == 305 /* Use Proxy (deprecated) */
-     || status == 306 /* Switch Proxy (former) */)
-        return NULL;
-
-    const char *location = vlc_http_msg_get_header(file->resp, "Location");
-    if (location == NULL)
-        return NULL;
-
-    /* TODO: if status is 3xx, check for Retry-After and wait */
-
-    /* NOTE: The anchor is discard if it is present as VLC does not support
-     * HTML anchors so far. */
-    size_t len = strcspn(location, "#");
-
-    /* FIXME: resolve relative URL _correctly_ */
-    if (location[0] == '/')
-    {
-        char *url;
-
-        if (unlikely(asprintf(&url, "https://%s%.*s", file->authority,
-                              (int)len, location)) < 0)
-            return NULL;
-        return url;
-    }
-    return strndup(location, len);
+    return vlc_http_res_get_redirect(&file->resource, file->resp);
 }
 
 uintmax_t vlc_http_file_get_size(struct vlc_http_file *file)
@@ -339,22 +206,15 @@ bool vlc_http_file_can_seek(struct vlc_http_file *file)
     if (status == 206 || status == 416)
         return true; /* Partial Content */
 
-    const char *str = vlc_http_msg_get_header(file->resp, "Accept-Ranges");
-    /* FIXME: tokenize */
-    if (str != NULL && !vlc_ascii_strcasecmp(str, "bytes"))
-        return true;
-
-    return false;
+    return vlc_http_msg_get_token(file->resp, "Accept-Ranges",
+                                  "bytes") != NULL;
 }
 
 char *vlc_http_file_get_type(struct vlc_http_file *file)
 {
-    int status = vlc_http_file_get_status(file);
-    if (status < 200 || status >= 300)
+    if (vlc_http_file_get_status(file) < 0)
         return NULL;
-
-    const char *type = vlc_http_msg_get_header(file->resp, "Content-Type");
-    return (type != NULL) ? strdup(type) : NULL;
+    return vlc_http_res_get_type(file->resp);
 }
 
 int vlc_http_file_seek(struct vlc_http_file *file, uintmax_t offset)
@@ -385,16 +245,16 @@ int vlc_http_file_seek(struct vlc_http_file *file, uintmax_t offset)
 
 block_t *vlc_http_file_read(struct vlc_http_file *file)
 {
-    int status = vlc_http_file_get_status(file);
-    if (status < 200 || status >= 300)
-        return NULL; /* do not "read" redirect or error message */
+    if (vlc_http_file_get_status(file) < 0)
+        return NULL;
 
-    block_t *block = vlc_http_msg_read(file->resp);
+    block_t *block = vlc_http_res_read(file->resp);
+
     if (block == NULL)
     {   /* Automatically reconnect if server supports seek */
         if (vlc_http_file_can_seek(file)
          && vlc_http_file_seek(file, file->offset) == 0)
-            block = vlc_http_msg_read(file->resp);
+            block = vlc_http_res_read(file->resp);
 
         if (block == NULL)
             return NULL;

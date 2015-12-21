@@ -31,7 +31,6 @@
 #include <time.h>
 
 #include <vlc_common.h>
-#include <vlc_strings.h>
 #include "message.h"
 #include "h2frame.h"
 
@@ -49,6 +48,15 @@ struct vlc_http_msg
 
 static bool vlc_http_is_token(const char *);
 
+static ssize_t vlc_http_msg_find_header(const struct vlc_http_msg *m,
+                                        const char *name)
+{
+    for (unsigned i = 0; i < m->count; i++)
+        if (!strcasecmp(m->headers[i][0], name))
+            return i;
+    return -1;
+}
+
 static int vlc_http_msg_vadd_header(struct vlc_http_msg *m, const char *name,
                                     const char *fmt, va_list ap)
 {
@@ -58,28 +66,51 @@ static int vlc_http_msg_vadd_header(struct vlc_http_msg *m, const char *name,
         return -1;
     }
 
+    char *value;
+    if (unlikely(vasprintf(&value, fmt, ap) < 0))
+        return -1;
+
+    /* IETF RFC7230 §3.2.4 */
+    for (char *p = value; *p; p++)
+        if (*p == '\r' || *p == '\n')
+            *p = ' ';
+
+    /* Fold identically named header field values. This is unfortunately not
+     * possible for Set-Cookie, while Cookie requires a special separator. */
+    ssize_t idx = vlc_http_msg_find_header(m, name);
+    if (idx >= 0 && strcasecmp(name, "Set-Cookie"))
+    {
+        char *merged;
+        char sep = strcasecmp(name, "Cookie") ? ',' : ';';
+
+        int val = asprintf(&merged, "%s%c %s", m->headers[idx][1], sep, value);
+
+        free(value);
+
+        if (unlikely(val == -1))
+            return -1;
+
+        free(m->headers[idx][1]);
+        m->headers[idx][1] = merged;
+        return 0;
+    }
+
     char *(*h)[2] = realloc(m->headers, sizeof (char *[2]) * (m->count + 1));
     if (unlikely(h == NULL))
+    {
+        free(value);
         return -1;
+    }
 
     m->headers = h;
     h += m->count;
 
     h[0][0] = strdup(name);
     if (unlikely(h[0][0] == NULL))
-        return -1;
-
-    char *value;
-    if (unlikely(vasprintf(&value, fmt, ap) < 0))
     {
-        free(h[0][0]);
+        free(value);
         return -1;
     }
-
-    /* IETF RFC7230 §3.2.4 */
-    for (char *p = value; *p; p++)
-        if (*p == '\r' || *p == '\n')
-            *p = ' ';
 
     h[0][1] = value;
     m->count++;
@@ -103,12 +134,13 @@ int vlc_http_msg_add_header(struct vlc_http_msg *m, const char *name,
 const char *vlc_http_msg_get_header(const struct vlc_http_msg *m,
                                     const char *name)
 {
-    for (unsigned i = 0; i < m->count; i++)
-        if (!vlc_ascii_strcasecmp(m->headers[i][0], name))
-            return m->headers[i][1];
-
-    errno = ENOENT;
-    return NULL;
+    ssize_t idx = vlc_http_msg_find_header(m, name);
+    if (idx < 0)
+    {
+        errno = ENOENT;
+        return NULL;
+    }
+    return m->headers[idx][1];
 }
 
 int vlc_http_msg_get_status(const struct vlc_http_msg *m)
@@ -395,86 +427,88 @@ struct vlc_h2_frame *vlc_http_msg_h2_frame(const struct vlc_http_msg *m,
     return f;
 }
 
-static int vlc_h2_header_special(const char *name)
-{
-    /* NOTE: HPACK always returns lower-case names, so strcmp() is fine. */
-    static const char special_names[5][16] = {
-        ":status", ":method", ":scheme", ":authority", ":path"
-    };
-
-    for (unsigned i = 0; i < 5; i++)
-        if (!strcmp(special_names[i], name))
-            return i;
-    return -1;
-}
-
-struct vlc_http_msg *vlc_http_msg_h2_headers(unsigned n, char *hdrs[][2])
+struct vlc_http_msg *vlc_http_msg_h2_headers(unsigned n,
+                                             const char *const hdrs[][2])
 {
     struct vlc_http_msg *m = vlc_http_resp_create(0);
     if (unlikely(m == NULL))
         return NULL;
 
-    m->headers = malloc(n * sizeof (char *[2]));
-    if (unlikely(m->headers == NULL))
-        goto error;
-
-    char *special_caption[5] = { NULL, NULL, NULL, NULL, NULL };
-    char *special[5] = { NULL, NULL, NULL, NULL, NULL };
-
     for (unsigned i = 0; i < n; i++)
     {
-        char *name = hdrs[i][0];
-        char *value = hdrs[i][1];
-        int idx = vlc_h2_header_special(name);
+        const char *name = hdrs[i][0];
+        const char *value = hdrs[i][1];
 
-        if (idx >= 0)
+        /* NOTE: HPACK always returns lower-case names, so strcmp() is fine. */
+        if (!strcmp(name, ":status"))
         {
-            if (special[idx] != NULL)
-                goto error; /* Duplicate special header! */
+            char *end;
+            unsigned long status = strtoul(value, &end, 10);
 
-            special_caption[idx] = name;
-            special[idx] = value;
+            if (m->status != 0 || status > 999 || *end != '\0')
+                goto error; /* Not a three decimal digits status! */
+
+            m->status = status;
             continue;
         }
 
-        m->headers[m->count][0] = name;
-        m->headers[m->count][1] = value;
-        m->count++;
+        if (!strcmp(name, ":method"))
+        {
+            if (m->method != NULL)
+                goto error;
+
+            m->method = strdup(value);
+            if (unlikely(m->method == NULL))
+                goto error;
+
+            m->status = -1; /* this is a request */
+            continue;
+        }
+
+        if (!strcmp(name, ":scheme"))
+        {
+            if (m->scheme != NULL)
+                goto error;
+
+            m->scheme = strdup(value);
+            if (unlikely(m->scheme == NULL))
+                goto error;
+            continue;
+        }
+
+        if (!strcmp(name, ":authority"))
+        {
+            if (m->authority != NULL)
+                goto error;
+
+            m->authority = strdup(value);
+            if (unlikely(m->authority == NULL))
+                goto error;
+            continue;
+        }
+
+        if (!strcmp(name, ":path"))
+        {
+            if (m->path != NULL)
+                goto error;
+
+            m->path = strdup(value);
+            if (unlikely(m->path == NULL))
+                goto error;
+            continue;
+        }
+
+        if (vlc_http_msg_add_header(m, name, "%s", value))
+            goto error;
     }
 
-    if (special[0] != NULL)
-    {   /* HTTP response */
-        char *end;
-        unsigned long status = strtoul(special[0], &end, 10);
-
-        if (status > 999 || *end != '\0')
-            goto error; /* Not a three decimal digits status! */
-
-        free(special[0]);
-        m->status = status;
-    }
-    else
-        m->status = -1; /* HTTP request */
-
-    m->method = special[1];
-    m->scheme = special[2];
-    m->authority = special[3];
-    m->path = special[4];
-
-    for (unsigned i = 0; i < 5; i++)
-        free(special_caption[i]);
-
-    return m;
-
+    if ((m->status < 0) == (m->method == NULL))
+    {   /* Must be either a request or response. Not both, not neither. */
 error:
-    free(m->headers);
-    free(m);
-    for (unsigned i = 0; i < n; i++)
-    {
-        free(hdrs[i][0]);
-        free(hdrs[i][1]);
+        vlc_http_msg_destroy(m);
+        m = NULL;
     }
-    return NULL;
+    return m;
 }
 
 /* Header helpers */
@@ -507,6 +541,41 @@ static bool vlc_http_is_token(const char *str)
 {
     size_t len = vlc_http_token_length(str);
     return len > 0 && str[len] == '\0';
+}
+
+const char *vlc_http_first_token(const char *value)
+{
+    return value + strspn(value, "\t ");
+}
+
+const char *vlc_http_next_token(const char *value)
+{
+    value = strchr(value, ',');
+    if (value == NULL)
+        return NULL;
+
+    return value + strspn(value, "\t ,");
+}
+
+const char *vlc_http_msg_get_token(const struct vlc_http_msg *msg,
+                                   const char *field, const char *token)
+{
+    const char *value = vlc_http_msg_get_header(msg, field);
+    if (value == NULL)
+        return NULL;
+
+    const size_t length = strlen(token);
+
+    for (value = vlc_http_first_token(value);
+         value != NULL;
+         value = vlc_http_next_token(value))
+    {
+        if (vlc_http_token_length(value) == length
+         && !strncasecmp(token, value, length))
+            return value;
+    }
+
+    return NULL;
 }
 
 static size_t vlc_http_comment_length(const char *str)

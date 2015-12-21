@@ -25,10 +25,10 @@
 #include <assert.h>
 #include <vlc_common.h>
 #include <vlc_tls.h>
+#include <vlc_http.h>
 #include <vlc_interrupt.h>
 #include "transport.h"
-#include "h1conn.h"
-#include "h2conn.h"
+#include "conn.h"
 #include "connmgr.h"
 #include "message.h"
 
@@ -85,129 +85,245 @@ static vlc_tls_t *vlc_https_connect_i11e(vlc_tls_creds_t *creds,
     return res;
 }
 
-struct vlc_http_mgr
+struct vlc_http_connecting
 {
-    vlc_tls_creds_t *creds;
-    struct vlc_h1_conn *conn1;
-    struct vlc_h2_conn *conn2;
+    vlc_object_t *obj;
+    const char *host;
+    unsigned port;
+    vlc_sem_t done;
 };
 
-static struct vlc_h1_conn *vlc_h1_conn_find(struct vlc_http_mgr *mgr,
-                                            const char *host, unsigned port)
+static void *vlc_http_connect_thread(void *data)
 {
-    (void) host; (void) port;
-    return mgr->conn1;
+    struct vlc_http_connecting *c = data;
+    vlc_tls_t *tls;
+
+    tls = vlc_http_connect(c->obj, c->host, c->port);
+    vlc_sem_post(&c->done);
+    return tls;
 }
 
-static struct vlc_h2_conn *vlc_h2_conn_find(struct vlc_http_mgr *mgr,
-                                            const char *host, unsigned port)
+/** Interruptible vlc_http_connect() */
+static vlc_tls_t *vlc_http_connect_i11e(vlc_object_t *obj,
+                                        const char *host, unsigned port)
+{
+    struct vlc_http_connecting c;
+    vlc_thread_t th;
+
+    c.obj = obj;
+    c.host = host;
+    c.port = port;
+    vlc_sem_init(&c.done, 0);
+
+    if (vlc_clone(&th, vlc_http_connect_thread, &c, VLC_THREAD_PRIORITY_INPUT))
+        return NULL;
+
+    void *res;
+
+    if (vlc_sem_wait_i11e(&c.done))
+        vlc_cancel(th);
+    vlc_join(th, &res);
+    vlc_sem_destroy(&c.done);
+
+    if (res == VLC_THREAD_CANCELED)
+        res = NULL;
+    return res;
+}
+
+
+struct vlc_http_mgr
+{
+    vlc_object_t *obj;
+    vlc_tls_creds_t *creds;
+    vlc_http_cookie_jar_t *jar;
+    struct vlc_http_conn *conn;
+    bool use_h2c;
+};
+
+static struct vlc_http_conn *vlc_http_mgr_find(struct vlc_http_mgr *mgr,
+                                               const char *host, unsigned port)
 {
     (void) host; (void) port;
-    return mgr->conn2;
+    return mgr->conn;
+}
+
+static void vlc_http_mgr_release(struct vlc_http_mgr *mgr,
+                                 struct vlc_http_conn *conn)
+{
+    assert(mgr->conn == conn);
+    mgr->conn = NULL;
+
+    vlc_http_conn_release(conn);
 }
 
 static
-struct vlc_http_msg *vlc_https_request_reuse(struct vlc_http_mgr *mgr,
-                                             const char *host, unsigned port,
-                                             const struct vlc_http_msg *req)
+struct vlc_http_msg *vlc_http_mgr_reuse(struct vlc_http_mgr *mgr,
+                                        const char *host, unsigned port,
+                                        const struct vlc_http_msg *req)
 {
-    struct vlc_h2_conn *conn2 = vlc_h2_conn_find(mgr, host, port);
-    if (conn2 != NULL)
+    struct vlc_http_conn *conn = vlc_http_mgr_find(mgr, host, port);
+    if (conn == NULL)
+        return NULL;
+
+    struct vlc_http_stream *stream = vlc_http_stream_open(conn, req);
+    if (stream != NULL)
     {
-        struct vlc_http_stream *s = vlc_h2_stream_open(conn2, req);
-        if (s != NULL)
-        {
-            struct vlc_http_msg *m = vlc_http_stream_read_headers(s);
-            if (m != NULL)
-                return m;
+        struct vlc_http_msg *m = vlc_http_stream_read_headers(stream);
+        if (m != NULL)
+            return m;
 
-            vlc_http_stream_close(s, false);
-            /* NOTE: If the request were not idempotent, NULL should be
-             * returned here. POST is not used/supported so far, and CONNECT is
-             * treated as if it were idempotent (which turns out OK here). */
-        }
-        /* Get rid of closing or reset connection */
-        vlc_h2_conn_release(conn2);
-        mgr->conn2 = NULL;
+        vlc_http_stream_close(stream, false);
+        /* NOTE: If the request were not idempotent, we would not know if it
+         * was processed by the other end. Thus POST is not used/supported so
+         * far, and CONNECT is treated as if it were idempotent (which works
+         * fine here). */
     }
-
-    struct vlc_h1_conn *conn1 = vlc_h1_conn_find(mgr, host, port);
-    if (conn1 != NULL)
-    {
-        struct vlc_http_stream *s = vlc_h1_stream_open(conn1, req);
-        if (s != NULL)
-        {
-            struct vlc_http_msg *m = vlc_http_stream_read_headers(s);
-            if (m != NULL)
-                return m;
-
-            vlc_http_stream_close(s, false);
-        }
-        vlc_h1_conn_release(conn1);
-        mgr->conn1 = NULL;
-    }
+    /* Get rid of closing or reset connection */
+    vlc_http_mgr_release(mgr, conn);
     return NULL;
 }
 
-struct vlc_http_msg *vlc_https_request(struct vlc_http_mgr *mgr,
-                                       const char *host, unsigned port,
-                                       const struct vlc_http_msg *req)
+static struct vlc_http_msg *vlc_https_request(struct vlc_http_mgr *mgr,
+                                              const char *host, unsigned port,
+                                              const struct vlc_http_msg *req)
 {
+    if (mgr->creds == NULL && mgr->conn != NULL)
+        return NULL; /* switch from HTTP to HTTPS not implemented */
+
+    if (mgr->creds == NULL)
+    {   /* First TLS connection: load x509 credentials */
+        mgr->creds = vlc_tls_ClientCreate(mgr->obj);
+        if (mgr->creds == NULL)
+            return NULL;
+    }
+
     /* TODO? non-idempotent request support */
-    struct vlc_http_msg *resp = vlc_https_request_reuse(mgr, host, port, req);
+    struct vlc_http_msg *resp = vlc_http_mgr_reuse(mgr, host, port, req);
     if (resp != NULL)
-        return resp;
+        return resp; /* existing connection reused */
 
     bool http2;
     vlc_tls_t *tls = vlc_https_connect_i11e(mgr->creds, host, port, &http2);
-
     if (tls == NULL)
         return NULL;
 
+    struct vlc_http_conn *conn;
+
+    /* For HTTPS, TLS-ALPN determines whether HTTP version 2.0 ("h2") or 1.1
+     * ("http/1.1") is used.
+     * NOTE: If the negotiated protocol is explicitly "http/1.1", HTTP 1.0
+     * should not be used. HTTP 1.0 should only be used if ALPN is not
+     * supported by the server.
+     * NOTE: We do not enforce TLS version 1.2 for HTTP 2.0 explicitly.
+     */
     if (http2)
+        conn = vlc_h2_conn_create(tls);
+    else
+        conn = vlc_h1_conn_create(tls);
+
+    if (unlikely(conn == NULL))
     {
-        struct vlc_h2_conn *conn2 = vlc_h2_conn_create(tls);
-        if (likely(conn2 != NULL))
-            mgr->conn2 = conn2;
-        else
-            vlc_https_disconnect(tls);
-    }
-    else /* TODO: HTTP/1.x support */
-    {
-        struct vlc_h1_conn *conn1 = vlc_h1_conn_create(tls);
-        if (likely(conn1 != NULL))
-            mgr->conn1 = conn1;
-        else
-            vlc_https_disconnect(tls);
+        vlc_tls_Close(tls);
+        return NULL;
     }
 
-    return vlc_https_request_reuse(mgr, host, port, req);
+    mgr->conn = conn;
+
+    return vlc_http_mgr_reuse(mgr, host, port, req);
 }
 
-struct vlc_http_mgr *vlc_http_mgr_create(vlc_object_t *obj)
+static struct vlc_http_msg *vlc_http_request(struct vlc_http_mgr *mgr,
+                                             const char *host, unsigned port,
+                                             const struct vlc_http_msg *req)
+{
+    if (mgr->creds != NULL && mgr->conn != NULL)
+        return NULL; /* switch from HTTPS to HTTP not implemented */
+
+    struct vlc_http_msg *resp = vlc_http_mgr_reuse(mgr, host, port, req);
+    if (resp != NULL)
+        return resp;
+
+    vlc_tls_t *tls = vlc_http_connect_i11e(mgr->obj, host, port);
+    if (tls == NULL)
+        return NULL;
+
+    struct vlc_http_conn *conn;
+
+    if (mgr->use_h2c)
+        conn = vlc_h2_conn_create(tls);
+    else
+        conn = vlc_h1_conn_create(tls);
+
+    if (unlikely(conn == NULL))
+    {
+        vlc_tls_Close(tls);
+        return NULL;
+    }
+
+    mgr->conn = conn;
+
+    return vlc_http_mgr_reuse(mgr, host, port, req);
+}
+
+struct vlc_http_msg *vlc_http_mgr_request(struct vlc_http_mgr *mgr, bool https,
+                                          const char *host, unsigned port,
+                                          const struct vlc_http_msg *m)
+{
+    return (https ? vlc_https_request : vlc_http_request)(mgr, host, port, m);
+}
+
+int vlc_http_mgr_send_cookies(struct vlc_http_mgr *mgr, bool https,
+                              const char *host, const char *path,
+                              struct vlc_http_msg *req)
+{
+    int ret = 0;
+
+    if (mgr->jar != NULL)
+    {
+        char *cookies = vlc_http_cookies_fetch(mgr->jar, https, host, path);
+        if (cookies != NULL)
+        {
+            msg_Dbg(mgr->obj, "retrieved cookies: %s", cookies);
+            ret = vlc_http_msg_add_header(req, "Cookie", "%s", cookies);
+            free(cookies);
+        }
+    }
+    return ret;
+}
+
+void vlc_http_mgr_recv_cookies(struct vlc_http_mgr *mgr, bool https,
+                               const char *host, const char *path,
+                               const struct vlc_http_msg *resp)
+{
+    if (mgr->jar != NULL)
+    {   /* FIXME: fold multiple Set-Cookies headers with ';' */
+        const char *cookies = vlc_http_msg_get_header(resp, "Set-Cookie");
+        if (cookies != NULL
+         && vlc_http_cookies_store(mgr->jar, cookies, https, host, path))
+            msg_Dbg(mgr->obj, "stored cookie: %s", cookies);
+    }
+}
+
+struct vlc_http_mgr *vlc_http_mgr_create(vlc_object_t *obj,
+                                         vlc_http_cookie_jar_t *jar, bool h2c)
 {
     struct vlc_http_mgr *mgr = malloc(sizeof (*mgr));
     if (unlikely(mgr == NULL))
         return NULL;
 
-    mgr->creds = vlc_tls_ClientCreate(obj);
-    if (mgr->creds == NULL)
-    {
-        free(mgr);
-        return NULL;
-    }
-
-    mgr->conn1 = NULL;
-    mgr->conn2 = NULL;
+    mgr->obj = obj;
+    mgr->creds = NULL;
+    mgr->jar = jar;
+    mgr->conn = NULL;
+    mgr->use_h2c = h2c;
     return mgr;
 }
 
 void vlc_http_mgr_destroy(struct vlc_http_mgr *mgr)
 {
-    if (mgr->conn2 != NULL)
-        vlc_h2_conn_release(mgr->conn2);
-    if (mgr->conn1 != NULL)
-        vlc_h1_conn_release(mgr->conn1);
-    vlc_tls_Delete(mgr->creds);
+    if (mgr->conn != NULL)
+        vlc_http_mgr_release(mgr, mgr->conn);
+    if (mgr->creds != NULL)
+        vlc_tls_Delete(mgr->creds);
     free(mgr);
 }

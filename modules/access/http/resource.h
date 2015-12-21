@@ -1,5 +1,5 @@
 /*****************************************************************************
- * h2conn.h: HTTP/2 connection handling
+ * resource.h: HTTP resource common code
  *****************************************************************************
  * Copyright (C) 2015 Rémi Denis-Courmont
  *
@@ -18,13 +18,29 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston MA 02110-1301, USA.
  *****************************************************************************/
 
-struct vlc_tls;
 struct vlc_http_msg;
+struct vlc_http_mgr;
 
-struct vlc_h2_conn;
+struct vlc_http_resource
+{
+    struct vlc_http_mgr *manager;
+    char *host;
+    unsigned port;
+    bool secure;
+    char *authority;
+    char *path;
+    char *agent;
+    char *referrer;
+};
 
-struct vlc_h2_conn *vlc_h2_conn_create(struct vlc_tls *tls);
-void vlc_h2_conn_release(struct vlc_h2_conn *conn);
+int vlc_http_res_init(struct vlc_http_resource *, struct vlc_http_mgr *mgr,
+                      const char *uri,const char *ua, const char *ref);
+void vlc_http_res_deinit(struct vlc_http_resource *);
 
-struct vlc_http_stream *vlc_h2_stream_open(struct vlc_h2_conn *conn,
-                                           const struct vlc_http_msg *msg);
+struct vlc_http_msg *vlc_http_res_open(struct vlc_http_resource *res,
+    int (*cb)(struct vlc_http_msg *req, const struct vlc_http_resource *,
+              void *), void *);
+char *vlc_http_res_get_redirect(const struct vlc_http_resource *,
+                                const struct vlc_http_msg *resp);
+char *vlc_http_res_get_type(const struct vlc_http_msg *resp);
+struct block_t *vlc_http_res_read(struct vlc_http_msg *resp);

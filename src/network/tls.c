@@ -131,22 +131,29 @@ void vlc_tls_Delete (vlc_tls_creds_t *crd)
 vlc_tls_t *vlc_tls_SessionCreate (vlc_tls_creds_t *crd, int fd,
                                   const char *host, const char *const *alpn)
 {
-    vlc_tls_t *session = vlc_custom_create (crd->p_parent, sizeof (*session),
-                                            "tls session");
+    vlc_tls_t *session = malloc(sizeof (*session));
+    if (unlikely(session == NULL))
+        return NULL;
+
+    session->obj = crd->p_parent;
+    session->fd = fd;
+
     int val = crd->open (crd, session, fd, host, alpn);
     if (val != VLC_SUCCESS)
     {
-        vlc_object_release (session);
-        return NULL;
+        free(session);
+        session= NULL;
     }
-    session->fd = fd;
     return session;
 }
 
 void vlc_tls_SessionDelete (vlc_tls_t *session)
 {
-    session->close (session);
-    vlc_object_release (session);
+    int canc = vlc_savecancel();
+    session->close(session);
+    vlc_restorecancel(canc);
+
+    free(session);
 }
 
 static void cleanup_tls(void *data)
@@ -178,11 +185,11 @@ vlc_tls_t *vlc_tls_ClientSessionCreate (vlc_tls_creds_t *crd, int fd,
     ufd[0].fd = fd;
 
     vlc_cleanup_push (cleanup_tls, session);
-    while ((val = crd->handshake (session, host, service, alp)) != 0)
+    while ((val = crd->handshake(crd, session, host, service, alp)) != 0)
     {
         if (val < 0)
         {
-            msg_Err (session, "TLS client session handshake error");
+            msg_Err(crd, "TLS session handshake error");
 error:
             vlc_tls_SessionDelete (session);
             session = NULL;
@@ -201,7 +208,7 @@ error:
         canc = vlc_savecancel();
         if (val == 0)
         {
-            msg_Err (session, "TLS client session handshake timeout");
+            msg_Err(crd, "TLS session handshake timeout");
             goto error;
         }
     }
@@ -210,7 +217,7 @@ error:
     return session;
 }
 
-int vlc_tls_Read(vlc_tls_t *session, void *buf, size_t len, bool waitall)
+ssize_t vlc_tls_Read(vlc_tls_t *session, void *buf, size_t len, bool waitall)
 {
     struct pollfd ufd;
 
@@ -243,7 +250,7 @@ int vlc_tls_Read(vlc_tls_t *session, void *buf, size_t len, bool waitall)
     }
 }
 
-int vlc_tls_Write(vlc_tls_t *session, const void *buf, size_t len)
+ssize_t vlc_tls_Write(vlc_tls_t *session, const void *buf, size_t len)
 {
     struct pollfd ufd;
 
@@ -303,4 +310,39 @@ char *vlc_tls_GetLine(vlc_tls_t *session)
 error:
     free(line);
     return NULL;
+}
+
+static ssize_t vlc_tls_DummyReceive(vlc_tls_t *tls, void *buf, size_t len)
+{
+    return recv(tls->fd, buf, len, 0);
+}
+
+static ssize_t vlc_tls_DummySend(vlc_tls_t *tls, const void *buf, size_t len)
+{
+    return send(tls->fd, buf, len, MSG_NOSIGNAL);
+}
+
+static int vlc_tls_DummyShutdown(vlc_tls_t *tls, bool duplex)
+{
+    return shutdown(tls->fd, duplex ? SHUT_RDWR : SHUT_WR);
+}
+
+static void vlc_tls_DummyClose(vlc_tls_t *tls)
+{
+    (void) tls;
+}
+
+vlc_tls_t *vlc_tls_DummyCreate(vlc_object_t *obj, int fd)
+{
+    vlc_tls_t *session = malloc(sizeof (*session));
+    if (unlikely(session == NULL))
+        return NULL;
+
+    session->obj = obj;
+    session->fd = fd;
+    session->recv = vlc_tls_DummyReceive;
+    session->send = vlc_tls_DummySend;
+    session->shutdown = vlc_tls_DummyShutdown;
+    session->close = vlc_tls_DummyClose;
+    return session;
 }

@@ -150,9 +150,7 @@ struct access_sys_t
     const char *psz_protocol;
 
     char       *psz_mime;
-    char       *psz_pragma;
     char       *psz_location;
-    bool i_version;
     bool b_mms;
     bool b_icecast;
 #ifdef HAVE_ZLIB_H
@@ -213,6 +211,7 @@ static int Open( vlc_object_t *p_this )
     access_t *p_access = (access_t*)p_this;
     const char *psz_url = p_access->psz_url;
     char *psz;
+    int ret = VLC_EGENERIC;
 
     access_sys_t *p_sys = malloc( sizeof(*p_sys) );
     if( unlikely(p_sys == NULL) )
@@ -222,10 +221,8 @@ static int Open( vlc_object_t *p_this )
     p_sys->b_error = false;
     p_sys->b_proxy = false;
     p_sys->psz_proxy_passbuf = NULL;
-    p_sys->i_version = 1;
     p_sys->b_seekable = true;
     p_sys->psz_mime = NULL;
-    p_sys->psz_pragma = NULL;
     p_sys->b_mms = false;
     p_sys->b_icecast = false;
     p_sys->psz_location = NULL;
@@ -378,26 +375,8 @@ static int Open( vlc_object_t *p_this )
     p_access->p_sys = p_sys;
 connect:
     /* Connect */
-    switch( Connect( p_access, 0 ) )
-    {
-        case -1:
-            goto error;
-
-        case -2:
-            /* Retry with http 1.0 */
-            msg_Dbg( p_access, "switching to HTTP version 1.0" );
-            p_sys->i_version = 0;
-            p_sys->b_seekable = false;
-
-            if( Connect( p_access, 0 ) )
-                goto error;
-
-        case 0:
-            break;
-
-        default:
-            vlc_assert_unreachable();
-    }
+    if( Connect( p_access, 0 ) )
+        goto error;
 
     if( p_sys->i_code == 401 )
     {
@@ -438,34 +417,22 @@ connect:
 
     if( ( p_sys->i_code == 301 || p_sys->i_code == 302 ||
           p_sys->i_code == 303 || p_sys->i_code == 307 ) &&
-        p_sys->psz_location && *p_sys->psz_location )
+        p_sys->psz_location != NULL )
     {
         p_access->psz_url = p_sys->psz_location;
-
-        /* Clean up current Open() run */
-        vlc_UrlClean( &p_sys->url );
-        http_auth_Reset( &p_sys->auth );
-        if( p_sys->b_proxy )
-            vlc_UrlClean( &p_sys->proxy );
-        free( p_sys->psz_proxy_passbuf );
-        http_auth_Reset( &p_sys->proxy_auth );
-        free( p_sys->psz_mime );
-        free( p_sys->psz_pragma );
-        free( p_sys->psz_user_agent );
-        free( p_sys->psz_referrer );
-
-        Disconnect( p_access );
-        vlc_tls_Delete( p_sys->p_creds );
-#ifdef HAVE_ZLIB_H
-        inflateEnd( &p_sys->inflate.stream );
-#endif
-        free( p_sys );
-        return VLC_ACCESS_REDIRECT;
+        p_sys->psz_location = NULL;
+        ret = VLC_ACCESS_REDIRECT;
+        goto error;
     }
 
-    if( p_sys->b_mms )
+    if( p_sys->p_creds == NULL && p_sys->b_mms )
     {
-        msg_Dbg( p_access, "this is actually a live mms server, BAIL" );
+        msg_Dbg( p_access, "redirecting to MMS plug-in" );
+
+        if( unlikely(asprintf( &p_access->psz_url, "mmsh://%s",
+                               p_access->psz_location ) == -1) )
+            p_access->psz_url = NULL;
+        ret = VLC_ACCESS_REDIRECT;
         goto error;
     }
 
@@ -488,7 +455,6 @@ error:
         vlc_UrlClean( &p_sys->proxy );
     free( p_sys->psz_proxy_passbuf );
     free( p_sys->psz_mime );
-    free( p_sys->psz_pragma );
     free( p_sys->psz_location );
     free( p_sys->psz_user_agent );
     free( p_sys->psz_referrer );
@@ -500,7 +466,7 @@ error:
     inflateEnd( &p_sys->inflate.stream );
 #endif
     free( p_sys );
-    return VLC_EGENERIC;
+    return ret;
 }
 
 /*****************************************************************************
@@ -518,7 +484,6 @@ static void Close( vlc_object_t *p_this )
     http_auth_Reset( &p_sys->proxy_auth );
 
     free( p_sys->psz_mime );
-    free( p_sys->psz_pragma );
     free( p_sys->psz_location );
 
     free( p_sys->psz_icy_name );
@@ -934,7 +899,6 @@ static int Connect( access_t *p_access, uint64_t i_tell )
     /* Clean info */
     free( p_sys->psz_location );
     free( p_sys->psz_mime );
-    free( p_sys->psz_pragma );
 
     free( p_sys->psz_icy_genre );
     free( p_sys->psz_icy_name );
@@ -943,7 +907,6 @@ static int Connect( access_t *p_access, uint64_t i_tell )
 
     p_sys->psz_location = NULL;
     p_sys->psz_mime = NULL;
-    p_sys->psz_pragma = NULL;
     p_sys->b_mms = false;
     p_sys->b_chunked = false;
     p_sys->i_chunk = 0;
@@ -976,13 +939,6 @@ static int Connect( access_t *p_access, uint64_t i_tell )
         {
             char *psz;
             unsigned i_status;
-
-            if( p_sys->i_version == 0 )
-            {
-                /* CONNECT is not in HTTP/1.0 */
-                Disconnect( p_access );
-                return -1;
-            }
 
             WriteHeaders( p_access,
                           "CONNECT %s:%d HTTP/1.1\r\nHost: %s:%d\r\n\r\n",
@@ -1036,8 +992,8 @@ static int Connect( access_t *p_access, uint64_t i_tell )
         const char *alpn[] = { "http/1.1", NULL };
 
         p_sys->p_tls = vlc_tls_ClientSessionCreate( p_sys->p_creds, p_sys->fd,
-                p_sys->url.psz_host, "https",
-                p_sys->i_version ? alpn : NULL, NULL );
+                                                    p_sys->url.psz_host,
+                                                    "https", alpn, NULL );
         if( p_sys->p_tls == NULL )
         {
             msg_Err( p_access, "cannot establish HTTP/TLS session" );
@@ -1061,16 +1017,14 @@ static int Request( access_t *p_access, uint64_t i_tell )
     if( !psz_path || !*psz_path )
         psz_path = "/";
     if( p_sys->b_proxy && p_sys->p_tls == NULL )
-        WriteHeaders( p_access, "GET http://%s:%d%s%s%s HTTP/1.%d\r\n",
+        WriteHeaders( p_access, "GET http://%s:%d%s%s%s HTTP/1.1\r\n",
                       p_sys->url.psz_host, p_sys->url.i_port,
                       psz_path, p_sys->url.psz_option ? "?" : "",
-                      p_sys->url.psz_option ? p_sys->url.psz_option : "",
-                      p_sys->i_version );
+                      p_sys->url.psz_option ? p_sys->url.psz_option : "" );
     else
-        WriteHeaders( p_access, "GET %s%s%s HTTP/1.%d\r\n",
+        WriteHeaders( p_access, "GET %s%s%s HTTP/1.1\r\n",
                       psz_path, p_sys->url.psz_option ? "?" : "",
-                      p_sys->url.psz_option ? p_sys->url.psz_option : "",
-                      p_sys->i_version );
+                      p_sys->url.psz_option ? p_sys->url.psz_option : "" );
     if( p_sys->url.i_port != (p_sys->p_tls ? 443 : 80) )
         WriteHeaders( p_access, "Host: %s:%d\r\n",
                       p_sys->url.psz_host, p_sys->url.i_port );
@@ -1082,12 +1036,9 @@ static int Request( access_t *p_access, uint64_t i_tell )
     if (p_sys->psz_referrer)
         WriteHeaders( p_access, "Referer: %s\r\n", p_sys->psz_referrer );
     /* Offset */
-    if( p_sys->i_version == 1 )
-    {
-        if( !p_sys->b_continuous )
-            WriteHeaders( p_access, "Range: bytes=%"PRIu64"-\r\n", i_tell );
-        WriteHeaders( p_access, "Connection: close\r\n" );
-    }
+    if( !p_sys->b_continuous )
+        WriteHeaders( p_access, "Range: bytes=%"PRIu64"-\r\n", i_tell );
+    WriteHeaders( p_access, "Connection: close\r\n" );
 
     /* Cookies */
     if( p_sys->cookies )
@@ -1300,9 +1251,7 @@ static int Request( access_t *p_access, uint64_t i_tell )
         {
             if( !strcasecmp( psz, "Pragma: features" ) )
                 p_sys->b_mms = true;
-            free( p_sys->psz_pragma );
-            p_sys->psz_pragma = strdup( p );
-            msg_Dbg( p_access, "Pragma: %s", p_sys->psz_pragma );
+            msg_Dbg( p_access, "Pragma: %s", p );
         }
         else if( !strcasecmp( psz, "Server" ) )
         {

@@ -44,6 +44,7 @@
 #include "mediacodec.h"
 #include "../../packetizer/h264_nal.h"
 #include "../../packetizer/hevc_nal.h"
+#include "../../packetizer/hxxx_nal.h"
 #include <OMX_Core.h>
 #include <OMX_Component.h>
 #include "omxil_utils.h"
@@ -262,18 +263,28 @@ static int H264SetCSD(decoder_t *p_dec, void *p_buf, size_t i_size,
                       bool *p_size_changed)
 {
     decoder_sys_t *p_sys = p_dec->p_sys;
-    struct h264_nal_sps sps;
     uint8_t *p_sps_buf = NULL, *p_pps_buf = NULL;
     size_t i_sps_size = 0, i_pps_size = 0;
 
     /* Check if p_buf contains a valid SPS PPS */
     if (h264_get_spspps(p_buf, i_size, &p_sps_buf, &i_sps_size,
-                        &p_pps_buf, &i_pps_size) == 0
-     && h264_parse_sps(p_sps_buf, i_sps_size, &sps) == 0
-     && sps.i_width && sps.i_height)
+                        &p_pps_buf, &i_pps_size) == 0 )
     {
         struct csd csd[2];
         int i_csd_count = 0;
+
+        const uint8_t *p_buffer = p_sps_buf;
+        size_t i_buffer = i_sps_size;
+        if(!hxxx_strip_AnnexB_startcode(&p_buffer, &i_buffer))
+            return VLC_EGENERIC;
+
+        h264_sequence_parameter_set_t *p_sps = h264_decode_sps(p_buffer, i_buffer, true);
+        if( !p_sps )
+            return VLC_EGENERIC;
+
+        unsigned vsize[4];
+        (void) h264_get_picture_size( p_sps, &vsize[0], &vsize[1], &vsize[2], &vsize[3] );
+        /* FIXME: what to do with visible width/height ? */
 
         if (i_sps_size)
         {
@@ -291,24 +302,33 @@ static int H264SetCSD(decoder_t *p_dec, void *p_buf, size_t i_size,
         /* Compare the SPS PPS with the old one */
         if (!CSDCmp(p_dec, csd, i_csd_count))
         {
-            msg_Warn(p_dec, "New SPS/PPS found, id: %d size: %dx%d sps: %d pps: %d",
-                     sps.i_id, sps.i_width, sps.i_height,
+            msg_Warn(p_dec, "New SPS/PPS found, id: %d size: %ux%u sps: %d pps: %d",
+                     p_sps->i_id, vsize[0], vsize[1],
                      i_sps_size, i_pps_size);
 
             /* In most use cases, p_sys->p_csd[0] contains a SPS, and
              * p_sys->p_csd[1] contains a PPS */
             if (CSDDup(p_dec, csd, i_csd_count))
+            {
+                h264_release_sps( p_sps );
                 return VLC_ENOMEM;
+            }
 
             if (p_size_changed)
-                *p_size_changed = (sps.i_width != p_sys->u.video.i_width
-                                || sps.i_height != p_sys->u.video.i_height);
+                *p_size_changed = (vsize[0] != p_sys->u.video.i_width
+                                || vsize[1] != p_sys->u.video.i_height);
 
-            p_sys->u.video.i_width = sps.i_width;
-            p_sys->u.video.i_height = sps.i_height;
+            p_sys->u.video.i_width = vsize[0];
+            p_sys->u.video.i_height = vsize[1];
+
+            h264_release_sps( p_sps );
+
             return VLC_SUCCESS;
         }
+
+        h264_release_sps( p_sps );
     }
+
     return VLC_EGENERIC;
 }
 

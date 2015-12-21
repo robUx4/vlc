@@ -36,35 +36,12 @@
 
 #include <vlc_common.h>
 #include <vlc_block.h>
+#include <vlc_tls.h>
 #include "h2frame.h"
-#include "h2conn.h"
+#include "conn.h"
 #include "message.h"
-#include "transport.h"
 
-/* I/O callbacks */
-static int internal_fd = -1;
-
-ssize_t vlc_https_send(struct vlc_tls *tls, const void *buf, size_t len)
-{
-    assert(tls == NULL);
-    (void) buf;
-    return len;
-}
-
-ssize_t vlc_https_recv(struct vlc_tls *tls, void *buf, size_t size)
-{
-    assert(tls == NULL);
-    return read(internal_fd, buf, size);
-}
-
-void vlc_https_disconnect(struct vlc_tls *tls)
-{
-    assert(tls == NULL);
-    if (close(internal_fd))
-        assert(!"close");
-}
-
-static struct vlc_h2_conn *conn;
+static struct vlc_http_conn *conn;
 static int external_fd;
 
 static void conn_send(struct vlc_h2_frame *f)
@@ -77,25 +54,68 @@ static void conn_send(struct vlc_h2_frame *f)
     free(f);
 }
 
+enum {
+    DATA, HEADERS, PRIORITY, RST_STREAM, SETTINGS, PUSH_PROMISE, PING, GOAWAY,
+    WINDOW_UPDATE, CONTINUATION,
+};
+
+static void conn_expect(uint_fast8_t wanted)
+{
+    size_t len;
+    ssize_t val;
+    uint8_t hdr[9];
+    uint8_t got;
+
+    do {
+        val = recv(external_fd, hdr, 9, MSG_WAITALL);
+        assert(val == 9);
+        assert(hdr[0] == 0);
+
+        /* Check type. We do not currently validate WINDOW_UPDATE. */
+        got = hdr[3];
+        assert(wanted == got || WINDOW_UPDATE == got);
+
+        len = (hdr[1] << 8) | hdr[2];
+        if (len > 0)
+        {
+            char buf[len];
+
+            val = recv(external_fd, buf, len, MSG_WAITALL);
+            assert(val == (ssize_t)len);
+        }
+    }
+    while (got != wanted);
+}
+
 static void conn_create(void)
 {
+    ssize_t val;
     int fds[2];
+    char hello[24];
 
     if (socketpair(PF_LOCAL, SOCK_STREAM|SOCK_CLOEXEC, 0, fds))
         assert(!"socketpair");
 
-    external_fd = fds[0];
-    internal_fd = fds[1];
+    struct vlc_tls *tls = vlc_tls_DummyCreate(NULL, fds[1]);
+    assert(tls != NULL);
 
-    conn = vlc_h2_conn_create(NULL);
+    external_fd = fds[0];
+
+    conn = vlc_h2_conn_create(tls);
     assert(conn != NULL);
     conn_send(vlc_h2_frame_settings());
+
+    val = recv(external_fd, hello, 24, MSG_WAITALL);
+    assert(val == 24);
+    assert(!memcmp(hello, "PRI * HTTP/2.0\r\n", 16));
+    conn_expect(SETTINGS);
+    conn_expect(SETTINGS);
 }
 
 static void conn_destroy(void)
 {
     shutdown(external_fd, SHUT_WR);
-    vlc_h2_conn_release(conn);
+    vlc_http_conn_release(conn);
     close(external_fd);
 }
 
@@ -105,7 +125,7 @@ static struct vlc_http_stream *stream_open(void)
                                                  "www.example.com", "/");
     assert(m != NULL);
 
-    struct vlc_http_stream *s = vlc_h2_stream_open(conn, m);
+    struct vlc_http_stream *s = vlc_http_stream_open(conn, m);
     vlc_http_msg_destroy(m);
     return s;
 }
@@ -134,6 +154,8 @@ static void stream_data(uint_fast32_t id, const char *str, bool eos)
     conn_send(vlc_h2_frame_data(id, str, strlen(str), eos));
 }
 
+/* TODO: check messages coming from the connection under test */
+
 int main(void)
 {
     struct vlc_http_stream *s, *s2;
@@ -146,17 +168,20 @@ int main(void)
 
     conn_create();
     conn_send(vlc_h2_frame_ping(42));
+    conn_expect(PING);
 
     /* Test rejected stream */
     sid += 2;
     s = stream_open();
     assert(s != NULL);
+    conn_expect(HEADERS);
     conn_send(vlc_h2_frame_rst_stream(sid, VLC_H2_REFUSED_STREAM));
     m = vlc_http_stream_read_headers(s);
     assert(m == NULL);
     b = vlc_http_stream_read(s);
     assert(b == NULL);
     vlc_http_stream_close(s, false);
+    conn_expect(RST_STREAM);
 
     /* Test accepted stream */
     sid += 2;
@@ -167,9 +192,13 @@ int main(void)
     assert(m != NULL);
     vlc_http_msg_destroy(m);
 
-    /* Test late data */
-    stream_data(3, "Hello ", false);
+    stream_data(3, "Hello ", false); /* late data */
     stream_data(3, "world!", true);
+
+    conn_expect(HEADERS);
+    conn_expect(RST_STREAM);
+    conn_expect(RST_STREAM);
+    conn_expect(RST_STREAM);
 
     /* Test continuation then accepted stream */
     sid += 2;
@@ -195,6 +224,10 @@ int main(void)
     assert(b == NULL);
     vlc_http_msg_destroy(m);
 
+    conn_expect(HEADERS);
+    conn_expect(RST_STREAM);
+    conn_expect(RST_STREAM);
+
     /* Test accepted stream after continuation */
     sid += 2;
     s = stream_open();
@@ -215,6 +248,14 @@ int main(void)
     assert(b == NULL);
     vlc_http_msg_destroy(m);
 
+    conn_expect(HEADERS);
+    conn_expect(HEADERS);
+    conn_expect(RST_STREAM);
+    conn_expect(RST_STREAM);
+
+    /* Test nonexistent stream reset */
+    conn_send(vlc_h2_frame_rst_stream(sid + 100, VLC_H2_REFUSED_STREAM));
+
     /* Test multiple streams in non-LIFO order */
     sid += 2;
     s = stream_open();
@@ -231,6 +272,12 @@ int main(void)
     m = vlc_http_stream_read_headers(s2);
     assert(m != NULL);
     vlc_http_msg_destroy(m);
+
+    conn_expect(HEADERS);
+    conn_expect(HEADERS);
+    conn_expect(RST_STREAM);
+    conn_expect(RST_STREAM);
+    /* might or might not seen one or two extra RST_STREAM now */
 
     /* Test graceful connection termination */
     sid += 2;

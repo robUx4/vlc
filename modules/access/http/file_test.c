@@ -1,5 +1,5 @@
 /*****************************************************************************
- * message_test.c: HTTP request/response
+ * file_test.c: HTTP file download test
  *****************************************************************************
  * Copyright (C) 2015 Rémi Denis-Courmont
  *
@@ -38,6 +38,7 @@ static const char ua[] = PACKAGE_NAME "/" PACKAGE_VERSION " (test suite)";
 
 static const char *replies[2] = { NULL, NULL };
 static uintmax_t offset = 0;
+static bool etags = false;
 
 int main(void)
 {
@@ -63,6 +64,7 @@ int main(void)
                  "\r\n";
 
     offset = 0;
+    etags = true;
     f = vlc_http_file_create(NULL, url, ua, NULL);
     assert(f != NULL);
     assert(vlc_http_file_get_status(f) == 200);
@@ -82,6 +84,7 @@ int main(void)
     replies[0] = "HTTP/1.1 206 Partial Content\r\n"
                  "Content-Range: bytes 0-2344/2345\r\n"
                  "ETag: W/\"foobar42\"\r\n"
+                 "Last-Modified: Mon, 21 Oct 2013 20:13:22 GMT\r\n"
                  "\r\n";
 
     offset = 0;
@@ -89,20 +92,24 @@ int main(void)
     assert(f != NULL);
     assert(vlc_http_file_can_seek(f));
     assert(vlc_http_file_get_size(f) == 2345);
+    assert(vlc_http_file_read(f) == NULL);
 
     /* Seek success */
     replies[0] = "HTTP/1.1 206 Partial Content\r\n"
                  "Content-Range: bytes 1234-3455/3456\r\n"
                  "ETag: W/\"foobar42\"\r\n"
+                 "Last-Modified: Mon, 21 Oct 2013 20:13:22 GMT\r\n"
                  "\r\n";
     assert(vlc_http_file_seek(f, offset = 1234) == 0);
     assert(vlc_http_file_can_seek(f));
     assert(vlc_http_file_get_size(f) == 3456);
+    assert(vlc_http_file_read(f) == NULL);
 
     /* Seek too far */
     replies[0] = "HTTP/1.1 416 Range Not Satisfiable\r\n"
                  "Content-Range: bytes */4567\r\n"
                  "ETag: W/\"foobar42\"\r\n"
+                 "Last-Modified: Mon, 21 Oct 2013 20:13:22 GMT\r\n"
                  "\r\n";
     vlc_http_file_seek(f, offset = 5678);
     assert(vlc_http_file_can_seek(f));
@@ -139,10 +146,64 @@ int main(void)
     assert(vlc_http_file_get_redirect(f) == NULL);
     vlc_http_file_destroy(f);
 
+    /* No entity tags */
+    replies[0] = "HTTP/1.1 206 Partial Content\r\n"
+                 "Content-Range: bytes 0-2344/2345\r\n"
+                 "Last-Modified: Mon, 21 Oct 2013 20:13:22 GMT\r\n"
+                 "\r\n";
+
+    offset = 0;
+    etags = false;
+    f = vlc_http_file_create(NULL, url, ua, NULL);
+    assert(f != NULL);
+    assert(vlc_http_file_can_seek(f));
+
+    replies[0] = "HTTP/1.1 206 Partial Content\r\n"
+                 "Content-Range: bytes 1234-3455/3456\r\n"
+                 "Last-Modified: Mon, 21 Oct 2013 20:13:22 GMT\r\n"
+                 "\r\n";
+    assert(vlc_http_file_seek(f, offset = 1234) == 0);
+    vlc_http_file_destroy(f);
+
+    /* Invalid responses */
+    replies[0] = "HTTP/1.1 206 Partial Content\r\n"
+                 "Content-Type: multipart/byteranges\r\n"
+                 "\r\n";
+    offset = 0;
+
+    f = vlc_http_file_create(NULL, url, ua, NULL);
+    assert(f != NULL);
+    assert(vlc_http_file_get_size(f) == (uintmax_t)-1);
+
+    replies[0] = "HTTP/1.1 206 Partial Content\r\n"
+                 "Content-Range: seconds 60-120/180\r\n"
+                 "\r\n";
+    assert(vlc_http_file_seek(f, 0) == -1);
+
+    /* Incomplete range */
+    replies[0] = "HTTP/1.1 206 Partial Content\r\n"
+                 "Content-Range: bytes 0-1233/*\r\n"
+                 "\r\n";
+    assert(vlc_http_file_seek(f, 0) == 0);
+    assert(vlc_http_file_get_size(f) == 1234);
+
+    /* Extraneous range */
+    replies[0] = "HTTP/1.1 200 OK\r\n"
+                 "Content-Range: bytes 0-1233/1234\r\n"
+                 "\r\n";
+    assert(vlc_http_file_seek(f, 0) == 0);
+    assert(vlc_http_file_get_size(f) == (uintmax_t)-1);
+
+    vlc_http_file_destroy(f);
 
     /* Dummy API calls */
     f = vlc_http_file_create(NULL, "ftp://localhost/foo", NULL, NULL);
     assert(f == NULL);
+    f = vlc_http_file_create(NULL, "/foo", NULL, NULL);
+    assert(f == NULL);
+    f = vlc_http_file_create(NULL, "http://www.example.com", NULL, NULL);
+    assert(f != NULL);
+    vlc_http_file_destroy(f);
 
     return 0;
 }
@@ -206,13 +267,14 @@ static const struct vlc_http_stream_cbs stream_callbacks =
 
 static struct vlc_http_stream stream = { &stream_callbacks };
 
-struct vlc_http_msg *vlc_https_request(struct vlc_http_mgr *mgr,
-                                       const char *host, unsigned port,
-                                       const struct vlc_http_msg *req)
+struct vlc_http_msg *vlc_http_mgr_request(struct vlc_http_mgr *mgr, bool https,
+                                          const char *host, unsigned port,
+                                          const struct vlc_http_msg *req)
 {
     const char *str;
     char *end;
 
+    assert(https);
     assert(mgr == NULL);
     assert(!strcmp(host, "www.example.com"));
     assert(port == 8443);
@@ -238,11 +300,45 @@ struct vlc_http_msg *vlc_https_request(struct vlc_http_mgr *mgr,
     assert(str != NULL && !strncmp(str, "bytes=", 6)
         && strtoul(str + 6, &end, 10) == offset && *end == '-');
 
+    time_t mtime = vlc_http_msg_get_time(req, "If-Unmodified-Since");
     str = vlc_http_msg_get_header(req, "If-Match");
-    if (offset != 0)
-        assert(str != NULL && !strcmp(str, "\"foobar42\""));
+
+    if (etags)
+    {
+        if (offset != 0)
+            assert(str != NULL && !strcmp(str, "\"foobar42\""));
+        else
+        if (str != NULL)
+            assert(strcmp(str, "*") || strcmp(str, "\"foobar42\""));
+    }
     else
-        assert(str == NULL || strcmp(str, "*") || strcmp(str, "\"foobar42\""));
+    {
+        if (offset != 0)
+            assert(mtime == 1382386402);
+    }
 
     return vlc_http_stream_read_headers(&stream);
+}
+
+int vlc_http_mgr_send_cookies(struct vlc_http_mgr *mgr, bool https,
+                              const char *host, const char *path,
+                              struct vlc_http_msg *req)
+{
+    assert(https);
+    assert(!strcmp(host, "www.example.com"));
+    assert(!strcmp(path, "/dir/file.ext?a=b"));
+    assert(mgr == NULL);
+    (void) req;
+    return 0;
+}
+
+void vlc_http_mgr_recv_cookies(struct vlc_http_mgr *mgr, bool https,
+                               const char *host, const char *path,
+                               const struct vlc_http_msg *resp)
+{
+    assert(https);
+    assert(!strcmp(host, "www.example.com"));
+    assert(!strcmp(path, "/dir/file.ext?a=b"));
+    assert(mgr == NULL);
+    (void) resp;
 }

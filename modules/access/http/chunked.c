@@ -30,11 +30,10 @@
 #include <string.h>
 #include <vlc_common.h>
 #include <vlc_block.h>
-#include <vlc_tls.h> /* FIXME: remove this and test */
+#include <vlc_tls.h> /* TODO: remove this */
 
 #include "message.h"
-#include "transport.h"
-#include "h1conn.h"
+#include "conn.h"
 
 struct vlc_chunked_stream
 {
@@ -50,7 +49,6 @@ static_assert(offsetof(struct vlc_chunked_stream, stream) == 0, "Cast error");
 
 static void *vlc_chunked_fatal(struct vlc_chunked_stream *s)
 {
-    assert(!s->error);
     s->error = true;
     return NULL;
 }
@@ -119,7 +117,7 @@ static block_t *vlc_chunked_read(struct vlc_http_stream *stream)
     {
         char crlf[2];
 
-        if (vlc_https_recv(s->tls, crlf, 2) < 2 || memcmp(crlf, "\r\n", 2))
+        if (vlc_tls_Read(s->tls, crlf, 2, true) < 2 || memcmp(crlf, "\r\n", 2))
             vlc_chunked_fatal(s);
     }
     return block;
