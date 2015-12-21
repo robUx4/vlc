@@ -64,7 +64,6 @@ static int InputEvent( vlc_object_t *, char const *,
 static int AddrChangedEvent( vlc_object_t *, char const *,
                            vlc_value_t, vlc_value_t, void * );
 static void *ChromecastThread(void *data);
-static int connectChromecast(intf_thread_t *p_intf);
 
 #define CONTROL_CFG_PREFIX "chromecast-"
 
@@ -709,26 +708,25 @@ static int InputEvent( vlc_object_t *p_this, char const *psz_var,
  * @param p_intf the intf_thread_t structure
  * @return the opened socket file descriptor or -1 on error
  */
-static int connectChromecast(intf_thread_t *p_intf)
+int intf_sys_t::connectChromecast()
 {
-    intf_sys_t *p_sys = p_intf->p_sys;
-    int fd = net_ConnectTCP(p_intf, p_sys->deviceIP.c_str(), p_sys->devicePort);
+    int fd = net_ConnectTCP(p_intf, deviceIP.c_str(), devicePort);
     if (fd < 0)
         return -1;
 
-    p_sys->p_creds = vlc_tls_ClientCreate(VLC_OBJECT(p_intf));
-    if (p_sys->p_creds == NULL)
+    p_creds = vlc_tls_ClientCreate(VLC_OBJECT(p_intf));
+    if (p_creds == NULL)
     {
         net_Close(fd);
         return -1;
     }
 
-    p_sys->p_tls = vlc_tls_ClientSessionCreate(p_sys->p_creds, fd, p_sys->deviceIP.c_str(),
+    p_tls = vlc_tls_ClientSessionCreate(p_creds, fd, deviceIP.c_str(),
                                                "tcps", NULL, NULL);
 
-    if (p_sys->p_tls == NULL)
+    if (p_tls == NULL)
     {
-        vlc_tls_Delete(p_sys->p_creds);
+        vlc_tls_Delete(p_creds);
         return -1;
     }
 
@@ -1476,7 +1474,7 @@ static void* ChromecastThread(void* p_this)
 
     p_sys->setConnectionStatus( CHROMECAST_DISCONNECTED );
 
-    p_sys->i_sock_fd = connectChromecast(p_intf);
+    p_sys->i_sock_fd = p_sys->connectChromecast();
     if (p_sys->i_sock_fd < 0)
     {
         canc = vlc_savecancel();

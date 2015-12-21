@@ -214,6 +214,8 @@ struct intf_sys_t
     void msgPlayerSetVolume(float volume);
     void msgPlayerSetMute(bool mute);
 
+    int connectChromecast();
+
 private:
     int sendMessage(const castchannel::CastMessage &msg);
 
