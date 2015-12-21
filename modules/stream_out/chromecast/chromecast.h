@@ -234,6 +234,20 @@ private:
 
     enum connection_status conn_status;
 
+    void msgPing();
+    void msgPong();
+    void msgConnect(const std::string & destinationId = DEFAULT_CHOMECAST_RECEIVER);
+
+    void msgReceiverLaunchApp();
+    void msgReceiverGetStatus();
+
+    void msgPlayerLoad();
+    void msgPlayerStop();
+    void msgPlayerPlay();
+    void msgPlayerPause();
+    void msgPlayerSeek(const std::string & currentTime);
+    void msgPlayerGetStatus();
+
     unsigned i_app_requestId;
     unsigned i_requestId;
     unsigned i_sout_id;
@@ -245,20 +259,6 @@ private:
     bool              b_restart_playback;
     bool              b_forcing_position;
     double            f_restart_position;
-
-    void msgPing();
-    void msgPong();
-    void msgConnect(const std::string & destinationId = DEFAULT_CHOMECAST_RECEIVER);
-
-    void msgReceiverLaunchApp();
-    void msgReceiverGetStatus();
-    void msgPlayerGetStatus();
-
-    void msgPlayerLoad();
-    void msgPlayerStop();
-    void msgPlayerPlay();
-    void msgPlayerPause();
-    void msgPlayerSeek(const std::string & currentTime);
 
     std::string GetMedia();
 
