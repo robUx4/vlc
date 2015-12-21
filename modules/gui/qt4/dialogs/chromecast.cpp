@@ -37,7 +37,7 @@
 
 #include "dialogs/chromecast.hpp"
 
-#define VAR_CHROMECAST_ADDR  "chromecast-addr"
+#define VAR_CHROMECAST_ADDR  "chromecast-addr-port"
 
 class ChromecastReceiver : public QListWidgetItem
 {

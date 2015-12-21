@@ -48,7 +48,8 @@ static const std::string DEFAULT_CHOMECAST_RECEIVER = "receiver-0";
 static const std::string NAMESPACE_MEDIA            = "urn:x-cast:com.google.cast.media";
 
 // Status
-enum connection_status {
+enum connection_status
+{
     CHROMECAST_DISCONNECTED,
     CHROMECAST_TLS_CONNECTED,
     CHROMECAST_AUTHENTICATED,

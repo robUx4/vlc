@@ -82,7 +82,7 @@ static int connectChromecast(intf_thread_t *p_intf);
 #define PONG_WAIT_TIME 500
 #define PONG_WAIT_RETRIES 2
 
-#define VAR_CHROMECAST_ADDR  "chromecast-addr"
+#define VAR_CHROMECAST_ADDR  "chromecast-addr-port"
 
 static const std::string NAMESPACE_DEVICEAUTH = "urn:x-cast:com.google.cast.tp.deviceauth";
 static const std::string NAMESPACE_CONNECTION = "urn:x-cast:com.google.cast.tp.connection";
@@ -128,7 +128,21 @@ int Open(vlc_object_t *p_this)
     msg_Dbg(p_this, "OPENING Chromecast Control Interface");
 
     std::stringstream receiver_addr;
-    psz_addrChromecast = var_InheritString(p_intf, CONTROL_CFG_PREFIX "addr");
+    if( !var_Type( p_playlist, VAR_CHROMECAST_ADDR ) )
+        /* Don't recreate the same variable over and over and over... */
+        var_Create( p_playlist, VAR_CHROMECAST_ADDR, VLC_VAR_STRING );
+
+    psz_addrChromecast = var_GetString( p_playlist, VAR_CHROMECAST_ADDR );
+    if (psz_addrChromecast == NULL)
+        psz_addrChromecast = var_InheritString(p_intf, CONTROL_CFG_PREFIX "addr");
+    else if (psz_addrChromecast[0])
+        msg_Dbg( p_intf, "Using forced address %s", psz_addrChromecast);
+    else
+    {
+        free(psz_addrChromecast);
+        psz_addrChromecast = var_InheritString(p_intf, CONTROL_CFG_PREFIX "addr");
+    }
+
     if (psz_addrChromecast == NULL)
         msg_Info(p_intf, "No Chromecast receiver IP/Name provided");
     else
@@ -143,10 +157,6 @@ int Open(vlc_object_t *p_this)
         }
         vlc_UrlClean(&url);
     }
-
-    if( !var_Type( p_playlist, VAR_CHROMECAST_ADDR ) )
-        /* Don't recreate the same variable over and over and over... */
-        var_Create( p_playlist, VAR_CHROMECAST_ADDR, VLC_VAR_STRING );
     var_SetString( p_playlist, VAR_CHROMECAST_ADDR, receiver_addr.str().c_str() );
 
     char *psz_mime = var_InheritString(p_intf, CONTROL_CFG_PREFIX "mime");

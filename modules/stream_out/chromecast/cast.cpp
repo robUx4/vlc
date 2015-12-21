@@ -41,7 +41,7 @@
 struct sout_stream_sys_t
 {
     sout_stream_sys_t(sout_stream_t *stream, intf_thread_t *intf, sout_stream_t *sout)
-        :p_wrapped(sout)
+        :p_out(sout)
         ,p_intf(intf)
         ,p_stream(stream)
         ,b_header_started(false)
@@ -52,7 +52,7 @@ struct sout_stream_sys_t
 
     ~sout_stream_sys_t()
     {
-        sout_StreamChainDelete(p_wrapped, p_wrapped);
+        sout_StreamChainDelete(p_out, p_out);
         vlc_object_release(p_intf);
     }
 
@@ -61,7 +61,7 @@ struct sout_stream_sys_t
         return p_intf->p_sys->isFinishedPlaying();
     }
 
-    sout_stream_t * const p_wrapped;
+    sout_stream_t * const p_out;
     intf_thread_t * const p_intf;
 
 protected:
@@ -82,6 +82,7 @@ static void Close(vlc_object_t *);
 /* sout wrapper that can tell when the Chromecast is finished playing
  * rather than when data are finished sending */
 vlc_module_begin ()
+
     set_shortname( "cc_sout" )
     set_description(N_("Chromecast stream output"))
     set_capability("sout stream", 0)
@@ -104,7 +105,7 @@ static sout_stream_id_sys_t *Add(sout_stream_t *p_stream, const es_format_t *p_f
         if (p_fmt->i_cat != AUDIO_ES)
             return NULL;
     }
-    return sout_StreamIdAdd( p_sys->p_wrapped, p_fmt );
+    return sout_StreamIdAdd(p_sys->p_out, p_fmt);
 }
 
 
@@ -112,7 +113,7 @@ static void Del(sout_stream_t *p_stream, sout_stream_id_sys_t *id)
 {
     sout_stream_sys_t *p_sys = p_stream->p_sys;
 
-    sout_StreamIdDel( p_sys->p_wrapped, id );
+    sout_StreamIdDel(p_sys->p_out, id);
 }
 
 
@@ -121,14 +122,14 @@ static int Send(sout_stream_t *p_stream, sout_stream_id_sys_t *id,
 {
     sout_stream_sys_t *p_sys = p_stream->p_sys;
 
-    return sout_StreamIdSend( p_sys->p_wrapped, id, p_buffer );
+    return sout_StreamIdSend(p_sys->p_out, id, p_buffer);
 }
 
 static int Flush( sout_stream_t *p_stream, sout_stream_id_sys_t *id )
 {
     sout_stream_sys_t *p_sys = p_stream->p_sys;
 
-    return sout_StreamFlush( p_sys->p_wrapped, id );
+    return sout_StreamFlush( p_sys->p_out, id );
 }
 
 static int Control(sout_stream_t *p_stream, int i_query, va_list args)
@@ -142,13 +143,13 @@ static int Control(sout_stream_t *p_stream, int i_query, va_list args)
         return VLC_SUCCESS;
     }
 
-    return p_sys->p_wrapped->pf_control( p_sys->p_wrapped, i_query, args );
+    return p_sys->p_out->pf_control( p_sys->p_out, i_query, args );
 }
 
 /*****************************************************************************
  * Open: connect to the Chromecast and initialize the sout
  *****************************************************************************/
-int Open(vlc_object_t *p_this)
+static int Open(vlc_object_t *p_this)
 {
     sout_stream_t *p_stream = reinterpret_cast<sout_stream_t*>(p_this);
     sout_stream_sys_t *p_sys = NULL;
