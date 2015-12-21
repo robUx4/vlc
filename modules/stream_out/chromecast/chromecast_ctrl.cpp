@@ -222,6 +222,10 @@ void intf_sys_t::processMessage(const castchannel::CastMessage &msg)
 {
     const std::string & namespace_ = msg.namespace_();
 
+#ifndef NDEBUG
+    msg_Dbg(p_stream,"processMessage: %s->%s %s", namespace_.c_str(), msg.destination_id().c_str(), msg.payload_utf8().c_str());
+#endif
+
     if (namespace_ == NAMESPACE_DEVICEAUTH)
     {
         castchannel::DeviceAuthMessage authMessage;
@@ -259,7 +263,7 @@ void intf_sys_t::processMessage(const castchannel::CastMessage &msg)
         }
         else
         {
-            msg_Err(p_stream, "Heartbeat command not supported: %s", type.c_str());
+            msg_Warn(p_stream, "Heartbeat command not supported: %s", type.c_str());
         }
 
         json_value_free(p_data);
@@ -334,7 +338,7 @@ void intf_sys_t::processMessage(const castchannel::CastMessage &msg)
         }
         else
         {
-            msg_Err(p_stream, "Receiver command not supported: %s",
+            msg_Warn(p_stream, "Receiver command not supported: %s",
                     msg.payload_utf8().c_str());
         }
 
@@ -348,8 +352,9 @@ void intf_sys_t::processMessage(const castchannel::CastMessage &msg)
         if (type == "MEDIA_STATUS")
         {
             json_value status = (*p_data)["status"];
-            msg_Dbg(p_stream, "Player state: %s",
-                    status[0]["playerState"].operator const char *());
+            msg_Dbg(p_stream, "Player state: %s sessionId:%d",
+                    status[0]["playerState"].operator const char *(),
+                    (int)(json_int_t) status[0]["mediaSessionId"]);
         }
         else if (type == "LOAD_FAILED")
         {
@@ -357,11 +362,14 @@ void intf_sys_t::processMessage(const castchannel::CastMessage &msg)
             msgReceiverClose(appTransportId);
             vlc_mutex_lock(&lock);
             setConnectionStatus(CHROMECAST_CONNECTION_DEAD);
-            vlc_mutex_unlock(&lock);
+        }
+        else if (type == "INVALID_REQUEST")
+        {
+            msg_Dbg(p_stream, "We sent an invalid request reason:%s", (*p_data)["reason"].operator const char *());
         }
         else
         {
-            msg_Err(p_stream, "Media command not supported: %s",
+            msg_Warn(p_stream, "Media command not supported: %s",
                     msg.payload_utf8().c_str());
         }
 
@@ -382,7 +390,7 @@ void intf_sys_t::processMessage(const castchannel::CastMessage &msg)
         }
         else
         {
-            msg_Err(p_stream, "Connection command not supported: %s",
+            msg_Warn(p_stream, "Connection command not supported: %s",
                     type.c_str());
         }
     }
