@@ -44,7 +44,6 @@ struct sout_stream_sys_t
         :p_out(sout)
         ,p_intf(intf)
         ,p_stream(stream)
-        ,b_header_started(false)
     {
         assert(p_intf != NULL);
         vlc_object_hold(p_intf);
@@ -66,7 +65,6 @@ struct sout_stream_sys_t
 
 protected:
     sout_stream_t * const p_stream;
-    bool                  b_header_started;
 };
 
 /*****************************************************************************
