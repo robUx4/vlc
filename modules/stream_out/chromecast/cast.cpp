@@ -203,7 +203,7 @@ static int Open(vlc_object_t *p_this)
 
     p_sys = new(std::nothrow) sout_stream_sys_t(p_stream, p_intf, p_sout);
     if (unlikely(p_sys == NULL))
-        return VLC_ENOMEM;
+        goto error;
 
     // Set the sout callbacks.
     p_stream->pf_add     = Add;
@@ -218,18 +218,18 @@ static int Open(vlc_object_t *p_this)
     return VLC_SUCCESS;
 
 error:
-    delete p_sys;
     sout_StreamChainDelete(p_sout, p_sout);
     free(psz_mux);
     free(psz_var_mime);
+    delete p_sys;
     return VLC_EGENERIC;
 }
 
 /*****************************************************************************
  * Close: destroy interface
  *****************************************************************************/
-void Close(vlc_object_t *p_this)
+static void Close(vlc_object_t *p_this)
 {
-    sout_stream_t *p_sout = reinterpret_cast<sout_stream_t*>(p_this);
-    delete p_sout->p_sys;
+    sout_stream_t *p_stream = reinterpret_cast<sout_stream_t*>(p_this);
+    delete p_stream->p_sys;
 }

@@ -49,6 +49,31 @@
 static const vlc_fourcc_t DEFAULT_TRANSCODE_AUDIO = VLC_CODEC_MP3;
 static const vlc_fourcc_t DEFAULT_TRANSCODE_VIDEO = VLC_CODEC_H264;
 
+#define PACKET_MAX_LEN 10 * 1024
+
+// Media player Chromecast app id
+#define APP_ID "CC1AD845" // Default media player aka DEFAULT_MEDIA_RECEIVER_APPLICATION_ID
+
+static const int CHROMECAST_CONTROL_PORT = 8009;
+
+/* deadline regarding pings sent from receiver */
+#define PING_WAIT_TIME 6000
+#define PING_WAIT_RETRIES 0
+/* deadline regarding pong we expect after pinging the receiver */
+#define PONG_WAIT_TIME 500
+#define PONG_WAIT_RETRIES 2
+
+#define VAR_CHROMECAST_ADDR  "chromecast-addr-port"
+#define CONTROL_CFG_PREFIX "chromecast-"
+
+static const std::string NAMESPACE_DEVICEAUTH       = "urn:x-cast:com.google.cast.tp.deviceauth";
+static const std::string NAMESPACE_CONNECTION       = "urn:x-cast:com.google.cast.tp.connection";
+static const std::string NAMESPACE_HEARTBEAT        = "urn:x-cast:com.google.cast.tp.heartbeat";
+static const std::string NAMESPACE_RECEIVER         = "urn:x-cast:com.google.cast.receiver";
+
+/*****************************************************************************
+ * Local prototypes
+ *****************************************************************************/
 static int Open(vlc_object_t *);
 static void Close(vlc_object_t *);
 static int CurrentChanged( vlc_object_t *, char const *,
@@ -63,41 +88,19 @@ static int AddrChangedEvent( vlc_object_t *, char const *,
                            vlc_value_t, vlc_value_t, void * );
 static void *ChromecastThread(void *data);
 
-#define CONTROL_CFG_PREFIX "chromecast-"
-
-#define PACKET_MAX_LEN 10 * 1024
-
-// Media player Chromecast app id
-#define APP_ID "CC1AD845" // Default media player aka DEFAULT_MEDIA_RECEIVER_APPLICATION_ID
-
-static const int CHROMECAST_CONTROL_PORT = 8009;
-#define HTTP_PORT               8010
-
-/* deadline regarding pings sent from receiver */
-#define PING_WAIT_TIME 6000
-#define PING_WAIT_RETRIES 0
-/* deadline regarding pong we expect after pinging the receiver */
-#define PONG_WAIT_TIME 500
-#define PONG_WAIT_RETRIES 2
-
-#define VAR_CHROMECAST_ADDR  "chromecast-addr-port"
-
-static const std::string NAMESPACE_DEVICEAUTH       = "urn:x-cast:com.google.cast.tp.deviceauth";
-static const std::string NAMESPACE_CONNECTION       = "urn:x-cast:com.google.cast.tp.connection";
-static const std::string NAMESPACE_HEARTBEAT        = "urn:x-cast:com.google.cast.tp.heartbeat";
-static const std::string NAMESPACE_RECEIVER         = "urn:x-cast:com.google.cast.receiver";
+/*****************************************************************************
+ * Module descriptor
+ *****************************************************************************/
 
 #define IP_TEXT N_("Chromecast IP address")
 #define IP_LONGTEXT N_("This sets the IP adress of the Chromecast receiver.")
-#define TARGET_TEXT N_("Chromecast Name")
-#define TARGET_LONGTEXT N_("This sets the name of the Chromecast receiver.")
 #define HTTP_PORT_TEXT N_("HTTP port")
 #define HTTP_PORT_LONGTEXT N_("This sets the HTTP port of the server " \
                               "used to stream the media to the Chromecast.")
+#define MUXER_TEXT N_("Muxer")
+#define MUXER_LONGTEXT N_("This sets the muxer used to stream to the Chromecast.")
 #define MIME_TEXT N_("MIME content type")
 #define MIME_LONGTEXT N_("This sets the media MIME content type sent to the Chromecast.")
-#define MUXER_TEXT N_("Output muxer address")
-#define MUXER_LONGTEXT N_("Output muxer chromecast interface.")
 
 vlc_module_begin ()
     set_shortname( N_("Chromecast") )
@@ -114,16 +117,18 @@ vlc_module_begin ()
 
 vlc_module_end ()
 
+/*****************************************************************************
+ * Open: connect to the Chromecast and initialize the sout
+ *****************************************************************************/
 int Open(vlc_object_t *p_this)
 {
     intf_thread_t *p_intf = reinterpret_cast<intf_thread_t*>(p_this);
-    playlist_t *p_playlist = pl_Get( p_intf );
     intf_sys_t *p_sys = new(std::nothrow) intf_sys_t(p_intf);
-    char *psz_addrChromecast = NULL;
     if (unlikely(p_sys == NULL))
         return VLC_ENOMEM;
 
-    msg_Dbg(p_this, "OPENING Chromecast Control Interface");
+    playlist_t *p_playlist = pl_Get( p_intf );
+    char *psz_addrChromecast = NULL;
 
     std::stringstream receiver_addr;
     if( !var_Type( p_playlist, VAR_CHROMECAST_ADDR ) )
@@ -189,8 +194,6 @@ int Open(vlc_object_t *p_this)
 
     var_AddCallback( p_playlist, VAR_CHROMECAST_ADDR, AddrChangedEvent, p_intf );
 
-    msg_Dbg(p_this, "OPENING Chromecast done");
-
     return VLC_SUCCESS;
 
 error:
@@ -198,14 +201,15 @@ error:
     return VLC_EGENERIC;
 }
 
+/*****************************************************************************
+ * Close: destroy interface
+ *****************************************************************************/
 void Close(vlc_object_t *p_this)
 {
     intf_thread_t *p_intf = reinterpret_cast<intf_thread_t*>(p_this);
-    playlist_t *p_playlist = pl_Get( p_intf );
     intf_sys_t *p_sys = p_intf->p_sys;
 
-    msg_Dbg(p_this, "CLOSING Chromecast Control Interface");
-
+    playlist_t *p_playlist = pl_Get( p_intf );
     var_DelCallback( p_playlist, VAR_CHROMECAST_ADDR, AddrChangedEvent, p_intf );
     var_DelCallback( p_playlist, "input-prepare", CurrentChanged, p_intf );
     var_DelCallback( p_playlist, "mute", MuteChanged, p_intf );
@@ -216,8 +220,6 @@ void Close(vlc_object_t *p_this)
     vlc_mutex_destroy(&p_sys->lock);
     vlc_cond_destroy(&p_sys->seekCommandCond);
     vlc_cond_destroy(&p_sys->loadCommandCond);
-
-    msg_Dbg(p_this, "CLOSING Chromecast Done");
 
     delete p_sys;
 }
@@ -1458,10 +1460,10 @@ void intf_sys_t::msgPlayerSetMute(bool b_mute)
 /*****************************************************************************
  * Chromecast thread
  *****************************************************************************/
-static void* ChromecastThread(void* p_this)
+static void* ChromecastThread(void* p_data)
 {
     int canc;
-    intf_thread_t *p_intf = reinterpret_cast<intf_thread_t*>(p_this);
+    intf_thread_t *p_intf = reinterpret_cast<intf_thread_t*>(p_data);
     intf_sys_t *p_sys = p_intf->p_sys;
 
     vlc_interrupt_set(p_sys->p_interrupt);
