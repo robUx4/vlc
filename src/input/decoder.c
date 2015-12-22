@@ -593,6 +593,16 @@ int decoder_GetDisplayRate( decoder_t *p_dec )
     return p_dec->pf_get_display_rate( p_dec );
 }
 
+void decoder_AbortPictures( decoder_t *p_dec, bool b_abort )
+{
+    decoder_owner_sys_t *p_owner = p_dec->p_owner;
+
+    vlc_mutex_lock( &p_owner->lock );
+    if( p_owner->p_vout != NULL )
+        vout_Cancel( p_owner->p_vout, b_abort );
+    vlc_mutex_unlock( &p_owner->lock );
+}
+
 static void DecoderWaitUnblock( decoder_t *p_dec )
 {
     decoder_owner_sys_t *p_owner = p_dec->p_owner;
@@ -716,9 +726,10 @@ static void DecoderProcessSout( decoder_t *p_dec, block_t *p_block )
 {
     decoder_owner_sys_t *p_owner = p_dec->p_owner;
     block_t *p_sout_block;
+    block_t **pp_block = p_block ? &p_block : NULL;
 
     while( ( p_sout_block =
-                 p_dec->pf_packetize( p_dec, p_block ? &p_block : NULL ) ) )
+                 p_dec->pf_packetize( p_dec, pp_block ) ) )
     {
         if( p_owner->p_sout_input == NULL )
         {
@@ -962,11 +973,12 @@ static int DecoderQueueVideo( decoder_t *p_dec, picture_t *p_pic )
 static void DecoderDecodeVideo( decoder_t *p_dec, block_t *p_block )
 {
     picture_t      *p_pic;
+    block_t **pp_block = p_block ? &p_block : NULL;
     int i_lost = 0;
     int i_decoded = 0;
     int i_displayed = 0;
 
-    while( (p_pic = p_dec->pf_decode_video( p_dec, &p_block )) )
+    while( (p_pic = p_dec->pf_decode_video( p_dec, pp_block ) ) )
     {
         i_decoded++;
 
@@ -988,10 +1000,11 @@ static void DecoderProcessVideo( decoder_t *p_dec, block_t *p_block )
     if( p_owner->p_packetizer )
     {
         block_t *p_packetized_block;
+        block_t **pp_block = p_block ? &p_block : NULL;
         decoder_t *p_packetizer = p_owner->p_packetizer;
 
         while( (p_packetized_block =
-                p_packetizer->pf_packetize( p_packetizer, p_block ? &p_block : NULL )) )
+                p_packetizer->pf_packetize( p_packetizer, pp_block ) ) )
         {
             if( !es_format_IsSimilar( &p_dec->fmt_in, &p_packetizer->fmt_out ) )
             {
@@ -1023,7 +1036,7 @@ static void DecoderProcessVideo( decoder_t *p_dec, block_t *p_block )
             }
         }
         /* Drain the decoder after the packetizer is drained */
-        if( !p_block )
+        if( !pp_block )
             DecoderDecodeVideo( p_dec, NULL );
     }
     else
@@ -1144,11 +1157,12 @@ static int DecoderQueueAudio( decoder_t *p_dec, block_t *p_aout_buf )
 static void DecoderDecodeAudio( decoder_t *p_dec, block_t *p_block )
 {
     block_t *p_aout_buf;
+    block_t **pp_block = p_block ? &p_block : NULL;
     int i_decoded = 0;
     int i_lost = 0;
     int i_played = 0;
 
-    while( (p_aout_buf = p_dec->pf_decode_audio( p_dec, &p_block )) )
+    while( (p_aout_buf = p_dec->pf_decode_audio( p_dec, pp_block ) ) )
     {
         i_decoded++;
 
@@ -1170,10 +1184,11 @@ static void DecoderProcessAudio( decoder_t *p_dec, block_t *p_block )
     if( p_owner->p_packetizer )
     {
         block_t *p_packetized_block;
+        block_t **pp_block = p_block ? &p_block : NULL;
         decoder_t *p_packetizer = p_owner->p_packetizer;
 
         while( (p_packetized_block =
-                p_packetizer->pf_packetize( p_packetizer, p_block ? &p_block : NULL )) )
+                p_packetizer->pf_packetize( p_packetizer, pp_block ) ) )
         {
             if( !es_format_IsSimilar( &p_dec->fmt_in, &p_packetizer->fmt_out ) )
             {
@@ -1202,7 +1217,7 @@ static void DecoderProcessAudio( decoder_t *p_dec, block_t *p_block )
             }
         }
         /* Drain the decoder after the packetizer is drained */
-        if( !p_block )
+        if( !pp_block )
             DecoderDecodeAudio( p_dec, NULL );
     }
     else
@@ -1295,8 +1310,9 @@ static int DecoderQueueSpu( decoder_t *p_dec, subpicture_t *p_spu )
 static void DecoderProcessSpu( decoder_t *p_dec, block_t *p_block )
 {
     subpicture_t *p_spu;
+    block_t **pp_block = p_block ? &p_block : NULL;
 
-    while( (p_spu = p_dec->pf_decode_sub( p_dec, p_block ? &p_block : NULL ) ) )
+    while( (p_spu = p_dec->pf_decode_sub( p_dec, pp_block ) ) )
         DecoderQueueSpu( p_dec, p_spu );
 }
 
@@ -1872,7 +1888,7 @@ void input_DecoderDelete( decoder_t *p_dec )
      * This unblocks the thread, allowing the decoder module to join all its
      * worker threads (if any) and the decoder thread to terminate. */
     if( p_owner->p_vout != NULL )
-        vout_Cancel( p_owner->p_vout );
+        vout_Cancel( p_owner->p_vout, true );
     vlc_mutex_unlock( &p_owner->lock );
 
     vlc_join( p_owner->thread, NULL );

@@ -73,6 +73,7 @@ date_Increment
 date_Init
 date_Move
 date_Set
+decoder_AbortPictures
 decoder_GetDisplayDate
 decoder_GetDisplayRate
 decoder_GetInputAttachments
@@ -620,7 +621,6 @@ vlc_sd_probe_Add
 vlc_sdp_Start
 vlc_sd_Start
 vlc_sd_Stop
-vlc_tdestroy
 vlc_testcancel
 vlc_threadvar_create
 vlc_threadvar_delete

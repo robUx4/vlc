@@ -114,7 +114,7 @@ struct decoder_sys_t
     bool            b_output_ready;
     /* If true, the first input block was successfully dequeued */
     bool            b_input_dequeued;
-    bool            b_error;
+    bool            b_aborted;
     /* TODO: remove. See jni_EventHardwareAccelerationError */
     bool            b_error_signaled;
 
@@ -179,6 +179,8 @@ static void RemoveInflightPictures(decoder_t *);
 #define MEDIACODEC_AUDIO_TEXT "Use MediaCodec for audio decoding"
 #define MEDIACODEC_AUDIO_LONGTEXT "Still experimental."
 
+#define MEDIACODEC_TUNNELEDPLAYBACK_TEXT "Use a tunneled surface for playback"
+
 #define CFG_PREFIX "mediacodec-"
 
 vlc_module_begin ()
@@ -191,6 +193,8 @@ vlc_module_begin ()
              DIRECTRENDERING_TEXT, DIRECTRENDERING_LONGTEXT, true)
     add_bool(CFG_PREFIX "audio", false,
              MEDIACODEC_AUDIO_TEXT, MEDIACODEC_AUDIO_LONGTEXT, true)
+    add_bool(CFG_PREFIX "tunneled-playback", false,
+             MEDIACODEC_TUNNELEDPLAYBACK_TEXT, NULL, true)
     set_callbacks( OpenDecoderNdk, CloseDecoder )
     add_shortcut( "mediacodec_ndk" )
     add_submodule ()
@@ -469,6 +473,8 @@ static int StartMediaCodec(decoder_t *p_dec)
             }
         }
         args.video.p_awh = p_sys->u.video.p_awh;
+        args.video.b_tunneled_playback = args.video.p_awh ?
+                var_InheritBool(p_dec, CFG_PREFIX "tunneled-playback") : false;
     }
     else
     {
@@ -712,9 +718,9 @@ static void AbortDecoderLocked(decoder_t *p_dec)
 {
     decoder_sys_t *p_sys = p_dec->p_sys;
 
-    if (!p_sys->b_error)
+    if (!p_sys->b_aborted)
     {
-        p_sys->b_error = true;
+        p_sys->b_aborted = true;
         vlc_cancel(p_sys->out_thread);
     }
 }
@@ -860,6 +866,13 @@ static int Video_ProcessOutput(decoder_t *p_dec, mc_api_out *p_out,
         if (p_out->u.buf.i_ts <= p_sys->i_preroll_end)
             return p_sys->api->release_out(p_sys->api, p_out->u.buf.i_index, false);
 
+        if (!p_sys->api->b_direct_rendering && p_out->u.buf.p_ptr == NULL)
+        {
+            /* This can happen when receiving an EOS buffer */
+            msg_Warn(p_dec, "Invalid buffer, dropping frame");
+            return p_sys->api->release_out(p_sys->api, p_out->u.buf.i_index, false);
+        }
+
         p_pic = decoder_NewPicture(p_dec);
         if (!p_pic) {
             msg_Warn(p_dec, "NewPicture failed");
@@ -970,6 +983,13 @@ static int Audio_ProcessOutput(decoder_t *p_dec, mc_api_out *p_out,
     if (p_out->type == MC_OUT_TYPE_BUF)
     {
         block_t *p_block = NULL;
+        if (p_out->u.buf.p_ptr == NULL)
+        {
+            /* This can happen when receiving an EOS buffer */
+            msg_Warn(p_dec, "Invalid buffer, dropping frame");
+            return p_sys->api->release_out(p_sys->api, p_out->u.buf.i_index, false);
+        }
+
         if (!p_sys->b_has_format) {
             msg_Warn(p_dec, "Buffers returned before output format is set, dropping frame");
             return p_sys->api->release_out(p_sys->api, p_out->u.buf.i_index, false);
@@ -1114,7 +1134,7 @@ static void DecodeFlushLocked(decoder_t *p_dec)
 
     vlc_cond_broadcast(&p_sys->cond);
 
-    while (!p_sys->b_error && p_sys->b_flush_out)
+    while (!p_sys->b_aborted && p_sys->b_flush_out)
         vlc_cond_wait(&p_sys->dec_cond, &p_sys->lock);
 }
 
@@ -1190,7 +1210,7 @@ static void *OutThread(void *data)
                 block_t *p_block = NULL;
 
                 if (p_sys->pf_process_output(p_dec, &out, &p_pic,
-                                             &p_block) == -1)
+                                             &p_block) == -1 && !out.b_eos)
                 {
                     msg_Err(p_dec, "pf_process_output failed");
                     vlc_restorecancel(canc);
@@ -1200,6 +1220,13 @@ static void *OutThread(void *data)
                     decoder_QueueVideo(p_dec, p_pic);
                 else if (p_block)
                     decoder_QueueAudio(p_dec, p_block);
+
+                if (out.b_eos)
+                {
+                    msg_Warn(p_dec, "EOS received, abort OutThread");
+                    vlc_restorecancel(canc);
+                    break;
+                }
             } else if (i_ret != 0)
             {
                 msg_Err(p_dec, "get_out failed");
@@ -1218,7 +1245,7 @@ static void *OutThread(void *data)
     msg_Warn(p_dec, "OutThread stopped");
 
     /* Signal DecoderFlush that the output thread aborted */
-    p_sys->b_error = true;
+    p_sys->b_aborted = true;
     vlc_cond_signal(&p_sys->dec_cond);
 
     vlc_cleanup_pop();
@@ -1245,60 +1272,75 @@ static int DecodeCommon(decoder_t *p_dec, block_t **pp_block)
     int i_flags = 0;
     int i_ret;
     bool b_dequeue_timeout = false;
-    block_t *p_block;
+    bool b_draining;
 
-    if (!pp_block || !*pp_block)
+    if (pp_block != NULL && *pp_block == NULL)
         return 0;
 
     vlc_mutex_lock(&p_sys->lock);
 
-    if (p_sys->b_error)
+    if (p_sys->b_aborted)
         goto end;
 
-    p_block = *pp_block;
-
-    if (p_block->i_flags & (BLOCK_FLAG_DISCONTINUITY|BLOCK_FLAG_CORRUPTED))
+    if (pp_block != NULL)
     {
-        DecodeFlushLocked(p_dec);
-        if (p_sys->b_error)
-            goto end;
-        if (p_block->i_flags & BLOCK_FLAG_CORRUPTED)
-            goto end;
-    }
-
-    /* Parse input block */
-    if ((i_ret = p_sys->pf_on_new_block(p_dec, p_block, &i_flags)) == 1)
-    {
-        if (i_flags & (NEWBLOCK_FLAG_FLUSH|NEWBLOCK_FLAG_RESTART))
+        block_t *p_block = *pp_block;
+        b_draining = false;
+        if (p_block->i_flags & (BLOCK_FLAG_DISCONTINUITY|BLOCK_FLAG_CORRUPTED))
         {
-            msg_Warn(p_dec, "Flushing from DecodeCommon");
-
-            /* Flush before restart to unblock OutThread */
             DecodeFlushLocked(p_dec);
-            if (p_sys->b_error)
+            if (p_sys->b_aborted)
                 goto end;
+            if (p_block->i_flags & BLOCK_FLAG_CORRUPTED)
+                goto end;
+        }
 
-            if (i_flags & NEWBLOCK_FLAG_RESTART)
+        /* Parse input block */
+        if ((i_ret = p_sys->pf_on_new_block(p_dec, p_block, &i_flags)) == 1)
+        {
+            if (i_flags & (NEWBLOCK_FLAG_FLUSH|NEWBLOCK_FLAG_RESTART))
             {
-                msg_Warn(p_dec, "Restarting from DecodeCommon");
-                StopMediaCodec(p_dec);
-                if (StartMediaCodec(p_dec) != VLC_SUCCESS)
-                {
-                    msg_Err(p_dec, "StartMediaCodec failed");
-                    AbortDecoderLocked(p_dec);
+                msg_Warn(p_dec, "Flushing from DecodeCommon");
+
+                /* Flush before restart to unblock OutThread */
+                DecodeFlushLocked(p_dec);
+                if (p_sys->b_aborted)
                     goto end;
+
+                if (i_flags & NEWBLOCK_FLAG_RESTART)
+                {
+                    msg_Warn(p_dec, "Restarting from DecodeCommon");
+                    StopMediaCodec(p_dec);
+                    if (StartMediaCodec(p_dec) != VLC_SUCCESS)
+                    {
+                        msg_Err(p_dec, "StartMediaCodec failed");
+                        AbortDecoderLocked(p_dec);
+                        goto end;
+                    }
                 }
             }
+        }
+        else
+        {
+            if (i_ret != 0)
+            {
+                AbortDecoderLocked(p_dec);
+                msg_Err(p_dec, "pf_on_new_block failed");
+            }
+            goto end;
         }
     }
     else
     {
-        if (i_ret != 0)
+        /* No input block, decoder is draining */
+        msg_Err(p_dec, "Decoder is draining");
+        b_draining = true;
+
+        if (!p_sys->b_output_ready )
         {
-            AbortDecoderLocked(p_dec);
-            msg_Err(p_dec, "pf_on_new_block failed");
+            /* Output no ready, no need to drain */
+            goto end;
         }
-        goto end;
     }
 
     /* Abort if MediaCodec is not yet started */
@@ -1306,7 +1348,8 @@ static int DecodeCommon(decoder_t *p_dec, block_t **pp_block)
         goto end;
 
     /* Queue CSD blocks and input blocks */
-    while ((p_block = GetNextBlock(p_sys, *pp_block)))
+    block_t *p_block = NULL;
+    while (b_draining || (p_block = GetNextBlock(p_sys, *pp_block)))
     {
         int i_index;
 
@@ -1318,27 +1361,35 @@ static int DecodeCommon(decoder_t *p_dec, block_t **pp_block)
                                          INT64_C(1000000) : -1);
         vlc_mutex_lock(&p_sys->lock);
 
-        if (p_sys->b_error)
+        if (p_sys->b_aborted)
             goto end;
+
+        bool b_config = false;
+        mtime_t i_ts = 0;
+        p_sys->b_input_dequeued = true;
+        const void *p_buf = NULL;
+        size_t i_size = 0;
 
         if (i_index >= 0)
         {
-            bool b_config = p_block && (p_block->i_flags & BLOCK_FLAG_CSD);
-            mtime_t i_ts = 0;
-            p_sys->b_input_dequeued = true;
-
-            if (!b_config)
+            assert(b_draining || p_block != NULL);
+            if (p_block != NULL)
             {
-                i_ts = p_block->i_pts;
-                if (!i_ts && p_block->i_dts)
-                    i_ts = p_block->i_dts;
+                b_config = (p_block->i_flags & BLOCK_FLAG_CSD);
+                if (!b_config)
+                {
+                    i_ts = p_block->i_pts;
+                    if (!i_ts && p_block->i_dts)
+                        i_ts = p_block->i_dts;
+                }
+                p_buf = p_block->p_buffer;
+                i_size = p_block->i_buffer;
             }
 
-            if (p_sys->api->queue_in(p_sys->api, i_index,
-                                     p_block->p_buffer, p_block->i_buffer, i_ts,
-                                     b_config) == 0)
+            if (p_sys->api->queue_in(p_sys->api, i_index, p_buf, i_size,
+                                     i_ts, b_config) == 0)
             {
-                if (!b_config)
+                if (!b_config && p_block != NULL)
                 {
                     if (p_block->i_flags & BLOCK_FLAG_PREROLL )
                         p_sys->i_preroll_end = i_ts;
@@ -1353,6 +1404,8 @@ static int DecodeCommon(decoder_t *p_dec, block_t **pp_block)
                     *pp_block = NULL;
                 }
                 b_dequeue_timeout = false;
+                if (b_draining)
+                    break;
             } else
             {
                 msg_Err(p_dec, "queue_in failed");
@@ -1391,13 +1444,34 @@ static int DecodeCommon(decoder_t *p_dec, block_t **pp_block)
         }
     }
 
+    if (b_draining)
+    {
+        msg_Warn(p_dec, "EOS sent, waiting for OutThread");
+
+        /* Wait for the OutThread to stop (and process all remaining output
+         * frames. Use a timeout here since we can't know if all decoders will
+         * behave correctly. */
+        mtime_t deadline = mdate() + INT64_C(1000000);
+        while (!p_sys->b_aborted
+            && vlc_cond_timedwait(&p_sys->dec_cond, &p_sys->lock, deadline) == 0);
+
+        if (!p_sys->b_aborted)
+            msg_Err(p_dec, "OutThread timed out");
+
+        /* In case pf_decode is called again (it shouldn't happen) */
+        p_sys->b_error_signaled = true;
+
+        vlc_mutex_unlock(&p_sys->lock);
+        return 0;
+    }
+
 end:
     if (pp_block && *pp_block)
     {
         block_Release(*pp_block);
         *pp_block = NULL;
     }
-    if (p_sys->b_error)
+    if (p_sys->b_aborted)
     {
         if (!p_sys->b_error_signaled) {
             /* Signal the error to the Java.

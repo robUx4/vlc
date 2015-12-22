@@ -46,6 +46,7 @@ struct mc_api_out
         MC_OUT_TYPE_BUF,
         MC_OUT_TYPE_CONF,
     } type;
+    bool b_eos;
     union
     {
         struct
@@ -86,6 +87,7 @@ union mc_api_args
         int i_width;
         int i_height;
         int i_angle;
+        bool b_tunneled_playback;
     } video;
     struct
     {
