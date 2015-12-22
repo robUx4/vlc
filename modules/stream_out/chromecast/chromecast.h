@@ -66,6 +66,12 @@ enum command_status {
     CMD_SEEK_SENT,
 };
 
+enum receiver_display {
+    DISPLAY_UNKNOWN,
+    HAS_VIDEO,
+    AUDIO_ONLY
+};
+
 struct intf_sys_t
 {
     intf_sys_t(intf_thread_t * const intf);
@@ -83,6 +89,7 @@ struct intf_sys_t
     std::string appTransportId;
     std::string mediaSessionId;
 
+    receiver_display  canDisplay;
     int i_sock_fd;
     vlc_tls_creds_t *p_creds;
     vlc_tls_t *p_tls;
@@ -99,6 +106,12 @@ struct intf_sys_t
     void sendPlayerCmd();
 
     void InputUpdated( input_thread_t * );
+
+    void setCanDisplay(receiver_display canDisplay) {
+        vlc_mutex_locker locker(&lock);
+        this->canDisplay = canDisplay;
+        vlc_cond_broadcast(&loadCommandCond);
+    }
 
     connection_status getConnectionStatus() const
     {
@@ -165,7 +178,12 @@ private:
 
     std::string       s_sout;
     std::string       s_chromecast_url;
+    bool              canRemux;
+    bool              canDoDirect;
     std::string GetMedia();
+
+    bool canDecodeVideo( const es_format_t * ) const;
+    bool canDecodeAudio( const es_format_t * ) const;
 
     void plugOutputRedirection();
     void unplugOutputRedirection();

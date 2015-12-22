@@ -32,6 +32,7 @@
 
 #include "chromecast.h"
 
+#include <vlc_access.h>
 #include <vlc_input.h>
 #include <vlc_playlist.h>
 #include <vlc_threads.h>
@@ -44,6 +45,9 @@
 #endif
 
 #include "../../misc/webservices/json.h"
+
+static const vlc_fourcc_t DEFAULT_TRANSCODE_AUDIO = VLC_CODEC_MP3;
+static const vlc_fourcc_t DEFAULT_TRANSCODE_VIDEO = VLC_CODEC_H264;
 
 #define PACKET_MAX_LEN 10 * 1024
 
@@ -263,6 +267,7 @@ intf_sys_t::intf_sys_t(intf_thread_t * const p_this)
     :p_stream(p_this)
     ,p_input(NULL)
     ,devicePort(CHROMECAST_CONTROL_PORT)
+    ,canDisplay(DISPLAY_UNKNOWN)
     ,p_tls(NULL)
     ,conn_status(CHROMECAST_DISCONNECTED)
     ,cmd_status(NO_CMD_PENDING)
@@ -373,6 +378,27 @@ static int CurrentChanged( vlc_object_t *p_this, char const *psz_var,
     return VLC_SUCCESS;
 }
 
+bool intf_sys_t::canDecodeVideo( const es_format_t *p_es ) const
+{
+    if (p_es->i_codec == VLC_CODEC_H264 || p_es->i_codec == VLC_CODEC_VP8)
+        return true;
+    return false;
+}
+
+bool intf_sys_t::canDecodeAudio( const es_format_t *p_es ) const
+{
+    if (p_es->i_codec == VLC_CODEC_VORBIS ||
+        p_es->i_codec == VLC_CODEC_MP4A ||
+        p_es->i_codec == VLC_FOURCC('h', 'a', 'a', 'c') ||
+        p_es->i_codec == VLC_FOURCC('l', 'a', 'a', 'c') ||
+        p_es->i_codec == VLC_FOURCC('s', 'a', 'a', 'c') ||
+        p_es->i_codec == VLC_CODEC_MPGA ||
+        p_es->i_codec == VLC_CODEC_MP3 ||
+        p_es->i_codec == VLC_CODEC_A52 ||
+        p_es->i_codec == VLC_CODEC_EAC3)
+        return true;
+    return false;
+}
 
 void intf_sys_t::unplugOutputRedirection()
 {
@@ -419,7 +445,7 @@ void intf_sys_t::InputUpdated( input_thread_t *p_input )
         var_AddCallback( p_input, "intf-event", InputEvent, p_stream );
 
         mutex_cleanup_push(&lock);
-        while (!deviceIP.empty() && conn_status != CHROMECAST_CONNECTION_DEAD)
+        while (!deviceIP.empty() && canDisplay == DISPLAY_UNKNOWN && conn_status != CHROMECAST_CONNECTION_DEAD)
         {
             msg_Dbg(p_stream, "InputUpdated waiting for Chromecast connection, current %d", conn_status);
             vlc_cond_wait(&loadCommandCond, &lock);
@@ -435,6 +461,45 @@ void intf_sys_t::InputUpdated( input_thread_t *p_input )
 
         assert(!p_input->b_preparsing);
 
+        canRemux = false;
+        canDoDirect = false;
+        vlc_fourcc_t i_codec_video = 0, i_codec_audio = 0;
+
+        input_item_t * p_item = input_GetItem(p_input);
+        if ( p_item )
+        {
+            canRemux = true;
+            for (int i=0; i<p_item->i_es; ++i)
+            {
+                es_format_t *p_es = p_item->es[i];
+                if (p_es->i_cat == AUDIO_ES)
+                {
+                    if (!canDecodeAudio( p_es ))
+                    {
+                        msg_Dbg( p_stream, "can't remux audio track %d codec %4.4s", p_es->i_id, (const char*)&p_es->i_codec );
+                        canRemux = false;
+                    }
+                    else if (i_codec_audio == 0)
+                        i_codec_audio = p_es->i_codec;
+                }
+                else if (canDisplay==HAS_VIDEO && p_es->i_cat == VIDEO_ES)
+                {
+                    if (!canDecodeVideo( p_es ))
+                    {
+                        msg_Dbg( p_stream, "can't remux video track %d codec %4.4s", p_es->i_id, (const char*)&p_es->i_codec );
+                        canRemux = false;
+                    }
+                    else if (i_codec_video == 0)
+                        i_codec_video = p_es->i_codec;
+                }
+                else
+                {
+                    p_es->i_priority = ES_PRIORITY_NOT_SELECTABLE;
+                    msg_Dbg( p_stream, "disable non audio/video track %d i_cat:%d codec %4.4s canDisplay:%d", p_es->i_id, p_es->i_cat, (const char*)&p_es->i_codec, canDisplay );
+                }
+            }
+        }
+
         int i_port = var_InheritInteger(p_stream, CONTROL_CFG_PREFIX "http-port");
 
         if (deviceIP.empty())
@@ -443,6 +508,40 @@ void intf_sys_t::InputUpdated( input_thread_t *p_input )
         {
             std::stringstream ssout;
             ssout << '#';
+            if ( !canRemux )
+            {
+                if ( i_codec_audio == 0 )
+                    i_codec_audio = DEFAULT_TRANSCODE_AUDIO;
+                /* avcodec AAC encoder is experimental */
+                if ( i_codec_audio == VLC_CODEC_MP4A ||
+                     i_codec_audio == VLC_FOURCC('h', 'a', 'a', 'c') ||
+                     i_codec_audio == VLC_FOURCC('l', 'a', 'a', 'c') ||
+                     i_codec_audio == VLC_FOURCC('s', 'a', 'a', 'c'))
+                    i_codec_audio = DEFAULT_TRANSCODE_AUDIO;
+
+                if ( i_codec_video == 0 )
+                    i_codec_video = DEFAULT_TRANSCODE_VIDEO;
+
+                /* TODO: provide audio samplerate and channels */
+                ssout << "transcode{acodec=";
+                char s_fourcc[5];
+                vlc_fourcc_to_char( i_codec_audio, s_fourcc );
+                s_fourcc[4] = '\0';
+                ssout << s_fourcc;
+                if ( canDisplay==HAS_VIDEO )
+                {
+                    /* TODO: provide maxwidth,maxheight */
+                    ssout << ",vcodec=";
+                    vlc_fourcc_to_char( i_codec_video, s_fourcc );
+                    s_fourcc[4] = '\0';
+                    ssout << s_fourcc;
+                }
+                ssout << "}:";
+            }
+            if (mime == "video/x-matroska" && canDisplay==HAS_VIDEO && i_codec_audio == VLC_CODEC_VORBIS && i_codec_video == VLC_CODEC_VP8 )
+                mime == "video/webm";
+            if (mime == "video/x-matroska" && !canDisplay==HAS_VIDEO )
+                mime == "audio/x-matroska";
             ssout << "cc_sout{http-port=" << i_port << ",mux=" << muxer << ",mime=" << mime << ",uid=" << i_sout_id++ << "}";
             s_sout = ssout.str();
         }
@@ -980,8 +1079,18 @@ std::string intf_sys_t::GetMedia()
         free( psz_name );
 
         std::stringstream chromecast_url;
-        int i_port = var_InheritInteger(p_stream, CONTROL_CFG_PREFIX "http-port");
-        chromecast_url << "http://" << serverIP << ":" << i_port << "/stream";
+        if ( canDoDirect && canRemux )
+        {
+            char *psz_uri = input_item_GetURI(p_item);
+            chromecast_url << psz_uri;
+            msg_Dbg( p_stream, "using direct URL: %s", psz_uri );
+            free( psz_uri );
+        }
+        else
+        {
+            int i_port = var_InheritInteger(p_stream, CONTROL_CFG_PREFIX "http-port");
+            chromecast_url << "http://" << serverIP << ":" << i_port << "/stream";
+        }
         s_chromecast_url = chromecast_url.str();
 
         msg_Dbg(p_stream,"s_chromecast_url: %s", s_chromecast_url.c_str());
@@ -1150,6 +1259,14 @@ static void* ChromecastThread(void* p_data)
     vlc_mutex_unlock(&p_sys->lock);
 
     p_sys->msgAuth();
+
+    /* HACK: determine if this is a Chromecast Audio */
+    std::stringstream s_video_test;
+    s_video_test << "http://" << p_sys->deviceIP << ":8008/apps/YouTube";
+    access_t *p_test_app = vlc_access_NewMRL( VLC_OBJECT(p_stream), s_video_test.str().c_str() );
+    p_sys->setCanDisplay( p_test_app != NULL ? HAS_VIDEO : AUDIO_ONLY );
+    if ( p_test_app )
+        vlc_access_Delete( p_test_app );
 
     vlc_restorecancel(canc);
 
