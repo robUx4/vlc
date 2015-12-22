@@ -115,6 +115,9 @@ struct intf_sys_t
     int connectChromecast(char *psz_ipChromecast);
     void disconnectChromecast();
 
+    void msgPlayerSetVolume(float volume);
+    void msgPlayerSetMute(bool mute);
+
     void msgPing();
     void msgPong();
     void msgConnect(const std::string & destinationId = DEFAULT_CHOMECAST_RECEIVER);
