@@ -74,6 +74,8 @@ struct intf_sys_t
 
     intf_thread_t  * const p_stream;
     input_thread_t *p_input;
+    uint16_t       devicePort;
+    std::string    deviceIP;
     std::string    serverIP;
     std::string    mime;
     std::string    muxer;
@@ -115,7 +117,8 @@ struct intf_sys_t
         }
     }
 
-    int connectChromecast(char *psz_ipChromecast);
+    void ipChangedEvent(const char *psz_new_ip);
+    int connectChromecast();
     void disconnectChromecast();
 
     void msgPlayerSetVolume(float volume);
