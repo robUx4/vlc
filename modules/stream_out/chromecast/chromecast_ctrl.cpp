@@ -70,12 +70,16 @@ static const std::string NAMESPACE_RECEIVER         = "urn:x-cast:com.google.cas
  *****************************************************************************/
 static int Open(vlc_object_t *);
 static void Close(vlc_object_t *);
+static void Clean(intf_thread_t *);
+
 static int CurrentChanged( vlc_object_t *, char const *,
                           vlc_value_t, vlc_value_t, void * );
 static int InputEvent( vlc_object_t *, char const *,
                        vlc_value_t, vlc_value_t, void * );
-static void Clean(intf_thread_t *);
-
+static int MuteChanged( vlc_object_t *, char const *,
+                          vlc_value_t, vlc_value_t, void * );
+static int VolumeChanged( vlc_object_t *, char const *,
+                          vlc_value_t, vlc_value_t, void * );
 static void *ChromecastThread(void *data);
 
 /*****************************************************************************
@@ -203,6 +207,8 @@ int Open(vlc_object_t *p_this)
     p_intf->p_sys = p_sys;
 
     var_AddCallback( p_playlist, "input-prepare", CurrentChanged, p_intf );
+    var_AddCallback( p_playlist, "mute", MuteChanged, p_intf );
+    var_AddCallback( p_playlist, "volume", VolumeChanged, p_intf );
     return VLC_SUCCESS;
 
 error:
@@ -221,6 +227,8 @@ void Close(vlc_object_t *p_this)
 
     playlist_t *p_playlist = pl_Get( p_intf );
     var_DelCallback( p_playlist, "input-prepare", CurrentChanged, p_intf );
+    var_DelCallback( p_playlist, "mute", MuteChanged, p_intf );
+    var_DelCallback( p_playlist, "volume", VolumeChanged, p_intf );
 
     vlc_cancel(p_sys->chromecastThread);
     vlc_join(p_sys->chromecastThread, NULL);
@@ -302,6 +310,36 @@ intf_sys_t::~intf_sys_t()
 {
     vlc_cond_destroy(&loadCommandCond);
     vlc_mutex_destroy(&lock);
+}
+
+static int MuteChanged( vlc_object_t *p_this, char const *psz_var,
+                          vlc_value_t oldval, vlc_value_t val, void *p_data )
+{
+    VLC_UNUSED( p_this );
+    VLC_UNUSED( psz_var );
+    VLC_UNUSED( oldval );
+    intf_thread_t *p_intf = static_cast<intf_thread_t *>(p_data);
+    intf_sys_t *p_sys = p_intf->p_sys;
+
+    if (!p_sys->mediaSessionId.empty())
+        p_sys->msgPlayerSetMute( val.b_bool );
+
+    return VLC_SUCCESS;
+}
+
+static int VolumeChanged( vlc_object_t *p_this, char const *psz_var,
+                          vlc_value_t oldval, vlc_value_t val, void *p_data )
+{
+    VLC_UNUSED( p_this );
+    VLC_UNUSED( psz_var );
+    VLC_UNUSED( oldval );
+    intf_thread_t *p_intf = static_cast<intf_thread_t *>(p_data);
+    intf_sys_t *p_sys = p_intf->p_sys;
+
+    if ( !p_sys->mediaSessionId.empty() )
+        p_sys->msgPlayerSetVolume( val.f_float );
+
+    return VLC_SUCCESS;
 }
 
 static int CurrentChanged( vlc_object_t *p_this, char const *psz_var,
@@ -963,6 +1001,37 @@ void intf_sys_t::msgPlayerPause()
 
     std::stringstream ss;
     ss << "{\"type\":\"PAUSE\","
+       <<  "\"mediaSessionId\":" << mediaSessionId << ","
+       <<  "\"requestId\":" << i_requestId++
+       << "}";
+
+    buildMessage(NAMESPACE_MEDIA, ss.str(), appTransportId);
+}
+
+void intf_sys_t::msgPlayerSetVolume(float f_volume)
+{
+    assert(!mediaSessionId.empty());
+
+    if ( f_volume < 0.0 || f_volume > 1.0)
+        return;
+
+    std::stringstream ss;
+    ss << "{\"type\":\"SET_VOLUME\","
+       <<  "\"volume\":{\"level\":" << f_volume << "},"
+       <<  "\"mediaSessionId\":" << mediaSessionId << ","
+       <<  "\"requestId\":" << i_requestId++
+       << "}";
+
+    buildMessage(NAMESPACE_MEDIA, ss.str(), appTransportId);
+}
+
+void intf_sys_t::msgPlayerSetMute(bool b_mute)
+{
+    assert(!mediaSessionId.empty());
+
+    std::stringstream ss;
+    ss << "{\"type\":\"SET_VOLUME\","
+       <<  "\"volume\":{\"muted\":" << ( b_mute ? "true" : "false" ) << "},"
        <<  "\"mediaSessionId\":" << mediaSessionId << ","
        <<  "\"requestId\":" << i_requestId++
        << "}";
