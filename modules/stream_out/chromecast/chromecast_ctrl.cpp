@@ -1298,20 +1298,20 @@ void intf_sys_t::msgReceiverClose()
     setConnectionStatus( deviceIP.empty() ? CHROMECAST_DISCONNECTED : CHROMECAST_TLS_CONNECTED );
 }
 
-void intf_sys_t::msgReceiverLaunchApp()
+void intf_sys_t::msgReceiverGetStatus()
 {
     std::stringstream ss;
-    ss << "{\"type\":\"LAUNCH\","
-       <<  "\"appId\":\"" << APP_ID << "\","
+    ss << "{\"type\":\"GET_STATUS\","
        <<  "\"requestId\":" << i_receiver_requestId++ << "}";
 
     pushMessage(NAMESPACE_RECEIVER, ss.str());
 }
 
-void intf_sys_t::msgReceiverGetStatus()
+void intf_sys_t::msgReceiverLaunchApp()
 {
     std::stringstream ss;
-    ss << "{\"type\":\"GET_STATUS\","
+    ss << "{\"type\":\"LAUNCH\","
+       <<  "\"appId\":\"" << APP_ID << "\","
        <<  "\"requestId\":" << i_receiver_requestId++ << "}";
 
     pushMessage(NAMESPACE_RECEIVER, ss.str());
