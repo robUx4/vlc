@@ -966,7 +966,6 @@ static httpd_host_t *httpd_HostCreate(vlc_object_t *p_this,
         goto error;
     }
     for (host->nfd = 0; host->fds[host->nfd] != -1; host->nfd++);
-    msg_Dbg(host, "listening on %d interfaces", host->nfd);
 
     host->port     = port;
     host->i_url    = 0;
@@ -1045,7 +1044,6 @@ void httpd_HostDelete(httpd_host_t *host)
 
     vlc_tls_Delete(host->p_tls);
     net_ListenClose(host->fds);
-    host->nfd = 0;
     vlc_cond_destroy(&host->wait);
     vlc_mutex_destroy(&host->lock);
     vlc_object_release(host);
@@ -2042,10 +2040,7 @@ static void httpdLoop(httpd_host_t *host)
         /* */
         fd = vlc_accept (fd, NULL, NULL, true);
         if (fd == -1)
-        {
-            msg_Warn(host, "accept failed: %s", vlc_strerror_c(net_errno));
             continue;
-        }
         setsockopt (fd, SOL_SOCKET, SO_REUSEADDR,
                 &(int){ 1 }, sizeof(int));
 
