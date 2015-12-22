@@ -208,10 +208,7 @@ static bool PlayItem( playlist_t *p_playlist, playlist_item_t *p_item )
     input_thread_t *p_input_thread = input_Create( p_playlist, p_input, NULL,
                                                    p_sys->p_input_resource );
 
-    PL_LOCK;
-    p_sys->p_input = p_input_thread;
-    PL_UNLOCK;
-    var_SetAddress( p_playlist, "input-current", p_input_thread );
+    var_SetAddress( p_playlist, "input-prepare", p_input_thread );
 
     if( likely(p_input_thread != NULL) )
     {
@@ -224,11 +221,6 @@ static bool PlayItem( playlist_t *p_playlist, playlist_item_t *p_item )
                              InputEvent, p_playlist );
             vlc_object_release( p_input_thread );
             p_input_thread = NULL;
-
-            PL_LOCK;
-            p_sys->p_input = p_input_thread;
-            PL_UNLOCK;
-            var_SetAddress( p_playlist, "input-current", p_input_thread );
         }
     }
 
@@ -243,6 +235,12 @@ static bool PlayItem( playlist_t *p_playlist, playlist_item_t *p_item )
         libvlc_ArtRequest( p_playlist->p_libvlc, p_input, META_REQUEST_OPTION_NONE );
     }
     free( psz_arturl );
+
+    PL_LOCK;
+    p_sys->p_input = p_input_thread;
+    PL_UNLOCK;
+
+    var_SetAddress( p_playlist, "input-current", p_input_thread );
 
     PL_LOCK;
     return p_input_thread != NULL;
@@ -456,6 +454,7 @@ static void LoopInput( playlist_t *p_playlist )
         PL_DEBUG( "dead input" );
         PL_UNLOCK;
 
+        var_SetAddress( p_playlist, "input-prepare", NULL );
         var_SetAddress( p_playlist, "input-current", NULL );
 
         /* WARNING: Input resource manipulation and callback deletion are

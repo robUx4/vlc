@@ -181,7 +181,7 @@ int Open(vlc_object_t *p_this)
 
     p_intf->p_sys = p_sys;
 
-    var_AddCallback( p_playlist, "input-current", CurrentChanged, p_intf );
+    var_AddCallback( p_playlist, "input-prepare", CurrentChanged, p_intf );
     var_AddCallback( p_playlist, "mute", MuteChanged, p_intf );
     var_AddCallback( p_playlist, "volume", VolumeChanged, p_intf );
 
@@ -207,7 +207,7 @@ void Close(vlc_object_t *p_this)
     msg_Dbg(p_this, "CLOSING Chromecast Control Interface");
 
     var_DelCallback( p_playlist, VAR_CHROMECAST_ADDR, AddrChangedEvent, p_intf );
-    var_DelCallback( p_playlist, "input-current", CurrentChanged, p_intf );
+    var_DelCallback( p_playlist, "input-prepare", CurrentChanged, p_intf );
     var_DelCallback( p_playlist, "mute", MuteChanged, p_intf );
     var_DelCallback( p_playlist, "volume", VolumeChanged, p_intf );
 
@@ -1510,12 +1510,6 @@ static void* ChromecastThread(void* p_this)
         vlc_access_Delete( p_test_app );
 
     vlc_restorecancel(canc);
-
-    playlist_t *p_playlist = pl_Get( p_intf );
-    input_thread_t *p_input = playlist_CurrentInput( p_playlist );
-    p_sys->InputUpdated( p_input );
-    if ( p_input != NULL )
-        vlc_object_release( p_input );
 
     while (1)
     {
