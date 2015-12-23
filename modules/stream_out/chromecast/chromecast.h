@@ -167,15 +167,15 @@ struct intf_sys_t
 
     restart_state     restartState;
     /* local date when playback started/resumed */
-    mtime_t     date_play_start;
+    mtime_t           date_play_start;
     /* playback time reported by the receiver, used to wait for seeking point */
-    mtime_t     playback_start_chromecast;
+    mtime_t           playback_start_chromecast;
     /* local playback time of the input when playback started/resumed */
-    mtime_t     playback_start_local;
+    mtime_t           playback_start_local;
     /* internal seek time */
-    mtime_t                m_seektime;
+    mtime_t           m_seektime;
     /* seek time with Chromecast relative timestamp */
-    mtime_t                i_seektime;
+    mtime_t           i_seektime;
 
 
     vlc_mutex_t  lock;
@@ -236,9 +236,9 @@ private:
     int sendMessage(const castchannel::CastMessage &msg);
 
     void pushMessage(const std::string & namespace_,
-                      const std::string & payload,
-                      const std::string & destinationId = DEFAULT_CHOMECAST_RECEIVER,
-                      castchannel::CastMessage_PayloadType payloadType = castchannel::CastMessage_PayloadType_STRING);
+                     const std::string & payload,
+                     const std::string & destinationId = DEFAULT_CHOMECAST_RECEIVER,
+                     castchannel::CastMessage_PayloadType payloadType = castchannel::CastMessage_PayloadType_STRING);
 
     void pushMediaPlayerMessage(const std::stringstream & payload);
 

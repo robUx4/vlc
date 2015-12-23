@@ -75,6 +75,7 @@ static const std::string NAMESPACE_RECEIVER         = "urn:x-cast:com.google.cas
  *****************************************************************************/
 static int Open(vlc_object_t *);
 static void Close(vlc_object_t *);
+
 static int CurrentChanged( vlc_object_t *, char const *,
                           vlc_value_t, vlc_value_t, void * );
 static int InputEvent( vlc_object_t *, char const *,
@@ -1126,7 +1127,7 @@ void intf_sys_t::processMessage(const castchannel::CastMessage &msg)
             }
             if (!mediaSessionId.empty() && session_id[0] && mediaSessionId != session_id) {
                 msg_Warn(p_intf, "different mediaSessionId detected %s was %s", mediaSessionId.c_str(), this->mediaSessionId.c_str());
-                //p_sys->msgPlayerLoad();
+                //msgPlayerLoad();
             }
 
             mediaSessionId = session_id;
@@ -1260,28 +1261,28 @@ void intf_sys_t::msgAuth()
     castchannel::DeviceAuthMessage authMessage;
     authMessage.mutable_challenge();
 
-    pushMessage(NAMESPACE_DEVICEAUTH, authMessage.SerializeAsString(),
-                 DEFAULT_CHOMECAST_RECEIVER, castchannel::CastMessage_PayloadType_BINARY);
+    pushMessage( NAMESPACE_DEVICEAUTH, authMessage.SerializeAsString(),
+                 DEFAULT_CHOMECAST_RECEIVER, castchannel::CastMessage_PayloadType_BINARY );
 }
 
 
 void intf_sys_t::msgPing()
 {
     std::string s("{\"type\":\"PING\"}");
-    pushMessage(NAMESPACE_HEARTBEAT, s);
+    pushMessage( NAMESPACE_HEARTBEAT, s );
 }
 
 
 void intf_sys_t::msgPong()
 {
     std::string s("{\"type\":\"PONG\"}");
-    pushMessage(NAMESPACE_HEARTBEAT, s);
+    pushMessage( NAMESPACE_HEARTBEAT, s );
 }
 
 void intf_sys_t::msgConnect(const std::string & destinationId)
 {
     std::string s("{\"type\":\"CONNECT\"}");
-    pushMessage(NAMESPACE_CONNECTION, s, destinationId);
+    pushMessage( NAMESPACE_CONNECTION, s, destinationId );
 }
 
 
@@ -1303,7 +1304,7 @@ void intf_sys_t::msgReceiverGetStatus()
     ss << "{\"type\":\"GET_STATUS\","
        <<  "\"requestId\":" << i_receiver_requestId++ << "}";
 
-    pushMessage(NAMESPACE_RECEIVER, ss.str());
+    pushMessage( NAMESPACE_RECEIVER, ss.str() );
 }
 
 void intf_sys_t::msgReceiverLaunchApp()
@@ -1313,7 +1314,7 @@ void intf_sys_t::msgReceiverLaunchApp()
        <<  "\"appId\":\"" << APP_ID << "\","
        <<  "\"requestId\":" << i_receiver_requestId++ << "}";
 
-    pushMessage(NAMESPACE_RECEIVER, ss.str());
+    pushMessage( NAMESPACE_RECEIVER, ss.str() );
 }
 
 void intf_sys_t::msgPlayerGetStatus()
