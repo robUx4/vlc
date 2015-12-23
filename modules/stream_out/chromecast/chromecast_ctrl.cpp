@@ -229,7 +229,6 @@ intf_sys_t::intf_sys_t(intf_thread_t * const p_this)
     ,date_play_start(-1)
     ,playback_start_chromecast(-1.0)
     ,playback_start_local(0)
-    ,i_supportedMediaCommands(15)
     ,m_seektime(-1.0)
     ,i_seektime(-1.0)
     ,conn_status(CHROMECAST_DISCONNECTED)
@@ -1103,8 +1102,6 @@ void intf_sys_t::processMessage(const castchannel::CastMessage &msg)
                     (int)(json_int_t) status[0]["mediaSessionId"]);
 
             vlc_mutex_locker locker(&lock);
-            i_supportedMediaCommands = status[0]["supportedMediaCommands"].operator json_int_t();
-
             receiver_state oldPlayerState = receiverState;
             std::string newPlayerState = status[0]["playerState"].operator const char *();
 

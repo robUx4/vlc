@@ -157,8 +157,6 @@ struct intf_sys_t
     vlc_tls_creds_t *p_creds;
     vlc_tls_t *p_tls;
 
-    int                    i_supportedMediaCommands;
-
     restart_state     restartState;
     /* local date when playback started/resumed */
     mtime_t           date_play_start;
