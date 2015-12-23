@@ -154,6 +154,7 @@ private:
     void msgPlayerLoad();
     void msgPlayerPlay();
     void msgPlayerPause();
+    void msgPlayerGetStatus();
 
     void processMessage(const castchannel::CastMessage &msg);
 

@@ -904,6 +904,10 @@ void intf_sys_t::processMessage(const castchannel::CastMessage &msg)
                         /* now we can start the Chromecast playback */
                         sendPlayerCmd();
                 }
+                else
+                {
+                    msgPlayerGetStatus();
+                }
             }
             else
             {
@@ -1145,6 +1149,16 @@ void intf_sys_t::msgReceiverLaunchApp()
        <<  "\"requestId\":" << i_receiver_requestId++ << "}";
 
     pushMessage( NAMESPACE_RECEIVER, ss.str() );
+}
+
+void intf_sys_t::msgPlayerGetStatus()
+{
+    std::stringstream ss;
+    ss << "{\"type\":\"GET_STATUS\","
+       <<  "\"requestId\":" << i_requestId++
+       << "}";
+
+    pushMediaPlayerMessage( ss );
 }
 
 
