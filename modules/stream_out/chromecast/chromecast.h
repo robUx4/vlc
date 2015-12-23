@@ -39,6 +39,7 @@
 #include "cast_channel.pb.h"
 
 #define PACKET_HEADER_LEN 4
+#define SOUT_INTF_ADDRESS  "sout-chromecast-intf"
 
 // Media player Chromecast app id
 static const std::string DEFAULT_CHOMECAST_RECEIVER = "receiver-0";
