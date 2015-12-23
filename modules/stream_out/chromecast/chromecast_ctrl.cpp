@@ -169,9 +169,6 @@ int Open(vlc_object_t *p_this)
     p_sys->mime = psz_mux; /* TODO get the MIME type from the playlist/input ? */
     free(psz_mux);
 
-    vlc_mutex_init(&p_sys->lock);
-    vlc_cond_init(&p_sys->loadCommandCond);
-
     p_intf->p_sys = p_sys;
 
     var_AddCallback( p_playlist, "input-prepare", CurrentChanged, p_intf );
@@ -202,9 +199,6 @@ void Close(vlc_object_t *p_this)
     var_DelCallback( p_playlist, "volume", VolumeChanged, p_intf );
 
     p_sys->ipChangedEvent( NULL );
-
-    vlc_mutex_destroy(&p_sys->lock);
-    vlc_cond_destroy(&p_sys->loadCommandCond);
 
     switch (p_sys->getConnectionStatus())
     {
