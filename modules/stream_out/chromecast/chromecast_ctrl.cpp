@@ -509,7 +509,7 @@ void intf_sys_t::InputUpdated( input_thread_t *p_input )
         else
         {
             std::stringstream ssout;
-            ssout << "#";
+            ssout << '#';
             if ( !canRemux )
             {
                 if ( i_codec_audio == 0 )
