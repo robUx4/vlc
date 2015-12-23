@@ -72,6 +72,13 @@ enum receiver_display {
     AUDIO_ONLY
 };
 
+enum receiver_state {
+    RECEIVER_IDLE,
+    RECEIVER_PLAYING,
+    RECEIVER_BUFFERING,
+    RECEIVER_PAUSED,
+};
+
 struct intf_sys_t
 {
     intf_sys_t(intf_thread_t * const intf);
@@ -88,8 +95,11 @@ struct intf_sys_t
 
     std::string appTransportId;
     std::string mediaSessionId;
+    receiver_state receiverState;
 
     receiver_display  canDisplay;
+    bool              currentStopped;
+
     int i_sock_fd;
     vlc_tls_creds_t *p_creds;
     vlc_tls_t *p_tls;
@@ -187,6 +197,7 @@ private:
 
     void plugOutputRedirection();
     void unplugOutputRedirection();
+    void setCurrentStopped(bool);
 };
 
 #endif /* VLC_CHROMECAST_H */
