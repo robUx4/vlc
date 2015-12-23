@@ -30,10 +30,10 @@
 #define VLC_CHROMECAST_H
 
 #include <vlc_common.h>
-#include <vlc_plugin.h>
 #include <vlc_interface.h>
-#include <vlc_tls.h>
 #include <vlc_interrupt.h>
+#include <vlc_plugin.h>
+#include <vlc_tls.h>
 
 #include <sstream>
 

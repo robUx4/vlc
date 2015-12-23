@@ -38,7 +38,6 @@
 
 #include <vlc_access.h>
 #include <vlc_input.h>
-#include <vlc_network.h>
 #include <vlc_playlist.h>
 #include <vlc_url.h>
 
