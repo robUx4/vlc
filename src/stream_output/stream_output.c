@@ -211,13 +211,13 @@ int sout_InputDelete( sout_packetizer_input_t *p_input )
     return( VLC_SUCCESS);
 }
 
-bool sout_InputIsEmpty(sout_packetizer_input_t *p_input)
+bool sout_InputIsEmpty( sout_packetizer_input_t *p_input )
 {
     sout_instance_t *p_sout = p_input->p_sout;
     bool b;
 
     vlc_mutex_lock( &p_sout->lock );
-    if (sout_StreamControl( p_sout->p_stream, SOUT_STREAM_EMPTY, &b ) != VLC_SUCCESS)
+    if( sout_StreamControl( p_sout->p_stream, SOUT_STREAM_EMPTY, &b ) != VLC_SUCCESS )
         b = true;
     vlc_mutex_unlock( &p_sout->lock );
     return b;
@@ -562,11 +562,10 @@ int sout_MuxSendBuffer( sout_mux_t *p_mux, sout_input_t *p_input,
     return p_mux->pf_mux( p_mux );
 }
 
-int sout_MuxFlush( sout_mux_t *p_mux, sout_input_t *p_input )
+void sout_MuxFlush( sout_mux_t *p_mux, sout_input_t *p_input )
 {
     VLC_UNUSED(p_mux);
     block_FifoEmpty( p_input->p_fifo );
-    return VLC_SUCCESS;
 }
 
 /*****************************************************************************

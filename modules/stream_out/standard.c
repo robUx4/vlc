@@ -144,9 +144,9 @@ static int Send( sout_stream_t *p_stream, sout_stream_id_sys_t *id,
     return sout_MuxSendBuffer( p_stream->p_sys->p_mux, (sout_input_t*)id, p_buffer );
 }
 
-static int Flush( sout_stream_t *p_stream, sout_stream_id_sys_t *id )
+static void Flush( sout_stream_t *p_stream, sout_stream_id_sys_t *id )
 {
-    return sout_MuxFlush( p_stream->p_sys->p_mux, (sout_input_t*)id );
+    sout_MuxFlush( p_stream->p_sys->p_mux, (sout_input_t*)id );
 }
 
 static void create_SDP(sout_stream_t *p_stream, sout_access_out_t *p_access)

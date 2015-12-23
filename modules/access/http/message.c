@@ -68,13 +68,27 @@ static int vlc_http_msg_vadd_header(struct vlc_http_msg *m, const char *name,
     }
 
     char *value;
-    if (unlikely(vasprintf(&value, fmt, ap) < 0))
+    int len = vasprintf(&value, fmt, ap);
+    if (unlikely(len < 0))
         return -1;
 
     /* IETF RFC7230 §3.2.4 */
     for (char *p = value; *p; p++)
         if (*p == '\r' || *p == '\n')
             *p = ' ';
+
+    /* Discard leading OWS */
+    size_t crop = strspn(value, "\t ");
+    if (crop > 0)
+    {
+        assert((unsigned)len >= crop);
+        memmove(value, value + crop, len - crop + 1);
+        len -= crop;
+    }
+
+    /* Discard trailing OWS */
+    while (len > 0 && (value[len - 1] == '\t' || value[len - 1] == ' '))
+        value[--len] = '\0';
 
     /* Fold identically named header field values. This is unfortunately not
      * possible for Set-Cookie, while Cookie requires a special separator. */
@@ -538,23 +552,46 @@ static size_t vlc_http_token_length(const char *str)
     return i;
 }
 
+static size_t vlc_http_quoted_length(const char *str)
+{
+    size_t i = 0;
+    unsigned char c;
+
+    if (str[i++] != '"')
+        return 0;
+
+    do
+    {
+        c = str[i++];
+
+        if (c == '\0')
+            return 0;
+
+        if (c == '\\') /* Quoted pair */
+        {
+            unsigned char q = str[i++];
+            if (q < 32 && q != '\t')
+                return 0;
+        }
+    }
+    while (c != '"');
+
+    return i;
+}
+
 static bool vlc_http_is_token(const char *str)
 {
     size_t len = vlc_http_token_length(str);
     return len > 0 && str[len] == '\0';
 }
 
-const char *vlc_http_first_token(const char *value)
-{
-    return value + strspn(value, "\t ");
-}
-
 const char *vlc_http_next_token(const char *value)
-{
-    value = strchr(value, ',');
-    if (value == NULL)
+{   /* We handle either token or token = token / quoted-string */
+    value += strcspn(value, ",\"");
+    if (!*value)
         return NULL;
 
+    value += vlc_http_quoted_length(value);
     return value + strspn(value, "\t ,");
 }
 
@@ -562,18 +599,15 @@ const char *vlc_http_msg_get_token(const struct vlc_http_msg *msg,
                                    const char *field, const char *token)
 {
     const char *value = vlc_http_msg_get_header(msg, field);
-    if (value == NULL)
-        return NULL;
-
     const size_t length = strlen(token);
 
-    for (value = vlc_http_first_token(value);
-         value != NULL;
-         value = vlc_http_next_token(value))
+    while (value != NULL)
     {
         if (vlc_http_token_length(value) == length
          && !strncasecmp(token, value, length))
             return value;
+
+        value = vlc_http_next_token(value);
     }
 
     return NULL;

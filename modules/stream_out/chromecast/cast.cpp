@@ -135,11 +135,11 @@ static int Send(sout_stream_t *p_stream, sout_stream_id_sys_t *id,
     return sout_StreamIdSend(p_sys->p_out, id, p_buffer);
 }
 
-static int Flush( sout_stream_t *p_stream, sout_stream_id_sys_t *id )
+static void Flush( sout_stream_t *p_stream, sout_stream_id_sys_t *id )
 {
     sout_stream_sys_t *p_sys = p_stream->p_sys;
 
-    return sout_StreamFlush( p_sys->p_out, id );
+    sout_StreamFlush( p_sys->p_out, id );
 }
 
 static int Control(sout_stream_t *p_stream, int i_query, va_list args)
