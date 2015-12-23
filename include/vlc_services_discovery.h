@@ -73,7 +73,8 @@ enum services_discovery_category_e
     SD_CAT_DEVICES = 1,           /**< Devices, like portable music players */
     SD_CAT_LAN,                   /**< LAN/WAN services, like Upnp or SAP */
     SD_CAT_INTERNET,              /**< Internet or Website channels services */
-    SD_CAT_MYCOMPUTER             /**< Computer services, like Discs or Apps */
+    SD_CAT_MYCOMPUTER,            /**< Computer services, like Discs or Apps */
+    SD_CAT_RENDERER               /**< Network Devices to send audio/video to */
 };
 
 /**
