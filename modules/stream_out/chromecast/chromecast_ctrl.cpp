@@ -423,14 +423,23 @@ bool intf_sys_t::canDecodeAudio( const es_format_t *p_es ) const
 void intf_sys_t::unplugOutputRedirection()
 {
     msg_Dbg( p_intf, "unplug output redirection from input %s", input_GetItem( p_input )->psz_name );
+    if ( var_Type( p_input->p_parent, SOUT_INTF_ADDRESS ) )
+    {
+        var_Destroy( p_input->p_parent, SOUT_INTF_ADDRESS );
         var_SetString( p_input, "sout", NULL );
+    }
 }
 
 void intf_sys_t::plugOutputRedirection()
 {
     msg_Dbg( p_intf, "plug output redirection on input %s", input_GetItem( p_input )->psz_name );
+    if ( !var_Type( p_input->p_parent, SOUT_INTF_ADDRESS) )
+    {
+        var_Create( p_input->p_parent, SOUT_INTF_ADDRESS, VLC_VAR_ADDRESS );
+        var_SetAddress( p_input->p_parent, SOUT_INTF_ADDRESS, p_intf );
         msg_Dbg(p_intf, "force sout to %s", s_sout.c_str());
         var_SetString( p_input, "sout", s_sout.c_str() );
+    }
 }
 
 void intf_sys_t::InputUpdated( input_thread_t *p_input )
