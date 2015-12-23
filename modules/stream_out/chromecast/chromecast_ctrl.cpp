@@ -244,8 +244,6 @@ intf_sys_t::intf_sys_t(intf_thread_t * const p_this)
     vlc_mutex_init(&lock);
     vlc_cond_init(&loadCommandCond);
     vlc_cond_init(&seekCommandCond);
-
-    p_interrupt = vlc_interrupt_create();
 }
 
 intf_sys_t::~intf_sys_t()
@@ -255,8 +253,6 @@ intf_sys_t::~intf_sys_t()
     vlc_cond_destroy(&seekCommandCond);
     vlc_cond_destroy(&loadCommandCond);
     vlc_mutex_destroy(&lock);
-
-    vlc_interrupt_destroy(p_interrupt);
 }
 
 static int AddrChangedEvent(vlc_object_t *p_this, char const *psz_var,
@@ -1453,8 +1449,6 @@ static void* ChromecastThread(void* p_data)
     int canc;
     intf_thread_t *p_intf = reinterpret_cast<intf_thread_t*>(p_data);
     intf_sys_t *p_sys = p_intf->p_sys;
-
-    vlc_interrupt_set(p_sys->p_interrupt);
 
     p_sys->setConnectionStatus( CHROMECAST_DISCONNECTED );
 
