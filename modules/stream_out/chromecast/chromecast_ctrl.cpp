@@ -1,5 +1,5 @@
 /*****************************************************************************
- * chromecast.cpp: Chromecast module for vlc
+ * chromecast_ctrl.cpp: Chromecast module for vlc
  *****************************************************************************
  * Copyright © 2014-2015 VideoLAN
  *
@@ -200,6 +200,7 @@ error:
     delete p_sys;
     return VLC_EGENERIC;
 }
+
 
 /*****************************************************************************
  * Close: destroy interface
@@ -703,10 +704,8 @@ static int InputEvent( vlc_object_t *p_this, char const *psz_var,
     return VLC_SUCCESS;
 }
 
-
 /**
  * @brief Connect to the Chromecast
- * @param p_intf the intf_thread_t structure
  * @return the opened socket file descriptor or -1 on error
  */
 int intf_sys_t::connectChromecast()
