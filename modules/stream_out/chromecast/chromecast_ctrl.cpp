@@ -601,7 +601,9 @@ void intf_sys_t::InputUpdated( input_thread_t *p_input )
 void intf_sys_t::setCurrentStopped(bool stopped) {
     if (currentStopped != stopped)
     {
+#ifndef NDEBUG
         msg_Dbg(p_intf, "change current file stopped, now %d", stopped);
+#endif
         currentStopped = stopped;
         vlc_cond_broadcast(&loadCommandCond);
     }
@@ -623,7 +625,9 @@ void intf_sys_t::sendPlayerCmd()
         return;
     }
 
+#ifndef NDEBUG
     msg_Dbg( p_intf, "sendPlayerCmd input_state:%d mediaSessionId:'%s' cmd_status:%d", (int)var_GetInteger( p_input, "state" ), mediaSessionId.c_str(), cmd_status );
+#endif
     switch( var_GetInteger( p_input, "state" ) )
     {
     case OPENING_S:
@@ -1132,7 +1136,9 @@ void intf_sys_t::processMessage(const castchannel::CastMessage &msg)
 
             if (receiverState != oldPlayerState)
             {
+#ifndef NDEBUG
                 msg_Dbg(p_intf, "change Chromecast player state from %d to %d", oldPlayerState, receiverState);
+#endif
                 switch( receiverState )
                 {
                 case RECEIVER_BUFFERING:
