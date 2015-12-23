@@ -179,10 +179,6 @@ int Open(vlc_object_t *p_this)
     p_sys->muxer = psz_mime; /* TODO get the MIME type from the playlist/input ? */
     free(psz_mime);
 
-    vlc_mutex_init(&p_sys->lock);
-    vlc_cond_init(&p_sys->loadCommandCond);
-    vlc_cond_init(&p_sys->seekCommandCond);
-
     p_intf->p_sys = p_sys;
 
     var_AddCallback( p_playlist, "input-prepare", CurrentChanged, p_intf );
@@ -215,12 +211,6 @@ void Close(vlc_object_t *p_this)
     var_DelCallback( p_playlist, "mute", MuteChanged, p_intf );
     var_DelCallback( p_playlist, "volume", VolumeChanged, p_intf );
 
-    p_sys->ipChangedEvent( NULL );
-
-    vlc_mutex_destroy(&p_sys->lock);
-    vlc_cond_destroy(&p_sys->seekCommandCond);
-    vlc_cond_destroy(&p_sys->loadCommandCond);
-
     delete p_sys;
 }
 
@@ -250,12 +240,20 @@ intf_sys_t::intf_sys_t(intf_thread_t * const p_this)
     ,b_restart_playback(false)
     ,b_forcing_position(false)
 {
+    vlc_mutex_init(&lock);
+    vlc_cond_init(&loadCommandCond);
+    vlc_cond_init(&seekCommandCond);
+
     p_interrupt = vlc_interrupt_create();
 }
 
 intf_sys_t::~intf_sys_t()
 {
     ipChangedEvent( NULL );
+
+    vlc_cond_destroy(&seekCommandCond);
+    vlc_cond_destroy(&loadCommandCond);
+    vlc_mutex_destroy(&lock);
 
     vlc_interrupt_destroy(p_interrupt);
 }
