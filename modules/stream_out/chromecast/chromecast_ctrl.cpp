@@ -112,7 +112,7 @@ vlc_module_begin ()
     add_string(CONTROL_CFG_PREFIX "addr", "", IP_TEXT, IP_LONGTEXT, false)
     add_integer(CONTROL_CFG_PREFIX "http-port", HTTP_PORT, HTTP_PORT_TEXT, HTTP_PORT_LONGTEXT, false)
     add_string(CONTROL_CFG_PREFIX "mime", "video/x-matroska", MIME_TEXT, MIME_LONGTEXT, false)
-    add_string(CONTROL_CFG_PREFIX "muxer", "avformat{mux=matroska}", MUXER_TEXT, MUXER_LONGTEXT, false)
+    add_string(CONTROL_CFG_PREFIX "mux", "avformat{mux=matroska}", MUXER_TEXT, MUXER_LONGTEXT, false)
     set_callbacks( Open, Close )
 
 vlc_module_end ()
