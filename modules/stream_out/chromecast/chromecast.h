@@ -66,17 +66,17 @@ enum command_status {
     CMD_SEEK_SENT,
 };
 
+enum receiver_display {
+    DISPLAY_UNKNOWN,
+    HAS_VIDEO,
+    AUDIO_ONLY
+};
+
 enum receiver_state {
     RECEIVER_IDLE,
     RECEIVER_PLAYING,
     RECEIVER_BUFFERING,
     RECEIVER_PAUSED,
-};
-
-enum receiver_display {
-    DISPLAY_UNKNOWN,
-    HAS_VIDEO,
-    AUDIO_ONLY
 };
 
 enum restart_state {
@@ -133,8 +133,6 @@ struct intf_sys_t
 
     bool seekTo(mtime_t pos);
 
-    void sendPlayerCmd();
-
     bool forceSeekPosition() const {
         return b_forcing_position;
     }
@@ -157,27 +155,28 @@ struct intf_sys_t
     std::string mediaSessionId;
     receiver_state receiverState;
 
-    /* local date when playback started/resumed */
-    mtime_t     date_play_start;
-    /* playback time reported by the receiver, used to wait for seeking point */
-    mtime_t     playback_start_chromecast;
-    /* local playback time of the input when playback started/resumed */
-    mtime_t     playback_start_local;
     bool        canPause;
     receiver_display  canDisplay;
-    restart_state     restartState;
     bool              currentStopped;
 
     int i_sock_fd;
     vlc_tls_creds_t *p_creds;
     vlc_tls_t *p_tls;
 
-    enum command_status    cmd_status;
     int                    i_supportedMediaCommands;
+
+    restart_state     restartState;
+    /* local date when playback started/resumed */
+    mtime_t     date_play_start;
+    /* playback time reported by the receiver, used to wait for seeking point */
+    mtime_t     playback_start_chromecast;
+    /* local playback time of the input when playback started/resumed */
+    mtime_t     playback_start_local;
     /* internal seek time */
     mtime_t                m_seektime;
     /* seek time with Chromecast relative timestamp */
     mtime_t                i_seektime;
+
 
     vlc_mutex_t  lock;
     vlc_cond_t   loadCommandCond;
@@ -189,6 +188,7 @@ struct intf_sys_t
     void msgReceiverClose();
 
     void handleMessages();
+    void sendPlayerCmd();
 
     void InputUpdated( input_thread_t * );
 
@@ -210,14 +210,29 @@ struct intf_sys_t
     }
 
     void ipChangedEvent(const char *psz_new_ip);
+    int connectChromecast();
     void stateChangedForRestart( input_thread_t * );
 
     void msgPlayerSetVolume(float volume);
     void msgPlayerSetMute(bool mute);
 
-    int connectChromecast();
-
 private:
+    void msgPing();
+    void msgPong();
+    void msgConnect(const std::string & destinationId = DEFAULT_CHOMECAST_RECEIVER);
+
+    void msgReceiverLaunchApp();
+    void msgReceiverGetStatus();
+
+    void msgPlayerLoad();
+    void msgPlayerStop();
+    void msgPlayerPlay();
+    void msgPlayerPause();
+    void msgPlayerSeek(const std::string & currentTime);
+    void msgPlayerGetStatus();
+
+    void processMessage(const castchannel::CastMessage &msg);
+
     int sendMessage(const castchannel::CastMessage &msg);
 
     void pushMessage(const std::string & namespace_,
@@ -236,21 +251,8 @@ private:
         }
     }
 
-    void msgPing();
-    void msgPong();
-    void msgConnect(const std::string & destinationId = DEFAULT_CHOMECAST_RECEIVER);
-
-    void msgReceiverLaunchApp();
-    void msgReceiverGetStatus();
-
-    void msgPlayerLoad();
-    void msgPlayerStop();
-    void msgPlayerPlay();
-    void msgPlayerPause();
-    void msgPlayerSeek(const std::string & currentTime);
-    void msgPlayerGetStatus();
-
     enum connection_status conn_status;
+    enum command_status    cmd_status;
 
     unsigned i_receiver_requestId;
     unsigned i_requestId;
@@ -268,8 +270,6 @@ private:
 
     bool canDecodeVideo( const es_format_t * ) const;
     bool canDecodeAudio( const es_format_t * ) const;
-
-    void processMessage(const castchannel::CastMessage &msg);
 
     void plugOutputRedirection();
     void unplugOutputRedirection();

@@ -73,6 +73,10 @@ protected:
 static int Open(vlc_object_t *);
 static void Close(vlc_object_t *);
 
+static const char *const ppsz_sout_options[] = {
+    "mime", "mux", "http-port", NULL
+};
+
 /*****************************************************************************
  * Module descriptor
  *****************************************************************************/
@@ -155,10 +159,6 @@ static int Control(sout_stream_t *p_stream, int i_query, va_list args)
 
     return p_sys->p_out->pf_control( p_sys->p_out, i_query, args );
 }
-
-static const char *const ppsz_sout_options[] = {
-    "mime", "mux", "http-port", NULL
-};
 
 /*****************************************************************************
  * Open: connect to the Chromecast and initialize the sout

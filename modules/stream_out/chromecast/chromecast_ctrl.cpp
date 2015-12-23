@@ -77,12 +77,12 @@ static int Open(vlc_object_t *);
 static void Close(vlc_object_t *);
 static int CurrentChanged( vlc_object_t *, char const *,
                           vlc_value_t, vlc_value_t, void * );
+static int InputEvent( vlc_object_t *, char const *,
+                       vlc_value_t, vlc_value_t, void * );
 static int MuteChanged( vlc_object_t *, char const *,
                           vlc_value_t, vlc_value_t, void * );
 static int VolumeChanged( vlc_object_t *, char const *,
                           vlc_value_t, vlc_value_t, void * );
-static int InputEvent( vlc_object_t *, char const *,
-                       vlc_value_t, vlc_value_t, void * );
 static int AddrChangedEvent( vlc_object_t *, char const *,
                            vlc_value_t, vlc_value_t, void * );
 static void *ChromecastThread(void *data);
@@ -127,9 +127,8 @@ int Open(vlc_object_t *p_this)
         return VLC_ENOMEM;
 
     playlist_t *p_playlist = pl_Get( p_intf );
-    char *psz_addrChromecast = NULL;
-
     std::stringstream receiver_addr;
+    char *psz_addrChromecast = NULL;
     if( !var_Type( p_playlist, VAR_CHROMECAST_ADDR ) )
         /* Don't recreate the same variable over and over and over... */
         var_Create( p_playlist, VAR_CHROMECAST_ADDR, VLC_VAR_STRING );
@@ -229,21 +228,21 @@ intf_sys_t::intf_sys_t(intf_thread_t *intf)
     ,p_input(NULL)
     ,devicePort(CHROMECAST_CONTROL_PORT)
     ,receiverState(RECEIVER_IDLE)
-    ,date_play_start(-1)
-    ,playback_start_chromecast(-1.0)
-    ,playback_start_local(0)
     ,canPause(false)
     ,canDisplay(DISPLAY_UNKNOWN)
-    ,restartState(RESTART_NONE)
     ,currentStopped(true)
     ,i_sock_fd(-1)
     ,p_creds(NULL)
     ,p_tls(NULL)
-    ,cmd_status(NO_CMD_PENDING)
+    ,restartState(RESTART_NONE)
+    ,date_play_start(-1)
+    ,playback_start_chromecast(-1.0)
+    ,playback_start_local(0)
     ,i_supportedMediaCommands(15)
     ,m_seektime(-1.0)
     ,i_seektime(-1.0)
     ,conn_status(CHROMECAST_DISCONNECTED)
+    ,cmd_status(NO_CMD_PENDING)
     ,i_receiver_requestId(0)
     ,i_requestId(0)
     ,i_sout_id(0)
@@ -1317,6 +1316,17 @@ void intf_sys_t::msgReceiverLaunchApp()
     pushMessage(NAMESPACE_RECEIVER, ss.str());
 }
 
+void intf_sys_t::msgPlayerGetStatus()
+{
+    std::stringstream ss;
+    ss << "{\"type\":\"GET_STATUS\","
+       <<  "\"requestId\":" << i_requestId++
+       << "}";
+
+    pushMediaPlayerMessage( ss );
+}
+
+
 std::string intf_sys_t::GetMedia()
 {
     std::stringstream ss;
@@ -1361,17 +1371,6 @@ std::string intf_sys_t::GetMedia()
 
     return ss.str();
 }
-
-void intf_sys_t::msgPlayerGetStatus()
-{
-    std::stringstream ss;
-    ss << "{\"type\":\"GET_STATUS\","
-       <<  "\"requestId\":" << i_requestId++
-       << "}";
-
-    pushMediaPlayerMessage( ss );
-}
-
 
 void intf_sys_t::msgPlayerLoad()
 {
