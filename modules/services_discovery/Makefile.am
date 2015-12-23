@@ -68,3 +68,11 @@ libos2drive_plugin_la_SOURCES = services_discovery/os2drive.c
 if HAVE_OS2
 sd_LTLIBRARIES += libos2drive_plugin.la
 endif
+
+libmicrodns_plugin_la_SOURCES = services_discovery/microdns.c
+libmicrodns_plugin_la_CPPFLAGS = $(AM_CPPFLAGS) $(MICRODNS_CFLAGS)
+libmicrodns_plugin_la_LIBADD = $(SOCKET_LIBS) $(MDNS_LIBS)
+if ENABLE_SOUT
+sd_LTLIBRARIES += libmicrodns_plugin.la
+endif
+
