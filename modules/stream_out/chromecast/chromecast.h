@@ -123,12 +123,6 @@ struct intf_sys_t
         this->canPause = canPause;
     }
 
-    void setCanDisplay(receiver_display canDisplay) {
-        vlc_mutex_locker locker(&lock);
-        this->canDisplay = canDisplay;
-        vlc_cond_broadcast(&loadCommandCond);
-    }
-
     bool isFinishedPlaying();
 
     bool seekTo(mtime_t pos);
@@ -191,6 +185,12 @@ struct intf_sys_t
     void sendPlayerCmd();
 
     void InputUpdated( input_thread_t * );
+
+    void setCanDisplay(receiver_display canDisplay) {
+        vlc_mutex_locker locker(&lock);
+        this->canDisplay = canDisplay;
+        vlc_cond_broadcast(&loadCommandCond);
+    }
 
     connection_status getConnectionStatus() const
     {
