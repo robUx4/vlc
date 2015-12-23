@@ -90,7 +90,7 @@ enum restart_state {
  *****************************************************************************/
 struct intf_sys_t
 {
-    intf_sys_t(intf_thread_t *intf);
+    intf_sys_t(intf_thread_t * const intf);
     ~intf_sys_t();
 
     mtime_t getPlaybackTime() const {

@@ -224,8 +224,8 @@ void Close(vlc_object_t *p_this)
     delete p_sys;
 }
 
-intf_sys_t::intf_sys_t(intf_thread_t *intf)
-    :p_intf(intf)
+intf_sys_t::intf_sys_t(intf_thread_t * const p_this)
+    :p_intf(p_this)
     ,p_input(NULL)
     ,devicePort(CHROMECAST_CONTROL_PORT)
     ,receiverState(RECEIVER_IDLE)
