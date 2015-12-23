@@ -118,11 +118,6 @@ struct intf_sys_t
         return 0.0;
     }
 
-    void setCanPause(bool canPause) {
-        vlc_mutex_locker locker(&lock);
-        this->canPause = canPause;
-    }
-
     bool isFinishedPlaying();
 
     bool seekTo(mtime_t pos);
@@ -149,7 +144,6 @@ struct intf_sys_t
     std::string mediaSessionId;
     receiver_state receiverState;
 
-    bool        canPause;
     receiver_display  canDisplay;
     bool              currentStopped;
 

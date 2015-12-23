@@ -79,10 +79,6 @@ struct demux_sys_t
         this->canSeek = canSeek;
     }
 
-    void setCanPause(bool canPause) {
-        p_intf->p_sys->setCanPause( canPause );
-    }
-
     bool seekTo(double pos) {
         if (i_length == -1)
             return false;
@@ -204,19 +200,6 @@ static int DemuxControl( demux_t *p_demux, int i_query, va_list args)
     case DEMUX_GET_TIME:
         *va_arg(args, int64_t *) = p_sys->getPlaybackTime();
         return VLC_SUCCESS;
-
-    case DEMUX_CAN_PAUSE:
-    {
-        int ret;
-        va_list ap;
-
-        va_copy( ap, args );
-        ret = p_demux->p_source->pf_control( p_demux->p_source, i_query, args );
-        if( ret == VLC_SUCCESS )
-            p_sys->setCanPause( *va_arg( ap, bool* ) );
-        va_end( ap );
-        return ret;
-    }
 
     case DEMUX_CAN_SEEK:
     {
