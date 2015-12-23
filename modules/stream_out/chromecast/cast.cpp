@@ -52,6 +52,11 @@ struct sout_stream_sys_t
         vlc_object_release(p_intf);
     }
 
+    bool isFinishedPlaying() const {
+        /* check if the Chromecast to be done playing */
+        return p_intf->p_sys->isFinishedPlaying();
+    }
+
     sout_stream_t * const p_out;
     intf_thread_t * const p_intf;
 };
@@ -80,6 +85,8 @@ static const char *const ppsz_sout_options[] = {
 #define MIME_TEXT N_("MIME content type")
 #define MIME_LONGTEXT N_("This sets the media MIME content type sent to the Chromecast.")
 
+/* sout wrapper that can tell when the Chromecast is finished playing
+ * rather than when data are finished sending */
 vlc_module_begin ()
 
     set_shortname( "cc_sout" )
@@ -138,6 +145,13 @@ static void Flush( sout_stream_t *p_stream, sout_stream_id_sys_t *id )
 static int Control(sout_stream_t *p_stream, int i_query, va_list args)
 {
     sout_stream_sys_t *p_sys = p_stream->p_sys;
+
+    if (i_query == SOUT_STREAM_EMPTY)
+    {
+        bool *b = va_arg( args, bool * );
+        *b = p_sys->isFinishedPlaying();
+        return VLC_SUCCESS;
+    }
 
     return p_sys->p_out->pf_control( p_sys->p_out, i_query, args );
 }

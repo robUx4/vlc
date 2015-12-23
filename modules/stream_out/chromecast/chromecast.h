@@ -84,6 +84,11 @@ struct intf_sys_t
     intf_sys_t(intf_thread_t * const intf);
     ~intf_sys_t();
 
+    bool isFinishedPlaying() {
+        vlc_mutex_locker locker(&lock);
+        return deviceIP.empty() || conn_status == CHROMECAST_CONNECTION_DEAD || (receiverState == RECEIVER_BUFFERING && cmd_status != CMD_SEEK_SENT);
+    }
+
 
     intf_thread_t  * const p_intf;
     input_thread_t *p_input;
