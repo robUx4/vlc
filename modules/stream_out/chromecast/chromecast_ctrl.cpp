@@ -62,6 +62,7 @@ static const int CHROMECAST_CONTROL_PORT = 8009;
 #define PONG_WAIT_TIME 500
 #define PONG_WAIT_RETRIES 2
 
+#define VAR_RENDERER_CONFIG  "renderer-config"
 #define CONTROL_CFG_PREFIX "chromecast-"
 
 static const std::string NAMESPACE_DEVICEAUTH       = "urn:x-cast:com.google.cast.tp.deviceauth";
@@ -83,6 +84,8 @@ static int MuteChanged( vlc_object_t *, char const *,
                           vlc_value_t, vlc_value_t, void * );
 static int VolumeChanged( vlc_object_t *, char const *,
                           vlc_value_t, vlc_value_t, void * );
+static int AddrChangedEvent( vlc_object_t *, char const *,
+                             vlc_value_t, vlc_value_t, void * );
 static void *ChromecastThread(void *data);
 
 /*****************************************************************************
@@ -126,7 +129,21 @@ int Open(vlc_object_t *p_this)
 
     playlist_t *p_playlist = pl_Get( p_intf );
     std::stringstream receiver_addr;
-    char *psz_addrChromecast = var_InheritString(p_intf, CONTROL_CFG_PREFIX "addr");
+    char *psz_addrChromecast = NULL;
+    if( !var_Type( p_playlist, VAR_RENDERER_CONFIG ) )
+        /* Don't recreate the same variable over and over and over... */
+        var_Create( p_playlist, VAR_RENDERER_CONFIG, VLC_VAR_STRING );
+
+    psz_addrChromecast = var_InheritString( p_playlist, VAR_RENDERER_CONFIG );
+    if (psz_addrChromecast == NULL)
+        psz_addrChromecast = var_InheritString(p_intf, CONTROL_CFG_PREFIX "addr");
+    else if (psz_addrChromecast[0])
+        msg_Dbg( p_intf, "Using forced address %s", psz_addrChromecast);
+    else
+    {
+        free(psz_addrChromecast);
+        psz_addrChromecast = var_InheritString(p_intf, CONTROL_CFG_PREFIX "addr");
+    }
 
     if (psz_addrChromecast == NULL)
         msg_Info(p_intf, "No Chromecast receiver IP/Name provided");
@@ -142,6 +159,7 @@ int Open(vlc_object_t *p_this)
         }
         vlc_UrlClean(&url);
     }
+    var_SetString( p_playlist, VAR_RENDERER_CONFIG, receiver_addr.str().c_str() );
 
     char *psz_mux = var_InheritString(p_intf, CONTROL_CFG_PREFIX "mux");
     if (psz_mux == NULL)
@@ -169,6 +187,8 @@ int Open(vlc_object_t *p_this)
 
     p_sys->ipChangedEvent( receiver_addr.str().c_str() );
 
+    var_AddCallback( p_playlist, VAR_RENDERER_CONFIG, AddrChangedEvent, p_intf );
+
     return VLC_SUCCESS;
 
 error:
@@ -186,6 +206,7 @@ void Close(vlc_object_t *p_this)
     intf_sys_t *p_sys = p_intf->p_sys;
 
     playlist_t *p_playlist = pl_Get( p_intf );
+    var_DelCallback( p_playlist, VAR_RENDERER_CONFIG, AddrChangedEvent, p_intf );
     var_DelCallback( p_playlist, "input-prepare", CurrentChanged, p_intf );
     var_DelCallback( p_playlist, "mute", MuteChanged, p_intf );
     var_DelCallback( p_playlist, "volume", VolumeChanged, p_intf );
@@ -257,6 +278,17 @@ intf_sys_t::~intf_sys_t()
 
     vlc_cond_destroy(&loadCommandCond);
     vlc_mutex_destroy(&lock);
+}
+
+static int AddrChangedEvent(vlc_object_t *p_this, char const *psz_var,
+                          vlc_value_t oldval, vlc_value_t val, void *p_data )
+{
+    VLC_UNUSED( p_this );
+    VLC_UNUSED( psz_var );
+    VLC_UNUSED( oldval );
+    intf_thread_t *p_intf = static_cast<intf_thread_t *>(p_data);
+    p_intf->p_sys->ipChangedEvent( val.psz_string );
+    return VLC_SUCCESS;
 }
 
 void intf_sys_t::ipChangedEvent(const char *psz_new_ip)
