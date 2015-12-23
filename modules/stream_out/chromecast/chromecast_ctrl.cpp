@@ -1264,7 +1264,7 @@ void intf_sys_t::msgPlayerSetMute(bool b_mute)
  * @param msg the CastMessage to send
  * @return the number of bytes sent or -1 on error
  */
-int intf_sys_t::sendMessage(castchannel::CastMessage &msg)
+int intf_sys_t::sendMessage(const castchannel::CastMessage &msg)
 {
     uint32_t i_size = msg.ByteSize();
     uint32_t i_sizeNetwork = hton32(i_size);

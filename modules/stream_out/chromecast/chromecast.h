@@ -163,7 +163,7 @@ private:
 
     void processMessage(const castchannel::CastMessage &msg);
 
-    int sendMessage(castchannel::CastMessage &msg);
+    int sendMessage(const castchannel::CastMessage &msg);
 
     void buildMessage(const std::string & namespace_,
                       const std::string & payload,
