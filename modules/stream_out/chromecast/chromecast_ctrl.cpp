@@ -35,7 +35,6 @@
 #include <vlc_access.h>
 #include <vlc_input.h>
 #include <vlc_playlist.h>
-#include <vlc_threads.h>
 #include <vlc_url.h>
 
 #include <cassert>

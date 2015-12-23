@@ -32,7 +32,6 @@
 #include <vlc_common.h>
 #include <vlc_interface.h>
 #include <vlc_plugin.h>
-#include <vlc_sout.h>
 #include <vlc_tls.h>
 
 #include <queue>
