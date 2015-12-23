@@ -85,7 +85,7 @@ static int MuteChanged( vlc_object_t *, char const *,
 static int VolumeChanged( vlc_object_t *, char const *,
                           vlc_value_t, vlc_value_t, void * );
 static int AddrChangedEvent( vlc_object_t *, char const *,
-                           vlc_value_t, vlc_value_t, void * );
+                             vlc_value_t, vlc_value_t, void * );
 static void *ChromecastThread(void *data);
 
 /*****************************************************************************
@@ -214,6 +214,9 @@ void Close(vlc_object_t *p_this)
     delete p_sys;
 }
 
+/*****************************************************************************
+ * intf_sys_t: class definition
+ *****************************************************************************/
 intf_sys_t::intf_sys_t(intf_thread_t * const p_this)
     :p_intf(p_this)
     ,p_input(NULL)
