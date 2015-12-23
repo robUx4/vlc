@@ -134,7 +134,7 @@ int Open(vlc_object_t *p_this)
         /* Don't recreate the same variable over and over and over... */
         var_Create( p_playlist, VAR_CHROMECAST_ADDR, VLC_VAR_STRING );
 
-    psz_addrChromecast = var_GetString( p_playlist, VAR_CHROMECAST_ADDR );
+    psz_addrChromecast = var_InheritString( p_playlist, VAR_CHROMECAST_ADDR );
     if (psz_addrChromecast == NULL)
         psz_addrChromecast = var_InheritString(p_intf, CONTROL_CFG_PREFIX "addr");
     else if (psz_addrChromecast[0])
