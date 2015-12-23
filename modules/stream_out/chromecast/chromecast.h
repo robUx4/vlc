@@ -89,6 +89,31 @@ struct intf_sys_t
         return deviceIP.empty() || conn_status == CHROMECAST_CONNECTION_DEAD || (receiverState == RECEIVER_BUFFERING && cmd_status != CMD_SEEK_SENT);
     }
 
+    mtime_t getPlaybackTime() const {
+        switch( receiverState )
+        {
+        case RECEIVER_PLAYING:
+            return ( mdate() - date_play_start ) + playback_start_local;
+
+        case RECEIVER_IDLE:
+            msg_Dbg(p_intf, "receiver idle using buffering time %" PRId64, playback_start_local);
+            break;
+        case RECEIVER_BUFFERING:
+            msg_Dbg(p_intf, "receiver buffering using buffering time %" PRId64, playback_start_local);
+            break;
+        case RECEIVER_PAUSED:
+            msg_Dbg(p_intf, "receiver paused using buffering time %" PRId64, playback_start_local);
+            break;
+        }
+        return playback_start_local;
+    }
+
+    double getPlaybackPosition(mtime_t i_length) const {
+        if( i_length > 0 && date_play_start != -1)
+            return (double) getPlaybackTime() / (double)( i_length );
+        return 0.0;
+    }
+
 
     intf_thread_t  * const p_intf;
     input_thread_t *p_input;
@@ -109,6 +134,12 @@ struct intf_sys_t
     vlc_tls_creds_t *p_creds;
     vlc_tls_t *p_tls;
 
+    /* local date when playback started/resumed */
+    mtime_t           date_play_start;
+    /* playback time reported by the receiver, used to wait for seeking point */
+    mtime_t           playback_start_chromecast;
+    /* local playback time of the input when playback started/resumed */
+    mtime_t           playback_start_local;
     vlc_mutex_t  lock;
     vlc_cond_t   loadCommandCond;
     vlc_thread_t chromecastThread;

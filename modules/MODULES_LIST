@@ -80,6 +80,7 @@ $Id$
  * chroma_omx: OMX Development Layer chroma conversions
  * chroma_yuv_neon: ARM NEON video chroma conversion
  * chromecast: Chromecast devices service discovery
+ * chromecast_demux: Internal demux filter to report the playback time on the Chromecast
  * clone: Clone video filter
  * colorthres:  Theshold color based on similarity to reference color Video filter
  * compressor: Dynamic range compressor
