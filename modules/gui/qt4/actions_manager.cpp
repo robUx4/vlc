@@ -93,6 +93,11 @@ void ActionsManager::doAction( int id_action )
             if( p_intf->p_sys->p_mi )
                 p_intf->p_sys->p_mi->getFullscreenControllerWidget()->toggleFullwidth();
             break;
+#if defined(ENABLE_SOUT)
+        case RENDERER_ACTION:
+            THEDP->rendererDialog(); break;
+            break;
+#endif
         default:
             msg_Warn( p_intf, "Action not supported: %i", id_action );
             break;
