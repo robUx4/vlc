@@ -161,23 +161,23 @@ int Open(vlc_object_t *p_this)
     }
     var_SetString( p_playlist, VAR_CHROMECAST_ADDR, receiver_addr.str().c_str() );
 
-    char *psz_mime = var_InheritString(p_intf, CONTROL_CFG_PREFIX "mime");
-    if (psz_mime == NULL)
-    {
-        msg_Err(p_intf, "Bad MIME type provided");
-        goto error;
-    }
-    p_sys->mime = psz_mime; /* TODO get the MIME type from the playlist/input ? */
-    free(psz_mime);
-
-    psz_mime = var_InheritString(p_intf, CONTROL_CFG_PREFIX "muxer");
-    if (psz_mime == NULL)
+    char *psz_mux = var_InheritString(p_intf, CONTROL_CFG_PREFIX "mux");
+    if (psz_mux == NULL)
     {
         msg_Err(p_intf, "Bad muxer provided");
         goto error;
     }
-    p_sys->muxer = psz_mime; /* TODO get the MIME type from the playlist/input ? */
-    free(psz_mime);
+    p_sys->muxer = psz_mux; /* TODO get the MIME type from the playlist/input ? */
+    free(psz_mux);
+
+    psz_mux = var_InheritString(p_intf, CONTROL_CFG_PREFIX "mime");
+    if (psz_mux == NULL)
+    {
+        msg_Err(p_intf, "Bad MIME type provided");
+        goto error;
+    }
+    p_sys->mime = psz_mux; /* TODO get the MIME type from the playlist/input ? */
+    free(psz_mux);
 
     p_intf->p_sys = p_sys;
 
