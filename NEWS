@@ -81,6 +81,9 @@ Stream filter:
  * Added ARIB STD-B25 TS streams decoder
  * Added stream prebuffering plugin
  * Removed HTTP Live streaming stream filter
+ 
+Demux filter:
+ * Added a chain of demuxer to wrap the one used for the input used for playback
 
 Audio output:
  * Complete rewrite of the AudioTrack Android module. This is now the default.
