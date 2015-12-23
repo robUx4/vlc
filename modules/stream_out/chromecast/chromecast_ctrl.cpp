@@ -1389,19 +1389,6 @@ void intf_sys_t::msgPlayerLoad()
     pushMediaPlayerMessage( ss );
 }
 
-void intf_sys_t::msgPlayerStop()
-{
-    assert(!mediaSessionId.empty());
-
-    std::stringstream ss;
-    ss << "{\"type\":\"STOP\","
-       <<  "\"mediaSessionId\":" << mediaSessionId << ","
-       <<  "\"requestId\":" << i_requestId++
-       << "}";
-
-    pushMediaPlayerMessage( ss );
-}
-
 void intf_sys_t::msgPlayerPlay()
 {
     assert(!mediaSessionId.empty());
