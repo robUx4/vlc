@@ -61,7 +61,6 @@ struct sout_stream_sys_t
  *****************************************************************************/
 static int Open(vlc_object_t *);
 static void Close(vlc_object_t *);
-static void Clean(sout_stream_t *p_stream);
 
 static const char *const ppsz_sout_options[] = {
     "http-port", "mux", "mime", NULL
@@ -143,7 +142,7 @@ static int Control(sout_stream_t *p_stream, int i_query, va_list args)
 static int Open(vlc_object_t *p_this)
 {
     sout_stream_t *p_stream = reinterpret_cast<sout_stream_t*>(p_this);
-    sout_stream_sys_t *p_sys;
+    sout_stream_sys_t *p_sys = NULL;
     intf_sys_t *p_intf = NULL;
     char *psz_mux = NULL;
     sout_stream_t *p_sout = NULL;
@@ -186,7 +185,7 @@ static int Open(vlc_object_t *p_this)
 error:
     sout_StreamChainDelete(p_sout, p_sout);
     free(psz_mux);
-    Clean(p_stream);
+    delete p_sys;
     return VLC_EGENERIC;
 }
 
@@ -197,10 +196,5 @@ static void Close(vlc_object_t *p_this)
 {
     sout_stream_t *p_stream = reinterpret_cast<sout_stream_t*>(p_this);
 
-    Clean(p_stream);
-}
-
-void Clean(sout_stream_t *p_stream)
-{
     delete p_stream->p_sys;
 }
