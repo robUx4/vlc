@@ -125,6 +125,7 @@ Muxers:
 
 Service Discovery:
  * New NetBios service discovery using libdsm
+ * New Chromecast devices service discovery using microdns
  * Rewrite of the UPnP service discovery
 
 Mac OS X Interface
