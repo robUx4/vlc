@@ -84,7 +84,7 @@ struct intf_sys_t
     ~intf_sys_t();
 
 
-    intf_thread_t  * const p_stream;
+    intf_thread_t  * const p_intf;
     input_thread_t *p_input;
     uint16_t       devicePort;
     std::string    deviceIP;
@@ -132,7 +132,7 @@ struct intf_sys_t
         if (conn_status != status)
         {
 #ifndef NDEBUG
-            msg_Dbg(p_stream, "change Chromecast connection status from %d to %d", conn_status, status);
+            msg_Dbg(p_intf, "change Chromecast connection status from %d to %d", conn_status, status);
 #endif
             conn_status = status;
             vlc_cond_broadcast(&loadCommandCond);
@@ -174,7 +174,7 @@ private:
     void setPlayerStatus(enum command_status status) {
         if (cmd_status != status)
         {
-            msg_Dbg(p_stream, "change Chromecast command status from %d to %d", cmd_status, status);
+            msg_Dbg(p_intf, "change Chromecast command status from %d to %d", cmd_status, status);
             cmd_status = status;
             vlc_cond_broadcast(&loadCommandCond);
         }
