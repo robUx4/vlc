@@ -74,7 +74,7 @@ static int Open(vlc_object_t *);
 static void Close(vlc_object_t *);
 
 static const char *const ppsz_sout_options[] = {
-    "mime", "mux", "http-port", NULL
+    "http-port", "mux", "mime", NULL
 };
 
 /*****************************************************************************
@@ -84,8 +84,8 @@ static const char *const ppsz_sout_options[] = {
 #define HTTP_PORT_TEXT N_("HTTP port")
 #define HTTP_PORT_LONGTEXT N_("This sets the HTTP port of the server " \
                               "used to stream the media to the Chromecast.")
-#define MUXER_TEXT N_("Muxer")
-#define MUXER_LONGTEXT N_("This sets the muxer used to stream to the Chromecast.")
+#define MUX_TEXT N_("Muxer")
+#define MUX_LONGTEXT N_("This sets the muxer used to stream to the Chromecast.")
 #define MIME_TEXT N_("MIME content type")
 #define MIME_LONGTEXT N_("This sets the media MIME content type sent to the Chromecast.")
 
@@ -102,8 +102,8 @@ vlc_module_begin ()
     set_callbacks(Open, Close)
 
     add_integer(SOUT_CFG_PREFIX "http-port", HTTP_PORT, HTTP_PORT_TEXT, HTTP_PORT_LONGTEXT, false)
-    add_string(SOUT_CFG_PREFIX "mime", "video/x-matroska", MIME_TEXT, MIME_LONGTEXT, false)
-    add_string(SOUT_CFG_PREFIX "mux", "avformat{mux=matroska}", MUXER_TEXT, MUXER_LONGTEXT, false)
+    add_string(SOUT_CFG_PREFIX "mux", "mp4stream", MUX_TEXT, MUX_LONGTEXT, false)
+    add_string(SOUT_CFG_PREFIX "mime", "video/mp4", MIME_TEXT, MIME_LONGTEXT, false)
 
 vlc_module_end ()
 
