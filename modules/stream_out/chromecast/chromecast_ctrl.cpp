@@ -126,15 +126,15 @@ int Open(vlc_object_t *p_this)
 
     playlist_t *p_playlist = pl_Get( p_intf );
     std::stringstream receiver_addr;
-    char *psz_ipChromecast = var_InheritString(p_intf, CONTROL_CFG_PREFIX "addr");
+    char *psz_addrChromecast = var_InheritString(p_intf, CONTROL_CFG_PREFIX "addr");
 
-    if (psz_ipChromecast == NULL)
+    if (psz_addrChromecast == NULL)
         msg_Info(p_intf, "No Chromecast receiver IP/Name provided");
     else
     {
         vlc_url_t url;
-        vlc_UrlParse(&url, psz_ipChromecast);
-        free(psz_ipChromecast);
+        vlc_UrlParse(&url, psz_addrChromecast);
+        free(psz_addrChromecast);
         if (url.psz_host && url.psz_host[0])
         {
             int i_port = url.i_port ? url.i_port : CHROMECAST_CONTROL_PORT;
