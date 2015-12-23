@@ -263,6 +263,15 @@ void intf_sys_t::buildMessage(const std::string & namespace_,
     messagesToSend.push(msg);
 }
 
+void intf_sys_t::pushMediaPlayerMessage(const std::stringstream & payload) {
+    assert(!appTransportId.empty());
+    buildMessage(NAMESPACE_MEDIA, payload.str(), appTransportId);
+}
+
+
+/*****************************************************************************
+ * intf_sys_t: class definition
+ *****************************************************************************/
 intf_sys_t::intf_sys_t(intf_thread_t * const p_this)
     :p_stream(p_this)
     ,p_input(NULL)
@@ -1199,7 +1208,7 @@ void intf_sys_t::msgPlayerLoad()
        <<  "\"requestId\":" << i_requestId++
        << "}";
 
-    buildMessage(NAMESPACE_MEDIA, ss.str(), appTransportId);
+    pushMediaPlayerMessage( ss );
 }
 
 void intf_sys_t::msgPlayerPlay()
@@ -1212,7 +1221,7 @@ void intf_sys_t::msgPlayerPlay()
        <<  "\"requestId\":" << i_requestId++
        << "}";
 
-    buildMessage(NAMESPACE_MEDIA, ss.str(), appTransportId);
+    pushMediaPlayerMessage( ss );
 }
 
 void intf_sys_t::msgPlayerPause()
@@ -1225,7 +1234,7 @@ void intf_sys_t::msgPlayerPause()
        <<  "\"requestId\":" << i_requestId++
        << "}";
 
-    buildMessage(NAMESPACE_MEDIA, ss.str(), appTransportId);
+    pushMediaPlayerMessage( ss );
 }
 
 void intf_sys_t::msgPlayerSetVolume(float f_volume)
@@ -1242,7 +1251,7 @@ void intf_sys_t::msgPlayerSetVolume(float f_volume)
        <<  "\"requestId\":" << i_requestId++
        << "}";
 
-    buildMessage(NAMESPACE_MEDIA, ss.str(), appTransportId);
+    pushMediaPlayerMessage( ss );
 }
 
 void intf_sys_t::msgPlayerSetMute(bool b_mute)
@@ -1256,7 +1265,7 @@ void intf_sys_t::msgPlayerSetMute(bool b_mute)
        <<  "\"requestId\":" << i_requestId++
        << "}";
 
-    buildMessage(NAMESPACE_MEDIA, ss.str(), appTransportId);
+    pushMediaPlayerMessage( ss );
 }
 
 /**
