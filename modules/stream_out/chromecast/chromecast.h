@@ -157,6 +157,7 @@ private:
     void msgPlayerLoad();
     void msgPlayerPlay();
     void msgPlayerPause();
+    void msgPlayerGetStatus();
 
     std::queue<castchannel::CastMessage> messagesToSend;
 
