@@ -30,10 +30,6 @@
 # include "config.h"
 #endif
 
-#ifdef HAVE_POLL
-# include <poll.h>
-#endif
-
 #include "chromecast.h"
 
 #include <vlc_access.h>
@@ -42,6 +38,10 @@
 #include <vlc_url.h>
 
 #include <cassert>
+#include <cerrno>
+#ifdef HAVE_POLL
+# include <poll.h>
+#endif
 
 #include "../../misc/webservices/json.h"
 
@@ -957,7 +957,7 @@ void intf_sys_t::processMessage(const castchannel::CastMessage &msg)
         {
             vlc_mutex_locker locker(&lock);
             setConnectionStatus(CHROMECAST_AUTHENTICATED);
-            msgConnect();
+            msgConnect(DEFAULT_CHOMECAST_RECEIVER);
             msgReceiverGetStatus();
         }
     }
@@ -1488,6 +1488,7 @@ static void* ChromecastThread(void* p_data)
     {
         p_sys->handleMessages();
 
+        vlc_mutex_locker locker(&lock);
         if ( p_sys->getConnectionStatus() == CHROMECAST_CONNECTION_DEAD )
             break;
     }

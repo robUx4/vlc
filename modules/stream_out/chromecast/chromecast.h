@@ -206,6 +206,7 @@ struct intf_sys_t
 
     void ipChangedEvent(const char *psz_new_ip);
     int connectChromecast();
+    void disconnectChromecast();
     void stateChangedForRestart( input_thread_t * );
 
     void msgPlayerSetVolume(float volume);
@@ -267,7 +268,6 @@ private:
 
     void plugOutputRedirection();
     void unplugOutputRedirection();
-    void disconnectChromecast();
     void setCurrentStopped(bool);
 
     void restartDoStop();
