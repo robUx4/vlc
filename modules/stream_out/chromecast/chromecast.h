@@ -155,7 +155,6 @@ struct intf_sys_t
     vlc_tls_creds_t *p_creds;
     vlc_tls_t *p_tls;
 
-    restart_state     restartState;
     /* local date when playback started/resumed */
     mtime_t           date_play_start;
     /* playback time reported by the receiver, used to wait for seeking point */
@@ -166,6 +165,7 @@ struct intf_sys_t
     mtime_t           m_seektime;
     /* seek time with Chromecast relative timestamp */
     mtime_t           i_seektime;
+    restart_state     restartState;
 
 
     vlc_mutex_t  lock;
@@ -222,8 +222,8 @@ private:
     void msgPlayerLoad();
     void msgPlayerPlay();
     void msgPlayerPause();
-    void msgPlayerSeek(const std::string & currentTime);
     void msgPlayerGetStatus();
+    void msgPlayerSeek(const std::string & currentTime);
 
     void processMessage(const castchannel::CastMessage &msg);
 

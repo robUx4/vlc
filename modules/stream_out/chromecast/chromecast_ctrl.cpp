@@ -227,12 +227,12 @@ intf_sys_t::intf_sys_t(intf_thread_t * const p_this)
     ,i_sock_fd(-1)
     ,p_creds(NULL)
     ,p_tls(NULL)
-    ,restartState(RESTART_NONE)
     ,date_play_start(-1)
     ,playback_start_chromecast(-1.0)
     ,playback_start_local(0)
     ,m_seektime(-1.0)
     ,i_seektime(-1.0)
+    ,restartState(RESTART_NONE)
     ,conn_status(CHROMECAST_DISCONNECTED)
     ,cmd_status(NO_CMD_PENDING)
     ,i_receiver_requestId(0)
@@ -583,7 +583,8 @@ void intf_sys_t::InputUpdated( input_thread_t *p_input )
                 restartDoStop();
             }
         }
-        else if (conn_status != CHROMECAST_CONNECTION_DEAD)
+        else
+        if (conn_status != CHROMECAST_CONNECTION_DEAD)
         {
             plugOutputRedirection();
         }
@@ -630,10 +631,6 @@ void intf_sys_t::sendPlayerCmd()
     case OPENING_S:
         if (!mediaSessionId.empty()) {
             msg_Warn(p_intf, "opening when a session was still opened:%s", mediaSessionId.c_str());
-#if 0
-            msgPlayerStop();
-#endif
-            //mediaSessionId = "";
         }
         else
         //playback_start_chromecast = -1.0;
@@ -662,20 +659,8 @@ void intf_sys_t::sendPlayerCmd()
         }
         break;
     case END_S:
-#if 0
-        /* the MediaPlayer app doesn't like to be stopped, it won't restart after that */
-        if (!mediaSessionId.empty() /* && receiverState == RECEIVER_BUFFERING */) {
-            msgPlayerStop();
-
-            /* TODO reset the sout as we'll need another one for the next load */
-            //var_SetString( p_input, "sout", NULL );
-            //mediaSessionId = ""; // it doesn't seem to send a status update like it should
-            //setPlayerStatus(NO_CMD_PENDING); /* TODO: may not be needed */
-        }
-#endif
         break;
     default:
-        //msgClose();
         break;
     }
 }
@@ -985,10 +970,6 @@ void intf_sys_t::processMessage(const castchannel::CastMessage &msg)
         {
             msg_Dbg(p_intf, "PING received from the Chromecast");
             msgPong();
-#if 0
-            if (!appTransportId.empty())
-                msgPlayerGetStatus();
-#endif
         }
         else if (type == "PONG")
         {
@@ -1051,7 +1032,6 @@ void intf_sys_t::processMessage(const castchannel::CastMessage &msg)
                 else
                 {
                     msgPlayerGetStatus();
-                    //msgReceiverGetStatus();
                 }
             }
             else
@@ -1459,7 +1439,6 @@ static void* ChromecastThread(void* p_data)
     int canc;
     intf_thread_t *p_intf = reinterpret_cast<intf_thread_t*>(p_data);
     intf_sys_t *p_sys = p_intf->p_sys;
-
     p_sys->setConnectionStatus( CHROMECAST_DISCONNECTED );
 
     p_sys->i_sock_fd = p_sys->connectChromecast();

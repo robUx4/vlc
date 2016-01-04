@@ -34,7 +34,6 @@
 
 #include <cassert>
 
-// Media player Chromecast app id
 static const mtime_t SEEK_FORWARD_OFFSET = 1000000;
 
 bool intf_sys_t::seekTo(mtime_t pos)
@@ -122,7 +121,7 @@ void intf_sys_t::pushMessage(const std::string & namespace_,
 
 void intf_sys_t::pushMediaPlayerMessage(const std::stringstream & payload) {
     assert(!appTransportId.empty());
-    pushMessage(NAMESPACE_MEDIA, payload.str(), appTransportId);
+    pushMessage( NAMESPACE_MEDIA, payload.str(), appTransportId );
 }
 
 void intf_sys_t::msgPlayerSeek(const std::string & currentTime)

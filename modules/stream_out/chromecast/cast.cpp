@@ -163,9 +163,9 @@ static int Open(vlc_object_t *p_this)
 {
     sout_stream_t *p_stream = reinterpret_cast<sout_stream_t*>(p_this);
     sout_stream_sys_t *p_sys = NULL;
+    intf_thread_t *p_intf = NULL;
     char *psz_mux = NULL;
     char *psz_var_mime = NULL;
-    intf_thread_t *p_intf = NULL;
     sout_stream_t *p_sout = NULL;
     std::stringstream ss;
 
@@ -175,15 +175,14 @@ static int Open(vlc_object_t *p_this)
         goto error;
     }
 
-    config_ChainParse( p_stream, SOUT_CFG_PREFIX, ppsz_sout_options,
-                   p_stream->p_cfg );
+    config_ChainParse(p_stream, SOUT_CFG_PREFIX, ppsz_sout_options, p_stream->p_cfg);
 
-    psz_mux = var_InheritString(p_stream, SOUT_CFG_PREFIX "mux");
+    psz_mux = var_GetNonEmptyString(p_stream, SOUT_CFG_PREFIX "mux");
     if (psz_mux == NULL || !psz_mux[0])
     {
         goto error;
     }
-    psz_var_mime = var_InheritString(p_stream, SOUT_CFG_PREFIX "mime");
+    psz_var_mime = var_GetNonEmptyString(p_stream, SOUT_CFG_PREFIX "mime");
     if (psz_var_mime == NULL || !psz_var_mime[0])
         goto error;
 
