@@ -165,10 +165,10 @@ private:
 
     int sendMessage(const castchannel::CastMessage &msg);
 
-    void buildMessage(const std::string & namespace_,
-                      const std::string & payload,
-                      const std::string & destinationId = DEFAULT_CHOMECAST_RECEIVER,
-                      castchannel::CastMessage_PayloadType payloadType = castchannel::CastMessage_PayloadType_STRING);
+    void pushMessage(const std::string & namespace_,
+                     const std::string & payload,
+                     const std::string & destinationId = DEFAULT_CHOMECAST_RECEIVER,
+                     castchannel::CastMessage_PayloadType payloadType = castchannel::CastMessage_PayloadType_STRING);
 
     void pushMediaPlayerMessage(const std::stringstream & payload);
 
