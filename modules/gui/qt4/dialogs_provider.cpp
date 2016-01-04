@@ -154,7 +154,7 @@ void DialogsProvider::customEvent( QEvent *event )
            bookmarksDialog(); break;
         case INTF_DIALOG_EXTENDED:
            extendedDialog(); break;
-#ifdef ENABLE_SOUT
+#if defined(ENABLE_SOUT) && defined(HAVE_MICRODNS)
         case INTF_DIALOG_CHROMECAST:
            chromecastDialog(); break;
 #endif
@@ -239,7 +239,7 @@ void DialogsProvider::extendedDialog()
         extDialog->hide();
 }
 
-#ifdef ENABLE_SOUT
+#if defined(ENABLE_SOUT) && defined(HAVE_MICRODNS)
 void DialogsProvider::chromecastDialog()
 {
     ChromecastDialog::getInstance( p_intf )->toggleVisible();

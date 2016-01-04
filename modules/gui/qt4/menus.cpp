@@ -428,7 +428,7 @@ QMenu *VLCMenuBar::ToolsMenu( intf_thread_t *p_intf, QMenu *menu )
         "Ctrl+Shift+W" );
 #endif
 
-#ifdef ENABLE_SOUT
+#if defined(ENABLE_SOUT) && defined(HAVE_MICRODNS)
     addDPStaticEntry( menu, qtr( I_MENU_CHROMECAST ), "", SLOT( chromecastDialog() ),
         "Ctrl+Shift+C" );
 #endif
