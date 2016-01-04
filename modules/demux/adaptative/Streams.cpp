@@ -228,23 +228,30 @@ AbstractStream::status AbstractStream::demux(mtime_t nz_deadline, bool send)
         return AbstractStream::status_dis;
     }
 
-    if(!demuxer && !startDemux())
+    if(!demuxer)
     {
-        /* If demux fails because of probing failure / wrong format*/
-        if(discontinuity)
+        format = segmentTracker->initialFormat();
+        if(!startDemux())
         {
-            msg_Dbg( p_realdemux, "Flushing on format change" );
-            prepareFormatChange();
-            discontinuity = false;
-            flushing = true;
-            return AbstractStream::status_buffering;
+            /* If demux fails because of probing failure / wrong format*/
+            if(discontinuity)
+            {
+                msg_Dbg( p_realdemux, "Flushing on format change" );
+                prepareFormatChange();
+                discontinuity = false;
+                flushing = true;
+                return AbstractStream::status_buffering;
+            }
+            dead = true; /* Prevent further retries */
+            return AbstractStream::status_eof;
         }
-        dead = true; /* Prevent further retries */
-        return AbstractStream::status_eof;
     }
 
     if(nz_deadline + VLC_TS_0 > getBufferingLevel()) /* not already demuxed */
     {
+        if(!segmentTracker->segmentsListReady()) /* Live Streams */
+            return AbstractStream::status_buffering_ahead;
+
         /* need to read, demuxer still buffering, ... */
         if(demuxer->demux(nz_deadline) != VLC_DEMUXER_SUCCESS)
         {

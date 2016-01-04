@@ -26,13 +26,11 @@
  * VLCPlaylistInfo interface
  *****************************************************************************/
 
-@class VLCInfoTreeItem;
 
-@interface VLCInfo : NSObject
+@interface VLCInfo : NSWindowController
 
 @property (readonly) input_item_t *item;
 
-@property (readwrite, weak) IBOutlet NSPanel *infoPanel;
 @property (readwrite, weak) IBOutlet NSOutlineView *outlineView;
 @property (readwrite, weak) IBOutlet NSTabView *tabView;
 
@@ -97,27 +95,27 @@
 @property (readwrite, weak) IBOutlet NSTextField *videoDecodedTextField;
 
 - (void)updateCocoaWindowLevel:(NSInteger)i_level;
-- (void)initPanel;
+- (IBAction)toggleWindow:(id)sender;
 
 - (IBAction)metaFieldChanged:(id)sender;
 - (IBAction)saveMetaData:(id)sender;
 - (IBAction)downloadCoverArt:(id)sender;
-- (void)initMediaPanelStats;
+
 - (void)updatePanelWithItem:(input_item_t *)_p_item;
-- (void)setMeta:(char *)meta forLabel:(id)theItem;
+
 - (void)updateMetadata;
 - (void)updateStatistics;
 
-+ (VLCInfo *)sharedInstance;
 @end
 
+/**
+ * Holds information for one element in the codec information panel
+ */
 @interface VLCInfoTreeItem : NSObject
 
-@property (readonly) int numberOfChildren;
-@property (readonly) NSString *name;
-@property (readonly) NSString *value;
+@property (readwrite) NSString *name;
+@property (readwrite) NSString *value;
 
-- (VLCInfoTreeItem *)childAtIndex:(NSUInteger)i_index;
-- (void)refresh;
+@property (readwrite) NSArray *children;
 
 @end

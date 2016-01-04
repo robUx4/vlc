@@ -107,8 +107,6 @@ static int VolumeUpdated(vlc_object_t *p_this, const char *psz_var,
     playlist_t *p_playlist;
     __weak NSOutlineView *_outlineView;
 
-    // TODO: for transition
-    __weak VLCPlaylist *_playlist;
     NSUInteger _retainedRowSelection;
 }
 @end
@@ -118,13 +116,12 @@ static int VolumeUpdated(vlc_object_t *p_this, const char *psz_var,
 #pragma mark -
 #pragma mark Init and Stuff
 
-- (id)initWithOutlineView:(NSOutlineView *)outlineView playlist:(playlist_t *)pl rootItem:(playlist_item_t *)root playlistObject:(id)plObj;
+- (id)initWithOutlineView:(NSOutlineView *)outlineView playlist:(playlist_t *)pl rootItem:(playlist_item_t *)root;
 {
     self = [super init];
     if (self) {
         p_playlist = pl;
         _outlineView = outlineView;
-        _playlist = plObj;
 
         msg_Dbg(VLCIntf, "Initializing playlist model");
         var_AddCallback(p_playlist, "item-change", PLItemUpdated, (__bridge void *)self);
@@ -302,7 +299,7 @@ static int VolumeUpdated(vlc_object_t *p_this, const char *psz_var,
     VLCMain *instance = [VLCMain sharedInstance];
     [[instance mainWindow] updateName];
 
-    [[VLCInfo sharedInstance] updateMetadata];
+    [[instance currentMediaInfoPanel] updateMetadata];
 }
 
 - (void)addItem:(int)i_item withParentNode:(int)i_node
@@ -733,42 +730,20 @@ static int VolumeUpdated(vlc_object_t *p_this, const char *psz_var,
         return YES;
     }
 
-    else if ([[o_pasteboard types] containsObject: NSFilenamesPboardType]) {
+    // try file drop
 
-        NSArray *o_values = [[o_pasteboard propertyListForType: NSFilenamesPboardType]
-                             sortedArrayUsingSelector: @selector(caseInsensitiveCompare:)];
-        NSUInteger count = [o_values count];
-        NSMutableArray *o_array = [NSMutableArray arrayWithCapacity:count];
-        input_thread_t *p_input = playlist_CurrentInput(p_playlist);
+    // drop on a node itself will append entries at the end
+    static_assert(NSOutlineViewDropOnItemIndex == -1, "Expect NSOutlineViewDropOnItemIndex to be -1");
 
-        if (count == 1 && p_input) {
-            int i_result = input_AddSubtitleOSD(p_input, vlc_path2uri([[o_values firstObject] UTF8String], NULL), true, true);
-            vlc_object_release(p_input);
-            if (i_result == VLC_SUCCESS)
-                return YES;
-        }
-        else if (p_input)
-            vlc_object_release(p_input);
+    NSArray *items = [[[VLCMain sharedInstance] playlist] createItemsFromExternalPasteboard:o_pasteboard];
+    if (items.count == 0)
+        return NO;
 
-        for (NSUInteger i = 0; i < count; i++) {
-            NSDictionary *o_dic;
-            char *psz_uri = vlc_path2uri([[o_values objectAtIndex:i] UTF8String], NULL);
-            if (!psz_uri)
-                continue;
-
-            o_dic = [NSDictionary dictionaryWithObject:toNSStr(psz_uri) forKey:@"ITEM_URL"];
-            free(psz_uri);
-
-            [o_array addObject: o_dic];
-        }
-
-        // drop on a node itself will append entries at the end
-        static_assert(NSOutlineViewDropOnItemIndex == -1, "Expect NSOutlineViewDropOnItemIndex to be -1");
-
-        [_playlist addPlaylistItems:o_array withParentItemId:[targetItem plItemId] atPos:index startPlayback:NO];
-        return YES;
-    }
-    return NO;
+    [[[VLCMain sharedInstance] playlist] addPlaylistItems:items
+                                         withParentItemId:[targetItem plItemId]
+                                                    atPos:index
+                                            startPlayback:NO];
+    return YES;
 }
 
 @end

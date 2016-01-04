@@ -783,8 +783,10 @@ time_t vlc_http_msg_get_mtime(const struct vlc_http_msg *m)
 unsigned vlc_http_msg_get_retry_after(const struct vlc_http_msg *m)
 {
     const char *str = vlc_http_msg_get_header(m, "Retry-After");
-    char *end;
+    if (str == NULL)
+        return 0;
 
+    char *end;
     unsigned long delay = strtoul(str, &end, 10);
     if (end != str && *end == '\0')
         return delay;
@@ -871,7 +873,7 @@ int vlc_http_msg_add_cookies(struct vlc_http_msg *m,
 
     if (cookies != NULL)
     {
-        val = vlc_http_msg_add_header(m, "Cookie", cookies);
+        val = vlc_http_msg_add_header(m, "Cookie", "%s", cookies);
         free(cookies);
     }
     return val;

@@ -74,7 +74,6 @@
     NSTableColumn *_sortTableColumn;
 
     BOOL b_playlistmenu_nib_loaded;
-    BOOL b_view_setup;
 
     PLModel *_model;
 }
@@ -83,6 +82,22 @@
 @end
 
 @implementation VLCPlaylist
+
+- (id)init
+{
+    self = [super init];
+    if (self) {
+        /* This uses a private API, but works fine on all current OSX releases.
+         * Radar ID 11739459 request a public API for this. However, it is probably
+         * easier and faster to recreate similar looking bitmaps ourselves. */
+        _ascendingSortingImage = [[NSOutlineView class] _defaultTableHeaderSortImage];
+        _descendingSortingImage = [[NSOutlineView class] _defaultTableHeaderReverseSortImage];
+
+        [[NSNotificationCenter defaultCenter] addObserver: self selector: @selector(applicationWillTerminate:) name: NSApplicationWillTerminateNotification object: nil];
+
+    }
+    return self;
+}
 
 + (void)initialize
 {
@@ -126,23 +141,8 @@
 
 - (void)awakeFromNib
 {
-    if (b_view_setup)
-        return;
-
-    [self reloadStyles];
+    // This is only called for the playlist popup menu
     [self initStrings];
-
-    /* This uses a private API, but works fine on all current OSX releases.
-     * Radar ID 11739459 request a public API for this. However, it is probably
-     * easier and faster to recreate similar looking bitmaps ourselves. */
-    _ascendingSortingImage = [[NSOutlineView class] _defaultTableHeaderSortImage];
-    _descendingSortingImage = [[NSOutlineView class] _defaultTableHeaderReverseSortImage];
-
-    _sortTableColumn = nil;
-
-    [[NSNotificationCenter defaultCenter] addObserver: self selector: @selector(applicationWillTerminate:) name: NSApplicationWillTerminateNotification object: nil];
-
-    b_view_setup = YES;
 }
 
 - (void)setOutlineView:(VLCPlaylistView * __nullable)outlineView
@@ -152,7 +152,7 @@
 
     playlist_t * p_playlist = pl_Get(VLCIntf);
 
-    _model = [[PLModel alloc] initWithOutlineView:_outlineView playlist:p_playlist rootItem:p_playlist->p_playing playlistObject:self];
+    _model = [[PLModel alloc] initWithOutlineView:_outlineView playlist:p_playlist rootItem:p_playlist->p_playing];
     [_outlineView setDataSource:_model];
     [_outlineView reloadData];
 
@@ -162,6 +162,8 @@
     [_outlineView setAllowsEmptySelection: NO];
     [_outlineView registerForDraggedTypes: [NSArray arrayWithObjects:NSFilenamesPboardType, @"VLCPlaylistItemPboardType", nil]];
     [_outlineView setIntercellSpacing: NSMakeSize (0.0, 1.0)];
+
+    [self reloadStyles];
 }
 
 - (void)setPlaylistHeaderView:(NSTableHeaderView * __nullable)playlistHeaderView
@@ -394,7 +396,7 @@
 
 - (IBAction)showInfoPanel:(id)sender
 {
-    [[VLCInfo sharedInstance] initPanel];
+    [[[VLCMain sharedInstance] currentMediaInfoPanel] toggleWindow:sender];
 }
 
 - (IBAction)deleteItem:(id)sender
@@ -495,6 +497,30 @@
         [[NSDocumentController sharedDocumentController] noteNewRecentDocumentURL:url];
 
     return p_input;
+}
+
+- (NSArray *)createItemsFromExternalPasteboard:(NSPasteboard *)pasteboard
+{
+    NSArray *o_array = [NSArray array];
+    if (![[pasteboard types] containsObject: NSFilenamesPboardType])
+        return o_array;
+
+    NSArray *o_values = [[pasteboard propertyListForType: NSFilenamesPboardType] sortedArrayUsingSelector:@selector(caseInsensitiveCompare:)];
+    NSUInteger count = [o_values count];
+
+    for (NSUInteger i = 0; i < count; i++) {
+        NSDictionary *o_dic;
+        char *psz_uri = vlc_path2uri([[o_values objectAtIndex:i] UTF8String], NULL);
+        if (!psz_uri)
+            continue;
+
+        o_dic = [NSDictionary dictionaryWithObject:toNSStr(psz_uri) forKey:@"ITEM_URL"];
+        free(psz_uri);
+
+        o_array = [o_array arrayByAddingObject: o_dic];
+    }
+
+    return o_array;
 }
 
 - (void)addPlaylistItems:(NSArray*)array

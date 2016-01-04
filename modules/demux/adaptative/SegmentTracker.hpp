@@ -95,6 +95,8 @@ namespace adaptative
             ~SegmentTracker();
 
             void setAdaptationLogic(AbstractAdaptationLogic *);
+            StreamFormat initialFormat() const;
+            bool segmentsListReady() const;
             void reset();
             SegmentChunk* getNextChunk(bool, HTTPConnectionManager *);
             bool setPositionByTime(mtime_t, bool, bool);
@@ -110,7 +112,8 @@ namespace adaptative
             bool initializing;
             bool index_sent;
             bool init_sent;
-            uint64_t count;
+            uint64_t next;
+            uint64_t curNumber;
             StreamFormat format;
             AbstractAdaptationLogic *logic;
             BaseAdaptationSet *adaptationSet;

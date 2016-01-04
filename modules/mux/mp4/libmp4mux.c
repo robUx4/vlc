@@ -80,7 +80,11 @@ bo_t *box_new(const char *fcc)
     if (!box)
         return NULL;
 
-    bo_init(box, 1024);
+    if(!bo_init(box, 1024))
+    {
+        bo_free(box);
+        return NULL;
+    }
 
     bo_add_32be  (box, 0);
     bo_add_fourcc(box, fcc);
@@ -1138,6 +1142,12 @@ static bo_t *GetStblBox(vlc_object_t *p_obj, mp4mux_trackinfo_t *p_track, bool b
 
     /* sample to chunk table */
     bo_t *stsc = box_full_new("stsc", 0, 0);
+    if(!stsc)
+    {
+        bo_free(stco);
+        bo_free(stsd);
+        return NULL;
+    }
     bo_add_32be(stsc, 0);     // entry-count (fixed latter)
 
     unsigned i_chunk = 0;
@@ -1182,6 +1192,7 @@ static bo_t *GetStblBox(vlc_object_t *p_obj, mp4mux_trackinfo_t *p_track, bool b
     {
         bo_free(stsd);
         bo_free(stco);
+        bo_free(stsc);
         return NULL;
     }
     bo_add_32be(stts, 0);     // entry-count (fixed latter)
@@ -1289,6 +1300,7 @@ static bo_t *GetStblBox(vlc_object_t *p_obj, mp4mux_trackinfo_t *p_track, bool b
         bo_free(stts);
         bo_free(stsz);
         bo_free(stss);
+        bo_free(ctts);
         return NULL;
     }
     box_gather(stbl, stsd);
@@ -1679,7 +1691,7 @@ bo_t * GetMoovBox(vlc_object_t *p_obj, mp4mux_trackinfo_t **pp_tracks, unsigned 
                 /* append dinf to mdia */
                 box_gather(minf, dinf);
             }
-            else bo_free(dinf);
+            else bo_free(dref);
         }
 
         /* add stbl */

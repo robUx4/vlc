@@ -93,6 +93,7 @@ struct decoder_sys_t
     /* */
     bool    b_slice;
     block_t *p_frame;
+    block_t **pp_frame_last;
     bool    b_frame_sps;
     bool    b_frame_pps;
 
@@ -200,6 +201,7 @@ static int Open( vlc_object_t *p_this )
 
     p_sys->b_slice = false;
     p_sys->p_frame = NULL;
+    p_sys->pp_frame_last = &p_sys->p_frame;
     p_sys->b_frame_sps = false;
     p_sys->b_frame_pps = false;
 
@@ -416,6 +418,7 @@ static void PacketizeReset( void *p_private, bool b_broken )
         if( p_sys->p_frame )
             block_ChainRelease( p_sys->p_frame );
         p_sys->p_frame = NULL;
+        p_sys->pp_frame_last = &p_sys->p_frame;
         p_sys->b_frame_sps = false;
         p_sys->b_frame_pps = false;
         p_sys->slice.i_frame_type = 0;
@@ -466,6 +469,7 @@ static block_t *ParseNALBlock( decoder_t *p_dec, bool *pb_ts_used, block_t *p_fr
         /* Reset context */
         p_sys->slice.i_frame_type = 0;
         p_sys->p_frame = NULL;
+        p_sys->pp_frame_last = &p_sys->p_frame;
         p_sys->b_frame_sps = false;
         p_sys->b_frame_pps = false;
         p_sys->b_slice = false;
@@ -544,7 +548,7 @@ static block_t *ParseNALBlock( decoder_t *p_dec, bool *pb_ts_used, block_t *p_fr
 
     /* Append the block */
     if( p_frag )
-        block_ChainAppend( &p_sys->p_frame, p_frag );
+        block_ChainLastAppend( &p_sys->pp_frame_last, p_frag );
 
     *pb_ts_used = false;
     if( p_sys->i_frame_dts <= VLC_TS_INVALID &&
@@ -586,27 +590,31 @@ static block_t *OutputPicture( decoder_t *p_dec )
         {
             p_head = p_sys->p_frame;
             p_sys->p_frame = p_sys->p_frame->p_next;
+            if( p_sys->p_frame == NULL )
+                p_sys->pp_frame_last = &p_sys->p_frame;
+            p_head->p_next = NULL;
         }
 
         block_t *p_list = NULL;
+        block_t **pp_list_tail = &p_list;
         for( int i = 0; i < H264_SPS_MAX && (b_sps_pps_i || p_sys->b_frame_sps); i++ )
         {
             if( p_sys->pp_sps[i] )
-                block_ChainAppend( &p_list, block_Duplicate( p_sys->pp_sps[i] ) );
+                block_ChainLastAppend( &pp_list_tail, block_Duplicate( p_sys->pp_sps[i] ) );
         }
         for( int i = 0; i < H264_PPS_MAX && (b_sps_pps_i || p_sys->b_frame_pps); i++ )
         {
             if( p_sys->pp_pps[i] )
-                block_ChainAppend( &p_list, block_Duplicate( p_sys->pp_pps[i] ) );
+                block_ChainLastAppend( &pp_list_tail, block_Duplicate( p_sys->pp_pps[i] ) );
         }
         if( b_sps_pps_i && p_list )
             p_sys->b_header = true;
 
-        if( p_head )
-            p_head->p_next = p_list;
-        else
-            p_head = p_list;
-        block_ChainAppend( &p_head, p_sys->p_frame );
+        if( p_list )
+            block_ChainAppend( &p_head, p_list );
+
+        if( p_sys->p_frame )
+            block_ChainAppend( &p_head, p_sys->p_frame );
 
         p_pic = block_ChainGather( p_head );
     }
@@ -686,6 +694,7 @@ static block_t *OutputPicture( decoder_t *p_dec )
 
     p_sys->slice.i_frame_type = 0;
     p_sys->p_frame = NULL;
+    p_sys->pp_frame_last = &p_sys->p_frame;
     p_sys->b_frame_sps = false;
     p_sys->b_frame_pps = false;
     p_sys->b_slice = false;
@@ -714,7 +723,7 @@ static void PutSPS( decoder_t *p_dec, block_t *p_frag )
     h264_sequence_parameter_set_t *p_sps = h264_decode_sps( p_buffer, i_buffer, true );
     if( !p_sps )
     {
-        msg_Warn( p_dec, "invalid SPS (sps_id=%d)", p_sps->i_id );
+        msg_Warn( p_dec, "invalid SPS" );
         block_Release( p_frag );
         return;
     }
@@ -749,8 +758,13 @@ static void PutSPS( decoder_t *p_dec, block_t *p_frag )
         p_sys->b_cpb_dpb_delays_present_flag = p_sps->vui.b_cpb_dpb_delays_present_flag;
         p_sys->i_cpb_removal_delay_length_minus1 = p_sps->vui.i_cpb_removal_delay_length_minus1;
         p_sys->i_dpb_output_delay_length_minus1 = p_sps->vui.i_dpb_output_delay_length_minus1;
-    }
 
+        if( p_sps->vui.b_fixed_frame_rate && !p_dec->fmt_out.video.i_frame_rate_base )
+        {
+            p_dec->fmt_out.video.i_frame_rate_base = p_sps->vui.i_num_units_in_tick;
+            p_dec->fmt_out.video.i_frame_rate = p_sps->vui.i_time_scale;
+        }
+    }
     /* We have a new SPS */
     if( !p_sys->b_sps )
         msg_Dbg( p_dec, "found NAL_SPS (sps_id=%d)", p_sps->i_id );
@@ -775,7 +789,7 @@ static void PutPPS( decoder_t *p_dec, block_t *p_frag )
     h264_picture_parameter_set_t *p_pps = h264_decode_pps( p_buffer, i_buffer, true );
     if( !p_pps )
     {
-        msg_Warn( p_dec, "invalid PPS (pps_id=%d sps_id=%d)", p_pps->i_id, p_pps->i_sps_id );
+        msg_Warn( p_dec, "invalid PPS" );
         block_Release( p_frag );
         return;
     }

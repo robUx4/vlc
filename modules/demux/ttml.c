@@ -231,15 +231,19 @@ static int ReadTTML( demux_t* p_demux )
 
             while ( psz_attr_name && psz_attr_value )
             {
-                if ( !strcasecmp( psz_attr_name, "begin" ) )
+                if ( !psz_begin && !strcasecmp( psz_attr_name, "begin" ) )
                     psz_begin = strdup( psz_attr_value );
-                else if ( !strcasecmp( psz_attr_name, "end" ) )
+                else if ( !psz_end && !strcasecmp( psz_attr_name, "end" ) )
                     psz_end = strdup( psz_attr_value );
                 else if ( !strcasecmp( psz_attr_name, psz_attr_name ) )
                 {
                     psz_text = Append( psz_text, " %s = \"%s\"", psz_attr_name, psz_attr_value );
                     if ( unlikely( psz_text == NULL ) )
+                    {
+                        free( psz_begin );
+                        free( psz_end );
                         return VLC_ENOMEM;
+                    }
                 }
                 psz_attr_name = xml_ReaderNextAttr( p_sys->p_reader, &psz_attr_value );
             }
@@ -374,7 +378,7 @@ static void ParseHead( demux_t* p_demux )
     char* psz_head = NULL;
     size_t i_head_len = 0; // head tags size, in bytes
     size_t i_size; // allocated buffer size
-    size_t i_read;
+    ssize_t i_read;
 
     // Rewind since the XML parser will have consumed the entire file.
     stream_Seek( p_demux->s, 0 );

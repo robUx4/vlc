@@ -32,6 +32,7 @@
 #include <vlc_common.h>
 #include <vlc_plugin.h>
 #include <vlc_demux.h>
+#include <limits.h>
 
 /* TODO:
  *  - test
@@ -335,8 +336,8 @@ static int Open( vlc_object_t * p_this )
 
 error:
     msg_Warn( p_demux, "cannot load Nuv file" );
+    Close( p_this );
     p_demux->p_sys = NULL;
-    free( p_sys );
     return VLC_EGENERIC;
 }
 
@@ -647,7 +648,8 @@ static int HeaderLoad( demux_t *p_demux, header_t *h )
              h->d_fps, h->i_video_blocks, h->i_audio_blocks, h->i_text_blocks,
              h->i_keyframe_distance );
 #endif
-    return VLC_SUCCESS;
+
+    return (h->d_fps) ? VLC_SUCCESS : VLC_EGENERIC;
 }
 
 /* FrameHeaderLoad:
@@ -921,9 +923,15 @@ static void demux_IndexAppend( demux_index_t *p_idx,
         }
         else
         {
+            if(INT_MAX - 1000 < p_idx->i_idx_max ||
+               (SIZE_MAX / sizeof(demux_index_entry_t)) - p_idx->i_idx_max < 1000)
+                return;
+            size_t i_realloc = (1000 + p_idx->i_idx_max) * sizeof(demux_index_entry_t);
+            demux_index_entry_t *p_realloc = realloc( p_idx->idx, i_realloc );
+            if( !p_realloc )
+                return;
             p_idx->i_idx_max += 1000;
-            p_idx->idx = xrealloc( p_idx->idx,
-                                p_idx->i_idx_max*sizeof(demux_index_entry_t));
+            p_idx->idx = p_realloc;
         }
     }
 

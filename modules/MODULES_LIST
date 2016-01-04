@@ -89,6 +89,7 @@ $Id$
  * crystalhd: crystalhd decoder
  * ctrl_chromecast: Handler to adapt playing files to the connected Chromecast
  * cvdsub: CVD subtitles decoder
+ * cvpx_i420: filter to copy from OS X accelerated surfaces to CPU in YUV
  * d3d11_surface: Convert D3D11 GPU textures to YUV planes
  * d3d11va: Direct3D11 hardware-accelerated decoding
  * daala: a daala video decoder/packetizer using libdaala
@@ -172,15 +173,14 @@ $Id$
  * gradient: Gradient and edge detection video effects filter
  * grain: Grain Video filter
  * grey_yuv: grayscale to others conversion module
- * growl: announce currently playing stream to growl
  * gstdecode: GStreamer based decoder module.
- * h264: H264 decoder
+ * h26x: Raw H264 and HEVC demuxers
  * hds: HTTP Dynamic Streaming, per Adobe's specs
  * headphone_channel_mixer:  headphone channel mixer with virtual spatialization effect
- * hevc: HEVC demuxer
  * hotkeys: hotkeys control module
  * hqdn3d: High Quality denoising filter
  * http: HTTP Network access module
+ * https: HTTP/TLS access module for HTTP 2.0 support
  * i420_rgb: planar YUV to packed RGB conversion functions
  * i420_rgb_mmx: MMX accelerated version of i420_rgb
  * i420_rgb_sse2: sse2 accelerated version of i420_rgb
@@ -273,6 +273,7 @@ $Id$
  * opus: a opus audio decoder/packetizer/encoder using the libopus library
  * os2drive: service discovery for OS/2 drives
  * oss: audio output module using the OSS /dev/dsp interface
+ * osx_notifications: announce currently playing stream to OS X/Growl
  * packetizer_avparser: libavcodec packetizer
  * packetizer_copy: Simple copy packetizer
  * packetizer_dirac: Dirac video packetizer
@@ -303,7 +304,6 @@ $Id$
  * qsv: QuickSyncVideo Encoder for Intel hardware
  * qt4: interface module using the cross-platform Qt4 library
  * qtsound: Quicktime Audio Capture
- * quartztext: Text renderer using native Mac OS X API
  * quicktime: Quicktime decoder that uses the QT library
  * rar: RAR access and stream filter
  * rawaud: raw audio input module for vlc
@@ -341,7 +341,6 @@ $Id$
  * shm: Shared memory framebuffer access module
  * sid: Sidplay demuxer
  * simple_channel_mixer: channel mixer
- * simple_channel_mixer_neon: channel mixer using NEON assembly
  * skins2: Skinnable interface, new generation
  * smb: SMB shares access module
  * smf: Standard MIDI file demuxer
@@ -442,7 +441,6 @@ $Id$
  * wav: Wav demuxer
  * wave: Wave video effect
  * waveout: simple audio output module for Windows
- * win32text: Text renderer using native Win32 API
  * win_hotkeys: module to catch hotkeys when application doesn't have the focus
  * win_msg: Windows Messages module
  * windrive: Windows logical disc drives

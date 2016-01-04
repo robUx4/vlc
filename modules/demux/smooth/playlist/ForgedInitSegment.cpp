@@ -123,7 +123,7 @@ void ForgedInitSegment::setWaveFormatEx(const std::string &waveformat)
     size_t i_data;
     uint8_t *p_data = HexDecode(waveformat, &i_data);
     fromWaveFormatEx(p_data, i_data);
-    delete p_data;
+    free(p_data);
 }
 
 void ForgedInitSegment::setCodecPrivateData(const std::string &extra)
@@ -282,6 +282,9 @@ block_t * ForgedInitSegment::buildMoovBox()
         moov = box->b;
         free(box);
     }
+
+    if(!moov)
+        return NULL;
 
     vlc_fourcc_t extra[] = {MAJOR_isom, VLC_FOURCC('p','i','f','f'), VLC_FOURCC('i','s','o','2'), VLC_FOURCC('s','m','o','o')};
     box = GetFtyp(VLC_FOURCC('i','s','m','l'), 1, extra, ARRAY_SIZE(extra));
