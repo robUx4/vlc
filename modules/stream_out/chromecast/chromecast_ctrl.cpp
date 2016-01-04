@@ -895,7 +895,9 @@ bool intf_sys_t::restartDoPlay()
 {
     if ( b_restart_playback )
     {
+#ifndef NDEBUG
         msg_Dbg( p_intf, "restart playback p_input:%p playlist_Play() b_restart_playback:1 position:%f", (void*)p_input, f_restart_position );
+#endif
         playlist_Play( pl_Get(p_intf) );
         //b_restart_playback = false;
         return true;
@@ -919,7 +921,9 @@ void intf_sys_t::restartDoStop()
     var_AddCallback( p_input, "intf-event", RestartAfterEnd, p_intf );
     b_restart_playback = true;
     input_Control(p_input, INPUT_GET_POSITION, &f_restart_position);
+#ifndef NDEBUG
     msg_Dbg( p_intf, "Current %p position:%f", (void*)p_input, f_restart_position );
+#endif
     vlc_object_release(p_input);
 
     restartState = RESTART_STOPPING;
@@ -1166,7 +1170,9 @@ void intf_sys_t::processMessage(const castchannel::CastMessage &msg)
                     setCurrentStopped( false );
                     setPlayerStatus(CMD_PLAYBACK_SENT);
                     date_play_start = mdate();
+#ifndef NDEBUG
                     msg_Dbg(p_intf, "Playback started with an offset of %" PRId64 " now:%" PRId64 " playback_start_local:%" PRId64, playback_start_chromecast, date_play_start, playback_start_local);
+#endif
                     break;
 
                 case RECEIVER_PAUSED:
@@ -1178,13 +1184,17 @@ void intf_sys_t::processMessage(const castchannel::CastMessage &msg)
                     }
 
                     playback_start_chromecast = (1 + mtime_t( double( status[0]["currentTime"] ) ) ) * 1000000L;
+#ifndef NDEBUG
                     msg_Dbg(p_intf, "Playback paused with an offset of %" PRId64 " date_play_start:%" PRId64, playback_start_chromecast, date_play_start);
+#endif
 
                     if (date_play_start != -1 && oldPlayerState == RECEIVER_PLAYING)
                     {
                         /* this is a pause generated remotely */
                         playback_start_local += mdate() - date_play_start;
+#ifndef NDEBUG
                         msg_Dbg(p_intf, "updated playback_start_local:%" PRId64, playback_start_local);
+#endif
                     }
                     date_play_start = -1;
                     break;

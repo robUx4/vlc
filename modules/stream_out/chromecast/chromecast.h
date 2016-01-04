@@ -128,7 +128,9 @@ struct intf_sys_t
     void resetForcedSeek(mtime_t i_length) {
         b_forcing_position = false;
         playback_start_local = i_length * f_restart_position;
+#ifndef NDEBUG
         msg_Dbg(p_intf, "resetForcedSeek playback_start_local:%" PRId64, playback_start_local);
+#endif
     }
 
     intf_thread_t  * const p_intf;

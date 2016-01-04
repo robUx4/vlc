@@ -59,7 +59,9 @@ bool intf_sys_t::seekTo(mtime_t pos)
     }
     m_seektime = pos; // + playback_start_chromecast - playback_start_local;
     playback_start_local = pos;
+#ifndef NDEBUG
     msg_Dbg( p_intf, "%ld Seeking to %" PRId64 "/%s playback_time:%" PRId64 " playback_start_local:%" PRId64, GetCurrentThreadId(), pos, current_time, playback_start_chromecast, playback_start_local);
+#endif
     setPlayerStatus(CMD_SEEK_SENT);
     msgPlayerSeek( current_time );
 

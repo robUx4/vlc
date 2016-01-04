@@ -134,9 +134,13 @@ struct demux_sys_t
             mutex_cleanup_push(&p_intf->p_sys->lock);
             while (p_intf->p_sys->playback_start_chromecast < p_intf->p_sys->i_seektime)
             {
+#ifndef NDEBUG
                 msg_Dbg(p_demux, "%ld waiting for Chromecast seek", GetCurrentThreadId());
+#endif
                 vlc_cond_wait(&p_intf->p_sys->seekCommandCond, &p_intf->p_sys->lock);
+#ifndef NDEBUG
                 msg_Dbg(p_demux, "%ld finished waiting for Chromecast seek", GetCurrentThreadId());
+#endif
             }
             vlc_cleanup_pop();
 
