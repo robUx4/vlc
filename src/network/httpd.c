@@ -2034,8 +2034,12 @@ static void httpdLoop(httpd_host_t *host)
 
         assert (fd == host->fds[nfd]);
 
-        if (ufd[nfd].revents == 0 || ufd[nfd].revents & (POLLERR|POLLHUP) != 0)
+        if (ufd[nfd].revents == 0)
             continue;
+#if 1
+        if ((ufd[nfd].revents & (POLLERR|POLLHUP)) != 0)
+            continue;
+#endif
 
         /* */
         fd = vlc_accept (fd, NULL, NULL, true);
