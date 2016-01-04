@@ -55,8 +55,14 @@ enum connection_status
     CHROMECAST_TLS_CONNECTED,
     CHROMECAST_AUTHENTICATED,
     CHROMECAST_APP_STARTED,
-    CHROMECAST_MEDIA_LOAD_SENT,
     CHROMECAST_CONNECTION_DEAD,
+};
+
+enum command_status {
+    NO_CMD_PENDING,
+    CMD_LOAD_SENT,
+    CMD_PLAYBACK_SENT,
+    CMD_SEEK_SENT,
 };
 
 struct intf_sys_t
@@ -64,9 +70,14 @@ struct intf_sys_t
     intf_sys_t(intf_thread_t * const intf);
     ~intf_sys_t();
 
-    intf_thread_t  * const p_stream;
+    intf_thread_t  * const p_intf;
+    input_thread_t *p_input;
     std::string    serverIP;
+    std::string    mime;
+    std::string    muxer;
+
     std::string appTransportId;
+    std::string mediaSessionId;
 
     int i_sock_fd;
     vlc_tls_creds_t *p_creds;
@@ -80,6 +91,9 @@ struct intf_sys_t
     void msgReceiverClose(std::string destinationId);
 
     void handleMessages();
+    void sendPlayerCmd();
+
+    void InputUpdated( input_thread_t * );
 
     connection_status getConnectionStatus() const
     {
@@ -91,7 +105,7 @@ struct intf_sys_t
         if (conn_status != status)
         {
 #ifndef NDEBUG
-            msg_Dbg(p_stream, "change Chromecast connection status from %d to %d", conn_status, status);
+            msg_Dbg(p_intf, "change Chromecast connection status from %d to %d", conn_status, status);
 #endif
             conn_status = status;
             vlc_cond_broadcast(&loadCommandCond);
@@ -109,6 +123,8 @@ struct intf_sys_t
     void msgReceiverGetStatus();
 
     void msgPlayerLoad();
+    void msgPlayerPlay();
+    void msgPlayerPause();
 
     void processMessage(const castchannel::CastMessage &msg);
 
@@ -120,10 +136,27 @@ private:
                       const std::string & destinationId = DEFAULT_CHOMECAST_RECEIVER,
                       castchannel::CastMessage_PayloadType payloadType = castchannel::CastMessage_PayloadType_STRING);
 
+    void setPlayerStatus(enum command_status status) {
+        if (cmd_status != status)
+        {
+            msg_Dbg(p_intf, "change Chromecast command status from %d to %d", cmd_status, status);
+            cmd_status = status;
+        }
+    }
+
     enum connection_status conn_status;
+    enum command_status    cmd_status;
 
     unsigned i_receiver_requestId;
     unsigned i_requestId;
+    unsigned i_sout_id;
+
+    std::string       s_sout;
+    std::string       s_chromecast_url;
+    std::string GetMedia();
+
+    void plugOutputRedirection();
+    void unplugOutputRedirection();
 };
 
 #endif /* VLC_CHROMECAST_H */
