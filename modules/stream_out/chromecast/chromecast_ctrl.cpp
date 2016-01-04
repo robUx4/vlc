@@ -241,10 +241,10 @@ void Clean(intf_thread_t *p_intf)
  * @param destinationId the destination idenifier
  * @return the generated CastMessage
  */
-void intf_sys_t::buildMessage(const std::string & namespace_,
-                              const std::string & payload,
-                              const std::string & destinationId,
-                              castchannel::CastMessage_PayloadType payloadType)
+void intf_sys_t::pushMessage(const std::string & namespace_,
+                             const std::string & payload,
+                             const std::string & destinationId,
+                             castchannel::CastMessage_PayloadType payloadType)
 {
     castchannel::CastMessage msg;
 
@@ -263,7 +263,7 @@ void intf_sys_t::buildMessage(const std::string & namespace_,
 
 void intf_sys_t::pushMediaPlayerMessage(const std::stringstream & payload) {
     assert(!appTransportId.empty());
-    buildMessage(NAMESPACE_MEDIA, payload.str(), appTransportId);
+    pushMessage( NAMESPACE_MEDIA, payload.str(), appTransportId );
 }
 
 
@@ -1110,35 +1110,35 @@ void intf_sys_t::msgAuth()
     castchannel::DeviceAuthMessage authMessage;
     authMessage.mutable_challenge();
 
-    buildMessage(NAMESPACE_DEVICEAUTH, authMessage.SerializeAsString(),
-                 DEFAULT_CHOMECAST_RECEIVER, castchannel::CastMessage_PayloadType_BINARY);
+    pushMessage( NAMESPACE_DEVICEAUTH, authMessage.SerializeAsString(),
+                 DEFAULT_CHOMECAST_RECEIVER, castchannel::CastMessage_PayloadType_BINARY );
 }
 
 
 void intf_sys_t::msgPing()
 {
     std::string s("{\"type\":\"PING\"}");
-    buildMessage(NAMESPACE_HEARTBEAT, s);
+    pushMessage( NAMESPACE_HEARTBEAT, s );
 }
 
 
 void intf_sys_t::msgPong()
 {
     std::string s("{\"type\":\"PONG\"}");
-    buildMessage(NAMESPACE_HEARTBEAT, s);
+    pushMessage( NAMESPACE_HEARTBEAT, s );
 }
 
 void intf_sys_t::msgConnect(const std::string & destinationId)
 {
     std::string s("{\"type\":\"CONNECT\"}");
-    buildMessage(NAMESPACE_CONNECTION, s, destinationId);
+    pushMessage( NAMESPACE_CONNECTION, s, destinationId );
 }
 
 
 void intf_sys_t::msgReceiverClose(std::string destinationId)
 {
     std::string s("{\"type\":\"CLOSE\"}");
-    buildMessage(NAMESPACE_CONNECTION, s, destinationId);
+    pushMessage( NAMESPACE_CONNECTION, s, destinationId );
     if (appTransportId == destinationId)
         appTransportId = "";
     setConnectionStatus( deviceIP.empty() ? CHROMECAST_DISCONNECTED : CHROMECAST_TLS_CONNECTED );
@@ -1150,7 +1150,7 @@ void intf_sys_t::msgReceiverGetStatus()
     ss << "{\"type\":\"GET_STATUS\","
        <<  "\"requestId\":" << i_receiver_requestId++ << "}";
 
-    buildMessage(NAMESPACE_RECEIVER, ss.str());
+    pushMessage( NAMESPACE_RECEIVER, ss.str() );
 }
 
 void intf_sys_t::msgReceiverLaunchApp()
@@ -1160,7 +1160,7 @@ void intf_sys_t::msgReceiverLaunchApp()
        <<  "\"appId\":\"" << APP_ID << "\","
        <<  "\"requestId\":" << i_receiver_requestId++ << "}";
 
-    buildMessage(NAMESPACE_RECEIVER, ss.str());
+    pushMessage( NAMESPACE_RECEIVER, ss.str() );
 }
 
 
