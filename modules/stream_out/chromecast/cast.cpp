@@ -38,10 +38,9 @@
 
 struct sout_stream_sys_t
 {
-    sout_stream_sys_t(sout_stream_t *stream, intf_thread_t *intf, sout_stream_t *sout)
+    sout_stream_sys_t(intf_thread_t *intf, sout_stream_t *sout)
         : p_out(sout)
         , p_intf(intf)
-        , p_stream(stream)
     {
         assert(p_intf != NULL);
         vlc_object_hold(p_intf);
@@ -60,9 +59,6 @@ struct sout_stream_sys_t
 
     sout_stream_t * const p_out;
     intf_thread_t * const p_intf;
-
-protected:
-    sout_stream_t * const p_stream;
 };
 
 #define SOUT_CFG_PREFIX "sout-chromecast-"
@@ -201,7 +197,7 @@ static int Open(vlc_object_t *p_this)
         goto error;
     }
 
-    p_sys = new(std::nothrow) sout_stream_sys_t(p_stream, p_intf, p_sout);
+    p_sys = new(std::nothrow) sout_stream_sys_t(p_intf, p_sout);
     if (unlikely(p_sys == NULL))
         goto error;
 
