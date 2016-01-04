@@ -92,6 +92,11 @@ struct intf_sys_t
     intf_sys_t(intf_thread_t * const intf);
     ~intf_sys_t();
 
+    bool isFinishedPlaying() {
+        vlc_mutex_locker locker(&lock);
+        return deviceIP.empty() || conn_status == CHROMECAST_CONNECTION_DEAD || (receiverState == RECEIVER_BUFFERING && cmd_status != CMD_SEEK_SENT);
+    }
+
     mtime_t getPlaybackTime() const {
         switch( receiverState )
         {
@@ -116,8 +121,6 @@ struct intf_sys_t
             return (double) getPlaybackTime() / (double)( i_length );
         return 0.0;
     }
-
-    bool isFinishedPlaying();
 
     bool seekTo(mtime_t pos);
 

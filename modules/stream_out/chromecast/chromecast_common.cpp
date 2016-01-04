@@ -37,11 +37,6 @@
 // Media player Chromecast app id
 static const mtime_t SEEK_FORWARD_OFFSET = 1000000;
 
-bool intf_sys_t::isFinishedPlaying() {
-    vlc_mutex_locker locker(&lock);
-    return deviceIP.empty() || conn_status == CHROMECAST_CONNECTION_DEAD || (receiverState == RECEIVER_BUFFERING && cmd_status != CMD_SEEK_SENT);
-}
-
 bool intf_sys_t::seekTo(mtime_t pos)
 {
     vlc_mutex_locker locker(&lock);
