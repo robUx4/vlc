@@ -81,6 +81,7 @@ int intf_sys_t::sendMessage(const castchannel::CastMessage &msg)
     SetDWBE(p_data, i_size);
     msg.SerializeWithCachedSizesToArray(p_data + PACKET_HEADER_LEN);
 
+    vlc_mutex_locker locker(&lock);
     int i_ret = tls_Send(p_tls, p_data, PACKET_HEADER_LEN + i_size);
     delete[] p_data;
     if (i_ret == PACKET_HEADER_LEN + i_size)
@@ -115,7 +116,6 @@ void intf_sys_t::pushMessage(const std::string & namespace_,
     else // CastMessage_PayloadType_BINARY
         msg.set_payload_binary(payload);
 
-    vlc_mutex_locker locker(&lock);
     sendMessage(msg);
 }
 

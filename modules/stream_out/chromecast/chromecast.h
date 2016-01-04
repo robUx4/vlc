@@ -174,7 +174,7 @@ struct intf_sys_t
     vlc_thread_t chromecastThread;
 
     void msgAuth();
-    void msgReceiverClose();
+    void msgReceiverClose(std::string destinationId);
 
     void handleMessages();
     void sendPlayerCmd();

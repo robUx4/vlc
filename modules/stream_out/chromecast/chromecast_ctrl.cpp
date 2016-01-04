@@ -248,6 +248,19 @@ intf_sys_t::intf_sys_t(intf_thread_t * const p_this)
 
 intf_sys_t::~intf_sys_t()
 {
+    switch (getConnectionStatus())
+    {
+    case CHROMECAST_APP_STARTED:
+        // Generate the close messages.
+        msgReceiverClose(appTransportId);
+        // ft
+    case CHROMECAST_AUTHENTICATED:
+        msgReceiverClose(DEFAULT_CHOMECAST_RECEIVER);
+        // ft
+    default:
+        break;
+    }
+
     ipChangedEvent( NULL );
 
     vlc_cond_destroy(&seekCommandCond);
@@ -284,7 +297,7 @@ void intf_sys_t::ipChangedEvent(const char *psz_new_ip)
         if ( !deviceIP.empty() )
         {
             /* disconnect the current Chromecast */
-            msgReceiverClose();
+            msgReceiverClose(appTransportId);
 
             vlc_cancel(chromecastThread);
             vlc_join(chromecastThread, NULL);
@@ -1041,7 +1054,7 @@ void intf_sys_t::processMessage(const castchannel::CastMessage &msg)
                 /* If the app is no longer present */
                 case CHROMECAST_APP_STARTED:
                     msg_Warn(p_intf, "app is no longer present. closing");
-                    msgReceiverClose();
+                    msgReceiverClose(appTransportId);
                     break;
 
                 case CHROMECAST_AUTHENTICATED:
@@ -1203,7 +1216,7 @@ void intf_sys_t::processMessage(const castchannel::CastMessage &msg)
         {
             msg_Err(p_intf, "Media load failed");
             vlc_mutex_locker locker(&lock);
-            msgReceiverClose();
+            msgReceiverClose(appTransportId);
         }
         else if (type == "INVALID_REQUEST")
         {
@@ -1275,15 +1288,12 @@ void intf_sys_t::msgConnect(const std::string & destinationId)
 }
 
 
-void intf_sys_t::msgReceiverClose()
+void intf_sys_t::msgReceiverClose(std::string destinationId)
 {
-    if (appTransportId.empty())
-        return;
-
     std::string s("{\"type\":\"CLOSE\"}");
-    pushMessage(NAMESPACE_CONNECTION, s, appTransportId);
-
-    appTransportId = "";
+    pushMessage( NAMESPACE_CONNECTION, s, destinationId );
+    if (appTransportId == destinationId)
+        appTransportId = "";
     setConnectionStatus( deviceIP.empty() ? CHROMECAST_DISCONNECTED : CHROMECAST_TLS_CONNECTED );
 }
 
