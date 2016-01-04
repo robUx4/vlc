@@ -144,6 +144,7 @@ struct intf_sys_t
     void msgPlayerSetVolume(float volume);
     void msgPlayerSetMute(bool mute);
 
+private:
     void msgPing();
     void msgPong();
     void msgConnect(const std::string & destinationId = DEFAULT_CHOMECAST_RECEIVER);
@@ -157,7 +158,6 @@ struct intf_sys_t
 
     void processMessage(const castchannel::CastMessage &msg);
 
-private:
     int sendMessage(const castchannel::CastMessage &msg);
 
     void buildMessage(const std::string & namespace_,
