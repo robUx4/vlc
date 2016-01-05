@@ -75,7 +75,6 @@ static const std::string NAMESPACE_RECEIVER         = "urn:x-cast:com.google.cas
  *****************************************************************************/
 static int Open(vlc_object_t *);
 static void Close(vlc_object_t *);
-static void Clean(intf_thread_t *);
 
 static int CurrentChanged( vlc_object_t *, char const *,
                           vlc_value_t, vlc_value_t, void * );
@@ -129,12 +128,6 @@ int Open(vlc_object_t *p_this)
     playlist_t *p_playlist = pl_Get( p_intf );
     std::stringstream receiver_addr;
     char *psz_ipChromecast = var_InheritString(p_intf, CONTROL_CFG_PREFIX "addr");
-    if (psz_ipChromecast == NULL)
-    {
-        msg_Err(p_intf, "No Chromecast receiver IP provided");
-        Clean(p_intf);
-        return VLC_EGENERIC;
-    }
 
     if (psz_ipChromecast == NULL)
         msg_Info(p_intf, "No Chromecast receiver IP/Name provided");
@@ -198,31 +191,6 @@ void Close(vlc_object_t *p_this)
     var_DelCallback( p_playlist, "mute", MuteChanged, p_intf );
     var_DelCallback( p_playlist, "volume", VolumeChanged, p_intf );
 
-    p_sys->ipChangedEvent( NULL );
-
-    switch (p_sys->getConnectionStatus())
-    {
-    case CHROMECAST_APP_STARTED:
-        // Generate the close messages.
-        p_sys->msgReceiverClose(p_sys->appTransportId);
-        // ft
-    case CHROMECAST_AUTHENTICATED:
-        p_sys->msgReceiverClose(DEFAULT_CHOMECAST_RECEIVER);
-        // ft
-    default:
-        break;
-    }
-
-    Clean(p_intf);
-}
-
-/**
- * @brief Clean and release the variables in a sout_stream_sys_t structure
- */
-void Clean(intf_thread_t *p_intf)
-{
-    intf_sys_t *p_sys = p_intf->p_sys;
-
     delete p_sys;
 }
 
@@ -284,7 +252,21 @@ intf_sys_t::intf_sys_t(intf_thread_t * const p_this)
 
 intf_sys_t::~intf_sys_t()
 {
+    switch (getConnectionStatus())
+    {
+    case CHROMECAST_APP_STARTED:
+        // Generate the close messages.
+        msgReceiverClose(appTransportId);
+        // ft
+    case CHROMECAST_AUTHENTICATED:
+        msgReceiverClose(DEFAULT_CHOMECAST_RECEIVER);
+        // ft
+    default:
+        break;
+    }
+
     ipChangedEvent( NULL );
+
     vlc_cond_destroy(&loadCommandCond);
     vlc_mutex_destroy(&lock);
 }
