@@ -265,7 +265,9 @@ intf_sys_t::intf_sys_t(intf_thread_t * const p_this)
     :p_intf(p_this)
     ,p_input(NULL)
     ,devicePort(CHROMECAST_CONTROL_PORT)
+    ,receiverState(RECEIVER_IDLE)
     ,canDisplay(DISPLAY_UNKNOWN)
+    ,currentStopped(true)
     ,p_tls(NULL)
     ,conn_status(CHROMECAST_DISCONNECTED)
     ,cmd_status(NO_CMD_PENDING)
@@ -447,6 +449,7 @@ void intf_sys_t::InputUpdated( input_thread_t *p_input )
         unplugOutputRedirection();
     }
 
+    setCurrentStopped( true );
     this->p_input = p_input;
 
     if( this->p_input != NULL )
@@ -562,6 +565,16 @@ void intf_sys_t::InputUpdated( input_thread_t *p_input )
     vlc_mutex_unlock(&lock);
 }
 
+void intf_sys_t::setCurrentStopped(bool stopped) {
+    if (currentStopped != stopped)
+    {
+#ifndef NDEBUG
+        msg_Dbg(p_stream, "change current file stopped, now %d", stopped);
+#endif
+        currentStopped = stopped;
+    }
+}
+
 void intf_sys_t::sendPlayerCmd()
 {
     if (!p_input)
@@ -599,7 +612,7 @@ void intf_sys_t::sendPlayerCmd()
         }
         break;
     case PLAYING_S:
-        if (!mediaSessionId.empty()) {
+        if (!mediaSessionId.empty() && receiverState != RECEIVER_IDLE && currentStopped) {
             msgPlayerPlay();
             setPlayerStatus(CMD_PLAYBACK_SENT);
         } else if (cmd_status == NO_CMD_PENDING) {
@@ -608,7 +621,7 @@ void intf_sys_t::sendPlayerCmd()
         }
         break;
     case PAUSE_S:
-        if (!mediaSessionId.empty()) {
+        if (!mediaSessionId.empty() && receiverState != RECEIVER_IDLE && currentStopped) {
             msgPlayerPause();
             setPlayerStatus(CMD_PLAYBACK_SENT);
         } else if (cmd_status == NO_CMD_PENDING) {
@@ -700,6 +713,8 @@ void intf_sys_t::disconnectChromecast()
         p_tls = NULL;
         setConnectionStatus(CHROMECAST_DISCONNECTED);
         setPlayerStatus(NO_CMD_PENDING);
+        setCurrentStopped( true );
+        receiverState = RECEIVER_IDLE;
     }
 }
 
@@ -917,6 +932,7 @@ void intf_sys_t::processMessage(const castchannel::CastMessage &msg)
                 case CHROMECAST_AUTHENTICATED:
                     msg_Dbg(p_intf, "Chromecast was running no app, launch media_app");
                     appTransportId = "";
+                    receiverState = RECEIVER_IDLE;
                     msgReceiverLaunchApp();
                     break;
 
@@ -952,6 +968,23 @@ void intf_sys_t::processMessage(const castchannel::CastMessage &msg)
                     status[0]["playerState"].operator const char *(),
                     (int)(json_int_t) status[0]["mediaSessionId"]);
 
+            vlc_mutex_locker locker(&lock);
+            receiver_state oldPlayerState = receiverState;
+            std::string newPlayerState = status[0]["playerState"].operator const char *();
+
+            if (newPlayerState == "IDLE") {
+                receiverState = RECEIVER_IDLE;
+                mediaSessionId = ""; // this session is not valid anymore
+            }
+            else if (newPlayerState == "PLAYING")
+                receiverState = RECEIVER_PLAYING;
+            else if (newPlayerState == "BUFFERING")
+                receiverState = RECEIVER_BUFFERING;
+            else if (newPlayerState == "PAUSED")
+                receiverState = RECEIVER_PAUSED;
+            else if (!newPlayerState.empty())
+                msg_Warn(p_stream, "Unknown Chromecast state %s", newPlayerState.c_str());
+
             char session_id[32];
             if( snprintf( session_id, sizeof(session_id), "%" PRId64, (json_int_t) status[0]["mediaSessionId"] ) >= (int)sizeof(session_id) )
             {
@@ -960,10 +993,62 @@ void intf_sys_t::processMessage(const castchannel::CastMessage &msg)
             }
             if (!mediaSessionId.empty() && session_id[0] && mediaSessionId != session_id) {
                 msg_Warn(p_intf, "different mediaSessionId detected %s was %s", mediaSessionId.c_str(), this->mediaSessionId.c_str());
-                //p_sys->msgPlayerLoad();
+                //msgPlayerLoad();
             }
 
             mediaSessionId = session_id;
+
+            if (receiverState != oldPlayerState)
+            {
+#ifndef NDEBUG
+                msg_Dbg(p_stream, "change Chromecast player state from %d to %d", oldPlayerState, receiverState);
+#endif
+                switch( receiverState )
+                {
+                case RECEIVER_BUFFERING:
+                    if ( double(status[0]["currentTime"]) == 0.0 )
+                    {
+                        receiverState = oldPlayerState;
+                        msg_Dbg(p_stream, "Invalid buffering time, keep previous state %d", oldPlayerState);
+                    }
+                    else
+                    {
+                        if (!mediaSessionId.empty())
+                        {
+                            playlist_t *p_playlist = pl_Get( p_stream );
+                            msgPlayerSetMute( var_GetBool( p_playlist, "mute") );
+                            msgPlayerSetVolume( var_GetFloat( p_playlist, "volume") );
+                        }
+                    }
+                    break;
+
+                case RECEIVER_PLAYING:
+                    /* TODO reset demux PCR ? */
+                    setCurrentStopped( false );
+                    setPlayerStatus(CMD_PLAYBACK_SENT);
+                    break;
+
+                case RECEIVER_PAUSED:
+                    if (!mediaSessionId.empty())
+                    {
+                        playlist_t *p_playlist = pl_Get( p_stream );
+                        msgPlayerSetMute( var_GetBool( p_playlist, "mute") );
+                        msgPlayerSetVolume( var_GetFloat( p_playlist, "volume") );
+                    }
+                    break;
+
+                case RECEIVER_IDLE:
+                    setCurrentStopped( false );
+                    /* fall through */
+                default:
+                    setPlayerStatus(NO_CMD_PENDING);
+                    sendPlayerCmd();
+                    break;
+                }
+            }
+
+            if (cmd_status == CMD_LOAD_SENT)
+                sendPlayerCmd();
         }
         else if (type == "LOAD_FAILED")
         {
@@ -1045,6 +1130,8 @@ void intf_sys_t::msgReceiverClose(std::string destinationId)
 {
     std::string s("{\"type\":\"CLOSE\"}");
     buildMessage(NAMESPACE_CONNECTION, s, destinationId);
+    if (appTransportId == destinationId)
+        appTransportId = "";
     setConnectionStatus( deviceIP.empty() ? CHROMECAST_DISCONNECTED : CHROMECAST_TLS_CONNECTED );
 }
 
