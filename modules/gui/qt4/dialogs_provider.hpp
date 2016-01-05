@@ -124,8 +124,8 @@ public slots:
     void mediaCodecDialog();
     void prefsDialog();
     void extendedDialog();
-#if defined(ENABLE_SOUT) && defined(HAVE_MICRODNS)
-    void chromecastDialog();
+#if defined(ENABLE_SOUT)
+    void rendererDialog();
 #endif
     void synchroDialog();
     void messagesDialog();

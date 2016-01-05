@@ -57,7 +57,7 @@
 #include "dialogs/external.hpp"
 #include "dialogs/epg.hpp"
 #include "dialogs/errors.hpp"
-#include "dialogs/chromecast.hpp"
+#include "dialogs/renderer.hpp"
 
 #include <QEvent>
 #include <QApplication>
@@ -154,9 +154,9 @@ void DialogsProvider::customEvent( QEvent *event )
            bookmarksDialog(); break;
         case INTF_DIALOG_EXTENDED:
            extendedDialog(); break;
-#if defined(ENABLE_SOUT) && defined(HAVE_MICRODNS)
-        case INTF_DIALOG_CHROMECAST:
-           chromecastDialog(); break;
+#if defined(ENABLE_SOUT)
+        case INTF_DIALOG_RENDERER:
+           rendererDialog(); break;
 #endif
         case INTF_DIALOG_SENDKEY:
            sendKey( de->i_arg ); break;
@@ -239,10 +239,10 @@ void DialogsProvider::extendedDialog()
         extDialog->hide();
 }
 
-#if defined(ENABLE_SOUT) && defined(HAVE_MICRODNS)
-void DialogsProvider::chromecastDialog()
+#if defined(ENABLE_SOUT)
+void DialogsProvider::rendererDialog()
 {
-    ChromecastDialog::getInstance( p_intf )->toggleVisible();
+    RendererDialog::getInstance( p_intf )->toggleVisible();
 }
 #endif
 

@@ -1,5 +1,5 @@
 /*****************************************************************************
- * chromecast.hpp : Chromecast output dialog
+ * renderer.hpp : Renderer output dialog
  ****************************************************************************
  * Copyright ( C ) 2015 the VideoLAN team
  * $Id$
@@ -21,12 +21,12 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston MA 02110-1301, USA.
  *****************************************************************************/
 
-#ifndef QVLC_CHROMECAST_DIALOG_H_
-#define QVLC_CHROMECAST_DIALOG_H_ 1
+#ifndef QVLC_RENDERER_DIALOG_H_
+#define QVLC_RENDERER_DIALOG_H_ 1
 
 #include "util/qvlcframe.hpp"
 #include "util/singleton.hpp"
-#include "ui/chromecast.h"
+#include "ui/renderer.h"
 
 #include <QMutex>
 #include <QAtomicInt>
@@ -36,7 +36,7 @@ class QTreeWidget;
 class QTreeWidgetItem;
 class MsgEvent;
 
-class ChromecastDialog : public QVLCDialog, public Singleton<ChromecastDialog>
+class RendererDialog : public QVLCDialog, public Singleton<RendererDialog>
 {
     Q_OBJECT
 
@@ -45,10 +45,10 @@ public:
     void setVisible(bool visible);
 
 private:
-    ChromecastDialog( intf_thread_t * );
-    virtual ~ChromecastDialog();
+    RendererDialog( intf_thread_t * );
+    virtual ~RendererDialog();
 
-    Ui::chromecastWidget ui;
+    Ui::rendererWidget ui;
     void sinkMessage( const MsgEvent * );
 
 private slots:
@@ -58,7 +58,7 @@ private slots:
 
 private:
 
-    friend class    Singleton<ChromecastDialog>;
+    friend class    Singleton<RendererDialog>;
     services_discovery_t *p_sd;
     bool                  b_sd_started;
 };

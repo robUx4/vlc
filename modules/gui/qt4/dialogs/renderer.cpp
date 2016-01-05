@@ -1,5 +1,5 @@
 /*****************************************************************************
- * chromecast.cpp : Chromecast output dialog
+ * renderer.cpp : Renderer output dialog
  ****************************************************************************
  * Copyright (C) 2015 the VideoLAN team
  *
@@ -35,7 +35,7 @@
 #include <vlc_services_discovery.h>
 #include <vlc_url.h>
 
-#include "dialogs/chromecast.hpp"
+#include "dialogs/renderer.hpp"
 
 #define VAR_CHROMECAST_ADDR  "chromecast-addr-port"
 
@@ -62,22 +62,22 @@ protected:
     uint16_t port;
     ChromecastType type;
 
-    friend class ChromecastDialog;
+    friend class RendererDialog;
 };
 
 extern "C" void discovery_event_received( const vlc_event_t * p_event, void * user_data )
 {
-    ChromecastDialog *p_this = reinterpret_cast<ChromecastDialog*>(user_data);
+    RendererDialog *p_this = reinterpret_cast<RendererDialog*>(user_data);
     p_this->discoveryEventReceived( p_event );
 }
 
-ChromecastDialog::ChromecastDialog( intf_thread_t *_p_intf )
+RendererDialog::RendererDialog( intf_thread_t *_p_intf )
                : QVLCDialog( (QWidget*)_p_intf->p_sys->p_mi, _p_intf )
                , p_sd( NULL )
                , b_sd_started( false )
 {
-    setWindowTitle( qtr( "Chromecast Output" ) );
-    setWindowRole( "vlc-chromecast" );
+    setWindowTitle( qtr( "Renderer Output" ) );
+    setWindowRole( "vlc-renderer" );
 
     /* Build Ui */
     ui.setupUi( this );
@@ -86,16 +86,16 @@ ChromecastDialog::ChromecastDialog( intf_thread_t *_p_intf )
     CONNECT( ui.buttonBox, rejected(), this, onReject() );
     CONNECT( ui.receiversListWidget, itemDoubleClicked(QListWidgetItem*), this, accept());
 
-    QVLCTools::restoreWidgetPosition( p_intf, "Chromecast", this, QSize( 400 , 440 ) );
+    QVLCTools::restoreWidgetPosition( p_intf, "Renderer", this, QSize( 400 , 440 ) );
 }
 
-ChromecastDialog::~ChromecastDialog()
+RendererDialog::~RendererDialog()
 {
     if ( p_sd != NULL )
         vlc_sd_Destroy( p_sd );
 };
 
-void ChromecastDialog::onReject()
+void RendererDialog::onReject()
 {
     /* set the chromecast control */
     playlist_t *p_playlist = pl_Get( p_intf );
@@ -105,14 +105,14 @@ void ChromecastDialog::onReject()
     QVLCDialog::reject();
 }
 
-void ChromecastDialog::close()
+void RendererDialog::close()
 {
-    QVLCTools::saveWidgetPosition( p_intf, "Chromecast", this );
+    QVLCTools::saveWidgetPosition( p_intf, "Renderer", this );
 
     QVLCDialog::close();
 }
 
-void ChromecastDialog::setVisible(bool visible)
+void RendererDialog::setVisible(bool visible)
 {
     QVLCDialog::setVisible(visible);
 
@@ -186,7 +186,7 @@ void ChromecastDialog::setVisible(bool visible)
     }
 }
 
-void ChromecastDialog::accept()
+void RendererDialog::accept()
 {
     /* get the selected one in the listview if any */
     QListWidgetItem *current = ui.receiversListWidget->currentItem();
@@ -233,7 +233,7 @@ void ChromecastDialog::accept()
     QVLCDialog::accept();
 }
 
-void ChromecastDialog::discoveryEventReceived( const vlc_event_t * p_event )
+void RendererDialog::discoveryEventReceived( const vlc_event_t * p_event )
 {
     if ( p_event->type == vlc_ServicesDiscoveryItemAdded )
     {

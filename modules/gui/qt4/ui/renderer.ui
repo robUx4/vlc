@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <ui version="4.0">
- <class>chromecastWidget</class>
- <widget class="QWidget" name="chromecastWidget">
+ <class>rendererWidget</class>
+ <widget class="QWidget" name="rendererWidget">
   <property name="geometry">
    <rect>
     <x>0</x>
@@ -11,13 +11,13 @@
    </rect>
   </property>
   <property name="windowTitle">
-   <string>Chromecast Output</string>
+   <string>Renderer Output</string>
   </property>
   <layout class="QVBoxLayout" name="verticalLayout_2">
    <item>
     <widget class="QLabel" name="label">
      <property name="text">
-      <string>Available Chromecasts</string>
+      <string>Available Renderers</string>
      </property>
     </widget>
    </item>

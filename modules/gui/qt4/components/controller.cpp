@@ -473,8 +473,8 @@ QWidget *AbstractController::createWidget( buttonType_e button, int options )
         CONNECT_MAP_SET( play, PLAY_ACTION );
         }
         break;
-    case CHROMECAST_BUTTON:{
-        NORMAL_BUTTON( CHROMECAST );
+    case RENDERER_BUTTON:{
+        NORMAL_BUTTON( RENDERER );
         }
         break;
     case ASPECT_RATIO_COMBOBOX:
