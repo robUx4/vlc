@@ -165,6 +165,8 @@ private:
                       const std::string & destinationId = DEFAULT_CHOMECAST_RECEIVER,
                       castchannel::CastMessage_PayloadType payloadType = castchannel::CastMessage_PayloadType_STRING);
 
+    void pushMediaPlayerMessage(const std::stringstream & payload);
+
     void setPlayerStatus(enum command_status status) {
         if (cmd_status != status)
         {

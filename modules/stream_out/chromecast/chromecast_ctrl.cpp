@@ -261,6 +261,15 @@ void intf_sys_t::buildMessage(const std::string & namespace_,
     sendMessage(msg);
 }
 
+void intf_sys_t::pushMediaPlayerMessage(const std::stringstream & payload) {
+    assert(!appTransportId.empty());
+    buildMessage(NAMESPACE_MEDIA, payload.str(), appTransportId);
+}
+
+
+/*****************************************************************************
+ * intf_sys_t: class definition
+ *****************************************************************************/
 intf_sys_t::intf_sys_t(intf_thread_t * const p_this)
     :p_intf(p_this)
     ,p_input(NULL)
@@ -569,7 +578,7 @@ void intf_sys_t::setCurrentStopped(bool stopped) {
     if (currentStopped != stopped)
     {
 #ifndef NDEBUG
-        msg_Dbg(p_stream, "change current file stopped, now %d", stopped);
+        msg_Dbg(p_intf, "change current file stopped, now %d", stopped);
 #endif
         currentStopped = stopped;
     }
@@ -983,7 +992,7 @@ void intf_sys_t::processMessage(const castchannel::CastMessage &msg)
             else if (newPlayerState == "PAUSED")
                 receiverState = RECEIVER_PAUSED;
             else if (!newPlayerState.empty())
-                msg_Warn(p_stream, "Unknown Chromecast state %s", newPlayerState.c_str());
+                msg_Warn(p_intf, "Unknown Chromecast state %s", newPlayerState.c_str());
 
             char session_id[32];
             if( snprintf( session_id, sizeof(session_id), "%" PRId64, (json_int_t) status[0]["mediaSessionId"] ) >= (int)sizeof(session_id) )
@@ -1001,7 +1010,7 @@ void intf_sys_t::processMessage(const castchannel::CastMessage &msg)
             if (receiverState != oldPlayerState)
             {
 #ifndef NDEBUG
-                msg_Dbg(p_stream, "change Chromecast player state from %d to %d", oldPlayerState, receiverState);
+                msg_Dbg(p_intf, "change Chromecast player state from %d to %d", oldPlayerState, receiverState);
 #endif
                 switch( receiverState )
                 {
@@ -1009,13 +1018,13 @@ void intf_sys_t::processMessage(const castchannel::CastMessage &msg)
                     if ( double(status[0]["currentTime"]) == 0.0 )
                     {
                         receiverState = oldPlayerState;
-                        msg_Dbg(p_stream, "Invalid buffering time, keep previous state %d", oldPlayerState);
+                        msg_Dbg(p_intf, "Invalid buffering time, keep previous state %d", oldPlayerState);
                     }
                     else
                     {
                         if (!mediaSessionId.empty())
                         {
-                            playlist_t *p_playlist = pl_Get( p_stream );
+                            playlist_t *p_playlist = pl_Get( p_intf );
                             msgPlayerSetMute( var_GetBool( p_playlist, "mute") );
                             msgPlayerSetVolume( var_GetFloat( p_playlist, "volume") );
                         }
@@ -1031,7 +1040,7 @@ void intf_sys_t::processMessage(const castchannel::CastMessage &msg)
                 case RECEIVER_PAUSED:
                     if (!mediaSessionId.empty())
                     {
-                        playlist_t *p_playlist = pl_Get( p_stream );
+                        playlist_t *p_playlist = pl_Get( p_intf );
                         msgPlayerSetMute( var_GetBool( p_playlist, "mute") );
                         msgPlayerSetVolume( var_GetFloat( p_playlist, "volume") );
                     }
@@ -1209,7 +1218,7 @@ void intf_sys_t::msgPlayerLoad()
        <<  "\"requestId\":" << i_requestId++
        << "}";
 
-    buildMessage(NAMESPACE_MEDIA, ss.str(), appTransportId);
+    pushMediaPlayerMessage( ss );
 }
 
 void intf_sys_t::msgPlayerPlay()
@@ -1222,7 +1231,7 @@ void intf_sys_t::msgPlayerPlay()
        <<  "\"requestId\":" << i_requestId++
        << "}";
 
-    buildMessage(NAMESPACE_MEDIA, ss.str(), appTransportId);
+    pushMediaPlayerMessage( ss );
 }
 
 void intf_sys_t::msgPlayerPause()
@@ -1235,7 +1244,7 @@ void intf_sys_t::msgPlayerPause()
        <<  "\"requestId\":" << i_requestId++
        << "}";
 
-    buildMessage(NAMESPACE_MEDIA, ss.str(), appTransportId);
+    pushMediaPlayerMessage( ss );
 }
 
 void intf_sys_t::msgPlayerSetVolume(float f_volume)
@@ -1252,7 +1261,7 @@ void intf_sys_t::msgPlayerSetVolume(float f_volume)
        <<  "\"requestId\":" << i_requestId++
        << "}";
 
-    buildMessage(NAMESPACE_MEDIA, ss.str(), appTransportId);
+    pushMediaPlayerMessage( ss );
 }
 
 void intf_sys_t::msgPlayerSetMute(bool b_mute)
@@ -1266,7 +1275,7 @@ void intf_sys_t::msgPlayerSetMute(bool b_mute)
        <<  "\"requestId\":" << i_requestId++
        << "}";
 
-    buildMessage(NAMESPACE_MEDIA, ss.str(), appTransportId);
+    pushMediaPlayerMessage( ss );
 }
 
 /**
