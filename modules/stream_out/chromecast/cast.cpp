@@ -229,3 +229,4 @@ static void Close(vlc_object_t *p_this)
 
     delete p_stream->p_sys;
 }
+
