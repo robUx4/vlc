@@ -750,13 +750,13 @@ void intf_sys_t::disconnectChromecast()
 
 /**
  * @brief Receive a data packet from the Chromecast
- * @param p_stream the object used to log
+ * @param p_intf the sout_stream_t structure
  * @param b_msgReceived returns true if a message has been entirely received else false
  * @param i_payloadSize returns the payload size of the message received
  * @return the number of bytes received of -1 on error
  */
 // Use here only C linkage and POD types as this function is a cancelation point.
-extern "C" int recvPacket(vlc_object_t *p_stream, bool &b_msgReceived,
+extern "C" int recvPacket(vlc_object_t *p_intf, bool &b_msgReceived,
                           uint32_t &i_payloadSize, int i_sock_fd, vlc_tls_t *p_tls,
                           unsigned *pi_received, uint8_t *p_data, bool *pb_pingTimeout,
                           int *pi_wait_delay, int *pi_wait_retries)
@@ -775,7 +775,7 @@ extern "C" int recvPacket(vlc_object_t *p_stream, bool &b_msgReceived,
         {
             if (!*pi_wait_retries)
             {
-                msg_Err(p_stream, "No PONG answer received from the Chromecast");
+                msg_Err(p_intf, "No PONG answer received from the Chromecast");
                 return 0; // Connection died
             }
             (*pi_wait_retries)--;
@@ -785,7 +785,7 @@ extern "C" int recvPacket(vlc_object_t *p_stream, bool &b_msgReceived,
             /* now expect a pong */
             *pi_wait_delay = PONG_WAIT_TIME;
             *pi_wait_retries = PONG_WAIT_RETRIES;
-            msg_Warn(p_stream, "No PING received from the Chromecast, sending a PING");
+            msg_Warn(p_intf, "No PING received from the Chromecast, sending a PING");
         }
         *pb_pingTimeout = true;
     }
@@ -821,7 +821,7 @@ extern "C" int recvPacket(vlc_object_t *p_stream, bool &b_msgReceived,
     if (i_payloadSize > i_maxPayloadSize)
     {
         // Error case: the packet sent by the Chromecast is too long: we drop it.
-        msg_Err(p_stream, "Packet too long: droping its data");
+        msg_Err(p_intf, "Packet too long: droping its data");
 
         uint32_t i_size = i_payloadSize - (*pi_received - PACKET_HEADER_LEN);
         if (i_size > i_maxPayloadSize)
@@ -1498,7 +1498,7 @@ static void* ChromecastThread(void* p_data)
     {
         p_sys->handleMessages();
 
-        vlc_mutex_locker locker(&lock);
+        vlc_mutex_locker locker(&p_sys->lock);
         if ( p_sys->getConnectionStatus() == CHROMECAST_CONNECTION_DEAD )
             break;
     }

@@ -80,7 +80,7 @@ SUFFIXES += .proto .pb.cc
 %.pb.h %.pb.cc: %.proto
 	$(PROTOC) --cpp_out=. -I$(srcdir) $<
 
-libstream_out_chromecast_plugin_la_SOURCES = \
+libctrl_chromecast_plugin_la_SOURCES = \
     stream_out/chromecast/cast_channel.proto stream_out/chromecast/chromecast.h \
     stream_out/chromecast/chromecast_common.cpp stream_out/chromecast/chromecast_ctrl.cpp \
     misc/webservices/json.h misc/webservices/json.c
