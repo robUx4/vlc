@@ -62,7 +62,7 @@ static const int CHROMECAST_CONTROL_PORT = 8009;
 #define PONG_WAIT_TIME 500
 #define PONG_WAIT_RETRIES 2
 
-#define VAR_CHROMECAST_ADDR  "chromecast-addr-port"
+#define VAR_RENDERER_CONFIG  "renderer-config"
 #define CONTROL_CFG_PREFIX "chromecast-"
 
 static const std::string NAMESPACE_DEVICEAUTH       = "urn:x-cast:com.google.cast.tp.deviceauth";
@@ -130,11 +130,11 @@ int Open(vlc_object_t *p_this)
     playlist_t *p_playlist = pl_Get( p_intf );
     std::stringstream receiver_addr;
     char *psz_addrChromecast = NULL;
-    if( !var_Type( p_playlist, VAR_CHROMECAST_ADDR ) )
+    if( !var_Type( p_playlist, VAR_RENDERER_CONFIG ) )
         /* Don't recreate the same variable over and over and over... */
-        var_Create( p_playlist, VAR_CHROMECAST_ADDR, VLC_VAR_STRING );
+        var_Create( p_playlist, VAR_RENDERER_CONFIG, VLC_VAR_STRING );
 
-    psz_addrChromecast = var_InheritString( p_playlist, VAR_CHROMECAST_ADDR );
+    psz_addrChromecast = var_InheritString( p_playlist, VAR_RENDERER_CONFIG );
     if (psz_addrChromecast == NULL)
         psz_addrChromecast = var_InheritString(p_intf, CONTROL_CFG_PREFIX "addr");
     else if (psz_addrChromecast[0])
@@ -159,7 +159,7 @@ int Open(vlc_object_t *p_this)
         }
         vlc_UrlClean(&url);
     }
-    var_SetString( p_playlist, VAR_CHROMECAST_ADDR, receiver_addr.str().c_str() );
+    var_SetString( p_playlist, VAR_RENDERER_CONFIG, receiver_addr.str().c_str() );
 
     char *psz_mux = var_InheritString(p_intf, CONTROL_CFG_PREFIX "mux");
     if (psz_mux == NULL)
@@ -187,7 +187,7 @@ int Open(vlc_object_t *p_this)
 
     p_sys->ipChangedEvent( receiver_addr.str().c_str() );
 
-    var_AddCallback( p_playlist, VAR_CHROMECAST_ADDR, AddrChangedEvent, p_intf );
+    var_AddCallback( p_playlist, VAR_RENDERER_CONFIG, AddrChangedEvent, p_intf );
 
     return VLC_SUCCESS;
 
@@ -206,7 +206,7 @@ void Close(vlc_object_t *p_this)
     intf_sys_t *p_sys = p_intf->p_sys;
 
     playlist_t *p_playlist = pl_Get( p_intf );
-    var_DelCallback( p_playlist, VAR_CHROMECAST_ADDR, AddrChangedEvent, p_intf );
+    var_DelCallback( p_playlist, VAR_RENDERER_CONFIG, AddrChangedEvent, p_intf );
     var_DelCallback( p_playlist, "input-prepare", CurrentChanged, p_intf );
     var_DelCallback( p_playlist, "mute", MuteChanged, p_intf );
     var_DelCallback( p_playlist, "volume", VolumeChanged, p_intf );

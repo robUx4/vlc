@@ -37,7 +37,7 @@
 
 #include "dialogs/renderer.hpp"
 
-#define VAR_CHROMECAST_ADDR  "chromecast-addr-port"
+#define VAR_RENDERER_CONFIG  "renderer-config"
 
 class RendererItem : public QListWidgetItem
 {
@@ -99,8 +99,8 @@ void RendererDialog::onReject()
 {
     /* set the renderer config */
     playlist_t *p_playlist = pl_Get( p_intf );
-    if( var_Type( p_playlist, VAR_CHROMECAST_ADDR ) )
-        var_SetString( p_playlist, VAR_CHROMECAST_ADDR, NULL );
+    if( var_Type( p_playlist, VAR_RENDERER_CONFIG ) )
+        var_SetString( p_playlist, VAR_RENDERER_CONFIG, NULL );
 
     QVLCDialog::reject();
 }
@@ -131,7 +131,7 @@ void RendererDialog::setVisible(bool visible)
         {
             int row = -1;
             playlist_t *p_playlist = pl_Get( p_intf );
-            char *psz_current_ip = var_GetString( p_playlist, VAR_CHROMECAST_ADDR );
+            char *psz_current_ip = var_GetString( p_playlist, VAR_RENDERER_CONFIG );
             if (psz_current_ip != NULL)
             {
                 vlc_url_t url;
@@ -203,10 +203,10 @@ void RendererDialog::accept()
 
         /* set the renderer config */
         playlist_t *p_playlist = pl_Get(p_intf);
-        if( !var_Type( p_playlist, VAR_CHROMECAST_ADDR ) )
+        if( !var_Type( p_playlist, VAR_RENDERER_CONFIG ) )
             /* Don't recreate the same variable over and over and over... */
-            var_Create( p_playlist, VAR_CHROMECAST_ADDR, VLC_VAR_STRING );
-        var_SetString( p_playlist, VAR_CHROMECAST_ADDR, ss.str().c_str() );
+            var_Create( p_playlist, VAR_RENDERER_CONFIG, VLC_VAR_STRING );
+        var_SetString( p_playlist, VAR_RENDERER_CONFIG, ss.str().c_str() );
 
         /* load the module needed to handle the renderer */
         bool module_loaded = false;
@@ -271,7 +271,7 @@ void RendererDialog::discoveryEventReceived( const vlc_event_t * p_event )
         ui.receiversListWidget->addItem( item );
 
         playlist_t *p_playlist = pl_Get( p_intf );
-        char *psz_current_ip = var_GetString( p_playlist, VAR_CHROMECAST_ADDR );
+        char *psz_current_ip = var_GetString( p_playlist, VAR_RENDERER_CONFIG );
         if (psz_current_ip)
         {
             vlc_UrlParse(&url, psz_current_ip);
