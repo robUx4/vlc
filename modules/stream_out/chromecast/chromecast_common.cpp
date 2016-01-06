@@ -42,7 +42,7 @@ bool intf_sys_t::seekTo(mtime_t pos)
     if (conn_status == CHROMECAST_CONNECTION_DEAD)
         return false;
 
-    assert(playback_start_chromecast != -1.0);
+    assert(playback_start_chromecast != -1);
 
     char current_time[32];
     i_seektime = mdate() + SEEK_FORWARD_OFFSET /* + playback_start_local */ ;

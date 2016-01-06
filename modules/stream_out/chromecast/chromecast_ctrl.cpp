@@ -228,10 +228,10 @@ intf_sys_t::intf_sys_t(intf_thread_t * const p_this)
     ,p_creds(NULL)
     ,p_tls(NULL)
     ,date_play_start(-1)
-    ,playback_start_chromecast(-1.0)
+    ,playback_start_chromecast(-1)
     ,playback_start_local(0)
-    ,m_seektime(-1.0)
-    ,i_seektime(-1.0)
+    ,m_seektime(-1)
+    ,i_seektime(-1)
     ,restartState(RESTART_NONE)
     ,conn_status(CHROMECAST_DISCONNECTED)
     ,cmd_status(NO_CMD_PENDING)
@@ -646,7 +646,7 @@ void intf_sys_t::sendPlayerCmd()
             msg_Warn(p_intf, "opening when a session was still opened:%s", mediaSessionId.c_str());
         }
         else
-        //playback_start_chromecast = -1.0;
+        //playback_start_chromecast = -1;
         if (cmd_status == NO_CMD_PENDING) {
             playback_start_local = 0;
             msgPlayerLoad();
@@ -1156,7 +1156,7 @@ void intf_sys_t::processMessage(const castchannel::CastMessage &msg)
 
                 case RECEIVER_PLAYING:
                     /* TODO reset demux PCR ? */
-                    if (unlikely(playback_start_chromecast == -1.0)) {
+                    if (unlikely(playback_start_chromecast == -1)) {
                         msg_Warn(p_intf, "start playing without buffering f_restart_position:%f", f_restart_position );
                         playback_start_chromecast = (1 + mtime_t( double( status[0]["currentTime"] ) ) ) * 1000000L;
                     }
@@ -1203,7 +1203,7 @@ void intf_sys_t::processMessage(const castchannel::CastMessage &msg)
                 }
             }
 
-            if (receiverState == RECEIVER_BUFFERING && i_seektime != -1.0)
+            if (receiverState == RECEIVER_BUFFERING && i_seektime != -1)
             {
                 msg_Dbg(p_intf, "Chromecast seeking possibly done");
                 vlc_cond_signal( &seekCommandCond );

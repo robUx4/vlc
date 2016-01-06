@@ -119,7 +119,7 @@ struct demux_sys_t
 
         /* hold the data while seeking */
         /* wait until the client is buffering for seeked data */
-        if (p_intf->p_sys->i_seektime != -1.0)
+        if (p_intf->p_sys->i_seektime != -1)
         {
             const mtime_t i_seek_time = p_intf->p_sys->m_seektime; // - (p_intf->p_sys->playback_start_chromecast - p_intf->p_sys->playback_start_local);
             msg_Dbg(p_demux, "%ld do the actual seek", GetCurrentThreadId());
@@ -144,8 +144,8 @@ struct demux_sys_t
             }
             vlc_cleanup_pop();
 
-            p_intf->p_sys->m_seektime = -1.0;
-            p_intf->p_sys->i_seektime = -1.0;
+            p_intf->p_sys->m_seektime = -1;
+            p_intf->p_sys->i_seektime = -1;
 
             if (p_intf->p_sys->getConnectionStatus() != CHROMECAST_APP_STARTED) {
                 msg_Warn(p_demux, "cannot seek as the Chromecast app is not running %d", p_intf->p_sys->getConnectionStatus());
@@ -159,7 +159,7 @@ struct demux_sys_t
     }
 
     bool seekViaChromecast() {
-        return !p_intf->p_sys->forceSeekPosition() && getPlaybackTime() != -1.0;
+        return !p_intf->p_sys->forceSeekPosition() && getPlaybackTime() != -1;
     }
 
     void resetForcedSeek() {
