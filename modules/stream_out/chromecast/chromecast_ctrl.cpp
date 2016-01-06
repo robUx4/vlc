@@ -1217,7 +1217,11 @@ void intf_sys_t::processMessage(const castchannel::CastMessage &msg)
         {
             msg_Err(p_intf, "Media load failed");
             vlc_mutex_locker locker(&lock);
-            msgReceiverClose(appTransportId);
+            /* close the app to restart it */
+            if (getConnectionStatus() == CHROMECAST_APP_STARTED)
+                msgReceiverClose(appTransportId);
+            else
+                msgReceiverGetStatus();
         }
         else if (type == "INVALID_REQUEST")
         {
