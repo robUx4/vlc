@@ -321,6 +321,13 @@ void intf_sys_t::ipChangedEvent(const char *psz_new_ip)
                 msg_Err(p_intf, "Could not start the Chromecast talking thread");
             }
         }
+        else
+        {
+            // make sure we unblock the demuxer
+            i_seektime = -1;
+            vlc_cond_signal(&seekCommandCond);
+            //vlc_cond_signal(&loadCommandCond);
+        }
     }
     vlc_UrlClean(&url);
 }
