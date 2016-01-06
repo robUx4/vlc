@@ -252,19 +252,6 @@ intf_sys_t::intf_sys_t(intf_thread_t * const p_this)
 
 intf_sys_t::~intf_sys_t()
 {
-    switch (getConnectionStatus())
-    {
-    case CHROMECAST_APP_STARTED:
-        // Generate the close messages.
-        msgReceiverClose(appTransportId);
-        // ft
-    case CHROMECAST_AUTHENTICATED:
-        msgReceiverClose(DEFAULT_CHOMECAST_RECEIVER);
-        // ft
-    default:
-        break;
-    }
-
     ipChangedEvent( NULL );
 
     vlc_cond_destroy(&loadCommandCond);
@@ -289,7 +276,21 @@ void intf_sys_t::ipChangedEvent(const char *psz_new_ip)
         if ( !deviceIP.empty() )
         {
             /* disconnect the current Chromecast */
-            msgReceiverClose(appTransportId);
+            switch (getConnectionStatus())
+            {
+            case CHROMECAST_APP_STARTED:
+                // Generate the close messages.
+                msgReceiverClose(appTransportId);
+                // ft
+            case CHROMECAST_TLS_CONNECTED:
+            case CHROMECAST_AUTHENTICATED:
+                msgReceiverClose(DEFAULT_CHOMECAST_RECEIVER);
+                // ft
+            case CHROMECAST_DISCONNECTED:
+            case CHROMECAST_CONNECTION_DEAD:
+            default:
+                break;
+            }
 
             vlc_cancel(chromecastThread);
             vlc_join(chromecastThread, NULL);
