@@ -1253,7 +1253,7 @@ void intf_sys_t::processMessage(const castchannel::CastMessage &msg)
             msg_Warn(p_intf, "received close message");
             vlc_mutex_locker locker(&lock);
             setConnectionStatus(CHROMECAST_CONNECTION_DEAD);
-            vlc_cond_signal(&seekCommandCond);
+            ipChangedEvent(NULL);
         }
         else
         {
