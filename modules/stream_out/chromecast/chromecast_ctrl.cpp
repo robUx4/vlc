@@ -923,7 +923,9 @@ void intf_sys_t::restartDoStop()
         PL_UNLOCK;
         return;
     }
+#ifndef NDEBUG
     msg_Dbg(p_intf, "add RestartAfterEnd callback %p on p_input:%p", RestartAfterEnd, p_input);
+#endif
     var_AddCallback( p_input, "intf-event", RestartAfterEnd, p_intf );
     b_restart_playback = true;
     input_Control(p_input, INPUT_GET_POSITION, &f_restart_position);
