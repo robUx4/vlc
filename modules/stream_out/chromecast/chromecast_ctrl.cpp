@@ -313,8 +313,6 @@ void intf_sys_t::ipChangedEvent(const char *psz_new_ip)
         deviceIP = psz_new_ip;
         devicePort = url.i_port ? url.i_port : CHROMECAST_CONTROL_PORT;
 
-        InputUpdated( NULL );
-
         if ( !deviceIP.empty() )
         {
             // Start the new Chromecast event thread.
@@ -323,6 +321,15 @@ void intf_sys_t::ipChangedEvent(const char *psz_new_ip)
             {
                 msg_Err(p_intf, "Could not start the Chromecast talking thread");
             }
+
+            playlist_t *p_playlist = pl_Get( p_intf );
+            PL_LOCK;
+            input_thread_t *p_input = playlist_CurrentInput(p_playlist);
+            PL_UNLOCK;
+            InputUpdated( p_input );
+            if ( p_input )
+                vlc_object_release( p_input );
+
         }
         else
         {
@@ -337,6 +344,8 @@ void intf_sys_t::ipChangedEvent(const char *psz_new_ip)
                 }
                 b_has_restart_callback = false;
             }
+
+            InputUpdated( NULL );
 
             // make sure we unblock the demuxer
             i_seektime = -1;
@@ -488,7 +497,7 @@ void intf_sys_t::InputUpdated( input_thread_t *p_input )
         var_AddCallback( p_input, "intf-event", InputEvent, p_intf );
 
         mutex_cleanup_push(&lock);
-        while (!deviceIP.empty() && canDisplay == DISPLAY_UNKNOWN && conn_status != CHROMECAST_CONNECTION_DEAD)
+        while ((deviceIP.empty() || canDisplay == DISPLAY_UNKNOWN) && conn_status != CHROMECAST_CONNECTION_DEAD)
         {
             msg_Dbg(p_intf, "InputUpdated waiting for Chromecast connection, current %d", conn_status);
             vlc_cond_wait(&loadCommandCond, &lock);
@@ -589,11 +598,7 @@ void intf_sys_t::InputUpdated( input_thread_t *p_input )
             s_sout = ssout.str();
         }
 
-        playlist_t *p_playlist = pl_Get( p_intf );
-        PL_LOCK;
-        if ( playlist_Status( p_playlist ) == PLAYLIST_STOPPED )
-            b_restart_playback = false;
-        else if (conn_status == CHROMECAST_CONNECTION_DEAD)
+        if (conn_status == CHROMECAST_CONNECTION_DEAD)
             b_restart_playback = false;
         else if (b_restart_playback)
         {
@@ -608,7 +613,7 @@ void intf_sys_t::InputUpdated( input_thread_t *p_input )
             char *psz_old_sout = var_GetString( p_input, "sout" );
             b_restart_playback = !psz_old_sout || !psz_old_sout[0];
             if ( b_restart_playback )
-                msg_Dbg( p_intf, "there's no sout defined yet status:%d", playlist_Status( p_playlist ) );
+                msg_Dbg( p_intf, "there's no sout defined yet status:%d", playlist_Status( pl_Get( p_intf ) ) );
             free(psz_old_sout);
         }
         else
@@ -617,7 +622,6 @@ void intf_sys_t::InputUpdated( input_thread_t *p_input )
             b_restart_playback = false;
         }
         msg_Dbg( p_intf, "%ld new b_restart_playback:%d", GetCurrentThreadId(), b_restart_playback );
-        PL_UNLOCK;
 
         if ( b_restart_playback )
         {
@@ -898,8 +902,8 @@ extern "C" int recvPacket(vlc_object_t *p_intf, bool &b_msgReceived,
 
 void intf_sys_t::stateChangedForRestart( input_thread_t *p_input )
 {
-    //playlist_t *p_playlist = pl_Get( p_intf );
-    //PL_LOCK;
+    playlist_t *p_playlist = pl_Get( p_intf );
+    PL_LOCK;
     msg_Dbg(p_intf, "%ld RestartAfterEnd state changed %d", GetCurrentThreadId(), (int)var_GetInteger( p_input, "state" ));
     if ( var_GetInteger( p_input, "state" ) == END_S )
     {
@@ -911,7 +915,7 @@ void intf_sys_t::stateChangedForRestart( input_thread_t *p_input )
             //var_DelCallback( p_input, "intf-event", RestartAfterEnd, p_intf );
         }
     }
-    //PL_UNLOCK;
+    PL_UNLOCK;
 }
 
 static int RestartAfterEnd( vlc_object_t *p_this, char const *psz_var,
