@@ -1297,9 +1297,13 @@ void intf_sys_t::msgReceiverClose(std::string destinationId)
 {
     std::string s("{\"type\":\"CLOSE\"}");
     pushMessage( NAMESPACE_CONNECTION, s, destinationId );
-    if (appTransportId == destinationId)
+    if (appTransportId != destinationId)
+        setConnectionStatus( CHROMECAST_DISCONNECTED );
+    else
+    {
         appTransportId = "";
-    setConnectionStatus( deviceIP.empty() ? CHROMECAST_DISCONNECTED : CHROMECAST_TLS_CONNECTED );
+        setConnectionStatus( CHROMECAST_AUTHENTICATED );
+    }
 }
 
 void intf_sys_t::msgReceiverGetStatus()
