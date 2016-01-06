@@ -86,6 +86,8 @@ static int VolumeChanged( vlc_object_t *, char const *,
                           vlc_value_t, vlc_value_t, void * );
 static int AddrChangedEvent( vlc_object_t *, char const *,
                              vlc_value_t, vlc_value_t, void * );
+static int RestartAfterEnd( vlc_object_t *, char const *,
+                            vlc_value_t, vlc_value_t, void * );
 static void *ChromecastThread(void *data);
 
 /*****************************************************************************
@@ -239,6 +241,7 @@ intf_sys_t::intf_sys_t(intf_thread_t * const p_this)
     ,i_requestId(0)
     ,i_sout_id(0)
     ,b_restart_playback(false)
+    ,b_has_restart_callback(false)
     ,b_forcing_position(false)
 {
     vlc_mutex_init(&lock);
@@ -323,6 +326,18 @@ void intf_sys_t::ipChangedEvent(const char *psz_new_ip)
         }
         else
         {
+            if (b_has_restart_callback)
+            {
+                if ( p_input )
+                {
+#ifndef NDEBUG
+                    msg_Dbg(p_intf, "del unneeded RestartAfterEnd callback %p on p_input:%p", RestartAfterEnd, p_input);
+#endif
+                    var_DelCallback( p_input, "intf-event", RestartAfterEnd, p_intf );
+                }
+                b_has_restart_callback = false;
+            }
+
             // make sure we unblock the demuxer
             i_seektime = -1;
             vlc_cond_signal(&seekCommandCond);
@@ -454,6 +469,14 @@ void intf_sys_t::InputUpdated( input_thread_t *p_input )
     {
         vlc_mutex_unlock(&lock);
         var_DelCallback( this->p_input, "intf-event", InputEvent, p_intf );
+        if (b_has_restart_callback)
+        {
+#ifndef NDEBUG
+            msg_Dbg(p_intf, "input gone, del RestartAfterEnd callback %p on p_input:%p", RestartAfterEnd, this->p_input);
+#endif
+            var_DelCallback( this->p_input, "intf-event", RestartAfterEnd, p_intf );
+            b_has_restart_callback = false;
+        }
         vlc_mutex_lock(&lock);
         unplugOutputRedirection();
     }
@@ -605,9 +628,19 @@ void intf_sys_t::InputUpdated( input_thread_t *p_input )
             }
         }
         else
-        if (conn_status != CHROMECAST_CONNECTION_DEAD)
         {
-            plugOutputRedirection();
+            if (b_has_restart_callback)
+            {
+#ifndef NDEBUG
+                msg_Dbg(p_intf, "normal plug, del RestartAfterEnd callback %p on p_input:%p", RestartAfterEnd, this->p_input);
+#endif
+                var_DelCallback( this->p_input, "intf-event", RestartAfterEnd, p_intf );
+                b_has_restart_callback = false;
+            }
+            if (conn_status != CHROMECAST_CONNECTION_DEAD)
+            {
+                plugOutputRedirection();
+            }
         }
     }
     else if ( !b_restart_playback )
@@ -923,10 +956,14 @@ void intf_sys_t::restartDoStop()
         PL_UNLOCK;
         return;
     }
+    if (!b_has_restart_callback)
+    {
 #ifndef NDEBUG
-    msg_Dbg(p_intf, "add RestartAfterEnd callback %p on p_input:%p", RestartAfterEnd, p_input);
+        msg_Dbg(p_intf, "add RestartAfterEnd callback %p on p_input:%p", RestartAfterEnd, p_input);
 #endif
-    var_AddCallback( p_input, "intf-event", RestartAfterEnd, p_intf );
+        var_AddCallback( p_input, "intf-event", RestartAfterEnd, p_intf );
+        b_has_restart_callback = true;
+    }
     b_restart_playback = true;
     input_Control(p_input, INPUT_GET_POSITION, &f_restart_position);
 #ifndef NDEBUG

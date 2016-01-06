@@ -258,6 +258,7 @@ private:
     bool              canRemux;
     bool              canDoDirect;
     bool              b_restart_playback;
+    bool              b_has_restart_callback;
     bool              b_forcing_position;
     double            f_restart_position;
 
