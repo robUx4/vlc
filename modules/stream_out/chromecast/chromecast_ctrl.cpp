@@ -913,7 +913,6 @@ void intf_sys_t::processMessage(const castchannel::CastMessage &msg)
                 case CHROMECAST_APP_STARTED:
                     msg_Warn(p_intf, "app is no longer present. closing");
                     msgReceiverClose(appTransportId);
-                    setConnectionStatus(CHROMECAST_CONNECTION_DEAD);
                     break;
 
                 case CHROMECAST_AUTHENTICATED:
