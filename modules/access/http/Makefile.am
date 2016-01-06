@@ -12,7 +12,7 @@ libvlc_http_la_SOURCES = \
 	access/http/h2frame.c access/http/h2frame.h \
 	access/http/h2output.c access/http/h2output.h \
 	access/http/h2conn.c access/http/h1conn.c \
-	access/http/chunked.c access/http/conn.h \
+	access/http/chunked.c access/http/tunnel.c access/http/conn.h \
 	access/http/connmgr.c access/http/connmgr.h
 libvlc_http_la_CPPFLAGS = -Dneedsomethinghere
 libvlc_http_la_LIBADD = \
@@ -44,9 +44,11 @@ http_file_test_SOURCES = access/http/file_test.c \
 	access/http/message.c access/http/message.h \
 	access/http/resource.c access/http/resource.h \
 	access/http/file.c access/http/file.h
+http_tunnel_test_SOURCES = access/http/tunnel_test.c
+http_tunnel_test_LDADD = libvlc_http.la
 check_PROGRAMS += hpack_test hpackenc_test \
 	h2frame_test h2output_test h2conn_test h1conn_test h1chunked_test \
-	http_msg_test http_file_test
+	http_msg_test http_file_test http_tunnel_test
 TESTS += hpack_test hpackenc_test \
 	h2frame_test h2output_test h2conn_test h1conn_test h1chunked_test \
-	http_msg_test http_file_test
+	http_msg_test http_file_test http_tunnel_test

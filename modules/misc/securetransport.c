@@ -386,6 +386,7 @@ static int st_Handshake (vlc_tls_creds_t *crd, vlc_tls_t *session,
     vlc_tls_sys_t *sys = session->sys;
 
     OSStatus retValue = SSLHandshake(sys->p_context);
+    *alp = NULL;
 
     if (retValue == errSSLWouldBlock) {
         msg_Dbg(crd, "handshake is blocked, try again later");
@@ -402,7 +403,7 @@ static int st_Handshake (vlc_tls_creds_t *crd, vlc_tls_t *session,
             return 0;
 
         case errSSLServerAuthCompleted:
-            msg_Warn(crd, "handshake completed, retrying");
+            msg_Dbg(crd, "SSLHandshake returned errSSLServerAuthCompleted, continuing handshake");
             return st_Handshake(crd, session, host, service, alp);
 
         case errSSLConnectionRefused:
@@ -427,6 +428,7 @@ static int st_Handshake (vlc_tls_creds_t *crd, vlc_tls_t *session,
 static ssize_t st_Send (vlc_tls_t *session, const void *buf, size_t length)
 {
     vlc_tls_sys_t *sys = session->sys;
+    assert(sys);
     OSStatus ret = noErr;
 
     /*
@@ -480,9 +482,7 @@ static ssize_t st_Send (vlc_tls_t *session, const void *buf, size_t length)
 static ssize_t st_Recv (vlc_tls_t *session, void *buf, size_t length)
 {
     vlc_tls_sys_t *sys = session->sys;
-
-    if (sys == NULL || buf == NULL)
-        return 0;
+    assert(sys);
 
     size_t actualSize;
     OSStatus ret = SSLRead(sys->p_context, buf, length, &actualSize);
@@ -504,6 +504,7 @@ static ssize_t st_Recv (vlc_tls_t *session, void *buf, size_t length)
  */
 
 static int st_SessionShutdown (vlc_tls_t *session, bool duplex) {
+    msg_Dbg(session->obj, "shutdown TLS session");
 
     vlc_tls_sys_t *sys = session->sys;
     OSStatus ret = noErr;
@@ -513,7 +514,7 @@ static int st_SessionShutdown (vlc_tls_t *session, bool duplex) {
         ret = SSLClose(sys->p_context);
     }
 
-    if (ret != noErr || ret != errSSLClosedGraceful) {
+    if (ret != noErr) {
         msg_Warn(session->obj, "Cannot close ssl context (%i)", (int)ret);
         return ret;
     }
@@ -634,6 +635,7 @@ static int st_ClientSessionOpen (vlc_tls_creds_t *crd, vlc_tls_t *session,
     return VLC_SUCCESS;
 
 error:
+    st_SessionShutdown(session, true);
     st_SessionClose(session);
     return VLC_EGENERIC;
 }
@@ -700,6 +702,7 @@ static int st_ServerSessionOpen (vlc_tls_creds_t *crd, vlc_tls_t *session,
     return VLC_SUCCESS;
 
 error:
+    st_SessionShutdown(session, true);
     st_SessionClose(session);
     return VLC_EGENERIC;
 }

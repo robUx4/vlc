@@ -144,8 +144,6 @@ int vlc_http_msg_add_header(struct vlc_http_msg *m, const char *name,
     return ret;
 }
 
-/* TODO: merge identically named headers (not really needed yet) */
-
 const char *vlc_http_msg_get_header(const struct vlc_http_msg *m,
                                     const char *name)
 {
@@ -264,6 +262,14 @@ struct vlc_http_msg *vlc_http_msg_iterate(struct vlc_http_msg *m)
     return next;
 }
 
+struct vlc_http_msg *vlc_http_msg_get_initial(struct vlc_http_stream *s)
+{
+    struct vlc_http_msg *m = vlc_http_stream_read_headers(s);
+    if (m == NULL)
+        vlc_http_stream_close(s, false);
+    return m;
+}
+
 struct vlc_http_msg *vlc_http_msg_get_final(struct vlc_http_msg *m)
 {
     while (m != NULL && (vlc_http_msg_get_status(m) / 100) == 1)
@@ -281,7 +287,8 @@ block_t *vlc_http_msg_read(struct vlc_http_msg *m)
 
 /* Serialization and deserialization */
 
-char *vlc_http_msg_format(const struct vlc_http_msg *m, size_t *restrict lenp)
+char *vlc_http_msg_format(const struct vlc_http_msg *m, size_t *restrict lenp,
+                          bool proxied)
 {
     size_t len;
 
@@ -291,6 +298,12 @@ char *vlc_http_msg_format(const struct vlc_http_msg *m, size_t *restrict lenp)
         len += strlen(m->method);
         len += strlen(m->path ? m->path : m->authority);
         len += strlen(m->authority);
+
+        if (proxied)
+        {
+            assert(m->scheme != NULL && m->path != NULL);
+            len += strlen(m->scheme) + 3 + strlen(m->authority);
+        }
     }
     else
         len = sizeof ("HTTP/1.1 123 .\r\n\r\n");
@@ -305,8 +318,13 @@ char *vlc_http_msg_format(const struct vlc_http_msg *m, size_t *restrict lenp)
     len = 0;
 
     if (m->status < 0)
-        len += sprintf(buf, "%s %s HTTP/1.1\r\nHost: %s\r\n", m->method,
+    {
+        len += sprintf(buf, "%s ", m->method);
+        if (proxied)
+            len += sprintf(buf + len, "%s://%s", m->scheme, m->authority);
+        len += sprintf(buf + len, "%s HTTP/1.1\r\nHost: %s\r\n",
                        m->path ? m->path : m->authority, m->authority);
+    }
     else
         len += sprintf(buf, "HTTP/1.1 %03hd .\r\n", m->status);
 
@@ -325,7 +343,6 @@ struct vlc_http_msg *vlc_http_msg_headers(const char *msg)
     struct vlc_http_msg *m;
     unsigned short code;
 
-    /* TODO: handle HTTP/1.0 differently */
     if (sscanf(msg, "HTTP/1.%*1u %3hu %*s", &code) == 1)
     {
         m = vlc_http_resp_create(code);

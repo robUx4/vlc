@@ -24,6 +24,7 @@
 
 #include <assert.h>
 #include <vlc_common.h>
+#include <vlc_network.h>
 #include <vlc_tls.h>
 #include <vlc_interrupt.h>
 #include "transport.h"
@@ -42,12 +43,40 @@ struct vlc_https_connecting
     vlc_sem_t done;
 };
 
+static char *vlc_https_proxy_find(const char *hostname, unsigned port)
+{
+    const char *fmt;
+    char *url, *proxy = NULL;
+    int canc = vlc_savecancel();
+
+    if (strchr(hostname, ':') != NULL)
+        fmt = port ? "https://[%s]:%u" : "https://[%s]";
+    else
+        fmt = port ? "https://%s:%u" : "https://%s";
+
+    if (likely(asprintf(&url, fmt, hostname, port) >= 0))
+    {
+        proxy = vlc_getProxyUrl(url);
+        free(url);
+    }
+    vlc_restorecancel(canc);
+    return proxy;
+}
+
 static void *vlc_https_connect_thread(void *data)
 {
     struct vlc_https_connecting *c = data;
     vlc_tls_t *tls;
 
-    tls = vlc_https_connect(c->creds, c->host, c->port, &c->http2);
+    char *proxy = vlc_https_proxy_find(c->host, c->port);
+    if (proxy != NULL)
+    {
+        tls = vlc_https_connect_proxy(c->creds, c->host, c->port, &c->http2,
+                                      proxy);
+        free(proxy);
+    }
+    else
+        tls = vlc_https_connect(c->creds, c->host, c->port, &c->http2);
     vlc_sem_post(&c->done);
     return tls;
 }
@@ -167,11 +196,10 @@ struct vlc_http_msg *vlc_http_mgr_reuse(struct vlc_http_mgr *mgr,
     struct vlc_http_stream *stream = vlc_http_stream_open(conn, req);
     if (stream != NULL)
     {
-        struct vlc_http_msg *m = vlc_http_stream_read_headers(stream);
+        struct vlc_http_msg *m = vlc_http_msg_get_initial(stream);
         if (m != NULL)
             return m;
 
-        vlc_http_stream_close(stream, false);
         /* NOTE: If the request were not idempotent, we would not know if it
          * was processed by the other end. Thus POST is not used/supported so
          * far, and CONNECT is treated as if it were idempotent (which works
@@ -218,7 +246,7 @@ static struct vlc_http_msg *vlc_https_request(struct vlc_http_mgr *mgr,
     if (http2)
         conn = vlc_h2_conn_create(tls);
     else
-        conn = vlc_h1_conn_create(tls);
+        conn = vlc_h1_conn_create(tls, false);
 
     if (unlikely(conn == NULL))
     {
@@ -251,7 +279,7 @@ static struct vlc_http_msg *vlc_http_request(struct vlc_http_mgr *mgr,
     if (mgr->use_h2c)
         conn = vlc_h2_conn_create(tls);
     else
-        conn = vlc_h1_conn_create(tls);
+        conn = vlc_h1_conn_create(tls, false);
 
     if (unlikely(conn == NULL))
     {
