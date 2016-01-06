@@ -25,8 +25,9 @@
 #endif
 
 #include <vlc_common.h>
-#include <vlc_services_discovery.h>
+#include <vlc_access.h>
 #include <vlc_plugin.h>
+#include <vlc_services_discovery.h>
 #include <microdns/microdns.h>
 
 static const char MDNS_CHROMECAST[] = "._googlecast._tcp.local";
@@ -142,15 +143,34 @@ static void new_entry_callback( void *p_this, int i_status, const struct rr_entr
                     p_entry = p_entry->next;
                 }
                 msg_Dbg(p_sd, "Found Chromecast '%s' %s:%d", psz_device_name, deviceIP, devicePort);
-                char deviceURI[64];
-                snprintf(deviceURI, sizeof(deviceURI), "chromecast://%s:%d", deviceIP, devicePort);
 
+                /* determine if it's audio-only by checking the YouTube app */
+                char deviceURI[64];
+                snprintf(deviceURI, sizeof(deviceURI), "http://%s:8008/apps/YouTube", deviceIP );
+                access_t *p_test_app = vlc_access_NewMRL( VLC_OBJECT(p_sd), deviceURI );
+
+                snprintf(deviceURI, sizeof(deviceURI), "chromecast://%s:%d", deviceIP, devicePort);
                 input_item_t *item = input_item_NewWithTypeExt (deviceURI, psz_device_name,
                                                0, NULL, 0, -1, ITEM_TYPE_RENDERER, true);
 
-                services_discovery_AddItem (p_sd, item, _("Chromecast"));
+                if ( p_test_app )
+                    vlc_access_Delete( p_test_app );
+
+                if ( item )
+                {
+                    /* TODO until we can pass the AUDIO|VIDEO flags in the renderer item */
+                    if ( p_test_app==NULL )
+                        input_item_AddOption( item, ":type=1", 0 );
+                    else
+                        input_item_AddOption( item, ":type=3", 0 );
+                    /* TODO until we can discover renderer handlers */
+                    input_item_AddOption( item, ":module=ctrl_chromecast", 0 );
+                    services_discovery_AddItem (p_sd, item, _("Chromecast"));
+                    input_item_Release( item );
+                }
 
                 free( deviceIP );
+
             }
             free( psz_device_name );
             free( psz_service_name );

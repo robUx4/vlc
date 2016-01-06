@@ -31,7 +31,6 @@
 #include <sstream>
 
 #include <vlc_common.h>
-#include <vlc_access.h>
 #include <vlc_services_discovery.h>
 #include <vlc_url.h>
 
@@ -48,12 +47,13 @@ public:
     };
 
     RendererItem(const char *psz_name, const char *psz_ip,
-                       uint16_t i_port, RendererType type)
+                       uint16_t i_port, RendererType type, const char * psz_module)
         : QListWidgetItem( type==AUDIO_ONLY ? QIcon( ":/sidebar/music" ) : QIcon( ":/sidebar/movie" ),
                            qfu( psz_name ).append(" (").append(psz_ip).append(')'))
         , ipAddress( qfu( psz_ip ) )
         , port(i_port)
         , type(type)
+        , module(psz_module ? psz_module : "")
     {
     }
 
@@ -61,6 +61,7 @@ protected:
     QString ipAddress;
     uint16_t port;
     RendererType type;
+    std::string module;
 
     friend class RendererDialog;
 };
@@ -199,37 +200,42 @@ void RendererDialog::accept()
         msg_Dbg( p_intf, "selecting Renderer %s %s:%u", psz_name.c_str(), psz_ip.c_str(), item->port );
 
         std::stringstream ss;
-        ss << psz_ip << ':' << item->port;
+        ss << psz_ip;
+        if (item->port)
+            ss << ':' << item->port;
+
+        playlist_t *p_playlist = pl_Get(p_intf);
+        /* load the module needed to handle the renderer */
+        if (!item->module.empty())
+        {
+            bool module_loaded = false;
+            vlc_list_t *l = vlc_list_children( p_playlist );
+            for( int i=0; i < l->i_count; i++ )
+            {
+                vlc_object_t *p_obj = (vlc_object_t *)l->p_values[i].p_address;
+                if ( p_obj->psz_object_type == std::string("interface") )
+                {
+                    char *psz_name = vlc_object_get_name( p_obj );
+                    if ( psz_name && psz_name == item->module )
+                    {
+                        module_loaded = true;
+                        free(psz_name);
+                        break;
+                    }
+                    free(psz_name);
+                }
+            }
+            vlc_list_release( l );
+
+            if ( !module_loaded )
+                intf_Create( p_playlist, item->module.c_str() );
+        }
 
         /* set the renderer config */
-        playlist_t *p_playlist = pl_Get(p_intf);
         if( !var_Type( p_playlist, VAR_RENDERER_CONFIG ) )
             /* Don't recreate the same variable over and over and over... */
             var_Create( p_playlist, VAR_RENDERER_CONFIG, VLC_VAR_STRING );
         var_SetString( p_playlist, VAR_RENDERER_CONFIG, ss.str().c_str() );
-
-        /* load the module needed to handle the renderer */
-        bool module_loaded = false;
-        vlc_list_t *l = vlc_list_children( p_playlist );
-        for( int i=0; i < l->i_count; i++ )
-        {
-            vlc_object_t *p_obj = (vlc_object_t *)l->p_values[i].p_address;
-            if ( p_obj->psz_object_type == std::string("interface") )
-            {
-                char *psz_name = vlc_object_get_name( p_obj );
-                if ( psz_name && psz_name == std::string("ctrl_chromecast") )
-                {
-                    module_loaded = true;
-                    free(psz_name);
-                    break;
-                }
-                free(psz_name);
-            }
-        }
-        vlc_list_release( l );
-
-        if ( !module_loaded )
-            intf_Create( p_playlist, "chromecast");
     }
 
     QVLCDialog::accept();
@@ -240,7 +246,8 @@ void RendererDialog::discoveryEventReceived( const vlc_event_t * p_event )
     if ( p_event->type == vlc_ServicesDiscoveryItemAdded )
     {
         vlc_url_t url;
-        vlc_UrlParse(&url, p_event->u.services_discovery_item_added.p_new_item->psz_uri);
+        const input_item_t *p_item =  p_event->u.services_discovery_item_added.p_new_item;
+        vlc_UrlParse(&url, p_item->psz_uri);
 
         if (url.psz_host)
         {
@@ -253,21 +260,26 @@ void RendererDialog::discoveryEventReceived( const vlc_event_t * p_event )
             }
         }
 
-        /* determine if it's audio-only by checking the YouTube app */
-        std::stringstream s_video_test;
+        char *psz_module = NULL;
+        int type = 3; // AUDIO|VIDEO
+        /* TODO ugly until we have a proper renderer_t type */
+        for( int i = 0; i < p_item->i_options; i++ )
+        {
+            char* psz_src = p_item->ppsz_options[i];
+            if ( psz_src[0] == ':' )
+                psz_src++;
 
-        s_video_test << "http://"
-                     << url.psz_host
-                     << ":8008/apps/YouTube";
-        access_t *p_test_app = vlc_access_NewMRL( VLC_OBJECT(p_intf), s_video_test.str().c_str() );
+            if (!strncmp( "module=", psz_src, 7 ))
+                psz_module = strdup( psz_src + 7 );
+            else if (!strncmp( "type=", psz_src, 5 ))
+                type = atoi( psz_src + 5 );
+        }
 
-        RendererItem *item = new RendererItem( p_event->u.services_discovery_item_added.p_new_item->psz_name,
-                                                           url.psz_host,
-                                                           url.i_port ? url.i_port : 8009,
-                                                           p_test_app ? RendererItem::HAS_VIDEO : RendererItem::AUDIO_ONLY);
+        RendererItem *item = new RendererItem( p_item->psz_name, url.psz_host, url.i_port,
+                                               type > 1 ? RendererItem::HAS_VIDEO : RendererItem::AUDIO_ONLY,
+                                               psz_module );
         vlc_UrlClean(&url);
-        if ( p_test_app )
-            vlc_access_Delete( p_test_app );
+        free(psz_module);
         ui.receiversListWidget->addItem( item );
 
         playlist_t *p_playlist = pl_Get( p_intf );
