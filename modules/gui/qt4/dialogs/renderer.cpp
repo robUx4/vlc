@@ -31,6 +31,7 @@
 #include <sstream>
 
 #include <vlc_common.h>
+#include <vlc_access.h>
 #include <vlc_services_discovery.h>
 #include <vlc_url.h>
 
@@ -113,6 +114,8 @@ void RendererDialog::close()
     QVLCDialog::close();
 }
 
+static const char MDNS_CHROMECAST[] = "._googlecast._tcp.local";
+
 void RendererDialog::setVisible(bool visible)
 {
     QVLCDialog::setVisible(visible);
@@ -123,7 +126,7 @@ void RendererDialog::setVisible(bool visible)
         if ( p_sd == NULL )
         {
             msg_Dbg( p_intf, "starting renderer discovery services..." );
-            p_sd = vlc_sd_Create( VLC_OBJECT(p_intf), "chromecast" );
+            p_sd = vlc_sd_Create( VLC_OBJECT(p_intf), "microdns{name=._googlecast._tcp.local}" );
             if( !p_sd )
                 msg_Err( p_intf, "Could not start renderer discovery services" );
         }
@@ -249,19 +252,32 @@ void RendererDialog::discoveryEventReceived( const vlc_event_t * p_event )
         const input_item_t *p_item =  p_event->u.services_discovery_item_added.p_new_item;
         vlc_UrlParse(&url, p_item->psz_uri);
 
-        if (url.psz_host)
+        if (!url.psz_protocol || strcmp(url.psz_protocol, "microdns"))
+            return;
+
+        if (url.psz_host && strcmp(url.psz_host, MDNS_CHROMECAST))
+            return;
+
+        if (!url.psz_path || !*url.psz_path)
+            return;
+
+        char *next = strchr (url.psz_path, ':');
+        unsigned i_port = next ? atoi (next+1) : 0;
+        *next = '\0';
+        const char *psz_host = url.psz_path+1;
+
+        if (psz_host)
         {
             int row = 0;
             for ( ; row < ui.receiversListWidget->count(); row++ )
             {
                 RendererItem *rowItem = reinterpret_cast<RendererItem*>( ui.receiversListWidget->item( row ) );
-                if (rowItem->ipAddress == url.psz_host)
+                if (rowItem->ipAddress == psz_host)
                     return;
             }
         }
 
         char *psz_module = NULL;
-        int type = 3; // AUDIO|VIDEO
         /* TODO ugly until we have a proper renderer_t type */
         for( int i = 0; i < p_item->i_options; i++ )
         {
@@ -271,13 +287,19 @@ void RendererDialog::discoveryEventReceived( const vlc_event_t * p_event )
 
             if (!strncmp( "module=", psz_src, 7 ))
                 psz_module = strdup( psz_src + 7 );
-            else if (!strncmp( "type=", psz_src, 5 ))
-                type = atoi( psz_src + 5 );
         }
 
-        RendererItem *item = new RendererItem( p_item->psz_name, url.psz_host, url.i_port,
-                                               type > 1 ? RendererItem::HAS_VIDEO : RendererItem::AUDIO_ONLY,
-                                               psz_module );
+        /* determine if it's audio-only by checking the YouTube app */
+        char deviceURI[64];
+        snprintf(deviceURI, sizeof(deviceURI), "http://%s:8008/apps/YouTube", psz_host );
+        access_t *p_test_app = vlc_access_NewMRL( VLC_OBJECT(p_sd), deviceURI );
+
+        RendererItem::RendererType type = p_test_app ? RendererItem::RendererType::HAS_VIDEO : RendererItem::RendererType::AUDIO_ONLY;
+        if ( p_test_app )
+            vlc_access_Delete( p_test_app );
+
+        RendererItem *item = new RendererItem( p_item->psz_name, psz_host, i_port,
+                                               type, psz_module );
         vlc_UrlClean(&url);
         free(psz_module);
         ui.receiversListWidget->addItem( item );
