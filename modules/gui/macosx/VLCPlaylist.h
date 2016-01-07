@@ -27,7 +27,7 @@
 #import "PLModel.h"
 #import "VLCPlaylistView.h"
 
-@interface VLCPlaylist : NSObject<NSOutlineViewDelegate>
+@interface VLCPlaylist : NSResponder<NSOutlineViewDelegate>
 
 @property (readwrite, weak) IBOutlet NSMenu *playlistMenu;
 @property (readwrite, weak) IBOutlet NSMenuItem *playPlaylistMenuItem;
@@ -52,8 +52,6 @@
 
 - (void)playlistUpdated;
 - (void)playbackModeUpdated;
-- (void)updateTogglePlaylistState;
-- (void)outlineViewSelectionDidChange:(NSNotification *)notification;
 - (void)sortNode:(int)i_mode;
 
 - (void)currentlyPlayingItemChanged;
@@ -96,7 +94,6 @@
 - (void)addPlaylistItems:(NSArray*)o_array withParentItemId:(int)i_plItemId atPos:(int)i_position startPlayback:(BOOL)b_start;
 
 
-- (void)setColumn: (NSString *)o_column state: (NSInteger)i_state translationDict:(NSDictionary *)o_dict;
 - (void)continuePlaybackWhereYouLeftOff:(input_thread_t *)p_input_thread;
 - (void)storePlaybackPositionForItem:(input_thread_t *)p_input_thread;
 
