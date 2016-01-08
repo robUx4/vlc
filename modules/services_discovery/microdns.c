@@ -162,7 +162,7 @@ static void new_entry_callback( void *p_this, int i_status, const struct rr_entr
                 msg_Dbg(p_sd, "Found '%s' device '%s' %s:%d", p_sys->psz_service_name, psz_device_name, deviceIP, devicePort);
 
                 char deviceURI[64];
-                snprintf(deviceURI, sizeof(deviceURI), "microdns://%s/%s:%d", p_sys->psz_service_name, deviceIP, devicePort);
+                snprintf(deviceURI, sizeof(deviceURI), "microdns://%s:%d/", deviceIP, devicePort);
                 input_item_t *item = input_item_NewWithTypeExt (deviceURI, psz_device_name,
                                                0, NULL, 0, -1, ITEM_TYPE_RENDERER, true);
 

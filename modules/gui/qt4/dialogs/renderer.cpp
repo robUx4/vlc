@@ -275,10 +275,8 @@ void RendererDialog::discoveryEventReceived( const vlc_event_t * p_event )
         if (!url.psz_path || !*url.psz_path)
             return;
 
-        char *next = strchr (url.psz_path, ':');
-        unsigned i_port = next ? atoi (next+1) : 0;
-        *next = '\0';
-        const char *psz_host = url.psz_path+1;
+        unsigned i_port = url.i_port;
+        const char *psz_host = url.psz_host;
 
         if (psz_host)
         {
