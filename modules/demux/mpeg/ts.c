@@ -235,6 +235,8 @@ typedef struct
     es_format_t  fmt;
     es_out_id_t *id;
     uint16_t i_sl_es_id;
+    /* J2K stuff */
+    uint8_t  b_interlaced;
 } ts_pes_es_t;
 
 typedef enum
@@ -2078,6 +2080,33 @@ static block_t *Opus_Parse(demux_t *demux, block_t *block)
     return out;
 }
 
+static block_t *J2K_Parse( demux_t *p_demux, block_t *p_block, bool b_interlaced )
+{
+    const uint8_t *p_buf = p_block->p_buffer;
+
+    if( p_block->i_buffer < ((b_interlaced) ? 48 : 38) )
+        goto invalid;
+
+    if( memcmp( p_buf, "elsmfrat", 8 ) )
+        goto invalid;
+
+    uint16_t i_den = GetWBE( &p_buf[8] );
+    uint16_t i_num = GetWBE( &p_buf[10] );
+    if( i_den == 0 )
+        goto invalid;
+    p_block->i_length = CLOCK_FREQ * i_den / i_num;
+
+    p_block->p_buffer += (b_interlaced) ? 48 : 38;
+    p_block->i_buffer -= (b_interlaced) ? 48 : 38;
+
+    return p_block;
+
+invalid:
+    msg_Warn( p_demux, "invalid J2K header, dropping codestream" );
+    block_Release( p_block );
+    return NULL;
+}
+
 /****************************************************************************
  * gathering stuff
  ****************************************************************************/
@@ -2242,6 +2271,17 @@ static void ParsePES( demux_t *p_demux, ts_pid_t *pid, block_t *p_pes )
         else if( pid->u.p_pes->es.fmt.i_codec == VLC_CODEC_OPUS)
         {
             p_block = Opus_Parse(p_demux, p_block);
+        }
+        else if( pid->u.p_pes->es.fmt.i_codec == VLC_CODEC_JPEG2000 )
+        {
+            if( unlikely(i_stream_id != 0xBD) )
+            {
+                block_Release( p_block );
+                p_block = NULL;
+            }
+            p_block = J2K_Parse( p_demux, p_block, pid->u.p_pes->es.b_interlaced );
+            if( !p_block )
+                return;
         }
 
         if( !pid->p_parent || pid->p_parent->type != TYPE_PMT )
@@ -4169,6 +4209,42 @@ static bool SetupISO14496LogicalStream( demux_t *p_demux, const decoder_config_d
     return true;
 }
 
+static void SetupAVCDescriptors( demux_t *p_demux, ts_pes_es_t *p_es, const dvbpsi_pmt_es_t *p_dvbpsies )
+{
+    const dvbpsi_descriptor_t *p_dr = PMTEsFindDescriptor( p_dvbpsies, 0x28 );
+    if( p_dr && p_dr->i_length >= 4 )
+    {
+        p_es->fmt.i_profile = p_dr->p_data[0];
+        p_es->fmt.i_level = p_dr->p_data[2];
+        msg_Dbg( p_demux, "     - found AVC_video_descriptor profile=0x%"PRIx8" level=0x%"PRIx8,
+                 p_es->fmt.i_profile, p_es->fmt.i_level );
+    }
+}
+
+static void SetupJ2KDescriptors( demux_t *p_demux, ts_pes_es_t *p_es, const dvbpsi_pmt_es_t *p_dvbpsies )
+{
+    const dvbpsi_descriptor_t *p_dr = PMTEsFindDescriptor( p_dvbpsies, 0x32 );
+    if( p_dr && p_dr->i_length >= 24 )
+    {
+        es_format_Init( &p_es->fmt, VIDEO_ES, VLC_CODEC_JPEG2000 );
+        p_es->fmt.i_profile = p_dr->p_data[0];
+        p_es->fmt.i_level = p_dr->p_data[1];
+        p_es->fmt.video.i_width = GetDWBE(&p_dr->p_data[2]);
+        p_es->fmt.video.i_height = GetDWBE(&p_dr->p_data[6]);
+        p_es->fmt.video.i_frame_rate_base = GetWBE(&p_dr->p_data[18]);
+        p_es->fmt.video.i_frame_rate = GetWBE(&p_dr->p_data[20]);
+        p_es->b_interlaced = p_dr->p_data[23] & 0x40;
+        if( p_dr->i_length > 24 )
+        {
+            p_es->fmt.p_extra = malloc(p_dr->i_length - 24);
+            if( p_es->fmt.p_extra )
+                p_es->fmt.i_extra = p_dr->i_length - 24;
+        }
+        msg_Dbg( p_demux, "     - found J2K_video_descriptor profile=0x%"PRIx8" level=0x%"PRIx8,
+                 p_es->fmt.i_profile, p_es->fmt.i_level );
+    }
+}
+
 static void SetupISO14496Descriptors( demux_t *p_demux, ts_pes_es_t *p_es,
                                       const ts_pmt_t *p_pmt, const dvbpsi_pmt_es_t *p_dvbpsies )
 {
@@ -4588,10 +4664,16 @@ static void PMTSetupEs0x06( demux_t *p_demux, ts_pes_t *p_pes,
     es_format_t *p_fmt = &p_pes->es.fmt;
     dvbpsi_descriptor_t *p_subs_dr = PMTEsFindDescriptor( p_dvbpsies, 0x59 );
     dvbpsi_descriptor_t *desc;
-
-    if( PMTEsHasRegistration( p_demux, p_dvbpsies, "AC-3" ) ||
-        PMTEsFindDescriptor( p_dvbpsies, 0x6a ) ||
-        PMTEsFindDescriptor( p_dvbpsies, 0x81 ) )
+    if( PMTEsHasRegistration( p_demux, p_dvbpsies, "EAC3" ) ||
+        PMTEsFindDescriptor( p_dvbpsies, 0x7a ) )
+    {
+        /* DVB with stream_type 0x06 (ETS EN 300 468) */
+        p_fmt->i_cat = AUDIO_ES;
+        p_fmt->i_codec = VLC_CODEC_EAC3;
+    }
+    else if( PMTEsHasRegistration( p_demux, p_dvbpsies, "AC-3" ) ||
+             PMTEsFindDescriptor( p_dvbpsies, 0x6a ) ||
+             PMTEsFindDescriptor( p_dvbpsies, 0x81 ) ) /* AC-3 channel (also in EAC3) */
     {
         p_fmt->i_cat = AUDIO_ES;
         p_fmt->i_codec = VLC_CODEC_A52;
@@ -4600,12 +4682,6 @@ static void PMTSetupEs0x06( demux_t *p_demux, ts_pes_t *p_pes,
               PMTEsHasRegistration(p_demux, p_dvbpsies, "Opus"))
     {
         OpusSetup(p_demux, desc->p_data, desc->i_length, p_fmt);
-    }
-    else if( PMTEsFindDescriptor( p_dvbpsies, 0x7a ) )
-    {
-        /* DVB with stream_type 0x06 (ETS EN 300 468) */
-        p_fmt->i_cat = AUDIO_ES;
-        p_fmt->i_codec = VLC_CODEC_EAC3;
     }
     else if( PMTEsHasRegistration( p_demux, p_dvbpsies, "DTS1" ) ||
              PMTEsHasRegistration( p_demux, p_dvbpsies, "DTS2" ) ||
@@ -5211,66 +5287,60 @@ static void PMTCallBack( void *data, dvbpsi_pmt_t *p_dvbpsipmt )
         }
         ValidateDVBMeta( p_demux, p_dvbpsies->i_pid );
 
-        char const * psz_typedesc = "";
-        switch(p_dvbpsies->i_type)
+        char const * psz_typedesc;
+        const char * const rgpsz_descs[] =
         {
-        case 0x00:
-            psz_typedesc = "ISO/IEC Reserved";
-            break;
-        case 0x01:
-            psz_typedesc = "ISO/IEC 11172 Video";
-            break;
-        case 0x02:
-            psz_typedesc = "ISO/IEC 13818-2 Video or ISO/IEC 11172-2 constrained parameter video stream";
-            break;
-        case 0x03:
-            psz_typedesc = "ISO/IEC 11172 Audio";
-            break;
-        case 0x04:
-            psz_typedesc = "ISO/IEC 13818-3 Audio";
-            break;
-        case 0x05:
-            psz_typedesc = "ISO/IEC 13818-1 private_sections";
-            break;
-        case 0x06:
-            psz_typedesc = "ISO/IEC 13818-1 PES packets containing private data";
-            break;
-        case 0x07:
-            psz_typedesc = "ISO/IEC 13522 MHEG";
-            break;
-        case 0x08:
-            psz_typedesc = "ISO/IEC 13818-1 Annex A DSM CC";
-            break;
-        case 0x09:
-            psz_typedesc = "ITU-T Rec. H.222.1";
-            break;
-        case 0x0A:
-            psz_typedesc = "ISO/IEC 13818-6 type A";
-            break;
-        case 0x0B:
-            psz_typedesc = "ISO/IEC 13818-6 type B";
-            break;
-        case 0x0C:
-            psz_typedesc = "ISO/IEC 13818-6 type C";
-            break;
-        case 0x0D:
-            psz_typedesc = "ISO/IEC 13818-6 type D";
-            break;
-        case 0x0E:
-            psz_typedesc = "ISO/IEC 13818-1 auxiliary";
-            break;
-        case 0x12:
-            psz_typedesc = "ISO/IEC 14496-1 SL-packetized or FlexMux stream carried in PES packets";
-            break;
-        case 0x13:
-            psz_typedesc = "ISO/IEC 14496-1 SL-packetized or FlexMux stream carried in sections";
-            break;
-        default:
-            if (p_dvbpsies->i_type >= 0x0F && p_dvbpsies->i_type <=0x7F)
-                psz_typedesc = "ISO/IEC 13818-1 Reserved";
-            else
-                psz_typedesc = "User Private";
-        }
+            "ISO/IEC Reserved",
+            "ISO/IEC 11172 Video",
+            "ISO/IEC 13818-2 Video or ISO/IEC 11172-2 constrained parameter video stream",
+            "ISO/IEC 11172 Audio",
+            "ISO/IEC 13818-3 Audio",
+            "ISO/IEC 13818-1 private_sections",
+            "ISO/IEC 13818-1 PES packets containing private data",
+            "ISO/IEC 13522 MHEG",
+            "ISO/IEC 13818-1 Annex A DSM CC",
+            /* ^ 0x08 */
+            "ITU-T Rec. H.222.1",
+            "ISO/IEC 13818-6 type A",
+            "ISO/IEC 13818-6 type B",
+            "ISO/IEC 13818-6 type C",
+            "ISO/IEC 13818-6 type D",
+            "ISO/IEC 13818-1 auxiliary",
+            "ISO/IEC 13818-7 Audio with ADTS transport",
+            /* ^ 0x0F */
+            "ISO/IEC 14496-2 Visual",
+            "ISO/IEC 14496-3 Audio with LATM transport",
+            "ISO/IEC 14496-1 SL-packetized or FlexMux stream carried in PES packets",
+            "ISO/IEC 14496-1 SL-packetized or FlexMux stream carried in sections",
+            "ISO/IEC 13818-6 Synchronized download protocol",
+            "Metadata carried in PES packets",
+            "Metadata carried in metadata_sections",
+            "Metadata carried in ISO/IEC 13818-6 Data Carousel",
+            "Metadata carried in ISO/IEC 13818-6 Object Carousel",
+            "Metadata carried in ISO/IEC 13818-6 Synchronized download protocol",
+            /* ^ 0x19 */
+            "MPEG-2 IPMP Stream",
+            "AVC video stream as defined in ITU-T Rec. H.264",
+            "ISO/IEC 14496-3 Audio",
+            "ISO/IEC 14496-17 Text",
+            "ISO/IEC 23002-3 auxiliary video stream",
+            "SVC video sub-stream as defined in ITU-T H.264 Annex G",
+            /* ^ 0x1F */
+            "MVC video sub-stream as defined in ITU-T H.264 Annex H",
+            "Video stream conforming to one or more profiles as defined in ITU-T T.800",
+            "Additional 3D View ITU-T H.262",
+            "Additional 3D View ITU-T H.264",
+            /* ^ 0x23 */
+        };
+
+        if( p_dvbpsies->i_type <= 0x23 )
+            psz_typedesc = rgpsz_descs[p_dvbpsies->i_type];
+        else if (p_dvbpsies->i_type >= 0x0F && p_dvbpsies->i_type < 0x7F)
+            psz_typedesc = "ISO/IEC 13818-1 Reserved";
+        else if( p_dvbpsies->i_type == 0x7F )
+            psz_typedesc = rgpsz_descs[0x1A];
+        else
+            psz_typedesc = "User Private";
 
         msg_Dbg( p_demux, "  * pid=%d type=0x%x %s",
                  p_dvbpsies->i_pid, p_dvbpsies->i_type, psz_typedesc );
@@ -5346,6 +5416,12 @@ static void PMTCallBack( void *data, dvbpsi_pmt_t *p_dvbpsipmt )
             case 0x11:
             case 0x12:
                 SetupISO14496Descriptors( p_demux, &p_pes->es, p_pmt, p_dvbpsies );
+                break;
+            case 0x1b:
+                SetupAVCDescriptors( p_demux, &p_pes->es, p_dvbpsies );
+                break;
+            case 0x21:
+                SetupJ2KDescriptors( p_demux, &p_pes->es, p_dvbpsies );
                 break;
             case 0x83:
                 /* LPCM (audio) */
@@ -5691,6 +5767,7 @@ static ts_pes_t *ts_pes_New( demux_t *p_demux )
 
     pes->es.id = NULL;
     pes->es.i_sl_es_id = 0;
+    pes->es.b_interlaced = false;
     es_format_Init( &pes->es.fmt, UNKNOWN_ES, 0 );
     ARRAY_INIT( pes->extra_es );
     pes->i_stream_type = 0;

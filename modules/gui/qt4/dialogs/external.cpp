@@ -29,6 +29,7 @@
 #include <vlc_dialog.h>
 
 #include <QDialog>
+#include <QCheckBox>
 #include <QDialogButtonBox>
 #include <QLabel>
 #include <QLineEdit>
@@ -39,14 +40,14 @@
 #include <QTimer>
 
 DialogHandler::DialogHandler (intf_thread_t *p_intf, QObject *_parent)
-    : QObject( _parent ), intf (p_intf),
+    : QObject( _parent ), p_intf (p_intf),
       critical (VLC_OBJECT(p_intf), "dialog-critical"),
       login (VLC_OBJECT(p_intf), "dialog-login"),
       question (VLC_OBJECT(p_intf), "dialog-question"),
       progressBar (VLC_OBJECT(p_intf), "dialog-progress-bar")
 {
-    var_Create (intf, "dialog-error", VLC_VAR_ADDRESS);
-    var_AddCallback (intf, "dialog-error", error, this);
+    var_Create (p_intf, "dialog-error", VLC_VAR_ADDRESS);
+    var_AddCallback (p_intf, "dialog-error", error, this);
     connect (this, SIGNAL(error(const QString &, const QString &)),
              SLOT(displayError(const QString &, const QString &)));
 
@@ -59,15 +60,15 @@ DialogHandler::DialogHandler (intf_thread_t *p_intf, QObject *_parent)
     progressBar.addCallback(this, SLOT(startProgressBar(void *)),
                             Qt::BlockingQueuedConnection);
 
-    dialog_Register (intf);
+    dialog_Register (p_intf);
 }
 
 DialogHandler::~DialogHandler (void)
 {
-    dialog_Unregister (intf);
+    dialog_Unregister (p_intf);
 
-    var_DelCallback (intf, "dialog-error", error, this);
-    var_Destroy (intf, "dialog-error");
+    var_DelCallback (p_intf, "dialog-error", error, this);
+    var_Destroy (p_intf, "dialog-error");
 }
 
 int DialogHandler::error (vlc_object_t *obj, const char *,
@@ -83,7 +84,7 @@ int DialogHandler::error (vlc_object_t *obj, const char *,
 
 void DialogHandler::displayError (const QString& title, const QString& message)
 {
-    ErrorsDialog::getInstance (intf)->addError(title, message);
+    ErrorsDialog::getInstance (p_intf)->addError(title, message);
 }
 
 void DialogHandler::displayCritical (void *value)
@@ -118,6 +119,15 @@ void DialogHandler::requestLogin (void *value)
     grid->addWidget (new QLabel (qtr("Password")), 2, 0);
     grid->addWidget (passLine, 2, 1);
 
+    QCheckBox *checkbox = NULL;
+    if (data->store != NULL)
+    {
+        checkbox = new QCheckBox;
+        checkbox->setChecked (getSettings()->value ("store_password", true).toBool ());
+        grid->addWidget (new QLabel (qtr("Store the Password")), 3, 0);
+        grid->addWidget (checkbox, 3, 1);
+    }
+
     panel->setLayout (grid);
     layout->addWidget (panel);
 
@@ -139,9 +149,18 @@ void DialogHandler::requestLogin (void *value)
     {
         *data->username = strdup (qtu(userLine->text ()));
         *data->password = strdup (qtu(passLine->text ()));
+        if (data->store != NULL)
+        {
+            *data->store = checkbox->isChecked ();
+            getSettings()->setValue ("store_password", *data->store);
+        }
     }
     else
+    {
         *data->username = *data->password = NULL;
+        if (data->store != NULL)
+            *data->store = false;
+    }
 
     delete dialog;
 }

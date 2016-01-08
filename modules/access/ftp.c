@@ -45,6 +45,7 @@
 #include <vlc_sout.h>
 #include <vlc_charset.h>
 #include <vlc_interrupt.h>
+#include <vlc_keystore.h>
 
 #ifndef IPPORT_FTP
 # define IPPORT_FTP 21u
@@ -73,6 +74,10 @@ static void OutClose( vlc_object_t * );
 #define ACCOUNT_TEXT N_("FTP account")
 #define ACCOUNT_LONGTEXT N_("Account that will be " \
     "used for the connection.")
+
+#define LOGIN_DIALOG_TITLE _("FTP authentication")
+#define LOGIN_DIALOG_TEXT _("Please enter a valid login and password for " \
+        "the ftp connexion to %s")
 
 vlc_module_begin ()
     set_shortname( "FTP" )
@@ -114,6 +119,8 @@ static int OutSeek( sout_access_out_t *, off_t );
 static ssize_t Write( sout_access_out_t *, block_t * );
 #endif
 
+static int LoginUserPwd( vlc_object_t *, access_sys_t *,
+                         const char *, const char *, bool * );
 static void FeaturesCheck( void *, const char * );
 
 typedef struct ftp_features_t
@@ -403,23 +410,42 @@ static int Login( vlc_object_t *p_access, access_sys_t *p_sys )
         }
     }
 
-    /* Send credentials over channel */
-    char *psz;
+    vlc_url_t url;
+    vlc_credential credential;
+    vlc_UrlParse( &url, ((access_t *)p_access)->psz_url );
+    vlc_credential_init( &credential, &url );
+    bool b_logged = false;
 
-    if( p_sys->url.psz_username && *p_sys->url.psz_username )
-        psz = strdup( p_sys->url.psz_username );
-    else
-        psz = var_InheritString( p_access, "ftp-user" );
-    if( !psz )
-        goto error;
-
-    if( ftp_SendCommand( p_access, p_sys, "USER %s", psz ) < 0 ||
-        ftp_RecvCommand( p_access, p_sys, &i_answer, NULL ) < 0 )
+    while( vlc_credential_get( &credential, p_access, "ftp-user", "ftp-pwd",
+                               LOGIN_DIALOG_TITLE, LOGIN_DIALOG_TEXT,
+                               url.psz_host )
+        && LoginUserPwd( p_access, p_sys, credential.psz_username,
+                         credential.psz_password, &b_logged ) == 0
+        && !b_logged );
+    if( b_logged )
     {
-        free( psz );
-        goto error;
+        vlc_credential_store( &credential );
+        vlc_credential_clean( &credential );
+        vlc_UrlClean( &url );
+        return 0;
     }
-    free( psz );
+    vlc_credential_clean( &credential );
+    vlc_UrlClean( &url );
+error:
+    clearCmdTLS( p_sys );
+    return -1;
+}
+
+static int LoginUserPwd( vlc_object_t *p_access, access_sys_t *p_sys,
+                         const char *psz_user, const char *psz_pwd,
+                         bool *p_logged )
+{
+    int i_answer;
+
+    /* Send credentials over channel */
+    if( ftp_SendCommand( p_access, p_sys, "USER %s", psz_user ) < 0 ||
+        ftp_RecvCommand( p_access, p_sys, &i_answer, NULL ) < 0 )
+        return -1;
 
     switch( i_answer / 100 )
     {
@@ -432,20 +458,10 @@ static int Login( vlc_object_t *p_access, access_sys_t *p_sys )
             break;
         case 3:
             msg_Dbg( p_access, "password needed" );
-            if( p_sys->url.psz_password && *p_sys->url.psz_password )
-                psz = strdup( p_sys->url.psz_password );
-            else
-                psz = var_InheritString( p_access, "ftp-pwd" );
-            if( !psz )
-                goto error;
 
-            if( ftp_SendCommand( p_access, p_sys, "PASS %s", psz ) < 0 ||
+            if( ftp_SendCommand( p_access, p_sys, "PASS %s", psz_pwd ) < 0 ||
                 ftp_RecvCommand( p_access, p_sys, &i_answer, NULL ) < 0 )
-            {
-                free( psz );
-                goto error;
-            }
-            free( psz );
+                return -1;
 
             switch( i_answer / 100 )
             {
@@ -453,6 +469,8 @@ static int Login( vlc_object_t *p_access, access_sys_t *p_sys )
                     msg_Dbg( p_access, "password accepted" );
                     break;
                 case 3:
+                {
+                    char *psz;
                     msg_Dbg( p_access, "account needed" );
                     psz = var_InheritString( p_access, "ftp-account" );
                     if( ftp_SendCommand( p_access, p_sys, "ACCT %s",
@@ -460,7 +478,7 @@ static int Login( vlc_object_t *p_access, access_sys_t *p_sys )
                         ftp_RecvCommand( p_access, p_sys, &i_answer, NULL ) < 0 )
                     {
                         free( psz );
-                        goto error;
+                        return -1;
                     }
                     free( psz );
 
@@ -470,30 +488,26 @@ static int Login( vlc_object_t *p_access, access_sys_t *p_sys )
                         dialog_Fatal( p_access,
                                       _("Network interaction failed"),
                                       "%s", _("Your account was rejected.") );
-                        goto error;
+                        return -1;
                     }
                     msg_Dbg( p_access, "account accepted" );
                     break;
+                }
 
                 default:
-                    msg_Err( p_access, "password rejected" );
-                    dialog_Fatal( p_access, _("Network interaction failed"),
-                                  "%s",  _("Your password was rejected.") );
-                    goto error;
+                    msg_Warn( p_access, "password rejected" );
+                    *p_logged = false;
+                    return 0;
             }
             break;
         default:
-            msg_Err( p_access, "user rejected" );
-            dialog_Fatal( p_access, _("Network interaction failed"), "%s",
-                        _("Your connection attempt to the server was rejected.") );
-            goto error;
+            msg_Warn( p_access, "user rejected" );
+            *p_logged = false;
+            return 0;
     }
 
+    *p_logged = true;
     return 0;
-
-error:
-    clearCmdTLS( p_sys );
-    return -1;
 }
 
 static void FeaturesCheck( void *opaque, const char *feature )

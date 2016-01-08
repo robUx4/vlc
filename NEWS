@@ -8,6 +8,8 @@ Core:
  * Support network browsing for distant file system (SMB, FTP, SFTP, ...)
    and rewrite the parsing of those files
  * VLC now assumes vlcrc config file is in UTF-8
+ * Add a keystore API: fetch and store password for common protocols (HTTP,
+   SMB, SFTP, FTP, RTSP ...)
 
 Access:
  * Support HDS (Http Dynamic Streaming) from Adobe (f4m, f4v, etc.)
@@ -181,6 +183,9 @@ Misc
  * Update libVLC doxygen modules
  * Add a text-to-speech renderer for subtitles on OS X/iOS
  * Add a text-to-speech renderer for subtitles on Windows
+ * Add Gnome libsecret-based crypto keystore
+ * Add KDE Kwallet-based crypto keystore
+ * Add a plaintext keystore
 
 Removed modules
  * Atmo video filter
@@ -191,6 +196,7 @@ Removed modules
  * QuartText text renderer module (use Freetype instead)
  * Win32 GDI text renderer module (use Freetype instead)
  * Growl notification (replaced by osx_notifications)
+ * VCDX "extended" Video CD access module (use the normal VCD module)
 
 
 Changes between 2.2.0 and 2.2.1:

@@ -1030,6 +1030,11 @@ static const char *const ppsz_prefres[] = {
 #define PLUGINS_CACHE_LONGTEXT N_( \
     "Use a plugins cache which will greatly improve the startup time of VLC.")
 
+#define KEYSTORE_TEXT N_("Preferred keystore list")
+#define KEYSTORE_LONGTEXT N_( \
+    "List of keystores that VLC will use in " \
+    "priority. Only advanced users should alter this option." )
+
 #define STATS_TEXT N_("Locally collect statistics")
 #define STATS_LONGTEXT N_( \
      "Collect miscellaneous local statistics about the playing media.")
@@ -1960,6 +1965,8 @@ vlc_module_begin ()
               PLUGINS_CACHE_LONGTEXT, true )
     add_obsolete_string( "plugin-path" ) /* since 2.0.0 */
     add_obsolete_string( "data-path" ) /* since 2.1.0 */
+    add_string( "keystore", NULL, KEYSTORE_TEXT,
+                KEYSTORE_LONGTEXT, true )
 
     set_section( N_("Performance options"), NULL )
 

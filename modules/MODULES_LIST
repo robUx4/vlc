@@ -204,6 +204,7 @@ $Id$
  * karaoke: simple karaoke audio filter
  * kate: kate text bitstream decoder
  * kva: OS/2 video output
+ * kwallet: store secrets via KDE Kwallet
  * libass: Subtitle renderers using libass
  * libbluray: Library to access Blu-Ray drives
  * libmpeg2: Mpeg2 video decoder using libmpeg2
@@ -287,6 +288,7 @@ $Id$
  * packetizer_vc1: VC-1 video packetizer
  * panoramix: image wall panoramic video with edge blending filter
  * param_eq: parametric equalizer
+ * plaintext_keystore: store secrets in a plaintext file (insecure)
  * playlist: playlist import module
  * png: PNG images decoder
  * podcast: podcast feed parser
@@ -333,6 +335,7 @@ $Id$
  * sd_journal: logger output to SystemD journal
  * sdl_image: SDL-based image decoder
  * sdp: SDP fake access
+ * secret: store secrets via Gnome libsecret
  * securetransport: TLS module for OS X and iOS
  * sepia: Sepia video filter
  * sftp: SFTP network access module
@@ -411,7 +414,6 @@ $Id$
  * vaapi_x11: VAAPI hardware-accelerated decoding with x11 backend
  * vc1: VC-1 Video demuxer
  * vcd: input module for accessing Video CDs
- * vcdx: input module for accessing Video CDs with navigation & stills
  * vda: VDADecoder hardware-accelerated decoding
  * vdpau_adjust: VDPAU color adjust video filter
  * vdpau_avcodec: VDPAU hardware-accelerated decoding

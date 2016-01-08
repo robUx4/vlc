@@ -564,7 +564,7 @@ need_libc=false
 
 dnl Check for usual libc functions
 AC_CHECK_DECLS([nanosleep],,,[#include <time.h>])
-AC_CHECK_FUNCS([daemon fcntl fstatvfs fork getenv getpwuid_r isatty lstat memalign mkostemp mmap open_memstream openat pread posix_fadvise posix_madvise setlocale stricmp strnicmp strptime uselocale pthread_cond_timedwait_monotonic_np pthread_condattr_setclock])
+AC_CHECK_FUNCS([daemon fcntl flock fstatvfs fork getenv getpwuid_r isatty lstat memalign mkostemp mmap open_memstream openat pread posix_fadvise posix_madvise setlocale stricmp strnicmp strptime uselocale pthread_cond_timedwait_monotonic_np pthread_condattr_setclock])
 AC_REPLACE_FUNCS([atof atoll dirfd fdopendir ffsll flockfile fsync getdelim getpid gmtime_r lldiv nrand48 poll posix_memalign pread rewind setenv strcasecmp strcasestr strdup strlcpy strndup strnlen strnstr strsep strtof strtok_r strtoll swab tdestroy timegm timespec_get strverscmp])
 AC_CHECK_FUNCS(fdatasync,,
   [AC_DEFINE(fdatasync, fsync, [Alias fdatasync() to fsync() if missing.])
@@ -1804,11 +1804,6 @@ AM_CONDITIONAL(HAVE_DECKLINK, [ test "${have_decklink}" != "no" ])
 
 
 dnl
-dnl  VCDX modules
-dnl
-PKG_ENABLE_MODULES_VLC([VCDX], [vcdx], [libcdio >= 0.78.2 libiso9660 >= 0.72 libvcdinfo >= 0.7.22], [navigate VCD with libvcdinfo], [no])
-
-dnl
 dnl  Built-in CD-DA and VCD module
 dnl
 AC_ARG_ENABLE(vcd,
@@ -2353,11 +2348,18 @@ AM_CONDITIONAL([HAVE_VAAPI_X11], [test "${have_vaapi_x11}" = "yes"])
 
 have_avcodec_vaapi="no"
 AS_IF([test "${have_vaapi}" = "yes" -a "${have_avcodec}" = "yes"], [
+  case "${avfork}" in
+    ffmpeg)
+      PKG_CHECK_EXISTS([libavcodec >= 57.10.100], [
+        AC_MSG_ERROR([VA API requires FFmpeg libavcodec < 57.10 or libav.])
+      ])
+      ;;
+  esac
   VLC_SAVE_FLAGS
   CPPFLAGS="${CPPFLAGS} ${AVCODEC_CFLAGS}"
   CFLAGS="${CFLAGS} ${AVCODEC_CFLAGS}"
   AC_CHECK_HEADERS([libavcodec/vaapi.h], [
-    AC_MSG_NOTICE([VAAPI acceleration activated])
+    AC_MSG_NOTICE([VA API acceleration activated])
     have_avcodec_vaapi="yes"
   ],[
     AS_IF([test -n "${enable_libva}"], [
@@ -2380,6 +2382,13 @@ have_avcodec_dxva2="no"
 AS_IF([test "${enable_dxva2}" != "no"], [
   if test "${SYS}" = "mingw32"; then
   AS_IF([test "x${have_avcodec}" = "xyes"], [
+    case "${avfork}" in
+      ffmpeg)
+        PKG_CHECK_EXISTS([libavcodec >= 57.10.100], [
+          AC_MSG_ERROR([DXVA2 requires FFmpeg libavcodec < 57.10 or libav.])
+        ])
+        ;;
+    esac
     AC_CHECK_HEADERS(dxva2api.h,
       [
         AC_CHECK_HEADERS(libavcodec/dxva2.h, [
@@ -3076,7 +3085,11 @@ have_avcodec_vdpau="no"
 AS_IF([test "${have_vdpau}" = "yes" -a "${have_avcodec}" = "yes"], [
   case "${avfork}" in
     libav) av_vdpau_ver="55.26.0" ;;
-    ffmpeg) av_vdpau_ver="55.42.100" ;;
+    ffmpeg) av_vdpau_ver="55.42.100"
+      PKG_CHECK_EXISTS([libavcodec >= 57.10.100], [
+        AC_MSG_ERROR([VDPAU requires FFmpeg libavcodec < 57.10 or libav.])
+      ])
+      ;;
   esac
   PKG_CHECK_EXISTS([libavutil >= 52.4.0 libavcodec >= ${av_vdpau_ver}], [
     have_avcodec_vdpau="yes"
@@ -3783,6 +3796,14 @@ AS_IF([test "${enable_qt}" != "no"], [
 AM_CONDITIONAL(ENABLE_QT4, [test "$enable_qt" != "no"])
 
 dnl
+dnl detect kde4-config patch (used for kde solids and kwallet).
+dnl
+AC_ARG_VAR([KDE4_CONFIG], [kde4-config utility])
+AS_IF([test "x$KDE4_CONFIG" = "x"], [
+  KDE4_CONFIG="kde4-config"
+])
+
+dnl
 dnl Simple test for skins2 dependency
 dnl
 AS_IF([test "$enable_qt" = "no"], [
@@ -4071,6 +4092,46 @@ AS_IF([test "${enable_taglib}" != "no"], [
 ])
 
 dnl
+dnl  libsecret
+dnl
+PKG_ENABLE_MODULES_VLC([SECRET], [], [libsecret-1], [use libsecret for keystore], [auto])
+
+dnl
+dnl  kwallet
+dnl
+AC_ARG_ENABLE(kwallet,
+  [AS_HELP_STRING([--enable-kwallet],
+    [use KWallet for keystore (default auto)])])
+have_kwallet="no"
+KWALLET_CXXFLAGS=""
+KWALLET_LIBS=""
+AS_IF([test "${SYS}" != "mingw32" -a "${SYS}" != "darwin" \
+         -a "${enable_qt}" != "no" -a "${KDE4_CONFIG}" != "no" \
+         -a "${enable_kwallet}" != "no" ], [
+  VLC_SAVE_FLAGS
+  AC_LANG_PUSH([C++])
+  KWALLET_CXXFLAGS="$QT_CFLAGS $CXXFLAGS_qt4 -I`$KDE4_CONFIG --path include`"
+  CPPFLAGS="$CPPFLAGS $KWALLET_CXXFLAGS"
+  AC_CHECK_HEADER([kwallet.h], [
+    KWALLET_LIBS="$QT_LIBS -L`$KDE4_CONFIG --install lib` -lkdeui"
+    LDFLAGS="$LDFLAGS $KWALLET_LIBS"
+    AC_LINK_IFELSE([AC_LANG_PROGRAM([#include <kwallet.h>], [
+KWallet::Wallet::LocalWallet();
+    ])], [
+      have_kwallet="yes"
+    ])
+  ])
+  AC_LANG_POP([C++])
+  VLC_RESTORE_FLAGS
+])
+AS_IF([test "$enable_kwallet" = "yes" -a "$have_kwallet" = "no" ], [
+  AC_MSG_ERROR([KWallet headers or so not found])
+])
+AC_SUBST(KWALLET_CXXFLAGS)
+AC_SUBST(KWALLET_LIBS)
+AM_CONDITIONAL([HAVE_KWALLET], [test "${have_kwallet}" = "yes"])
+
+dnl
 dnl  Developers helper modules (should be hidden from configure help)
 dnl
 AC_ARG_ENABLE(devtools, [], [], [enable_devtools="no"])
@@ -4129,11 +4190,6 @@ AC_SUBST(DEFS_BIGENDIAN)
 dnl
 dnl Where to install KDE solid .desktop
 dnl
-AC_ARG_VAR([KDE4_CONFIG], [kde4-config utility])
-AS_IF([test "x$KDE4_CONFIG" = "x"], [
-  KDE4_CONFIG="kde4-config"
-])
-
 AC_ARG_WITH(kde-solid,
   AS_HELP_STRING([--with-kde-solid=PATH],
                  [KDE Solid actions directory (auto)]),, [
