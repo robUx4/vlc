@@ -290,6 +290,7 @@ void RendererDialog::discoveryEventReceived( const vlc_event_t * p_event )
         }
 
         char *psz_module = NULL;
+        RendererItem::RendererType type = RendererItem::RendererType::HAS_VIDEO;
         /* TODO ugly until we have a proper renderer_t type */
         for( int i = 0; i < p_item->i_options; i++ )
         {
@@ -299,16 +300,9 @@ void RendererDialog::discoveryEventReceived( const vlc_event_t * p_event )
 
             if (!strncmp( "module=", psz_src, 7 ))
                 psz_module = strdup( psz_src + 7 );
+            if (!strncmp( "audio_only=", psz_src, 11 ))
+                type = RendererItem::RendererType::AUDIO_ONLY;
         }
-
-        /* FIXME determine if it's audio-only by checking the YouTube app */
-        char deviceURI[64];
-        snprintf(deviceURI, sizeof(deviceURI), "http://%s:8008/apps/YouTube", psz_host );
-        access_t *p_test_app = vlc_access_NewMRL( VLC_OBJECT(p_sd), deviceURI );
-
-        RendererItem::RendererType type = p_test_app ? RendererItem::RendererType::HAS_VIDEO : RendererItem::RendererType::AUDIO_ONLY;
-        if ( p_test_app )
-            vlc_access_Delete( p_test_app );
 
         RendererItem *item = new RendererItem( p_item->psz_name, psz_host, i_port,
                                                type, psz_module );

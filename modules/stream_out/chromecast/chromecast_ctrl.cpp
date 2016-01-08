@@ -1633,29 +1633,7 @@ void intf_sys_t::handleMessages()
  * Device discovery
  *****************************************************************************/
 
-extern "C" void discovery_event_received( const vlc_event_t * p_event, void * user_data )
-{
-    services_discovery_t *p_sd = reinterpret_cast<services_discovery_t*>(user_data);
-
-    switch(p_event->type)
-    {
-    case vlc_ServicesDiscoveryItemAdded:
-        input_item_AddOption( p_event->u.services_discovery_item_added.p_new_item, ":module=ctrl_chromecast", 0 );
-        services_discovery_AddItem( p_sd, p_event->u.services_discovery_item_added.p_new_item,
-                                    p_event->u.services_discovery_item_added.psz_category );
-        break;
-    case vlc_ServicesDiscoveryItemRemoved:
-        input_item_AddOption( p_event->u.services_discovery_item_removed.p_item, ":module=ctrl_chromecast", 0 );
-        services_discovery_RemoveItem( p_sd, p_event->u.services_discovery_item_removed.p_item );
-        break;
-    case vlc_ServicesDiscoveryItemRemoveAll:
-        services_discovery_RemoveAll( p_sd );
-        break;
-    default:
-        msg_Dbg( p_sd, "unexpected event %d", p_event->type );
-        break;
-    }
-}
+extern "C" void discovery_event_received( const vlc_event_t * p_event, void * user_data );
 
 struct services_discovery_sys_t
 {
@@ -1675,6 +1653,40 @@ struct services_discovery_sys_t
         vlc_event_detach( em, vlc_ServicesDiscoveryItemRemoveAll, discovery_event_received, p_this );
 
         vlc_sd_Destroy(p_microdns);
+    }
+
+    input_item_t *forward_device_added(input_item_t *p_device)
+    {
+        if ( !p_device )
+            return NULL;
+
+        vlc_url_t url;
+        vlc_UrlParse( &url, p_device->psz_uri );
+
+        if ( !url.psz_host || !url.psz_host[0] )
+            return NULL;
+
+        /* determine if it's audio-only by checking the YouTube app */
+        char deviceURI[64];
+        snprintf(deviceURI, sizeof(deviceURI), "http://%s:8008/apps/YouTube", url.psz_host );
+        access_t *p_test_app = vlc_access_NewMRL( VLC_OBJECT(p_this), deviceURI );
+        if ( !p_test_app )
+            input_item_AddOption( p_device, ":audio_only=1", 0 );
+        else
+            vlc_access_Delete( p_test_app );
+        vlc_UrlClean( &url );
+
+        input_item_AddOption( p_device, ":module=ctrl_chromecast", 0 );
+
+        input_item_Hold( p_device );
+        return p_device;
+    }
+
+    input_item_t *forward_device_removed(input_item_t *p_device)
+    {
+        if ( p_device )
+            input_item_AddOption( p_device, ":module=ctrl_chromecast", 0 );
+        return p_device;
     }
 
 private:
@@ -1731,3 +1743,36 @@ void DiscoveryClose(vlc_object_t *p_this)
     delete p_sd->p_sys;
 }
 
+extern "C" void discovery_event_received( const vlc_event_t * p_event, void * user_data )
+{
+    services_discovery_t *p_sd = reinterpret_cast<services_discovery_t*>(user_data);
+    input_item_t *p_item;
+
+    switch(p_event->type)
+    {
+    case vlc_ServicesDiscoveryItemAdded:
+        p_item = p_event->u.services_discovery_item_added.p_new_item;
+        p_item = p_sd->p_sys->forward_device_added( p_item );
+        if ( p_item )
+        {
+            services_discovery_AddItem( p_sd, p_item, p_event->u.services_discovery_item_added.psz_category );
+            input_item_Release( p_item );
+        }
+        break;
+    case vlc_ServicesDiscoveryItemRemoved:
+        p_item = p_event->u.services_discovery_item_removed.p_item;
+        p_item = p_sd->p_sys->forward_device_removed( p_item );
+        if ( p_item )
+        {
+            services_discovery_RemoveItem( p_sd, p_item );
+            input_item_Release( p_item );
+        }
+        break;
+    case vlc_ServicesDiscoveryItemRemoveAll:
+        services_discovery_RemoveAll( p_sd );
+        break;
+    default:
+        msg_Dbg( p_sd, "unexpected event %d", p_event->type );
+        break;
+    }
+}
