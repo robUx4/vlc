@@ -168,8 +168,6 @@ static void new_entry_callback( void *p_this, int i_status, const struct rr_entr
 
                 if ( item )
                 {
-                    /* TODO until we can discover renderer handlers */
-                    input_item_AddOption( item, ":module=ctrl_chromecast", 0 );
                     services_discovery_AddItem (p_sd, item, NULL);
                     input_item_Release( item );
                 }
