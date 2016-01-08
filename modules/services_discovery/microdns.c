@@ -53,9 +53,6 @@ vlc_module_begin ()
     set_callbacks (Open, Close)
     add_shortcut ("microdns")
     add_string(CFG_PREFIX "name", "", NAME_TEXT, NAME_LONGTEXT, false)
-
-    VLC_SD_PROBE_SUBMODULE
-
 vlc_module_end ()
 
 struct services_discovery_sys_t
