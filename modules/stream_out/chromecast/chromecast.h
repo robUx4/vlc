@@ -78,6 +78,15 @@ enum receiver_state {
     RECEIVER_PAUSED,
 };
 
+enum restart_state {
+    RESTART_NONE,
+    RESTART_STOPPING,
+    RESTART_STARTING,
+};
+
+/*****************************************************************************
+ * intf_sys_t: description and status of interface
+ *****************************************************************************/
 struct intf_sys_t
 {
     intf_sys_t(intf_thread_t * const intf);
@@ -139,6 +148,9 @@ struct intf_sys_t
     mtime_t           playback_start_chromecast;
     /* local playback time of the input when playback started/resumed */
     mtime_t           playback_start_local;
+    restart_state     restartState;
+
+
     vlc_mutex_t  lock;
     vlc_cond_t   loadCommandCond;
     vlc_thread_t chromecastThread;
@@ -177,6 +189,7 @@ struct intf_sys_t
     void ipChangedEvent(const char *psz_new_ip);
     int connectChromecast();
     void disconnectChromecast();
+    void stateChangedForRestart( input_thread_t * );
 
     void msgPlayerSetVolume(float volume);
     void msgPlayerSetMute(bool mute);
@@ -224,6 +237,11 @@ private:
     std::string       s_chromecast_url;
     bool              canRemux;
     bool              canDoDirect;
+    bool              b_restart_playback;
+    bool              b_has_restart_callback;
+    bool              b_forcing_position;
+    double            f_restart_position;
+
     std::string GetMedia();
 
     bool canDecodeVideo( const es_format_t * ) const;
@@ -232,6 +250,9 @@ private:
     void plugOutputRedirection();
     void unplugOutputRedirection();
     void setCurrentStopped(bool);
+
+    void restartDoStop();
+    bool restartDoPlay();
 };
 
 #endif /* VLC_CHROMECAST_H */
