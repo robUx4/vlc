@@ -279,6 +279,9 @@ intf_sys_t::intf_sys_t(intf_thread_t * const p_this)
     ,i_sock_fd(-1)
     ,p_creds(NULL)
     ,p_tls(NULL)
+    ,date_play_start(-1)
+    ,playback_start_chromecast(-1)
+    ,playback_start_local(0)
     ,conn_status(CHROMECAST_DISCONNECTED)
     ,cmd_status(NO_CMD_PENDING)
     ,i_receiver_requestId(0)
@@ -650,8 +653,9 @@ void intf_sys_t::sendPlayerCmd()
             //mediaSessionId = "";
         }
         else
-        //playback_start_chromecast = -1.0;
+        //playback_start_chromecast = -1;
         if (cmd_status == NO_CMD_PENDING) {
+            playback_start_local = 0;
             msgPlayerLoad();
             setPlayerStatus(CMD_LOAD_SENT);
         }
@@ -1067,13 +1071,25 @@ void intf_sys_t::processMessage(const castchannel::CastMessage &msg)
                             msgPlayerSetMute( var_GetBool( p_playlist, "mute") );
                             msgPlayerSetVolume( var_GetFloat( p_playlist, "volume") );
                         }
+
+                        playback_start_chromecast = (1 + mtime_t( double( status[0]["currentTime"] ) ) ) * 1000000L;
+                        msg_Dbg(p_intf, "Playback pending with an offset of %" PRId64, playback_start_chromecast);
                     }
+                    date_play_start = -1;
                     break;
 
                 case RECEIVER_PLAYING:
                     /* TODO reset demux PCR ? */
+                    if (unlikely(playback_start_chromecast == -1)) {
+                        msg_Warn(p_intf, "start playing without buffering");
+                        playback_start_chromecast = (1 + mtime_t( double( status[0]["currentTime"] ) ) ) * 1000000L;
+                    }
                     setCurrentStopped( false );
                     setPlayerStatus(CMD_PLAYBACK_SENT);
+                    date_play_start = mdate();
+#ifndef NDEBUG
+                    msg_Dbg(p_intf, "Playback started with an offset of %" PRId64 " now:%" PRId64 " playback_start_local:%" PRId64, playback_start_chromecast, date_play_start, playback_start_local);
+#endif
                     break;
 
                 case RECEIVER_PAUSED:
@@ -1083,6 +1099,21 @@ void intf_sys_t::processMessage(const castchannel::CastMessage &msg)
                         msgPlayerSetMute( var_GetBool( p_playlist, "mute") );
                         msgPlayerSetVolume( var_GetFloat( p_playlist, "volume") );
                     }
+
+                    playback_start_chromecast = (1 + mtime_t( double( status[0]["currentTime"] ) ) ) * 1000000L;
+#ifndef NDEBUG
+                    msg_Dbg(p_intf, "Playback paused with an offset of %" PRId64 " date_play_start:%" PRId64, playback_start_chromecast, date_play_start);
+#endif
+
+                    if (date_play_start != -1 && oldPlayerState == RECEIVER_PLAYING)
+                    {
+                        /* this is a pause generated remotely */
+                        playback_start_local += mdate() - date_play_start;
+#ifndef NDEBUG
+                        msg_Dbg(p_intf, "updated playback_start_local:%" PRId64, playback_start_local);
+#endif
+                    }
+                    date_play_start = -1;
                     break;
 
                 case RECEIVER_IDLE:
@@ -1091,6 +1122,7 @@ void intf_sys_t::processMessage(const castchannel::CastMessage &msg)
                 default:
                     setPlayerStatus(NO_CMD_PENDING);
                     sendPlayerCmd();
+                    date_play_start = -1;
                     break;
                 }
             }
