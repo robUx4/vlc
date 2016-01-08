@@ -233,41 +233,6 @@ void Close(vlc_object_t *p_this)
     delete p_sys;
 }
 
-/**
- * @brief Build a CastMessage to send to the Chromecast
- * @param namespace_ the message namespace
- * @param payloadType the payload type (CastMessage_PayloadType_STRING or
- * CastMessage_PayloadType_BINARY
- * @param payload the payload
- * @param destinationId the destination idenifier
- * @return the generated CastMessage
- */
-void intf_sys_t::pushMessage(const std::string & namespace_,
-                             const std::string & payload,
-                             const std::string & destinationId,
-                             castchannel::CastMessage_PayloadType payloadType)
-{
-    castchannel::CastMessage msg;
-
-    msg.set_protocol_version(castchannel::CastMessage_ProtocolVersion_CASTV2_1_0);
-    msg.set_namespace_(namespace_);
-    msg.set_payload_type(payloadType);
-    msg.set_source_id("sender-vlc");
-    msg.set_destination_id(destinationId);
-    if (payloadType == castchannel::CastMessage_PayloadType_STRING)
-        msg.set_payload_utf8(payload);
-    else // CastMessage_PayloadType_BINARY
-        msg.set_payload_binary(payload);
-
-    sendMessage(msg);
-}
-
-void intf_sys_t::pushMediaPlayerMessage(const std::stringstream & payload) {
-    assert(!appTransportId.empty());
-    pushMessage( NAMESPACE_MEDIA, payload.str(), appTransportId );
-}
-
-
 /*****************************************************************************
  * intf_sys_t: class definition
  *****************************************************************************/
@@ -284,6 +249,8 @@ intf_sys_t::intf_sys_t(intf_thread_t * const p_this)
     ,date_play_start(-1)
     ,playback_start_chromecast(-1)
     ,playback_start_local(0)
+    ,m_seektime(-1)
+    ,i_seektime(-1)
     ,restartState(RESTART_NONE)
     ,conn_status(CHROMECAST_DISCONNECTED)
     ,cmd_status(NO_CMD_PENDING)
@@ -296,12 +263,14 @@ intf_sys_t::intf_sys_t(intf_thread_t * const p_this)
 {
     vlc_mutex_init(&lock);
     vlc_cond_init(&loadCommandCond);
+    vlc_cond_init(&seekCommandCond);
 }
 
 intf_sys_t::~intf_sys_t()
 {
     ipChangedEvent( NULL );
 
+    vlc_cond_destroy(&seekCommandCond);
     vlc_cond_destroy(&loadCommandCond);
     vlc_mutex_destroy(&lock);
 }
@@ -394,6 +363,10 @@ void intf_sys_t::ipChangedEvent(const char *psz_new_ip)
             }
 
             InputUpdated( NULL );
+
+            // make sure we unblock the demuxer
+            i_seektime = -1;
+            vlc_cond_signal(&seekCommandCond);
         }
     }
     vlc_UrlClean(&url);
@@ -474,6 +447,7 @@ void intf_sys_t::unplugOutputRedirection()
     if ( var_Type( p_input->p_parent, SOUT_INTF_ADDRESS ) )
     {
         var_Destroy( p_input->p_parent, SOUT_INTF_ADDRESS );
+        var_SetString( p_input, "demux-filter", NULL );
         var_SetString( p_input, "sout", NULL );
     }
 }
@@ -487,6 +461,7 @@ void intf_sys_t::plugOutputRedirection()
         var_SetAddress( p_input->p_parent, SOUT_INTF_ADDRESS, p_intf );
         msg_Dbg(p_intf, "force sout to %s", s_sout.c_str());
         var_SetString( p_input, "sout", s_sout.c_str() );
+        var_SetString( p_input, "demux-filter", "cc_demux" );
     }
 }
 
@@ -501,6 +476,9 @@ void intf_sys_t::InputUpdated( input_thread_t *p_input )
         {
             b_restart_playback = false;
             restartState = RESTART_NONE;
+            msg_Dbg( p_intf, "force restart position:%f", f_restart_position );
+            b_forcing_position = true;
+            input_Control( p_input, INPUT_SET_POSITION, f_restart_position);
         }
         /* we will connect when we start the thread */
         p_input = NULL;
@@ -636,6 +614,41 @@ void intf_sys_t::InputUpdated( input_thread_t *p_input )
             ssout << "cc_sout{http-port=" << i_port << ",mux=" << muxer << ",mime=" << mime << ",uid=" << i_sout_id++ << "}";
             s_sout = ssout.str();
         }
+
+        if (conn_status == CHROMECAST_CONNECTION_DEAD)
+            b_restart_playback = false;
+        else if (b_restart_playback)
+        {
+            b_restart_playback = false;
+            restartState = RESTART_NONE;
+            msg_Dbg( p_intf, "force restart position:%f", f_restart_position );
+            b_forcing_position = true;
+            input_Control( this->p_input, INPUT_SET_POSITION, f_restart_position);
+        }
+        else if ( input_HasESOut( p_input ) )
+        {
+            char *psz_old_sout = var_GetString( p_input, "sout" );
+            b_restart_playback = !psz_old_sout || !psz_old_sout[0];
+            if ( b_restart_playback )
+                msg_Dbg( p_intf, "there's no sout defined yet status:%d", playlist_Status( pl_Get( p_intf ) ) );
+            free(psz_old_sout);
+        }
+        else
+        {
+            msg_Dbg( p_intf, "no need to restart to set the sout" );
+            b_restart_playback = false;
+        }
+        msg_Dbg( p_intf, "%ld new b_restart_playback:%d", GetCurrentThreadId(), b_restart_playback );
+
+        if ( b_restart_playback )
+        {
+            if (deviceIP.empty() || conn_status == CHROMECAST_APP_STARTED)
+            {
+                /* the MediaApp is already connected we need to stop now */
+                restartDoStop();
+            }
+        }
+        else
         {
             if (b_has_restart_callback)
             {
@@ -650,6 +663,10 @@ void intf_sys_t::InputUpdated( input_thread_t *p_input )
                 plugOutputRedirection();
             }
         }
+    }
+    else if ( !b_restart_playback )
+    {
+        restartDoStop();
     }
     vlc_mutex_unlock(&lock);
 }
@@ -939,7 +956,7 @@ bool intf_sys_t::restartDoPlay()
     if ( b_restart_playback )
     {
 #ifndef NDEBUG
-        msg_Dbg( p_intf, "restart playback p_input:%p playlist_Play() b_restart_playback:1", (void*)p_input );
+        msg_Dbg( p_intf, "restart playback p_input:%p playlist_Play() b_restart_playback:1 position:%f", (void*)p_input, f_restart_position );
 #endif
         playlist_Play( pl_Get(p_intf) );
         //b_restart_playback = false;
@@ -969,6 +986,10 @@ void intf_sys_t::restartDoStop()
         b_has_restart_callback = true;
     }
     b_restart_playback = true;
+    input_Control(p_input, INPUT_GET_POSITION, &f_restart_position);
+#ifndef NDEBUG
+    msg_Dbg( p_intf, "Current %p position:%f", (void*)p_input, f_restart_position );
+#endif
     vlc_object_release(p_input);
 
     restartState = RESTART_STOPPING;
@@ -1194,7 +1215,7 @@ void intf_sys_t::processMessage(const castchannel::CastMessage &msg)
                 case RECEIVER_PLAYING:
                     /* TODO reset demux PCR ? */
                     if (unlikely(playback_start_chromecast == -1)) {
-                        msg_Warn(p_intf, "start playing without buffering");
+                        msg_Warn(p_intf, "start playing without buffering f_restart_position:%f", f_restart_position );
                         playback_start_chromecast = (1 + mtime_t( double( status[0]["currentTime"] ) ) ) * 1000000L;
                     }
                     setCurrentStopped( false );
@@ -1240,6 +1261,12 @@ void intf_sys_t::processMessage(const castchannel::CastMessage &msg)
                 }
             }
 
+            if (receiverState == RECEIVER_BUFFERING && i_seektime != -1)
+            {
+                msg_Dbg(p_intf, "Chromecast seeking possibly done");
+                vlc_cond_signal( &seekCommandCond );
+            }
+
             if (cmd_status == CMD_LOAD_SENT)
                 sendPlayerCmd();
         }
@@ -1276,6 +1303,7 @@ void intf_sys_t::processMessage(const castchannel::CastMessage &msg)
             msg_Warn(p_intf, "received close message");
             vlc_mutex_locker locker(&lock);
             setConnectionStatus(CHROMECAST_CONNECTION_DEAD);
+            ipChangedEvent(NULL);
         }
         else
         {
@@ -1477,34 +1505,6 @@ void intf_sys_t::msgPlayerSetMute(bool b_mute)
        << "}";
 
     pushMediaPlayerMessage( ss );
-}
-
-/**
- * @brief Send a message to the Chromecast
- * @param msg the CastMessage to send
- * @return vlc error code
- */
-int intf_sys_t::sendMessage(const castchannel::CastMessage &msg)
-{
-    int i_size = msg.ByteSize();
-    uint8_t *p_data = new(std::nothrow) uint8_t[PACKET_HEADER_LEN + i_size];
-    if (p_data == NULL)
-        return VLC_ENOMEM;
-
-#ifndef NDEBUG
-    msg_Dbg(p_intf, "sendMessage: %s->%s %s", msg.namespace_().c_str(), msg.destination_id().c_str(), msg.payload_utf8().c_str());
-#endif
-
-    SetDWBE(p_data, i_size);
-    msg.SerializeWithCachedSizesToArray(p_data + PACKET_HEADER_LEN);
-
-    vlc_mutex_locker locker(&lock);
-    int i_ret = tls_Send(p_tls, p_data, PACKET_HEADER_LEN + i_size);
-    delete[] p_data;
-    if (i_ret == PACKET_HEADER_LEN + i_size)
-        return VLC_SUCCESS;
-
-    return VLC_EGENERIC;
 }
 
 /*****************************************************************************

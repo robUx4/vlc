@@ -122,6 +122,19 @@ struct intf_sys_t
         return 0.0;
     }
 
+    bool seekTo(mtime_t pos);
+
+    bool forceSeekPosition() const {
+        return b_forcing_position;
+    }
+
+    void resetForcedSeek(mtime_t i_length) {
+        b_forcing_position = false;
+        playback_start_local = i_length * f_restart_position;
+#ifndef NDEBUG
+        msg_Dbg(p_intf, "resetForcedSeek playback_start_local:%" PRId64, playback_start_local);
+#endif
+    }
 
     intf_thread_t  * const p_intf;
     input_thread_t *p_input;
@@ -148,11 +161,16 @@ struct intf_sys_t
     mtime_t           playback_start_chromecast;
     /* local playback time of the input when playback started/resumed */
     mtime_t           playback_start_local;
+    /* internal seek time */
+    mtime_t           m_seektime;
+    /* seek time with Chromecast relative timestamp */
+    mtime_t           i_seektime;
     restart_state     restartState;
 
 
     vlc_mutex_t  lock;
     vlc_cond_t   loadCommandCond;
+    vlc_cond_t   seekCommandCond;
     vlc_thread_t chromecastThread;
 
     void msgAuth();
@@ -206,6 +224,7 @@ private:
     void msgPlayerPlay();
     void msgPlayerPause();
     void msgPlayerGetStatus();
+    void msgPlayerSeek(const std::string & currentTime);
 
     void processMessage(const castchannel::CastMessage &msg);
 
