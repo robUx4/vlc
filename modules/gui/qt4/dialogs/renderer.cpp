@@ -114,22 +114,39 @@ void RendererDialog::close()
     QVLCDialog::close();
 }
 
-static const char MDNS_CHROMECAST[] = "._googlecast._tcp.local";
-
 void RendererDialog::setVisible(bool visible)
 {
     QVLCDialog::setVisible(visible);
 
     if (visible)
     {
-        /* TODO launch all discovery services for renderers */
-        if ( p_sd == NULL )
+        /* SD subnodes */
+        char **ppsz_longnames;
+        int *p_categories;
+        char **ppsz_names = vlc_sd_GetNames( THEPL, &ppsz_longnames, &p_categories );
+        if( !ppsz_names )
+            return;
+
+        char **ppsz_name = ppsz_names, **ppsz_longname = ppsz_longnames;
+        int *p_category = p_categories;
+        for( ; *ppsz_name; ppsz_name++, ppsz_longname++, p_category++ )
         {
-            msg_Dbg( p_intf, "starting renderer discovery services..." );
-            p_sd = vlc_sd_Create( VLC_OBJECT(p_intf), "microdns{name=._googlecast._tcp.local}" );
-            if( !p_sd )
-                msg_Err( p_intf, "Could not start renderer discovery services" );
+            if( *p_category == SD_CAT_RENDERER )
+            {
+                /* TODO launch all discovery services for renderers */
+                msg_Dbg( p_intf, "starting renderer discovery service %s", *ppsz_longname );
+                if ( p_sd == NULL )
+                {
+                    p_sd = vlc_sd_Create( VLC_OBJECT(p_intf), *ppsz_name );
+                    if( !p_sd )
+                        msg_Err( p_intf, "Could not start renderer discovery services" );
+                }
+                break;
+            }
         }
+        free( ppsz_names );
+        free( ppsz_longnames );
+        free( p_categories );
 
         if ( p_sd != NULL )
         {
@@ -252,10 +269,7 @@ void RendererDialog::discoveryEventReceived( const vlc_event_t * p_event )
         const input_item_t *p_item =  p_event->u.services_discovery_item_added.p_new_item;
         vlc_UrlParse(&url, p_item->psz_uri);
 
-        if (!url.psz_protocol || strcmp(url.psz_protocol, "microdns"))
-            return;
-
-        if (url.psz_host && strcmp(url.psz_host, MDNS_CHROMECAST))
+        if (!url.psz_protocol || !url.psz_protocol[0])
             return;
 
         if (!url.psz_path || !*url.psz_path)
@@ -289,7 +303,7 @@ void RendererDialog::discoveryEventReceived( const vlc_event_t * p_event )
                 psz_module = strdup( psz_src + 7 );
         }
 
-        /* determine if it's audio-only by checking the YouTube app */
+        /* FIXME determine if it's audio-only by checking the YouTube app */
         char deviceURI[64];
         snprintf(deviceURI, sizeof(deviceURI), "http://%s:8008/apps/YouTube", psz_host );
         access_t *p_test_app = vlc_access_NewMRL( VLC_OBJECT(p_sd), deviceURI );
