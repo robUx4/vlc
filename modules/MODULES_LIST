@@ -79,7 +79,6 @@ $Id$
  * chorus_flanger: Basic chorus/flanger/variable delay audio filter
  * chroma_omx: OMX Development Layer chroma conversions
  * chroma_yuv_neon: ARM NEON video chroma conversion
- * chromecast_demux: Internal demux filter to report the playback time on the Chromecast
  * clone: Clone video filter
  * colorthres:  Theshold color based on similarity to reference color Video filter
  * compressor: Dynamic range compressor
@@ -102,6 +101,7 @@ $Id$
  * decomp: Decompression module
  * deinterlace: naive deinterlacing filter
  * demux_cdg: Demuxer for CD-G files (Karaoke)
+ * demux_chromecast: Internal demux filter to report the playback time on the Chromecast
  * demux_stl: EBU STL subtitles demuxer
  * demuxdump: Pseudo-demuxer that dumps the stream
  * diracsys: BBC Dirac demuxer
@@ -224,7 +224,7 @@ $Id$
  * mediacodec: Android Jelly Bean MediaCodec decoder module
  * mediadirs: Picture/Music/Video user directories as service discoveries
  * mft: Media Foundation Transform audio/video decoder
- * microdns: microDNS devices service discovery
+ * microdns: mDNS devices service discovery
  * minimal_macosx: a minimal Mac OS X GUI, using the FrameWork
  * mirror: mirror video filter
  * mjpeg: a demuxer for multipart and concatenated JPEG data

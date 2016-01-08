@@ -112,10 +112,6 @@ ssize_t getdelim (char **, size_t *, int, FILE *);
 ssize_t getline (char **, size_t *, FILE *);
 #endif
 
-#ifndef HAVE_PREAD
-ssize_t pread (int fd, void *buf, size_t count, off_t offset);
-#endif
-
 #ifndef HAVE_REWIND
 void rewind (FILE *);
 #endif
