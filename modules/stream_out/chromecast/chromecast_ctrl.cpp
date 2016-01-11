@@ -367,7 +367,6 @@ void intf_sys_t::ipChangedEvent(const char *psz_new_ip)
             // make sure we unblock the demuxer
             i_seektime = -1;
             vlc_cond_signal(&seekCommandCond);
-            //vlc_cond_signal(&loadCommandCond);
         }
     }
     vlc_UrlClean(&url);
@@ -678,7 +677,6 @@ void intf_sys_t::setCurrentStopped(bool stopped) {
         msg_Dbg(p_intf, "change current file stopped, now %d", stopped);
 #endif
         currentStopped = stopped;
-        vlc_cond_broadcast(&loadCommandCond);
     }
 }
 
