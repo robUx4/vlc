@@ -242,7 +242,6 @@ private:
         {
             msg_Dbg(p_intf, "change Chromecast command status from %d to %d", cmd_status, status);
             cmd_status = status;
-            vlc_cond_broadcast(&loadCommandCond);
         }
     }
 
