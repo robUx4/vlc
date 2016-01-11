@@ -506,6 +506,7 @@ void intf_sys_t::InputUpdated( input_thread_t *p_input )
         unplugOutputRedirection();
     }
 
+    setCurrentStopped( true );
     this->p_input = p_input;
 
     if( this->p_input != NULL )
