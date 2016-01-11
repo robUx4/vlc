@@ -273,7 +273,6 @@ vlc_vaLog
 vlc_strerror
 vlc_strerror_c
 msleep
-mstrtime
 mwait
 net_Accept
 net_AcceptSingle
@@ -430,8 +429,10 @@ text_segment_Delete
 text_segment_ChainDelete
 text_segment_Copy
 vlc_tls_ClientCreate
+vlc_tls_ServerCreate
 vlc_tls_Delete
 vlc_tls_ClientSessionCreate
+vlc_tls_SessionCreate
 vlc_tls_SessionDelete
 vlc_tls_Read
 vlc_tls_Write
@@ -471,6 +472,7 @@ vlc_pipe
 vlc_write
 vlc_writev
 vlc_socket
+vlc_socketpair
 vlc_accept
 utf8_vfprintf
 var_AddCallback

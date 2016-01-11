@@ -149,7 +149,7 @@
 {
     NSFont *fontToUse;
     CGFloat rowHeight;
-    if (var_InheritBool(VLCIntf, "macosx-large-text")) {
+    if (var_InheritBool(getIntf(), "macosx-large-text")) {
         fontToUse = [NSFont systemFontOfSize:13.];
         rowHeight = 21.;
     } else {
@@ -175,7 +175,7 @@
     _outlineView = outlineView;
     [_outlineView setDelegate:self];
 
-    playlist_t * p_playlist = pl_Get(VLCIntf);
+    playlist_t * p_playlist = pl_Get(getIntf());
 
     _model = [[PLModel alloc] initWithOutlineView:_outlineView playlist:p_playlist rootItem:p_playlist->p_playing];
     [_outlineView setDataSource:_model];
@@ -290,7 +290,7 @@
 /* When called retrieves the selected outlineview row and plays that node or item */
 - (IBAction)playItem:(id)sender
 {
-    playlist_t *p_playlist = pl_Get(VLCIntf);
+    playlist_t *p_playlist = pl_Get(getIntf());
 
     // ignore clicks on column header when handling double action
     if (sender == _outlineView && [_outlineView clickedRow] == -1)
@@ -326,7 +326,7 @@
     free(psz_url);
     free(psz_path);
 
-    msg_Dbg(VLCIntf, "Reveal url %s in finder", [path UTF8String]);
+    msg_Dbg(getIntf(), "Reveal url %s in finder", [path UTF8String]);
     [[NSWorkspace sharedWorkspace] selectFile: path inFileViewerRootedAtPath: path];
 }
 
@@ -335,7 +335,7 @@
 {
     int i_count;
     NSIndexSet *o_selected_indexes;
-    intf_thread_t * p_intf = VLCIntf;
+    intf_thread_t * p_intf = getIntf();
     playlist_t * p_playlist = pl_Get(p_intf);
     playlist_item_t *p_item = NULL;
 
@@ -363,7 +363,7 @@
 {
     int i_count;
     NSIndexSet *o_selected_indexes;
-    intf_thread_t * p_intf = VLCIntf;
+    intf_thread_t * p_intf = getIntf();
     playlist_t * p_playlist = pl_Get(p_intf);
     playlist_item_t *p_item = NULL;
 
@@ -410,7 +410,7 @@
 
 - (void)sortNode:(int)i_mode
 {
-    playlist_t * p_playlist = pl_Get(VLCIntf);
+    playlist_t * p_playlist = pl_Get(getIntf());
     playlist_item_t * p_item;
 
     // TODO why do we need this kind of sort? It looks crap and confusing...
@@ -469,9 +469,12 @@
         [[tableColumn headerCell] setStringValue:[_translationsForPlaylistTableColumns objectForKey:columnId]];
 
         if ([columnId isEqualToString: TRACKNUM_COLUMN]) {
-            [tableColumn setWidth:20.];
-            [tableColumn setResizingMask:NSTableColumnNoResizing];
+            [tableColumn setMinWidth:20.];
+            [tableColumn setMaxWidth:70.];
             [[tableColumn headerCell] setStringValue:@"#"];
+
+        } else {
+            [tableColumn setMinWidth:42.];
         }
 
         [_outlineView addTableColumn:tableColumn];
@@ -503,6 +506,13 @@
             return NO;
         if (![[NSFileManager defaultManager] fileExistsAtPath:[url path]])
             return NO;
+
+    } else if ([item action] == @selector(deleteItem:)) {
+        return [_outlineView numberOfSelectedRows] > 0 && _model.editAllowed;
+    } else if ([item action] == @selector(selectAll:)) {
+        return [_outlineView numberOfRows] >= 0;
+    } else if ([item action] == @selector(playItem:)) {
+        return [_outlineView numberOfSelectedRows] > 0;
     }
 
     return YES;
@@ -550,7 +560,7 @@
 
 - (input_item_t *)createItem:(NSDictionary *)itemToCreateDict
 {
-    intf_thread_t *p_intf = VLCIntf;
+    intf_thread_t *p_intf = getIntf();
     playlist_t *p_playlist = pl_Get(p_intf);
 
     input_item_t *p_input;
@@ -586,7 +596,7 @@
         else if ([diskType isEqualToString: kVLCMediaBD] || [diskType isEqualToString: kVLCMediaBDMVFolder])
             uri = [NSString stringWithFormat: @"bluray://%@", path];
         else
-            msg_Warn(VLCIntf, "unknown disk type, treating %s as regular input", [path UTF8String]);
+            msg_Warn(getIntf(), "unknown disk type, treating %s as regular input", [path UTF8String]);
 
         p_input = input_item_New([uri UTF8String], [[[NSFileManager defaultManager] displayNameAtPath:path] UTF8String]);
     }
@@ -642,14 +652,14 @@
     if ([[self model] currentRootType] == ROOT_TYPE_MEDIALIBRARY)
         i_plItemId = [[[self model] rootItem] plItemId];
 
-    BOOL b_autoplay = var_InheritBool(VLCIntf, "macosx-autoplay");
+    BOOL b_autoplay = var_InheritBool(getIntf(), "macosx-autoplay");
 
     [self addPlaylistItems:array withParentItemId:i_plItemId atPos:-1 startPlayback:b_autoplay];
 }
 
 - (void)addPlaylistItems:(NSArray*)array withParentItemId:(int)i_plItemId atPos:(int)i_position startPlayback:(BOOL)b_start
 {
-    playlist_t * p_playlist = pl_Get(VLCIntf);
+    playlist_t * p_playlist = pl_Get(getIntf());
     PL_LOCK;
 
     playlist_item_t *p_parent = NULL;
@@ -727,12 +737,10 @@
     b_item_sel = (row != -1 && [_outlineView selectedRow] != -1);
     b_rows = [_outlineView numberOfRows] != 0;
 
-    playlist_t *p_playlist = pl_Get(VLCIntf);
+    playlist_t *p_playlist = pl_Get(getIntf());
     bool b_del_allowed = [[self model] editAllowed];
 
-    [_playPlaylistMenuItem setEnabled: b_item_sel];
-    [_deletePlaylistMenuItem setEnabled: b_item_sel && b_del_allowed];
-    [_selectAllPlaylistMenuItem setEnabled: b_rows];
+    // TODO move other items to menu validation protocol
     [_infoPlaylistMenuItem setEnabled: b_item_sel];
     [_preparsePlaylistMenuItem setEnabled: b_item_sel];
     [_recursiveExpandPlaylistMenuItem setEnabled: b_item_sel];
@@ -746,7 +754,7 @@
 - (void)outlineView:(NSOutlineView *)outlineView didClickTableColumn:(NSTableColumn *)aTableColumn
 {
     int type = 0;
-    intf_thread_t *p_intf = VLCIntf;
+    intf_thread_t *p_intf = getIntf();
     NSString * identifier = [aTableColumn identifier];
 
     playlist_t *p_playlist = pl_Get(p_intf);
@@ -788,13 +796,13 @@
                item:(id)item
 {
     /* this method can be called when VLC is already dead, hence the extra checks */
-    intf_thread_t * p_intf = VLCIntf;
+    intf_thread_t * p_intf = getIntf();
     if (!p_intf)
         return;
     playlist_t *p_playlist = pl_Get(p_intf);
 
     NSFont *fontToUse;
-    if (var_InheritBool(VLCIntf, "macosx-large-text"))
+    if (var_InheritBool(getIntf(), "macosx-large-text"))
         fontToUse = [NSFont systemFontOfSize:13.];
     else
         fontToUse = [NSFont systemFontOfSize:11.];
@@ -880,7 +888,7 @@
     if (!lastPosition || lastPosition.intValue <= 0)
         return;
 
-    int settingValue = config_GetInt(VLCIntf, "macosx-continue-playback");
+    int settingValue = config_GetInt(getIntf(), "macosx-continue-playback");
     if (settingValue == 2) // never resume
         return;
 
@@ -890,11 +898,11 @@
             return;
 
         mtime_t lastPos = (mtime_t)lastPosition.intValue * 1000000;
-        msg_Dbg(VLCIntf, "continuing playback at %lld", lastPos);
+        msg_Dbg(getIntf(), "continuing playback at %lld", lastPos);
         var_SetInteger(p_input_thread, "time", lastPos);
 
         if (result == RESUME_ALWAYS)
-            config_PutInt(VLCIntf, "macosx-continue-playback", 1);
+            config_PutInt(getIntf(), "macosx-continue-playback", 1);
     };
 
     if (settingValue == 1) { // always
@@ -910,7 +918,7 @@
 
 - (void)storePlaybackPositionForItem:(input_thread_t *)p_input_thread
 {
-    if (!var_InheritBool(VLCIntf, "macosx-recentitems"))
+    if (!var_InheritBool(getIntf(), "macosx-recentitems"))
         return;
 
     input_item_t *p_item = input_GetItem(p_input_thread);

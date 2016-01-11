@@ -23,7 +23,7 @@
 #endif
 #include <vlc/vlc.h>
 
-#include "../../lib/libvlc_internal.h"
+#include "../../../lib/libvlc_internal.h"
 
 #include <vlc_common.h>
 #include <vlc_plugin.h>
@@ -78,6 +78,7 @@ ks_find(vlc_keystore *p_keystore, const char *const ppsz_values[KEY_MAX],
             assert(strcmp(psz_value1, psz_value2) == 0);
         }
     }
+    vlc_keystore_release_entries(p_entries, i_entries);
     return i_entries;
 }
 
