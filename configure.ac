@@ -3735,6 +3735,7 @@ dnl microdns for Chromecast
 dnl
 PKG_WITH_MODULES([MICRODNS], [microdns], [have_microdns="yes" AC_DEFINE([HAVE_MICRODNS], [1], [The microdns library is present])])
 AM_CONDITIONAL(HAVE_MICRODNS, [test "${have_microdns}" = "yes"])
+PKG_ENABLE_MODULES_VLC([mDNS], [], [microdns], [mDNS discovery service], [auto])
 
 dnl
 dnl  Interface plugins

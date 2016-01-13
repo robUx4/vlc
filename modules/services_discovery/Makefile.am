@@ -73,8 +73,6 @@ libmicrodns_plugin_la_SOURCES = services_discovery/microdns.c
 libmicrodns_plugin_la_CPPFLAGS = $(AM_CPPFLAGS) $(MICRODNS_CFLAGS)
 libmicrodns_plugin_la_LIBADD = $(SOCKET_LIBS) $(MICRODNS_LIBS)
 if ENABLE_SOUT
-if HAVE_MICRODNS
 sd_LTLIBRARIES += libmicrodns_plugin.la
-endif
 endif
 
