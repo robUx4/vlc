@@ -143,12 +143,14 @@ static int Open( vlc_object_t *p_this )
     if( p_sys->p_session == NULL )
         goto error;
 
-    vlc_UrlParse( &p_sys->url, p_access->psz_location );
+    char *psz_decoded_location = vlc_uri_decode_duplicate( p_access->psz_location );
+    if( psz_decoded_location == NULL )
+        goto error;
+    vlc_UrlParse( &p_sys->url, psz_decoded_location );
+    free( psz_decoded_location );
     if( get_address( p_access ) != VLC_SUCCESS )
         goto error;
 
-    msg_Dbg( p_access, "Creds: username = %s, domain = %s",
-             p_sys->creds.login, p_sys->creds.domain );
     msg_Dbg( p_access, "Session: Host name = %s, ip = %s", p_sys->netbios_name,
              inet_ntoa( p_sys->addr ) );
 
@@ -314,6 +316,7 @@ static int login( access_t *p_access )
     vlc_credential credential;
     char *psz_var_domain;
     const char *psz_login, *psz_password, *psz_domain;
+    bool b_guest = false;
 
     vlc_UrlParse( &url, p_access->psz_url );
     vlc_credential_init( &credential, &url );
@@ -327,6 +330,7 @@ static int login( access_t *p_access )
     {
         psz_login = "Guest";
         psz_password = "Guest";
+        b_guest = true;
     }
     else
     {
@@ -343,6 +347,7 @@ static int login( access_t *p_access )
                                    SMB_LOGIN_DIALOG_TITLE,
                                    SMB_LOGIN_DIALOG_TEXT, p_sys->netbios_name ) )
         {
+            b_guest = false;
             psz_login = credential.psz_username;
             psz_password = credential.psz_password;
             psz_domain = credential.psz_realm;
@@ -351,26 +356,28 @@ static int login( access_t *p_access )
                 goto success;
         }
 
-        msg_Err( p_access, "Unable to login with username = %s, domain = %s",
-                   p_sys->creds.login, p_sys->creds.domain );
+        msg_Err( p_access, "Unable to login with username = '%s', domain = '%s'",
+                 psz_login, psz_domain );
         goto error;
     }
     else if( smb_session_is_guest( p_sys->p_session )  )
+    {
         msg_Warn( p_access, "Login failure but you were logged in as a Guest");
+        b_guest = true;
+    }
 
 success:
-    p_sys->creds.login = strdup(psz_login);
-    p_sys->creds.password = strdup(psz_password);
-    p_sys->creds.domain = strdup(psz_domain);
-    if (!p_sys->creds.login || !p_sys->creds.password || !p_sys->creds.domain)
+    msg_Warn( p_access, "Creds: username = '%s', domain = '%s'",
+             psz_login, psz_domain );
+    if( p_sys->psz_share != NULL && !b_guest )
     {
-        free(p_sys->creds.login);
-        free(p_sys->creds.password);
-        free(p_sys->creds.domain);
-        p_sys->creds.login = p_sys->creds.password = p_sys->creds.domain = NULL;
-        goto error;
+        p_sys->creds.login = strdup(psz_login);
+        p_sys->creds.domain = strdup(psz_domain);
+
+        if( !vlc_credential_store( &credential ) )
+            p_sys->creds.password = strdup(psz_password);
     }
-    vlc_credential_store( &credential );
+
     i_ret = VLC_SUCCESS;
 error:
     vlc_credential_clean( &credential );
@@ -529,7 +536,15 @@ static input_item_t *new_item( access_t *p_access, const char *psz_name,
     char         *psz_uri, *psz_option = NULL;
     int           i_ret;
 
-    i_ret = asprintf( &psz_uri, "smb://%s/%s", p_access->psz_location, psz_name );
+    char *psz_encoded_name = vlc_uri_encode( psz_name );
+    if( psz_encoded_name == NULL )
+        return NULL;
+    const char *psz_sep = p_access->psz_location[0] != '\0'
+        && p_access->psz_location[strlen(p_access->psz_location) -1] != '/'
+        ? "/" : "";
+    i_ret = asprintf( &psz_uri, "smb://%s%s%s", p_access->psz_location,
+                      psz_sep, psz_encoded_name );
+    free( psz_encoded_name );
     if( i_ret == -1 )
         return NULL;
 

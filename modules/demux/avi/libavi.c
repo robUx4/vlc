@@ -98,8 +98,20 @@ static int AVI_NextChunk( stream_t *s, avi_chunk_t *p_chk )
             return VLC_EGENERIC;
         }
     }
-    return stream_Seek( s, p_chk->common.i_chunk_pos +
-                                 __EVEN( p_chk->common.i_chunk_size ) + 8 );
+
+    bool b_seekable = false;
+    uint64_t i_offset = p_chk->common.i_chunk_pos +
+                        __EVEN( p_chk->common.i_chunk_size ) + 8;
+    if ( !stream_Control(s, STREAM_CAN_SEEK, &b_seekable) && b_seekable )
+    {
+        return stream_Seek( s, i_offset );
+    }
+    else
+    {
+        ssize_t i_read = i_offset - stream_Tell( s );
+        return (i_read >=0 && stream_Read( s, NULL, i_read ) == i_read) ?
+                    VLC_SUCCESS : VLC_EGENERIC;
+    }
 }
 
 /****************************************************************************
@@ -140,11 +152,10 @@ static int AVI_ChunkRead_list( stream_t *s, avi_chunk_t *p_container )
     if( p_container->common.i_chunk_fourcc == AVIFOURCC_LIST &&
         p_container->list.i_type == AVIFOURCC_movi )
     {
+        if( !b_seekable )
+            return VLC_SUCCESS;
         msg_Dbg( (vlc_object_t*)s, "skipping movi chunk" );
-        if( b_seekable )
-            return AVI_NextChunk( s, p_container );
-        else
-            return VLC_EGENERIC; /* point at begining of LIST-movi */
+        return AVI_NextChunk( s, p_container ); /* points at begining of LIST-movi if not seekable */
     }
 
     if( stream_Read( s, NULL, 12 ) != 12 )

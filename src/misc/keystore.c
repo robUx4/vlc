@@ -116,12 +116,7 @@ void
 vlc_keystore_release_entries(vlc_keystore_entry *p_entries, unsigned int i_count)
 {
     for (unsigned int i = 0; i < i_count; ++i)
-    {
-        vlc_keystore_entry *p_entry = &p_entries[i];
-        for (unsigned int j = 0; j < KEY_MAX; ++j)
-            free(p_entry->ppsz_values[j]);
-        free(p_entry->p_secret);
-    }
+        vlc_keystore_release_entry(&p_entries[i]);
     free(p_entries);
 }
 
@@ -131,21 +126,27 @@ find_closest_path(vlc_keystore_entry *p_entries, unsigned i_count,
 {
     vlc_keystore_entry *p_match_entry = NULL;
     size_t i_last_pathlen = 0;
+    char *psz_decoded_path = vlc_uri_decode_duplicate(psz_path);
+    if (psz_decoded_path == NULL)
+        return NULL;
 
     /* Try to find the entry that has the closest path to psz_url */
     for (unsigned int i = 0; i < i_count; ++i)
     {
         vlc_keystore_entry *p_entry = &p_entries[i];
         const char *psz_entry_path = p_entry->ppsz_values[KEY_PATH];
+        if (psz_entry_path == NULL)
+            continue;
         size_t i_entry_pathlen = strlen(psz_entry_path);
 
-        if (strncasecmp(psz_path, psz_entry_path, i_entry_pathlen) == 0
+        if (strncasecmp(psz_decoded_path, psz_entry_path, i_entry_pathlen) == 0
          && i_entry_pathlen > i_last_pathlen)
         {
             i_last_pathlen = i_entry_pathlen;
             p_match_entry = p_entry;
         }
     }
+    free(psz_decoded_path);
     return p_match_entry;
 }
 
@@ -268,6 +269,7 @@ credential_find_keystore(vlc_credential *p_credential)
         {
             p_credential->psz_password = (const char *)p_entry->p_secret;
             p_credential->psz_username = p_entry->ppsz_values[KEY_USER];
+            p_credential->b_from_keystore = true;
         }
     }
 }
@@ -317,6 +319,7 @@ vlc_credential_get(vlc_credential *p_credential, vlc_object_t *p_parent,
         return false;
     }
 
+    p_credential->b_from_keystore = false;
     /* Don't set username to NULL, we may want to use the last one set */
     p_credential->psz_password = NULL;
 
@@ -424,13 +427,15 @@ vlc_credential_get(vlc_credential *p_credential, vlc_object_t *p_parent,
 bool
 vlc_credential_store(vlc_credential *p_credential)
 {
-    if (!p_credential->p_keystore || !p_credential->b_store)
-        return false;
+    if (!p_credential->p_keystore || !p_credential->b_store
+     || p_credential->b_from_keystore)
+        return p_credential->b_from_keystore;
 
     const vlc_url_t *p_url = p_credential->p_url;
 
     char *psz_path = NULL;
-    if (protocol_store_path(p_url) && (psz_path = strdup(p_url->psz_path)))
+    if (protocol_store_path(p_url)
+     && (psz_path =  vlc_uri_decode_duplicate(p_url->psz_path)) != NULL)
     {
         char *p_slash;
         if (protocol_is_smb(p_url))
@@ -447,11 +452,6 @@ vlc_credential_store(vlc_credential *p_credential)
         }
         if (p_slash && psz_path != p_slash)
             *p_slash = '\0';
-        else
-        {
-            free(psz_path);
-            psz_path = NULL;
-        }
     }
 
     const char *ppsz_values[KEY_MAX] = { 0 };
@@ -473,7 +473,10 @@ vlc_credential_store(vlc_credential *p_credential)
     if (asprintf(&psz_label, "LibVLC password for %s://%s%s",
                  p_url->psz_protocol, p_url->psz_host,
                  psz_path ? psz_path : "") == -1)
+    {
+        free(psz_path);
         return false;
+    }
 
     bool b_ret = vlc_keystore_store(p_credential->p_keystore, ppsz_values,
                                     (const uint8_t *)p_credential->psz_password,
