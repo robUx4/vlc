@@ -898,9 +898,8 @@ struct vlc_cleanup_t
 /* The cleanup routine is only executed if the canceler hasn't been
  * called
  */
-# define vlc_cancel_pop( routine, arg ) \
-        vlc_cleanup_t vlc_cleanup_data = { NULL, routine, arg, }; \
-        vlc_control_cancel (VLC_CANCEL_POP, &vlc_cleanup_data); \
+# define vlc_cancel_pop(  ) \
+        vlc_control_cancel (VLC_CANCEL_POP); \
     } while (0)
 
 #endif /* !LIBVLC_USE_PTHREAD_CLEANUP */

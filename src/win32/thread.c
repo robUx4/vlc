@@ -580,7 +580,6 @@ static void CALLBACK vlc_cancel_self (ULONG_PTR self)
         th->killed = true;
         for (vlc_cleanup_t *p = th->cancelers; p != NULL; p = p->next)
             p->proc (p->data);
-        th->cancelers = NULL;
     }
 }
 #endif
@@ -683,13 +682,7 @@ void vlc_control_cancel (int cmd, ...)
 
         case VLC_CANCEL_POP:
         {
-            if ( th->cancelers )
-            {
-                vlc_cleanup_t *cleanup = va_arg (ap, vlc_cleanup_t *);
-                th->cancelers = th->cancelers->next;
-                if ( cleanup )
-                    cleanup->proc( cleanup->data );
-            }
+            th->cancelers = th->cancelers->next;
             break;
         }
     }

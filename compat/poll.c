@@ -136,7 +136,9 @@ int poll(struct pollfd *fds, unsigned nfds, int timeout)
     fd_set fds_read;
     fd_set fds_write;
     fd_set fds_err;
-    SOCKET maxfd;
+    SOCKET maxfd = INVALID_SOCKET;
+    SOCKET fd_cancel = INVALID_SOCKET;
+    SOCKET fd_cleanup = INVALID_SOCKET;
     int count;
 
     FD_ZERO(&fds_read);
@@ -166,17 +168,12 @@ int poll(struct pollfd *fds, unsigned nfds, int timeout)
     if (maxfd == INVALID_SOCKET)
         return wait_ms(timeout);
 
-    SOCKET fd_cancel = INVALID_SOCKET;
     if (timeout != 0)
     {
         /* use a dummy UDP socket to cancel interrupt infinite select() calls */
-        fd_cancel = socket( AF_INET, SOCK_DGRAM, IPPROTO_UDP );
+        fd_cleanup = fd_cancel = socket( AF_INET, SOCK_DGRAM, IPPROTO_UDP );
         if (fd_cancel != INVALID_SOCKET)
-        {
-            FD_SET(fd_cancel, &fds_read);
-            if (fd_cancel > maxfd)
-                maxfd = fd_cancel;
-        }
+            FD_SET(fd_cancel, &rdset);
     }
 
     if (timeout >= 0)
@@ -195,15 +192,17 @@ int poll(struct pollfd *fds, unsigned nfds, int timeout)
                fds_write.fd_count ? &fds_write : NULL,
                fds_err.fd_count ? &fds_err : NULL,
                timeout >= 0 ? &pending_tv : NULL);
-    vlc_cancel_pop(cancel_Cleanup, &fd_cancel);
+    vlc_cancel_pop();
 
-    if (fd_cancel != INVALID_SOCKET)
+    if (fd_cleanup != INVALID_SOCKET)
     {
-        if (FD_ISSET(fd_cancel, &fds_read))
+        if (fd_cancel != INVALID_SOCKET)
+            closesocket( fd_cancel );
+        if (FD_ISSET(fd_cleanup, &rdset))
         {
             /* the select() was canceled by an APC interrupt */
             errno = EINTR;
-            count = -1;
+            return -1;
         }
     }
 
