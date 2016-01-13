@@ -114,59 +114,87 @@ int (poll) (struct pollfd *fds, unsigned nfds, int timeout)
 
 #undef poll
 
-static int wait_ms(int timeout_ms);
-
 static inline void cancel_Select(void *p_data)
 {
     SOCKET *p_fd_cancel = p_data;
     if ( *p_fd_cancel != INVALID_SOCKET )
+    {
         closesocket( *p_fd_cancel );
-}
-
-static inline void cancel_Cleanup(void *p_data)
-{
-    SOCKET *p_fd_cancel = p_data;
-    if ( *p_fd_cancel != INVALID_SOCKET )
-        closesocket( *p_fd_cancel );
+        *p_fd_cancel = INVALID_SOCKET;
+    }
 }
 
 int poll(struct pollfd *fds, unsigned nfds, int timeout)
 {
     struct timeval pending_tv;
-    fd_set fds_read;
-    fd_set fds_write;
+    fd_set rdset;
+    fd_set wrset;
     fd_set fds_err;
     SOCKET maxfd = INVALID_SOCKET;
     SOCKET fd_cancel = INVALID_SOCKET;
     SOCKET fd_cleanup = INVALID_SOCKET;
     int count;
 
-    FD_ZERO(&fds_read);
-    FD_ZERO(&fds_write);
+    if (nfds == 0)
+    {    /* WSAWaitForMultipleEvents() does not allow zero events */
+        if (timeout < 0)
+        {
+            errno = EINVAL;
+            return -1;
+        }
+        if (timeout > 0 && SleepEx(timeout, TRUE))
+        {
+            errno = EINTR;
+            return -1;
+        }
+        return 0;
+    }
+
+    WSAEVENT *evts = malloc(nfds * sizeof (WSAEVENT));
+    if (evts == NULL)
+        return -1; /* ENOMEM */
+
+    FD_ZERO(&rdset);
+    FD_ZERO(&wrset);
     FD_ZERO(&fds_err);
-    maxfd = INVALID_SOCKET;
 
     for (unsigned i = 0; i < nfds; i++)
     {
+        SOCKET fd = fds[i].fd;
+        long mask = FD_CLOSE;
+
         fds[i].revents = 0;
-        if (fds[i].fd == INVALID_SOCKET)
-            continue;
-        if (fds[i].events & (POLLPRI|POLLRDNORM|POLLWRNORM)) {
-            if (maxfd == INVALID_SOCKET)
-                maxfd = fds[i].fd;
+        if (maxfd == INVALID_SOCKET)
+            maxfd = fd;
 
-            if (fds[i].events & POLLRDNORM)
-                FD_SET(fds[i].fd, &fds_read);
-            if (fds[i].events & POLLWRNORM)
-                FD_SET(fds[i].fd, &fds_write);
-            if (fds[i].events & POLLPRI)
-                FD_SET(fds[i].fd, &fds_err);
+        if (fds[i].events & POLLRDNORM)
+        {
+            mask |= FD_READ | FD_ACCEPT;
+            FD_SET(fd, &rdset);
         }
-    }
+        if (fds[i].events & POLLWRNORM)
+        {
+            mask |= FD_WRITE | FD_CONNECT;
+            FD_SET(fd, &wrset);
+        }
+        if (fds[i].events & POLLPRI)
+            mask |= FD_OOB;
+        FD_SET(fd, &fds_err);
 
-    /* WinSock select() can't handle zero events. */
-    if (maxfd == INVALID_SOCKET)
-        return wait_ms(timeout);
+        evts[i] = WSACreateEvent();
+        if (evts[i] == WSA_INVALID_EVENT)
+        {
+            while (i > 0)
+                WSACloseEvent(evts[--i]);
+            free(evts);
+            errno = ENOMEM;
+            return -1;
+        }
+
+        if (WSAEventSelect(fds[i].fd, evts[i], mask)
+         && WSAGetLastError() == WSAENOTSOCK)
+            fds[i].revents |= POLLNVAL;
+    }
 
     if (timeout != 0)
     {
@@ -188,8 +216,8 @@ int poll(struct pollfd *fds, unsigned nfds, int timeout)
                /* WinSock select() can't handle fd_sets with zero bits set, so
                   don't give it such arguments.
                */
-               fds_read.fd_count ? &fds_read : NULL,
-               fds_write.fd_count ? &fds_write : NULL,
+               rdset.fd_count ? &rdset : NULL,
+               wrset.fd_count ? &wrset : NULL,
                fds_err.fd_count ? &fds_err : NULL,
                timeout >= 0 ? &pending_tv : NULL);
     vlc_cancel_pop();
@@ -201,43 +229,54 @@ int poll(struct pollfd *fds, unsigned nfds, int timeout)
         if (FD_ISSET(fd_cleanup, &rdset))
         {
             /* the select() was canceled by an APC interrupt */
+            while (nfds > 0)
+                WSACloseEvent(evts[--nfds]);
+            free(evts);
             errno = EINTR;
             return -1;
         }
     }
 
-    if (count > 0)
+    count = 0;
+    for (unsigned i = 0; i < nfds; i++)
     {
-        count = 0;
-        for (unsigned i = 0; i < nfds; i++)
-        {
-            if (FD_ISSET(fds[i].fd, &fds_read))
-                fds[i].revents |= POLLIN;
-            if (FD_ISSET(fds[i].fd, &fds_write))
-                fds[i].revents |= POLLOUT;
-            if (FD_ISSET(fds[i].fd, &fds_err))
-                fds[i].revents |= POLLPRI;
+        /* also check extra events that may be available */
+        WSANETWORKEVENTS ne;
 
-            if (fds[i].revents != 0)
-                count++;
+        if (WSAEnumNetworkEvents(fds[i].fd, evts[i], &ne))
+        {
+            memset(&ne, 0, sizeof (ne));
+            if (WSAGetLastError() == WSAENOTSOCK)
+               fds[i].revents |= POLLNVAL;
         }
+        WSAEventSelect(fds[i].fd, evts[i], 0);
+        WSACloseEvent(evts[i]);
+
+        if (ne.lNetworkEvents & FD_CLOSE)
+        {
+            fds[i].revents |= POLLRDNORM | POLLHUP;
+            if (ne.iErrorCode[FD_CLOSE_BIT] != 0)
+                fds[i].revents |= POLLERR;
+        }
+        if (ne.lNetworkEvents & FD_OOB)
+        {
+            fds[i].revents |= POLLPRI;
+            if (ne.iErrorCode[FD_OOB_BIT] != 0)
+                fds[i].revents |= POLLERR;
+        }
+        if (FD_ISSET(fds[i].fd, &rdset))
+            fds[i].revents |= POLLRDNORM;
+        if (FD_ISSET(fds[i].fd, &wrset))
+            fds[i].revents |= POLLWRNORM;
+        if (FD_ISSET(fds[i].fd, &fds_err))
+            fds[i].revents |= POLLERR;
+
+        fds[i].revents &= fds[i].events | POLLERR | POLLHUP | POLLNVAL;
+        count += fds[i].revents != 0;
     }
+
+    free(evts);
 
     return count;
-}
-
-static int wait_ms(int timeout)
-{
-    if (timeout < 0)
-    {
-        errno = EINVAL;
-        return -1;
-    }
-    if (timeout > 0 && SleepEx( timeout, TRUE ))
-    {
-        errno = EINTR;
-        return -1;
-    }
-    return 0;
 }
 #endif
