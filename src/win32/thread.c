@@ -454,7 +454,6 @@ struct vlc_thread
 #else
     atomic_bool    killed;
 #endif
-    DWORD          currentId;
     vlc_cleanup_t *cleaners;
     vlc_cleanup_t *cancelers;
 
@@ -479,7 +478,6 @@ static unsigned __stdcall vlc_entry (void *p)
 
     TlsSetValue(thread_key, th);
     th->killable = true;
-    th->currentId = GetCurrentThreadId();
     th->data = th->entry (th->data);
     TlsSetValue(thread_key, NULL);
 

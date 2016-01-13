@@ -22,11 +22,11 @@
 # include <config.h>
 #endif
 
-#ifndef _WIN32
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
 
+#ifndef _WIN32
 # include <sys/time.h>
 # include <sys/select.h>
 # include <fcntl.h>
@@ -133,16 +133,11 @@ static inline void cancel_Cleanup(void *p_data)
 int poll(struct pollfd *fds, unsigned nfds, int timeout)
 {
     struct timeval pending_tv;
-    struct timeval *ptimeout;
     fd_set fds_read;
     fd_set fds_write;
     fd_set fds_err;
     SOCKET maxfd;
-
-    mtime_t initial_time;
-    int pending_ms = 0;
-    int error;
-    int r;
+    int count;
 
     FD_ZERO(&fds_read);
     FD_ZERO(&fds_write);
@@ -157,6 +152,7 @@ int poll(struct pollfd *fds, unsigned nfds, int timeout)
         if (fds[i].events & (POLLPRI|POLLRDNORM|POLLWRNORM)) {
             if (maxfd == INVALID_SOCKET)
                 maxfd = fds[i].fd;
+
             if (fds[i].events & POLLRDNORM)
                 FD_SET(fds[i].fd, &fds_read);
             if (fds[i].events & POLLWRNORM)
@@ -167,9 +163,8 @@ int poll(struct pollfd *fds, unsigned nfds, int timeout)
     }
 
     /* WinSock select() can't handle zero events. */
-    if (maxfd == INVALID_SOCKET) {
+    if (maxfd == INVALID_SOCKET)
         return wait_ms(timeout);
-    }
 
     SOCKET fd_cancel = INVALID_SOCKET;
     if (timeout != 0)
@@ -184,57 +179,37 @@ int poll(struct pollfd *fds, unsigned nfds, int timeout)
         }
     }
 
-    if (timeout < 0)
-        ptimeout = NULL;
-    else
+    if (timeout >= 0)
     {
-        pending_ms = timeout;
-        initial_time = mdate();
-        ptimeout = &pending_tv;
+        pending_tv.tv_sec = timeout / 1000;
+        pending_tv.tv_usec = (timeout % 1000) * 1000;
     }
 
     /* make the select interruptible */
     vlc_cancel_push(cancel_Select, &fd_cancel);
-    do {
-        if (ptimeout)
-        {
-            ptimeout->tv_sec = pending_ms / 1000;
-            ptimeout->tv_usec = (pending_ms % 1000) * 1000;
-        }
-        r = select(0,
-                   /* WinSock select() can't handle fd_sets with zero bits set, so
-                      don't give it such arguments.
-                   */
-                   fds_read.fd_count ? &fds_read : NULL,
-                   fds_write.fd_count ? &fds_write : NULL,
-                   fds_err.fd_count ? &fds_err : NULL,
-                   ptimeout);
-        if (r != -1)
-            break;
-        error = WSAGetLastError();
-        if (error && error != EINTR)
-            break;
-        if (ptimeout)
-        {
-            pending_ms = timeout - (int)(mdate() - initial_time) / (CLOCK_FREQ / 1000);
-            if (pending_ms <= 0)
-            {
-                r = 0;
-                break;
-            }
-        }
-    } while (r == -1);
+    count = select(0,
+               /* WinSock select() can't handle fd_sets with zero bits set, so
+                  don't give it such arguments.
+               */
+               fds_read.fd_count ? &fds_read : NULL,
+               fds_write.fd_count ? &fds_write : NULL,
+               fds_err.fd_count ? &fds_err : NULL,
+               timeout >= 0 ? &pending_tv : NULL);
     vlc_cancel_pop(cancel_Cleanup, &fd_cancel);
 
     if (fd_cancel != INVALID_SOCKET)
     {
         if (FD_ISSET(fd_cancel, &fds_read))
-            r = -1;
+        {
+            /* the select() was canceled by an APC interrupt */
+            errno = EINTR;
+            count = -1;
+        }
     }
 
-    if (r > 0)
+    if (count > 0)
     {
-        r = 0;
+        count = 0;
         for (unsigned i = 0; i < nfds; i++)
         {
             if (FD_ISSET(fds[i].fd, &fds_read))
@@ -243,12 +218,13 @@ int poll(struct pollfd *fds, unsigned nfds, int timeout)
                 fds[i].revents |= POLLOUT;
             if (FD_ISSET(fds[i].fd, &fds_err))
                 fds[i].revents |= POLLPRI;
+
             if (fds[i].revents != 0)
-                r++;
+                count++;
         }
     }
 
-    return r;
+    return count;
 }
 
 static int wait_ms(int timeout)
