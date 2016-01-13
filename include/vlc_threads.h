@@ -858,11 +858,16 @@ VLC_API unsigned vlc_GetCPUCount(void);
  */
 # define vlc_cleanup_pop( ) pthread_cleanup_pop (0)
 
+# define vlc_cancel_push( routine, arg )
+# define vlc_cancel_pop( )
+
 #else
 enum
 {
     VLC_CLEANUP_PUSH,
     VLC_CLEANUP_POP,
+    VLC_CANCEL_PUSH,
+    VLC_CANCEL_POP,
 };
 typedef struct vlc_cleanup_t vlc_cleanup_t;
 
@@ -883,6 +888,18 @@ struct vlc_cleanup_t
 
 # define vlc_cleanup_pop( ) \
         vlc_control_cancel (VLC_CLEANUP_POP); \
+    } while (0)
+
+#define vlc_cancel_push( routine, arg ) \
+    do { \
+        vlc_cleanup_t vlc_cleaner_data = { NULL, routine, arg, }; \
+        vlc_control_cancel (VLC_CANCEL_PUSH, &vlc_cleaner_data)
+
+/* The cleanup routine is only executed if the canceler hasn't been
+ * called
+ */
+# define vlc_cancel_pop(  ) \
+        vlc_control_cancel (VLC_CANCEL_POP); \
     } while (0)
 
 #endif /* !LIBVLC_USE_PTHREAD_CLEANUP */
