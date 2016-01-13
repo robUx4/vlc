@@ -22,11 +22,11 @@
 # include <config.h>
 #endif
 
+#ifndef _WIN32
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
 
-#ifndef _WIN32
 # include <sys/time.h>
 # include <sys/select.h>
 # include <fcntl.h>
@@ -109,146 +109,160 @@ int (poll) (struct pollfd *fds, unsigned nfds, int timeout)
 # include <windows.h>
 # include <winsock2.h>
 
+#include "../include/vlc_common.h"
+#include "../include/vlc_threads.h"
+
+#undef poll
+
+static int wait_ms(int timeout_ms);
+
+static inline void cancel_Select(void *p_data)
+{
+    SOCKET *p_fd_cancel = p_data;
+    if ( *p_fd_cancel != INVALID_SOCKET )
+        closesocket( *p_fd_cancel );
+}
+
+static inline void cancel_Cleanup(void *p_data)
+{
+    SOCKET *p_fd_cancel = p_data;
+    if ( *p_fd_cancel != INVALID_SOCKET )
+        closesocket( *p_fd_cancel );
+}
+
 int poll(struct pollfd *fds, unsigned nfds, int timeout)
 {
-    DWORD to = (timeout >= 0) ? (DWORD)timeout : INFINITE;
+    struct timeval pending_tv;
+    struct timeval *ptimeout;
+    fd_set fds_read;
+    fd_set fds_write;
+    fd_set fds_err;
+    SOCKET maxfd;
 
-    if (nfds == 0)
-    {    /* WSAWaitForMultipleEvents() does not allow zero events */
-        if (SleepEx(to, TRUE))
-        {
-            errno = EINTR;
-            return -1;
-        }
-        return 0;
-    }
+    mtime_t initial_time;
+    int pending_ms = 0;
+    int error;
+    int r;
 
-    WSAEVENT *evts = malloc(nfds * sizeof (WSAEVENT));
-    if (evts == NULL)
-        return -1; /* ENOMEM */
+    FD_ZERO(&fds_read);
+    FD_ZERO(&fds_write);
+    FD_ZERO(&fds_err);
+    maxfd = INVALID_SOCKET;
 
-    DWORD ret = WSA_WAIT_FAILED;
     for (unsigned i = 0; i < nfds; i++)
     {
-        SOCKET fd = fds[i].fd;
-        long mask = FD_CLOSE;
-        fd_set rdset, wrset, exset;
-
-        FD_ZERO(&rdset);
-        FD_ZERO(&wrset);
-        FD_ZERO(&exset);
-        FD_SET(fd, &exset);
-
-        if (fds[i].events & POLLRDNORM)
-        {
-            mask |= FD_READ | FD_ACCEPT;
-            FD_SET(fd, &rdset);
-        }
-        if (fds[i].events & POLLWRNORM)
-        {
-            mask |= FD_WRITE | FD_CONNECT;
-            FD_SET(fd, &wrset);
-        }
-        if (fds[i].events & POLLPRI)
-            mask |= FD_OOB;
-
         fds[i].revents = 0;
-
-        evts[i] = WSACreateEvent();
-        if (evts[i] == WSA_INVALID_EVENT)
-        {
-            while (i > 0)
-                WSACloseEvent(evts[--i]);
-            free(evts);
-            errno = ENOMEM;
-            return -1;
+        if (fds[i].fd == INVALID_SOCKET)
+            continue;
+        if (fds[i].events & (POLLPRI|POLLRDNORM|POLLWRNORM)) {
+            if (maxfd == INVALID_SOCKET)
+                maxfd = fds[i].fd;
+            if (fds[i].events & POLLRDNORM)
+                FD_SET(fds[i].fd, &fds_read);
+            if (fds[i].events & POLLWRNORM)
+                FD_SET(fds[i].fd, &fds_write);
+            if (fds[i].events & POLLPRI)
+                FD_SET(fds[i].fd, &fds_err);
         }
-
-        if (WSAEventSelect(fds[i].fd, evts[i], mask)
-         && WSAGetLastError() == WSAENOTSOCK)
-            fds[i].revents |= POLLNVAL;
-
-        struct timeval tv = { 0, 0 };
-        /* By its horrible design, WSAEnumNetworkEvents() only enumerates
-         * events that were not already signaled (i.e. it is edge-triggered).
-         * WSAPoll() would be better in this respect, but worse in others.
-         * So use WSAEnumNetworkEvents() after manually checking for pending
-         * events. */
-        if (select(0, &rdset, &wrset, &exset, &tv) > 0)
-        {
-            if (FD_ISSET(fd, &rdset))
-                fds[i].revents |= fds[i].events & POLLRDNORM;
-            if (FD_ISSET(fd, &wrset))
-                fds[i].revents |= fds[i].events & POLLWRNORM;
-            if (FD_ISSET(fd, &exset))
-                /* To add pain to injury, POLLERR and POLLPRI cannot be
-                 * distinguished here. */
-                fds[i].revents |= POLLERR | (fds[i].events & POLLPRI);
-        }
-
-        if (fds[i].revents != 0 && ret == WSA_WAIT_FAILED)
-            ret = WSA_WAIT_EVENT_0 + i;
     }
 
-    if (ret == WSA_WAIT_FAILED)
-        ret = WSAWaitForMultipleEvents(nfds, evts, FALSE, to, TRUE);
+    /* WinSock select() can't handle zero events. */
+    if (maxfd == INVALID_SOCKET) {
+        return wait_ms(timeout);
+    }
 
-    unsigned count = 0;
-    for (unsigned i = 0; i < nfds; i++)
+    SOCKET fd_cancel = INVALID_SOCKET;
+    if (timeout != 0)
     {
-        WSANETWORKEVENTS ne;
-
-        if (WSAEnumNetworkEvents(fds[i].fd, evts[i], &ne))
-            memset(&ne, 0, sizeof (ne));
-        WSAEventSelect(fds[i].fd, evts[i], 0);
-        WSACloseEvent(evts[i]);
-
-        if (ne.lNetworkEvents & FD_CONNECT)
+        /* use a dummy UDP socket to cancel interrupt infinite select() calls */
+        fd_cancel = socket( AF_INET, SOCK_DGRAM, IPPROTO_UDP );
+        if (fd_cancel != INVALID_SOCKET)
         {
-            fds[i].revents |= POLLWRNORM;
-            if (ne.iErrorCode[FD_CONNECT_BIT] != 0)
-                fds[i].revents |= POLLERR;
+            FD_SET(fd_cancel, &fds_read);
+            if (fd_cancel > maxfd)
+                maxfd = fd_cancel;
         }
-        if (ne.lNetworkEvents & FD_CLOSE)
-        {
-            fds[i].revents |= (fds[i].events & POLLRDNORM) | POLLHUP;
-            if (ne.iErrorCode[FD_CLOSE_BIT] != 0)
-                fds[i].revents |= POLLERR;
-        }
-        if (ne.lNetworkEvents & FD_ACCEPT)
-        {
-            fds[i].revents |= POLLRDNORM;
-            if (ne.iErrorCode[FD_ACCEPT_BIT] != 0)
-                fds[i].revents |= POLLERR;
-        }
-        if (ne.lNetworkEvents & FD_OOB)
-        {
-            fds[i].revents |= POLLPRI;
-            if (ne.iErrorCode[FD_OOB_BIT] != 0)
-                fds[i].revents |= POLLERR;
-        }
-        if (ne.lNetworkEvents & FD_READ)
-        {
-            fds[i].revents |= POLLRDNORM;
-            if (ne.iErrorCode[FD_READ_BIT] != 0)
-                fds[i].revents |= POLLERR;
-        }
-        if (ne.lNetworkEvents & FD_WRITE)
-        {
-            fds[i].revents |= POLLWRNORM;
-            if (ne.iErrorCode[FD_WRITE_BIT] != 0)
-                fds[i].revents |= POLLERR;
-        }
-        count += fds[i].revents != 0;
     }
 
-    free(evts);
+    if (timeout < 0)
+        ptimeout = NULL;
+    else
+    {
+        pending_ms = timeout;
+        initial_time = mdate();
+        ptimeout = &pending_tv;
+    }
 
-    if (count == 0 && ret == WSA_WAIT_IO_COMPLETION)
+    /* make the select interruptible */
+    vlc_cancel_push(cancel_Select, &fd_cancel);
+    do {
+        if (ptimeout)
+        {
+            ptimeout->tv_sec = pending_ms / 1000;
+            ptimeout->tv_usec = (pending_ms % 1000) * 1000;
+        }
+        r = select(0,
+                   /* WinSock select() can't handle fd_sets with zero bits set, so
+                      don't give it such arguments.
+                   */
+                   fds_read.fd_count ? &fds_read : NULL,
+                   fds_write.fd_count ? &fds_write : NULL,
+                   fds_err.fd_count ? &fds_err : NULL,
+                   ptimeout);
+        if (r != -1)
+            break;
+        error = WSAGetLastError();
+        if (error && error != EINTR)
+            break;
+        if (ptimeout)
+        {
+            pending_ms = timeout - (int)(mdate() - initial_time) / (CLOCK_FREQ / 1000);
+            if (pending_ms <= 0)
+            {
+                r = 0;
+                break;
+            }
+        }
+    } while (r == -1);
+    vlc_cancel_pop(cancel_Cleanup, &fd_cancel);
+
+    if (fd_cancel != INVALID_SOCKET)
+    {
+        if (FD_ISSET(fd_cancel, &fds_read))
+            r = -1;
+    }
+
+    if (r > 0)
+    {
+        r = 0;
+        for (unsigned i = 0; i < nfds; i++)
+        {
+            if (FD_ISSET(fds[i].fd, &fds_read))
+                fds[i].revents |= POLLIN;
+            if (FD_ISSET(fds[i].fd, &fds_write))
+                fds[i].revents |= POLLOUT;
+            if (FD_ISSET(fds[i].fd, &fds_err))
+                fds[i].revents |= POLLPRI;
+            if (fds[i].revents != 0)
+                r++;
+        }
+    }
+
+    return r;
+}
+
+static int wait_ms(int timeout)
+{
+    if (timeout < 0)
+    {
+        errno = EINVAL;
+        return -1;
+    }
+    if (timeout > 0 && SleepEx( timeout, TRUE ))
     {
         errno = EINTR;
         return -1;
     }
-    return count;
+    return 0;
 }
 #endif
