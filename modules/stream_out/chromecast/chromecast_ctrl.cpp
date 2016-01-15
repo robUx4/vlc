@@ -778,7 +778,7 @@ int intf_sys_t::connectChromecast()
         return -1;
     }
 
-    p_tls = vlc_tls_ClientSessionCreate(p_creds, fd, deviceIP.c_str(),
+    p_tls = vlc_tls_ClientSessionCreateFD(p_creds, fd, deviceIP.c_str(),
                                                "tcps", NULL, NULL);
 
     if (p_tls == NULL)

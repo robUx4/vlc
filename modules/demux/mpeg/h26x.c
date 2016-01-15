@@ -117,7 +117,7 @@ static int ProbeHEVC( const uint8_t *p_peek, size_t i_peek, void *p_priv )
     if( p_peek[0] & 0x80 )
         return -1;
 
-    const uint8_t i_type = (p_peek[0] & 0x7E) >> 1;
+    const uint8_t i_type = hevc_getNALType( p_peek );
     const uint8_t i_layer = hevc_getNALLayer( p_peek );
 
    if ( i_type == HEVC_NAL_VPS ) /* VPS */
@@ -378,7 +378,7 @@ static int OpenH264( vlc_object_t * p_this )
 static int OpenHEVC( vlc_object_t * p_this )
 {
     hevc_probe_ctx_t ctx = { 0, 0, 0 };
-    const char *rgi_psz_ext[] = { ".h265", ".265", ".bin", ".bit", ".raw", NULL };
+    const char *rgi_psz_ext[] = { ".h265", ".265", ".hevc", ".bin", ".bit", ".raw", NULL };
     const char *rgi_psz_mime[] = { "video/h265", "video/hevc", "video/HEVC", NULL };
 
     return GenericOpen( (demux_t*)p_this, "hevc", VLC_CODEC_HEVC, ProbeHEVC,

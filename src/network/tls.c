@@ -1,10 +1,8 @@
 /*****************************************************************************
  * tls.c
  *****************************************************************************
- * Copyright © 2004-2007 Rémi Denis-Courmont
+ * Copyright © 2004-2016 Rémi Denis-Courmont
  * $Id$
- *
- * Authors: Rémi Denis-Courmont <rem # videolan.org>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU Lesser General Public License as published by
@@ -128,32 +126,43 @@ void vlc_tls_Delete (vlc_tls_creds_t *crd)
 
 /*** TLS  session ***/
 
-vlc_tls_t *vlc_tls_SessionCreate (vlc_tls_creds_t *crd, int fd,
-                                  const char *host, const char *const *alpn)
+static vlc_tls_t *vlc_tls_SessionCreate(vlc_tls_creds_t *crd,
+                                        vlc_tls_t *sock,
+                                        const char *host,
+                                        const char *const *alpn)
 {
     vlc_tls_t *session = malloc(sizeof (*session));
     if (unlikely(session == NULL))
         return NULL;
 
     session->obj = crd->p_parent;
-    session->fd = fd;
+    session->p = NULL;
 
-    int val = crd->open (crd, session, fd, host, alpn);
-    if (val != VLC_SUCCESS)
+    int canc = vlc_savecancel();
+
+    if (crd->open(crd, session, sock, host, alpn) != VLC_SUCCESS)
     {
         free(session);
-        session= NULL;
+        session = NULL;
     }
+
+    vlc_restorecancel(canc);
     return session;
 }
 
 void vlc_tls_SessionDelete (vlc_tls_t *session)
 {
-    int canc = vlc_savecancel();
-    session->close(session);
-    vlc_restorecancel(canc);
+    do
+    {
+        int canc = vlc_savecancel();
+        session->close(session);
+        vlc_restorecancel(canc);
 
-    free(session);
+        vlc_tls_t *sock = session->p;
+        free(session);
+        session = sock;
+    }
+    while (session != NULL);
 }
 
 static void cleanup_tls(void *data)
@@ -163,26 +172,23 @@ static void cleanup_tls(void *data)
     vlc_tls_SessionDelete (session);
 }
 
-vlc_tls_t *vlc_tls_ClientSessionCreate (vlc_tls_creds_t *crd, int fd,
-                                        const char *host, const char *service,
-                                        const char *const *alpn, char **alp)
+#undef vlc_tls_ClientSessionCreate
+vlc_tls_t *vlc_tls_ClientSessionCreate(vlc_tls_creds_t *crd, vlc_tls_t *sock,
+                                       const char *host, const char *service,
+                                       const char *const *alpn, char **alp)
 {
-    vlc_tls_t *session;
-    int canc, val;
+    int val;
 
-    canc = vlc_savecancel();
-    session = vlc_tls_SessionCreate (crd, fd, host, alpn);
+    vlc_tls_t *session = vlc_tls_SessionCreate(crd, sock, host, alpn);
     if (session == NULL)
-    {
-        vlc_restorecancel(canc);
         return NULL;
-    }
 
+    int canc = vlc_savecancel();
     mtime_t deadline = mdate ();
     deadline += var_InheritInteger (crd, "ipv4-timeout") * 1000;
 
     struct pollfd ufd[1];
-    ufd[0].fd = fd;
+    ufd[0].fd = vlc_tls_GetFD(sock);
 
     vlc_cleanup_push (cleanup_tls, session);
     while ((val = crd->handshake(crd, session, host, service, alp)) != 0)
@@ -217,12 +223,30 @@ error:
     return session;
 }
 
+vlc_tls_t *vlc_tls_ServerSessionCreate(vlc_tls_creds_t *crd, int fd,
+                                       const char *const *alpn)
+{
+    vlc_tls_t *sock = vlc_tls_SocketOpen(VLC_OBJECT(crd), fd);
+    if (unlikely(sock == NULL))
+        return NULL;
+
+    vlc_tls_t *tls = vlc_tls_SessionCreate(crd, sock, NULL, alpn);
+    if (unlikely(tls == NULL))
+        vlc_tls_SessionDelete(sock);
+    else
+        tls->p = sock;
+    return tls;
+}
+
 ssize_t vlc_tls_Read(vlc_tls_t *session, void *buf, size_t len, bool waitall)
 {
     struct pollfd ufd;
+    struct iovec iov;
 
-    ufd.fd = session->fd;
+    ufd.fd = vlc_tls_GetFD(session);
     ufd.events = POLLIN;
+    iov.iov_base = buf;
+    iov.iov_len = len;
 
     for (size_t rcvd = 0;;)
     {
@@ -232,16 +256,16 @@ ssize_t vlc_tls_Read(vlc_tls_t *session, void *buf, size_t len, bool waitall)
             return -1;
         }
 
-        ssize_t val = session->recv(session, buf, len);
+        ssize_t val = session->readv(session, &iov, 1);
         if (val > 0)
         {
             if (!waitall)
                 return val;
-            buf = ((char *)buf) + val;
-            len -= val;
+            iov.iov_base = (char *)iov.iov_base + val;
+            iov.iov_len -= val;
             rcvd += val;
         }
-        if (len == 0 || val == 0)
+        if (iov.iov_len == 0 || val == 0)
             return rcvd;
         if (val == -1 && errno != EINTR && errno != EAGAIN)
             return rcvd ? (ssize_t)rcvd : -1;
@@ -253,9 +277,12 @@ ssize_t vlc_tls_Read(vlc_tls_t *session, void *buf, size_t len, bool waitall)
 ssize_t vlc_tls_Write(vlc_tls_t *session, const void *buf, size_t len)
 {
     struct pollfd ufd;
+    struct iovec iov;
 
-    ufd.fd = session->fd;
+    ufd.fd = vlc_tls_GetFD(session);
     ufd.events = POLLOUT;
+    iov.iov_base = (void *)buf;
+    iov.iov_len = len;
 
     for (size_t sent = 0;;)
     {
@@ -265,14 +292,14 @@ ssize_t vlc_tls_Write(vlc_tls_t *session, const void *buf, size_t len)
             return -1;
         }
 
-        ssize_t val = session->send(session, buf, len);
+        ssize_t val = session->writev(session, &iov, 1);
         if (val > 0)
         {
-            buf = ((const char *)buf) + val;
-            len -= val;
+            iov.iov_base = ((char *)iov.iov_base) + val;
+            iov.iov_len -= val;
             sent += val;
         }
-        if (len == 0 || val == 0)
+        if (iov.iov_len == 0 || val == 0)
             return sent;
         if (val == -1 && errno != EINTR && errno != EAGAIN)
             return sent ? (ssize_t)sent : -1;
@@ -312,37 +339,65 @@ error:
     return NULL;
 }
 
-static ssize_t vlc_tls_DummyReceive(vlc_tls_t *tls, void *buf, size_t len)
+static int vlc_tls_SocketGetFD(vlc_tls_t *tls)
 {
-    return recv(tls->fd, buf, len, 0);
+    return (intptr_t)tls->sys;
 }
 
-static ssize_t vlc_tls_DummySend(vlc_tls_t *tls, const void *buf, size_t len)
+static ssize_t vlc_tls_SocketRead(vlc_tls_t *tls, struct iovec *iov,
+                                  unsigned count)
 {
-    return send(tls->fd, buf, len, MSG_NOSIGNAL);
+    int fd = (intptr_t)tls->sys;
+    struct msghdr msg =
+    {
+        .msg_iov = iov,
+        .msg_iovlen = count,
+    };
+    return recvmsg(fd, &msg, 0);
 }
 
-static int vlc_tls_DummyShutdown(vlc_tls_t *tls, bool duplex)
+static ssize_t vlc_tls_SocketWrite(vlc_tls_t *tls, const struct iovec *iov,
+                                   unsigned count)
 {
-    return shutdown(tls->fd, duplex ? SHUT_RDWR : SHUT_WR);
+    int fd = (intptr_t)tls->sys;
+    const struct msghdr msg =
+    {
+        .msg_iov = (struct iovec *)iov,
+        .msg_iovlen = count,
+    };
+    return sendmsg(fd, &msg, MSG_NOSIGNAL);
 }
 
-static void vlc_tls_DummyClose(vlc_tls_t *tls)
+static int vlc_tls_SocketShutdown(vlc_tls_t *tls, bool duplex)
 {
+    int fd = (intptr_t)tls->sys;
+    return shutdown(fd, duplex ? SHUT_RDWR : SHUT_WR);
+}
+
+static void vlc_tls_SocketClose(vlc_tls_t *tls)
+{
+#if 0
+    int fd = (intptr_t)tls->sys;
+
+    net_Close(fd);
+#else
     (void) tls;
+#endif
 }
 
-vlc_tls_t *vlc_tls_DummyCreate(vlc_object_t *obj, int fd)
+vlc_tls_t *vlc_tls_SocketOpen(vlc_object_t *obj, int fd)
 {
     vlc_tls_t *session = malloc(sizeof (*session));
     if (unlikely(session == NULL))
         return NULL;
 
     session->obj = obj;
-    session->fd = fd;
-    session->recv = vlc_tls_DummyReceive;
-    session->send = vlc_tls_DummySend;
-    session->shutdown = vlc_tls_DummyShutdown;
-    session->close = vlc_tls_DummyClose;
+    session->sys = (void *)(intptr_t)fd;
+    session->get_fd = vlc_tls_SocketGetFD;
+    session->readv = vlc_tls_SocketRead;
+    session->writev = vlc_tls_SocketWrite;
+    session->shutdown = vlc_tls_SocketShutdown;
+    session->close = vlc_tls_SocketClose;
+    session->p = NULL;
     return session;
 }

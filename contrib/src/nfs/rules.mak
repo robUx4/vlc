@@ -17,10 +17,12 @@ $(TARBALLS)/libnfs-$(NFS_VERSION).tar.gz:
 nfs: libnfs-$(NFS_VERSION).tar.gz .sum-nfs
 	$(UNPACK)
 	mv libnfs-libnfs-$(NFS_VERSION) libnfs-$(NFS_VERSION)
+	$(APPLY) $(SRC)/nfs/nfs-no-utils.patch
+	$(UPDATE_AUTOCONFIG)
 	$(MOVE)
 
 .nfs: nfs
 	cd $< && ./bootstrap
-	cd $< && $(HOSTVARS) ./configure --disable-examples $(HOSTCONF)
+	cd $< && $(HOSTVARS) ./configure --disable-examples --disable-utils $(HOSTCONF)
 	cd $< && $(MAKE) install
 	touch $@

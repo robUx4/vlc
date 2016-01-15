@@ -115,7 +115,7 @@ vlc_tls_t *vlc_http_connect(vlc_object_t *obj, const char *name, unsigned port)
     if (fd == -1)
         return NULL;
 
-    vlc_tls_t *tls = vlc_tls_DummyCreate(obj, fd);
+    vlc_tls_t *tls = vlc_tls_SocketOpen(obj, fd);
     if (tls == NULL)
         net_Close(fd);
     return tls;
@@ -135,8 +135,8 @@ vlc_tls_t *vlc_https_connect(vlc_tls_creds_t *creds, const char *name,
     const char *alpn[] = { "h2", "http/1.1", NULL };
     char *alp;
 
-    vlc_tls_t *tls = vlc_tls_ClientSessionCreate(creds, fd, name, "https",
-                                                 alpn, &alp);
+    vlc_tls_t *tls = vlc_tls_ClientSessionCreateFD(creds, fd, name, "https",
+                                                 alpn + !*two, &alp);
     if (tls == NULL)
     {
         net_Close(fd);

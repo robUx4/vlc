@@ -40,11 +40,20 @@ static bool send_failure = false;
 static bool expect_hello = true;
 static vlc_sem_t rx;
 
-static ssize_t send_callback(vlc_tls_t *tls, const void *buf, size_t len)
+static int fd_callback(vlc_tls_t *tls)
 {
-    const uint8_t *p = buf;
+    (void) tls;
+    return -1;
+}
 
-    assert(tls->send == send_callback);
+static ssize_t send_callback(vlc_tls_t *tls, const struct iovec *iov,
+                             unsigned count)
+{
+    assert(count == 1);
+    assert(tls->writev == send_callback);
+
+    const uint8_t *p = iov->iov_base;
+    size_t len = iov->iov_len;
 
     if (expect_hello)
     {
@@ -71,7 +80,8 @@ static ssize_t send_callback(vlc_tls_t *tls, const void *buf, size_t len)
 
 static vlc_tls_t fake_tls =
 {
-    .send = send_callback,
+    .get_fd = fd_callback,
+    .writev = send_callback,
 };
 
 static struct vlc_h2_frame *frame(unsigned char c)

@@ -39,19 +39,36 @@ static const char *stream_content;
 static size_t stream_length;
 static bool stream_bad;
 
-static ssize_t recv_callback(struct vlc_tls *tls, void *buf, size_t len)
+static int fd_callback(struct vlc_tls *tls)
 {
-    size_t copy = len;
-    if (copy > stream_length)
-        copy = stream_length;
-    if (copy > 0)
+    (void) tls;
+    return -1;
+}
+
+static ssize_t recv_callback(struct vlc_tls *tls, struct iovec *iov,
+                             unsigned count)
+{
+    size_t rcvd = 0;
+
+    while (count > 0)
     {
-        memcpy(buf, stream_content, copy);
-        stream_content += copy;
-        stream_length -= copy;
+        size_t copy = iov->iov_len;
+        if (copy > stream_length)
+            copy = stream_length;
+
+        if (copy > 0)
+        {
+            memcpy(iov->iov_base, stream_content, copy);
+            stream_content += copy;
+            stream_length -= copy;
+            rcvd += copy;
+        }
+
+        iov++;
+        count--;
     }
     (void) tls;
-    return copy;
+    return rcvd;
 }
 
 static void close_callback(struct vlc_tls *tls)
@@ -61,7 +78,8 @@ static void close_callback(struct vlc_tls *tls)
 
 static struct vlc_tls chunked_tls =
 {
-    .recv = recv_callback,
+    .get_fd = fd_callback,
+    .readv = recv_callback,
     .close = close_callback,
 };
 

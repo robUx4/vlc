@@ -73,7 +73,7 @@ static void *tls_echo(void *data)
     ssize_t val;
     char buf[256];
 
-    ufd.fd = tls->fd;
+    ufd.fd = vlc_tls_GetFD(tls);
 
     while ((val = vlc_tls_SessionHandshake(server_creds, tls)) > 0)
     {
@@ -113,13 +113,13 @@ static int securepair(vlc_thread_t *th, vlc_tls_t **restrict client,
     val = tlspair(insecurev);
     assert(val == 0);
 
-    server = vlc_tls_SessionCreate(server_creds, insecurev[0], NULL, alpnv[0]);
+    server = vlc_tls_ServerSessionCreate(server_creds, insecurev[0], alpnv[0]);
     assert(server != NULL);
 
     val = vlc_clone(th, tls_echo, server, VLC_THREAD_PRIORITY_LOW);
     assert(val == 0);
 
-    *client = vlc_tls_ClientSessionCreate(client_creds, insecurev[1],
+    *client = vlc_tls_ClientSessionCreateFD(client_creds, insecurev[1],
                                           "localhost", "vlc-tls-test",
                                           alpnv[1], alp);
     if (*client == NULL)
@@ -197,8 +197,11 @@ int main(void)
 
     /* Do some I/O */
     char buf[12];
+    struct iovec iov;
 
-    val = tls->recv(tls, buf, sizeof (buf));
+    iov.iov_base = buf;
+    iov.iov_len = sizeof (buf);
+    val = tls->readv(tls, &iov, 1);
     assert(val == -1 && errno == EAGAIN);
 
     val = vlc_tls_Write(tls, "Hello ", 6);
@@ -228,13 +231,16 @@ int main(void)
     size_t bytes = 0;
     unsigned seed = 0;
 
+    iov.iov_base = data;
+    iov.iov_len = sizeof (data);
+
     do
     {
         for (size_t i = 0; i < sizeof (data); i++)
             data[i] = rand_r(&seed);
         bytes += sizeof (data);
     }
-    while ((val = tls->send(tls, data, sizeof (data))) == sizeof (data));
+    while ((val = tls->writev(tls, &iov, 1)) == sizeof (data));
 
     bytes -= sizeof (data);
     if (val > 0)
