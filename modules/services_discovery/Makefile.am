@@ -71,7 +71,7 @@ endif
 
 libmicrodns_plugin_la_SOURCES = services_discovery/microdns.c
 libmicrodns_plugin_la_CPPFLAGS = $(AM_CPPFLAGS) $(MICRODNS_CFLAGS)
-libmicrodns_plugin_la_LIBADD = $(SOCKET_LIBS) $(MICRODNS_LIBS)
+libmicrodns_plugin_la_LIBADD = $(SOCKET_LIBS) $(MDNS_LIBS)
 if ENABLE_SOUT
 sd_LTLIBRARIES += libmicrodns_plugin.la
 endif
