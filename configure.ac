@@ -81,6 +81,24 @@ AC_C_INLINE
 AC_C_RESTRICT
 AX_CXX_COMPILE_STDCXX_11(noext, optional)
 
+dnl Precompiled header
+AC_ARG_ENABLE(precompiled-header,
+     AS_HELP_STRING([--enable-precompiled-header],
+                    [Compile using a precompiled header (default disabled)]))
+
+use_precompiled_header=no
+use_precompiled_header_gcc=no
+AS_IF([test "${enable_precompiled_header}" = "yes"], [
+  AS_IF([test "${GCC}" = "yes"],[
+      use_precompiled_header=yes
+      use_precompiled_header_gcc=yes
+      AC_MSG_RESULT([Using precompiled header for GCC])
+    ],[
+    ])
+  ])
+AM_CONDITIONAL([USE_PRECOMPILED_HEADER], [test "$use_precompiled_header" != "no"])
+AM_CONDITIONAL([GCC_PRECOMPILED_HEADER], [test "$use_precompiled_header_gcc" != "no"])
+
 dnl Extend the --help string at the current spot.
 AC_DEFUN([EXTEND_HELP_STRING], [m4_divert_once([HELP_ENABLE], [$1])])
 

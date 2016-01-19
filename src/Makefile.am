@@ -11,6 +11,9 @@ EXTRA_DIST = \
 	revision.txt
 
 BUILT_SOURCES = $(nodist_pluginsinclude_HEADERS)
+#if GCC_PRECOMPILED_HEADER
+BUILT_SOURCES += $(abs_top_builddir)/include/vlc_precompiled.h.gch
+#endif
 CLEANFILES = $(BUILT_SOURCES)
 
 SUFFIXES = .pc.in .pc .rc.in .rc
@@ -77,6 +80,7 @@ pluginsinclude_HEADERS = \
 	../include/vlc_picture_pool.h \
 	../include/vlc_playlist.h \
 	../include/vlc_plugin.h \
+	../include/vlc_precompiled.h \
 	../include/vlc_probe.h \
 	../include/vlc_rand.h \
 	../include/vlc_services_discovery.h \
@@ -171,6 +175,9 @@ AM_CPPFLAGS = $(INCICONV) $(IDN_CFLAGS) \
 	-DLOCALEDIR=\"$(localedir)\" \
 	-DPKGDATADIR=\"$(vlcdatadir)\" \
 	-DPKGLIBDIR=\"$(vlclibdir)\"
+if GCC_PRECOMPILED_HEADER
+AM_CPPFLAGS += --include $(abs_top_builddir)/include/vlc_precompiled.h -Winvalid-pch
+endif
 AM_CFLAGS = $(CFLAGS_libvlccore)
 if HAVE_DYNAMIC_PLUGINS
 AM_CPPFLAGS += -DHAVE_DYNAMIC_PLUGINS
@@ -560,6 +567,16 @@ test_headers_SOURCES = test/headers.c
 AM_LDFLAGS = -no-install
 LDADD = libvlccore.la \
 	../compat/libcompat.la
+
+###############################################################################
+# Precompiled Header
+###############################################################################
+
+$(abs_top_builddir)/include/vlc_precompiled.h.gch: Makefile.am $(top_srcdir)/include/vlc_precompiled.h
+	$(AM_V_at)mkdir -p -- ../include
+	$(AM_V_at)touch $(abs_top_builddir)/include/vlc_precompiled.h #already used in compile flags
+	$(COMPILE) -o $@ $(top_srcdir)/include/vlc_precompiled.h
+	$(AM_V_at)rm -f $(abs_top_builddir)/include/vlc_precompiled.h
 
 ###############################################################################
 # GIT revision
