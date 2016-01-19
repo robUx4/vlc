@@ -24,7 +24,7 @@
 #ifndef VLC_VOUT_WRAPPER_H
 #define VLC_VOUT_WRAPPER_H 1
 
-#include <vlc_vout_display.h>
+#include "vlc_vout_display.h"
 
 /* XXX DO NOT use it outside the vout module wrapper XXX */
 

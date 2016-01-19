@@ -24,7 +24,7 @@
 #ifndef VLC_ACCESS_H
 #define VLC_ACCESS_H 1
 
-#include <vlc_block.h>
+#include "vlc_block.h"
 
 /**
  * \defgroup access Access

@@ -24,7 +24,7 @@
 #ifndef VLC_BLOCK_HELPER_H
 #define VLC_BLOCK_HELPER_H 1
 
-#include <vlc_block.h>
+#include "vlc_block.h"
 
 typedef struct block_bytestream_t
 {

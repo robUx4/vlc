@@ -642,7 +642,7 @@ static inline uint64_t bswap64 (uint64_t x)
 
 VLC_API char const * vlc_error( int ) VLC_USED;
 
-#include <vlc_arrays.h>
+#include "vlc_arrays.h"
 
 /* MSB (big endian)/LSB (little endian) conversions - network order is always
  * MSB, and should be used for both network communications and files. */

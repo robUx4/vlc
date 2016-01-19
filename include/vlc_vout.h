@@ -26,9 +26,9 @@
 #ifndef VLC_VOUT_H_
 #define VLC_VOUT_H_ 1
 
-#include <vlc_es.h>
-#include <vlc_picture.h>
-#include <vlc_subpicture.h>
+#include "vlc_es.h"
+#include "vlc_picture.h"
+#include "vlc_subpicture.h"
 
 /**
  * \defgroup output Output

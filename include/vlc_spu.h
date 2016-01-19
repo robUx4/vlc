@@ -26,7 +26,7 @@
 #ifndef VLC_SPU_H
 #define VLC_SPU_H 1
 
-#include <vlc_subpicture.h>
+#include "vlc_subpicture.h"
 
 #ifdef __cplusplus
 extern "C" {

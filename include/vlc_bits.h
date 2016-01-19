@@ -25,7 +25,7 @@
 #ifndef VLC_BITS_H
 #define VLC_BITS_H 1
 
-#include <vlc_common.h>
+#include "vlc_common.h"
 
 /**
  * \file

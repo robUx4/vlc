@@ -30,7 +30,7 @@
  * Transport Layer Security (TLS) functions
  */
 
-# include <vlc_network.h>
+# include "vlc_network.h"
 
 typedef struct vlc_tls vlc_tls_t;
 typedef struct vlc_tls_creds vlc_tls_creds_t;

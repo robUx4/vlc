@@ -29,7 +29,7 @@
  * This file defines picture fifo structures and functions in vlc
  */
 
-#include <vlc_picture.h>
+#include "vlc_picture.h"
 
 /**
  * Picture fifo handle

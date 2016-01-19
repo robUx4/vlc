@@ -25,10 +25,10 @@
 #ifndef VLC_FILTER_H
 #define VLC_FILTER_H 1
 
-#include <vlc_es.h>
-#include <vlc_picture.h>
-#include <vlc_subpicture.h>
-#include <vlc_mouse.h>
+#include "vlc_es.h"
+#include "vlc_picture.h"
+#include "vlc_subpicture.h"
+#include "vlc_mouse.h"
 
 /**
  * \defgroup filter Filters

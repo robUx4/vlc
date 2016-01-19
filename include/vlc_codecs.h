@@ -24,7 +24,7 @@
 #ifndef VLC_CODECS_H
 #define VLC_CODECS_H 1
 
-#include <vlc_fourcc.h>
+#include "vlc_fourcc.h"
 /**
  * \file
  * This file defines codec related structures needed by the demuxers and decoders

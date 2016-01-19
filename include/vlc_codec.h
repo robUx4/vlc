@@ -24,10 +24,10 @@
 #ifndef VLC_CODEC_H
 #define VLC_CODEC_H 1
 
-#include <vlc_block.h>
-#include <vlc_es.h>
-#include <vlc_picture.h>
-#include <vlc_subpicture.h>
+#include "vlc_block.h"
+#include "vlc_es.h"
+#include "vlc_picture.h"
+#include "vlc_subpicture.h"
 
 /**
  * \defgroup codec Codec

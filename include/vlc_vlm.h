@@ -25,7 +25,7 @@
 #ifndef VLC_VLM_H
 #define VLC_VLM_H 1
 
-#include <vlc_input.h>
+#include "vlc_input.h"
 
 /**
  * \defgroup server VLM

@@ -98,7 +98,7 @@
 #define A52_FRAME_NB 1536
 
 /* FIXME to remove once aout.h is cleaned a bit more */
-#include <vlc_block.h>
+#include "vlc_block.h"
 
 /** Audio output object */
 struct audio_output

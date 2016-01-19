@@ -24,9 +24,9 @@
 #ifndef VLC_VIDEO_SPLITTER_H
 #define VLC_VIDEO_SPLITTER_H 1
 
-#include <vlc_es.h>
-#include <vlc_picture.h>
-#include <vlc_mouse.h>
+#include "vlc_es.h"
+#include "vlc_picture.h"
+#include "vlc_mouse.h"
 
 /**
  * \file
