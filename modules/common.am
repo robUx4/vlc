@@ -36,9 +36,10 @@ AM_LDFLAGS += $(top_builddir)/modules/module.rc.lo \
 endif
 
 if GCC_PRECOMPILED_HEADER
-BUILT_SOURCES += $(abs_top_builddir)/modules/vlc_precompiled.h.gch
+BUILT_SOURCES += $(abs_top_builddir)/modules/vlc_precompiled.h.gch $(abs_top_builddir)/modules/vlc_precompiled.hpp.gch
 AM_CPPFLAGS += -DHAVE_GCC_PRECOMPILED -Winvalid-pch
-INCLUDES = --include $(abs_top_builddir)/modules/vlc_precompiled.h -DMODULE_STRING=\"$(MODULE_NAME)\" --include $(top_srcdir)/include/vlc_precompiled.h --include $(top_srcdir)/include/vlc_messages.h
+CFLAGS += --include $(abs_top_builddir)/modules/vlc_precompiled.h -DMODULE_STRING=\"$(MODULE_NAME)\" --include $(top_srcdir)/include/vlc_precompiled.h --include $(top_srcdir)/include/vlc_messages.h
+AM_CXXFLAGS += --include $(abs_top_builddir)/modules/vlc_precompiled.hpp -DMODULE_STRING=\"$(MODULE_NAME)\" --include $(top_srcdir)/include/vlc_precompiled.h --include $(top_srcdir)/include/vlc_messages.h
 else
 AM_CPPFLAGS = -DMODULE_STRING=\"$(MODULE_NAME)\"
 endif
@@ -56,3 +57,9 @@ $(abs_top_builddir)/modules/vlc_precompiled.h.gch: $(top_srcdir)/modules/common.
 	$(AM_V_at)rm -f $(abs_top_builddir)/modules/vlc_precompiled.h
 	$(AM_V_GEN)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -o $@ $(top_srcdir)/include/vlc_precompiled.h
 	$(AM_V_at)touch $(abs_top_builddir)/modules/vlc_precompiled.h # fallback if the PCH is not used
+
+$(abs_top_builddir)/modules/vlc_precompiled.hpp.gch: $(top_srcdir)/modules/common.am $(top_srcdir)/include/vlc_precompiled.h
+	$(AM_V_at)mkdir -p -- $(abs_top_builddir)/modules
+	$(AM_V_at)rm -f $(abs_top_builddir)/modules/vlc_precompiled.hpp
+	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(CXXFLAGS) -o $@ $(top_srcdir)/include/vlc_precompiled.h
+	$(AM_V_at)touch $(abs_top_builddir)/modules/vlc_precompiled.hpp # fallback if the PCH is not used
