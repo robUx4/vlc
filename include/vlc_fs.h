@@ -234,7 +234,7 @@ VLC_API char *vlc_getcwd(void) VLC_USED;
 #if defined( _WIN32 )
 typedef struct vlc_DIR
 {
-    _WDIR *wdir; /* MUST be first, see <vlc_fs.h" */
+    _WDIR *wdir; /* MUST be first, see <vlc_fs.h> */
     char *entry;
     union
     {

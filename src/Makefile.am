@@ -11,9 +11,6 @@ EXTRA_DIST = \
 	revision.txt
 
 BUILT_SOURCES = $(nodist_pluginsinclude_HEADERS)
-#if GCC_PRECOMPILED_HEADER
-BUILT_SOURCES += $(abs_top_builddir)/include/vlc_precompiled.h.gch
-#endif
 CLEANFILES = $(BUILT_SOURCES)
 
 SUFFIXES = .pc.in .pc .rc.in .rc
@@ -171,13 +168,9 @@ EXTRA_DIST += libvlc_win32_rc.rc.in
 lib_LTLIBRARIES = libvlccore.la
 
 AM_CPPFLAGS = $(INCICONV) $(IDN_CFLAGS) \
-	-DMODULE_STRING=\"core\" \
 	-DLOCALEDIR=\"$(localedir)\" \
 	-DPKGDATADIR=\"$(vlcdatadir)\" \
 	-DPKGLIBDIR=\"$(vlclibdir)\"
-if GCC_PRECOMPILED_HEADER
-AM_CPPFLAGS += --include $(abs_top_builddir)/include/vlc_precompiled.h -Winvalid-pch
-endif
 AM_CFLAGS = $(CFLAGS_libvlccore)
 if HAVE_DYNAMIC_PLUGINS
 AM_CPPFLAGS += -DHAVE_DYNAMIC_PLUGINS
@@ -185,6 +178,12 @@ endif
 if HAVE_DBUS
 AM_CPPFLAGS += -DHAVE_DBUS
 AM_CFLAGS += $(DBUS_CFLAGS)
+endif
+
+if GCC_PRECOMPILED_HEADER
+BUILT_SOURCES += $(abs_top_builddir)/include/vlc_precompiled.h.gch
+AM_CPPFLAGS += -DHAVE_GCC_PRECOMPILED -Winvalid-pch
+INCLUDES = --include $(abs_top_builddir)/include/vlc_precompiled.h -DMODULE_STRING=\"core\" --include $(top_srcdir)/include/vlc_messages.h
 endif
 
 libvlccore_la_SOURCES = $(SOURCES_libvlc)
@@ -573,10 +572,10 @@ LDADD = libvlccore.la \
 ###############################################################################
 
 $(abs_top_builddir)/include/vlc_precompiled.h.gch: Makefile.am $(top_srcdir)/include/vlc_precompiled.h
-	$(AM_V_at)mkdir -p -- ../include
-	$(AM_V_at)touch $(abs_top_builddir)/include/vlc_precompiled.h #already used in compile flags
-	$(COMPILE) -o $@ $(top_srcdir)/include/vlc_precompiled.h
-	$(AM_V_at)rm -f $(abs_top_builddir)/include/vlc_precompiled.h
+	$(AM_V_at)mkdir -p -- $(abs_top_builddir)/include
+#	$(AM_V_at)rm -f $(abs_top_builddir)/include/vlc_precompiled.h
+	$(AM_V_GEN)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -o $@ $(top_srcdir)/include/vlc_precompiled.h
+#	$(AM_V_at)touch $(abs_top_builddir)/include/vlc_precompiled.h  # fallback if the PCH is not used
 
 ###############################################################################
 # GIT revision

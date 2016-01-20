@@ -10,18 +10,12 @@ AUTOMAKE_OPTIONS = subdir-objects
 NULL =
 pluginsdir = $(vlclibdir)/plugins
 BUILT_SOURCES =
-CLEANFILES = $(BUILT_SOURCES)
 
 LTLIBVLCCORE = $(top_builddir)/src/libvlccore.la
 
 # Module name from object or executable file name.
 MODULE_NAME = $$(p="$@"; p="$${p\#\#*/}"; p="$${p\#lib}"; p="$${p%_plugin*}"; p=$$(echo "$$p"|sed 's/-/_/g'); p="$${p%.lo}"; echo "$$p")
 
-AM_CPPFLAGS = -DMODULE_STRING=\"$(MODULE_NAME)\"
-# cannot work, gcc requires the same defines as when the header was precompiled
-#if GCC_PRECOMPILED_HEADER
-#AM_CPPFLAGS += --include $(abs_top_builddir)/include/vlc_precompiled.h -Winvalid-pch
-#endif
 if HAVE_DYNAMIC_PLUGINS
 AM_CPPFLAGS += -D__PLUGIN__
 else
@@ -41,4 +35,24 @@ AM_LDFLAGS += $(top_builddir)/modules/module.rc.lo \
               -Wc,--static -Wc,-static-libgcc
 endif
 
+if GCC_PRECOMPILED_HEADER
+BUILT_SOURCES += $(abs_top_builddir)/modules/vlc_precompiled.h.gch
+AM_CPPFLAGS += -DHAVE_GCC_PRECOMPILED -Winvalid-pch
+INCLUDES = --include $(abs_top_builddir)/modules/vlc_precompiled.h -DMODULE_STRING=\"$(MODULE_NAME)\" --include $(top_srcdir)/include/vlc_precompiled.h --include $(top_srcdir)/include/vlc_messages.h
+else
+AM_CPPFLAGS = -DMODULE_STRING=\"$(MODULE_NAME)\"
+endif
+
+CLEANFILES = $(BUILT_SOURCES)
+
 SUFFIXES =
+
+###############################################################################
+# Precompiled Header
+###############################################################################
+
+$(abs_top_builddir)/modules/vlc_precompiled.h.gch: $(top_srcdir)/modules/common.am $(top_srcdir)/include/vlc_precompiled.h
+	$(AM_V_at)mkdir -p -- $(abs_top_builddir)/modules
+	$(AM_V_at)rm -f $(abs_top_builddir)/modules/vlc_precompiled.h
+	$(AM_V_GEN)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -o $@ $(top_srcdir)/include/vlc_precompiled.h
+	$(AM_V_at)touch $(abs_top_builddir)/modules/vlc_precompiled.h # fallback if the PCH is not used

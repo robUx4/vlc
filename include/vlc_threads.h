@@ -28,6 +28,10 @@
 #ifndef VLC_THREADS_H_
 #define VLC_THREADS_H_
 
+# ifdef __cplusplus
+extern "C" {
+# endif
+
 /**
  * \ingroup os
  * \defgroup thread Threads and synchronization primitives
@@ -947,5 +951,9 @@ VLC_API void vlc_global_mutex(unsigned, bool);
 #define vlc_global_unlock( n ) vlc_global_mutex(n, false)
 
 /** @} */
+
+# ifdef __cplusplus
+}
+# endif
 
 #endif /* !_VLC_THREADS_H */

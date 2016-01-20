@@ -890,7 +890,9 @@ VLC_API const char * VLC_Compiler( void ) VLC_USED;
 /*****************************************************************************
  * Additional vlc stuff
  *****************************************************************************/
-#include "vlc_messages.h"
+#ifndef HAVE_GCC_PRECOMPILED
+# include "vlc_messages.h"
+#endif /* HAVE_GCC_PRECOMPILED */
 #include "vlc_objects.h"
 #include "vlc_variables.h"
 #include "vlc_main.h"
