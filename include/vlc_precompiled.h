@@ -41,6 +41,7 @@
 #include "vlc_es.h"
 #include "vlc_demux.h"
 #include "vlc_aout.h"
+#include "vlc_config.h"
 
 #include "vlc_access.h"
 #include "vlc_arrays.h"
@@ -49,8 +50,6 @@
 #include "vlc_block.h"
 #include "vlc_charset.h"
 #include "vlc_codec.h"
-#include "vlc_config.h"
-#include "vlc_demux.h"
 //NO #include "vlc_filter.h"
 #include "vlc_fixups.h"
 #include "vlc_es_out.h"
@@ -64,10 +63,7 @@
 #include "vlc_services_discovery.h"
 #include "vlc_sout.h"
 #include "vlc_stream.h"
-#include "vlc_threads.h"
 #include "vlc_url.h"
-//#include "vlc_variables.h"
 #include "vlc_vout.h"
-//#include "vlc_threads.h"
 
 #endif /* !VLC_PRECOMPILED_HEADER_H */
