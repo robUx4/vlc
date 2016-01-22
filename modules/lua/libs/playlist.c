@@ -323,7 +323,9 @@ static int vlclua_playlist_current( lua_State *L )
         vlc_object_release( p_input );
     }
 
+#ifndef _MSC_VER
 #warning Indexing input items by ID is unsafe,
+#endif
     lua_pushinteger( L, id );
     return 1;
 }
