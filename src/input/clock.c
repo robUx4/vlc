@@ -536,7 +536,9 @@ void input_clock_GetSystemOrigin( input_clock_t *cl, mtime_t *pi_system, mtime_t
     vlc_mutex_unlock( &cl->lock );
 }
 
+#ifndef _MSC_VER
 #warning "input_clock_SetJitter needs more work"
+#endif
 void input_clock_SetJitter( input_clock_t *cl,
                             mtime_t i_pts_delay, int i_cr_average )
 {
