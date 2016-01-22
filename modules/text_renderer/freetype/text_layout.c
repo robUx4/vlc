@@ -88,7 +88,9 @@
 #endif
 
 #ifndef HAVE_FONT_FALLBACK
+# ifndef _MSC_VER
 # warning YOU ARE MISSING FONTS FALLBACK. TEXT WILL BE INCORRECT
+# endif
 #endif
 
 /**
