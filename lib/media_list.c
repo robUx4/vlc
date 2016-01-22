@@ -252,7 +252,9 @@ libvlc_media_list_add_file_content( libvlc_media_list_t * p_mlist,
 
     if( libvlc_media_list_add_media( p_mlist, p_md ) )
     {
+#ifndef _MSC_VER
 #warning Missing error handling!
+#endif
         /* printerr and leaks */
         return -1;
     }
