@@ -39,7 +39,9 @@
 
 static inline void vout_SendEventClose(vout_thread_t *vout)
 {
-#warning FIXME: implement video close event
+#ifndef _MSC_VER
+# warning FIXME: implement video close event
+#endif
     /* FIXME: this code is disabled as it breaks the non-playlist cases */
     //playlist_Stop(pl_Get(vout));
     (void) vout;
@@ -111,7 +113,9 @@ static inline void vout_SendEventSnapshot(vout_thread_t *vout, const char *filen
     var_SetString(vout->obj.libvlc, "snapshot-file", filename);
 }
 
-#warning "FIXME clean up postproc event"
+#ifndef _MSC_VER
+# warning "FIXME clean up postproc event"
+#endif
 
 extern void vout_InstallDeprecatedPostProcessing(vout_thread_t *);
 extern void vout_UninstallDeprecatedPostProcessing(vout_thread_t *);

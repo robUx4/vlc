@@ -420,7 +420,9 @@ int OpenDemux( vlc_object_t *p_this )
 
             get_rotation(&es_fmt, s);
 
+#if !defined(_MSC_VER)
 # warning FIXME: implement palette transmission
+#endif
             psz_type = "video";
             es_fmt.video.i_frame_rate = s->codec->time_base.num;
             es_fmt.video.i_frame_rate_base = s->codec->time_base.den * __MAX( s->codec->ticks_per_frame, 1 );
