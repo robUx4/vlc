@@ -632,6 +632,10 @@ AC_CHECK_TYPES([struct pollfd],,,
 #endif
 ])
 
+dnl Check for struct timespec
+AC_CHECK_TYPES([struct timespec],,,
+[#include <timespec.h>])
+
 dnl Checks for socket stuff
 VLC_SAVE_FLAGS
 SOCKET_LIBS=""
