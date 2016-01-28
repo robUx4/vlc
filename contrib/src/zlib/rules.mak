@@ -30,4 +30,7 @@ else
 	cd $< && $(HOSTVARS_PIC) $(ZLIB_CONFIG_VARS) ./configure --prefix=$(PREFIX) --static
 	cd $< && $(MAKE) install
 endif
+ifdef HAVE_VISUALSTUDIO
+	cd $< && cp "$(PREFIX)/lib/libz.a" "$(PREFIX)/lib/z.lib"
+endif
 	touch $@
