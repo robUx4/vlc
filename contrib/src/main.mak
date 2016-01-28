@@ -312,6 +312,11 @@ HOSTVARS_PIC := $(HOSTTOOLS) \
 	CFLAGS="$(CFLAGS) $(PIC)" \
 	CXXFLAGS="$(CXXFLAGS) $(PIC)" \
 	LDFLAGS="$(LDFLAGS)"
+HOSTVARS_CMAKE :=  $(HOSTTOOLS) \
+	CPPFLAGS="$(CPPFLAGS) $(PIC)" \
+	CFLAGS="$(CFLAGS) $(EXTRA_CMAKE_FLAGS) $(PIC)" \
+	CXXFLAGS="$(CXXFLAGS) $(EXTRA_CMAKE_FLAGS) $(PIC)" \
+	LDFLAGS="$(LDFLAGS)"
 
 download_git = \
 	rm -Rf $(@:.tar.xz=) && \
@@ -354,7 +359,8 @@ endif
 RECONF = mkdir -p -- $(PREFIX)/share/aclocal && \
 	cd $< && $(AUTORECONF) -fiv $(ACLOCAL_AMFLAGS)
 CMAKE = cmake . -DCMAKE_TOOLCHAIN_FILE=$(abspath toolchain.cmake) \
-		-DCMAKE_INSTALL_PREFIX=$(PREFIX)
+		-DCMAKE_INSTALL_PREFIX=$(PREFIX) \
+		$(CMAKE_TARGET)
 
 #
 # Per-package build rules
@@ -471,6 +477,9 @@ endif
 endif
 	echo "set(CMAKE_C_COMPILER $(CC))" >> $@
 	echo "set(CMAKE_CXX_COMPILER $(CXX))" >> $@
+ifdef VLC_ARCH
+	echo "set(CMAKE_SYSTEM_PROCESSOR $(VLC_ARCH))" >> $@
+endif
 	echo "set(CMAKE_FIND_ROOT_PATH $(PREFIX))" >> $@
 	echo "set(CMAKE_FIND_ROOT_PATH_MODE_PROGRAM NEVER)" >> $@
 	echo "set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY)" >> $@
