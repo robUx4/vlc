@@ -21,8 +21,12 @@ endif
 	$(MOVE)
 
 .taglib: taglib toolchain.cmake
-	cd $< && $(HOSTVARS_PIC) $(CMAKE) \
+	cd $< && $(HOSTVARS_CMAKE) $(CMAKE) \
 		-DBUILD_SHARED_LIBS:BOOL=OFF \
 		.
+ifdef HAVE_VISUALSTUDIO
+	cd $< && msbuild.exe -p:Configuration=$(VLC_CONFIGURATION) -m -nologo INSTALL.vcxproj
+else
 	cd $< && $(MAKE) install
+endif
 	touch $@
