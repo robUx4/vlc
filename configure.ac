@@ -489,6 +489,12 @@ dnl Check for broken versions of mingw-runtime compatability library
         AC_MSG_ERROR([LibVLC requires mingw-runtime version 3.15 or higher, or mingw-w64 version 3.0 or higher!])
     ])
 
+    AC_PREPROC_IFELSE([AC_LANG_SOURCE([
+#if !defined(__MINGW32__)
+# error Not compiling with mingw
+#endif
+    ])], [
+        AC_MSG_RESULT([ok])
     dnl force use of mingw provided c99 *printf over msvcrt
     CPPFLAGS="${CPPFLAGS} -D__USE_MINGW_ANSI_STDIO=1"
 
@@ -522,6 +528,9 @@ dnl Check for broken versions of mingw-runtime compatability library
             [AC_TRY_COMPILE([],,ac_cv_c_fnative_struct=yes, ac_cv_c_fnative_struct=no)])
         "${ac_cv_c_fnative_struct}" = "no" && VLC_RESTORE_FLAGS
     fi
+    ], [
+        AC_MSG_RESULT([Not compiling with mingw])
+    ])
 ])
 
 AC_ARG_ENABLE(winstore_app,
