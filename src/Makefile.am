@@ -193,7 +193,10 @@ libvlccore_la_LIBADD = $(LIBS_libvlccore) \
 libvlccore_la_DEPENDENCIES = libvlccore.sym
 if HAVE_WIN32
 libvlccore_la_DEPENDENCIES += libvlc_win32_rc.$(OBJEXT)
-libvlccore_la_LDFLAGS += -Wl,libvlc_win32_rc.$(OBJEXT) -avoid-version -Wc,-static
+libvlccore_la_LDFLAGS += -Wl,libvlc_win32_rc.$(OBJEXT) -avoid-version
+if IS_GCC_COMPILER
+libvlccore_la_LDFLAGS += -Wc,--static
+endif
 endif
 if HAVE_OS2
 libvlccore_la_LDFLAGS += -avoid-version
