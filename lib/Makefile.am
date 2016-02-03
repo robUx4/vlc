@@ -66,7 +66,10 @@ libvlc_la_LDFLAGS = \
 libvlc_la_DEPENDENCIES = libvlc.sym
 if HAVE_WIN32
 libvlc_la_DEPENDENCIES += ../src/libvlc_win32_rc.$(OBJEXT)
-libvlc_la_LDFLAGS += -Wl,../src/libvlc_win32_rc.$(OBJEXT) -avoid-version -Wc,-static
+libvlc_la_LDFLAGS += -Wl,../src/libvlc_win32_rc.$(OBJEXT) -avoid-version
+if IS_GCC_COMPILER
+libvlc_la_LDFLAGS += -Wc,--static
+endif
 endif
 if HAVE_OS2
 libvlc_la_LDFLAGS += -avoid-version
