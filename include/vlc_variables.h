@@ -583,6 +583,9 @@ static inline int var_CountChoices( vlc_object_t *p_obj, const char *psz_name )
         return 0;
     return count.i_int;
 }
+#ifdef _MSC_VER
+#pragma warning(pop)
+#endif /* _MSV_VER */
 #define var_CountChoices(a,b) var_CountChoices( VLC_OBJECT(a),b)
 
 
