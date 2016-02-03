@@ -454,6 +454,10 @@ static inline void vlc_dictionary_clear( vlc_dictionary_t * p_dict,
     p_dict->i_size = 0;
 }
 
+#ifdef _MSC_VER
+#pragma warning(push)
+#pragma warning(disable:4242 4244)    /* possible loss of data */
+#endif /* _MSV_VER */
 static inline int
 vlc_dictionary_has_key( const vlc_dictionary_t * p_dict, const char * psz_key )
 {
@@ -612,6 +616,9 @@ vlc_dictionary_remove_value_for_key( const vlc_dictionary_t * p_dict, const char
 
     /* No key was found */
 }
+#ifdef _MSC_VER
+#pragma warning(pop)
+#endif /* _MSV_VER */
 
 #ifdef __cplusplus
 // C++ helpers
