@@ -52,6 +52,18 @@
 # include <dvbpsi/pat.h>
 # include <dvbpsi/pmt.h>
 
+#if defined(_MSC_VER) && _MSC_VER >= 1900
+#define timezone _timezone
+#endif
+
+/* Include dvbpsi headers */
+#ifndef _DVBPSI_DVBPSI_H_
+ # include <dvbpsi/dvbpsi.h>
+#endif
+# include <dvbpsi/descriptor.h>
+# include <dvbpsi/pat.h>
+# include <dvbpsi/pmt.h>
+
 #include "ts_pid.h"
 #include "ts_streams.h"
 #include "ts_streams_private.h"
