@@ -32,14 +32,17 @@
 #include <vlc_plugin.h>
 #include <vlc_modules.h>
 #include <vlc_services_discovery.h>
+#include <vlc_renderer.h>
 
 #include <microdns/microdns.h>
 
 static int Open( vlc_object_t * );
 static void Close( vlc_object_t * );
 
-VLC_SD_PROBE_HELPER( "microdns", "mDNS Network Discovery", SD_CAT_LAN )
+static int vlc_sd_probe_Open( vlc_object_t *p_obj );
 
+#define RENDERER_TEXT "Search for renderers"
+#define RENDERER_LONGTEXT "If true, this sd will only search for renderers"
 
 #define CFG_PREFIX "sd-microdns-"
 
@@ -57,24 +60,42 @@ vlc_module_begin()
     set_capability( "services_discovery", 0 )
     set_callbacks( Open, Close )
     add_shortcut( "mdns", "microdns" )
+    add_bool( CFG_PREFIX "renderer", false, RENDERER_TEXT, RENDERER_LONGTEXT, true )
     VLC_SD_PROBE_SUBMODULE
 vlc_module_end ()
+
+static const struct
+{
+    const char *psz_protocol;
+    const char *psz_service_name;
+    bool        b_renderer;
+    int         i_renderer_flags;
+} protocols[] = {
+    { "ftp", "_ftp._tcp.local", false, 0 },
+    { "smb", "_smb._tcp.local", false, 0 },
+    { "nfs", "_nfs._tcp.local", false, 0 },
+    { "sftp", "_sftp-ssh._tcp.local", false, 0 },
+    { "rtsp", "_rtsp._tcp.local", false, 0 },
+    { "chromecast", "_googlecast._tcp.local", true, VLC_RENDERER_CAN_AUDIO },
+};
+#define NB_PROTOCOLS (sizeof(protocols) / sizeof(*protocols))
 
 struct services_discovery_sys_t
 {
     vlc_thread_t        thread;
     atomic_bool         stop;
     struct mdns_ctx *   p_microdns;
-    const char **       ppsz_service_names;
+    const char *        ppsz_service_names[NB_PROTOCOLS];
     unsigned int        i_nb_service_names;
     vlc_array_t         items;
 };
 
 struct item
 {
-    char *          psz_uri;
-    input_item_t *  p_input_item;
-    mtime_t         i_last_seen;
+    char *              psz_input_uri;
+    input_item_t *      p_input_item;
+    vlc_renderer_item * p_renderer_item;
+    mtime_t             i_last_seen;
 };
 
 struct srv
@@ -82,23 +103,24 @@ struct srv
     const char *psz_protocol;
     char *      psz_device_name;
     uint16_t    i_port;
+    bool        b_renderer;
+    int         i_renderer_flags;
 };
 
-static const struct
+static int vlc_sd_probe_Open( vlc_object_t *p_obj )
 {
-    const char *psz_protocol;
-    const char *psz_service_name;
-    uint16_t    i_default_port;
-} protocols[] = {
-    { "ftp", "_ftp._tcp.local", 21 },
-    { "smb", "_smb._tcp.local", 445 },
-    { "nfs", "_nfs._tcp.local", 2049 },
-    { "sftp", "_sftp-ssh._tcp.local", 22 },
-    { "rtsp", "_rtsp._tcp.local", 554 },
-};
-#define NB_PROTOCOLS (sizeof(protocols) / sizeof(*protocols))
+    vlc_probe_t *p_probe = (vlc_probe_t *)p_obj;
+    vlc_sd_probe_Add( p_probe, "microdns{longname=\"mDNS Network Discovery\","
+                      "no-renderer}",
+                      "mDNS Network Discovery", SD_CAT_LAN );
+    vlc_sd_probe_Add( p_probe, "microdns{longname=\"mDNS Network Discovery\","
+                      "renderer}",
+                      "mDNS Network Discovery", SD_CAT_RENDERER );
+    return VLC_PROBE_CONTINUE;
+}
 
 static const char *const ppsz_options[] = {
+    "renderer",
     NULL
 };
 
@@ -147,8 +169,9 @@ items_add_input( services_discovery_t *p_sd, char *psz_uri,
         return VLC_ENOMEM;
     }
 
-    p_item->psz_uri = psz_uri;
+    p_item->psz_input_uri = psz_uri;
     p_item->p_input_item = p_input_item;
+    p_item->p_renderer_item = NULL;
     p_item->i_last_seen = mdate();
     vlc_array_append( &p_sys->items, p_item );
     services_discovery_AddItem( p_sd, p_input_item, NULL );
@@ -156,25 +179,84 @@ items_add_input( services_discovery_t *p_sd, char *psz_uri,
     return VLC_SUCCESS;
 }
 
+static int
+items_add_renderer( services_discovery_t *p_sd, const char *psz_name,
+                    const char *psz_uri, int i_flags )
+{
+    services_discovery_sys_t *p_sys = p_sd->p_sys;
+
+    struct item *p_item = malloc( sizeof(struct item) );
+    if( p_item == NULL )
+        return VLC_ENOMEM;
+
+    vlc_renderer_item *p_renderer_item =
+        vlc_renderer_item_new( psz_name, psz_uri, i_flags );
+    if( p_renderer_item == NULL )
+    {
+        free( p_item );
+        return VLC_ENOMEM;
+    }
+
+    p_item->psz_input_uri = NULL;
+    p_item->p_input_item = NULL;
+    p_item->p_renderer_item = p_renderer_item;
+    p_item->i_last_seen = mdate();
+    vlc_array_append( &p_sys->items, p_item );
+    services_discovery_AddRenderer( p_sd, p_renderer_item );
+
+    return VLC_SUCCESS;
+}
+
 static void
 items_release( services_discovery_t *p_sd, struct item *p_item, bool b_notify )
 {
-    input_item_Release( p_item->p_input_item );
-    if( b_notify )
-        services_discovery_RemoveItem( p_sd, p_item->p_input_item );
-    free( p_item->psz_uri );
+    if( p_item->p_input_item != NULL )
+    {
+        input_item_Release( p_item->p_input_item );
+        if( b_notify )
+            services_discovery_RemoveItem( p_sd, p_item->p_input_item );
+    }
+    else
+    {
+        assert( p_item->p_renderer_item != NULL );
+        vlc_renderer_item_release( p_item->p_renderer_item );
+        if( b_notify )
+            services_discovery_RemoveRenderer( p_sd, p_item->p_renderer_item );
+    }
+
+    free( p_item->psz_input_uri );
     free( p_item );
 }
 
 static bool
-items_exists( services_discovery_t *p_sd, const char *psz_uri )
+items_input_exists( services_discovery_t *p_sd, const char *psz_uri )
 {
     services_discovery_sys_t *p_sys = p_sd->p_sys;
 
     for( int i = 0; i < vlc_array_count( &p_sys->items ); ++i )
     {
         struct item *p_item = vlc_array_item_at_index( &p_sys->items, i );
-        if( strcmp( psz_uri, p_item->psz_uri ) == 0 )
+        if( p_item->psz_input_uri != NULL
+         && strcmp( p_item->psz_input_uri, psz_uri ) == 0 )
+        {
+            p_item->i_last_seen = mdate();
+            return true;
+        }
+    }
+    return false;
+}
+
+static bool
+items_renderer_exists( services_discovery_t *p_sd, const char *psz_uri )
+{
+    services_discovery_sys_t *p_sys = p_sd->p_sys;
+
+    for( int i = 0; i < vlc_array_count( &p_sys->items ); ++i )
+    {
+        struct item *p_item = vlc_array_item_at_index( &p_sys->items, i );
+
+        if( p_item->p_renderer_item != NULL
+         && !strcmp( vlc_renderer_item_uri( p_item->p_renderer_item ), psz_uri ) )
         {
             p_item->i_last_seen = mdate();
             return true;
@@ -243,6 +325,7 @@ new_entries_cb( void *p_this, int i_status,
 
     /* There is one ip for several srvs, fetch them */
     const char *psz_ip = NULL;
+    const char *psz_model = NULL;
     for( const struct rr_entry *p_entry = p_entries;
          p_entry != NULL; p_entry = p_entry->next )
     {
@@ -260,11 +343,25 @@ new_entries_cb( void *p_this, int i_status,
                     if( p_srv->psz_device_name == NULL )
                         break;
                     p_srv->psz_protocol = protocols[i].psz_protocol;
-                    if( protocols[i].i_default_port != p_entry->data.SRV.port )
-                        p_srv->i_port = p_entry->data.SRV.port;
+                    p_srv->i_port = p_entry->data.SRV.port;
+                    p_srv->b_renderer = protocols[i].b_renderer;
+                    p_srv->i_renderer_flags = protocols[i].i_renderer_flags;
                     ++i_srv_idx;
                     break;
                 }
+            }
+        }
+        else if( p_entry->type == RR_TXT && psz_model == NULL )
+        {
+            const struct rr_data_txt *p_txt = p_entry->data.TXT;
+            while( p_txt )
+            {
+                if( p_txt->txt && !strncmp("md=", p_txt->txt, 3) )
+                {
+                    psz_model = p_txt->txt + 3;
+                    break;
+                }
+                p_txt = p_txt->next;
             }
         }
         else if( p_entry->type == RR_A && psz_ip == NULL )
@@ -288,17 +385,42 @@ new_entries_cb( void *p_this, int i_status,
         if( p_srv->i_port != 0 )
             sprintf( psz_port, ":%u", p_srv->i_port );
 
-        char *psz_uri;
-        if( asprintf( &psz_uri, "%s://%s%s", p_srv->psz_protocol, psz_ip,
-                      p_srv->i_port != 0 ? psz_port : "" ) < 0 )
-            continue;
-
-        if( items_exists( p_sd, psz_uri ) )
+        if( !p_srv->b_renderer )
         {
-            free( psz_uri );
-            continue;
+            char *psz_uri;
+            if( asprintf( &psz_uri, "%s://%s%s", p_srv->psz_protocol, psz_ip,
+                          p_srv->i_port != 0 ? psz_port : "" ) < 0 )
+                continue;
+
+            if( items_input_exists( p_sd, psz_uri ) )
+            {
+                free( psz_uri );
+                continue;
+            }
+            items_add_input( p_sd, psz_uri, p_srv->psz_device_name );
         }
-        items_add_input( p_sd, psz_uri, p_srv->psz_device_name );
+        else
+        {
+            char *psz_uri;
+            if( asprintf( &psz_uri, "%s://%s:%u", p_srv->psz_protocol, psz_ip,
+                          p_srv->i_port ) == -1 )
+                break;
+
+            if( items_renderer_exists( p_sd, psz_uri ) )
+            {
+                free( psz_uri );
+                continue;
+            }
+
+            if( strcmp( p_srv->psz_protocol, "chromecast" ) == 0
+             && ( psz_model == NULL
+               || strcasecmp( psz_model, "Chromecast Audio" ) != 0 ) )
+                p_srv->i_renderer_flags |= VLC_RENDERER_CAN_VIDEO;
+
+            items_add_renderer( p_sd, p_srv->psz_device_name, psz_uri,
+                                p_srv->i_renderer_flags );
+            free( psz_uri );
+        }
     }
 
     for( i_srv_idx = 0; i_srv_idx < i_nb_srv; ++i_srv_idx )
@@ -353,17 +475,12 @@ Open( vlc_object_t *p_obj )
     atomic_init( &p_sys->stop, false );
     vlc_array_init( &p_sys->items );
     config_ChainParse( p_sd, CFG_PREFIX, ppsz_options, p_sd->p_cfg );
+    bool b_renderer = var_GetBool( p_sd, CFG_PREFIX "renderer" );
 
     /* Listen to protocols that are handled by VLC */
-    const unsigned i_count = NB_PROTOCOLS;
-    p_sys->ppsz_service_names = calloc( i_count, sizeof(char*) );
-    if( !p_sys->ppsz_service_names )
-        goto error;
-
-    for( unsigned int i = 0; i < i_count; ++i )
+    for( unsigned int i = 0; i < NB_PROTOCOLS; ++i )
     {
-        /* Listen to a protocol only if a module can handle it */
-        if( module_exists( protocols[i].psz_protocol ) )
+        if( protocols[i].b_renderer == b_renderer )
             p_sys->ppsz_service_names[p_sys->i_nb_service_names++] =
                 protocols[i].psz_service_name;
     }
@@ -395,7 +512,6 @@ Open( vlc_object_t *p_obj )
 error:
     if( p_sys->p_microdns != NULL )
         mdns_destroy( p_sys->p_microdns );
-    free( p_sys->ppsz_service_names );
     free( p_sys );
     return i_ret;
 }
@@ -412,6 +528,5 @@ Close( vlc_object_t *p_this )
     items_clear( p_sd );
     mdns_destroy( p_sys->p_microdns );
 
-    free( p_sys->ppsz_service_names );
     free( p_sys );
 }
