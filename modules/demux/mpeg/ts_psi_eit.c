@@ -25,6 +25,9 @@
 #include <vlc_meta.h>
 #include <vlc_epg.h>
 #include <vlc_charset.h>   /* FromCharset, for EIT */
+#if defined(_MSC_VER) && _MSC_VER >= 1900
+#define timezone _timezone
+#endif
 
 #ifndef _DVBPSI_DVBPSI_H_
  #include <dvbpsi/dvbpsi.h>
