@@ -360,10 +360,12 @@ sdp_AddAttribute
 sdp_AddMedia
 secstotimestr
 services_discovery_AddItem
+services_discovery_AddRenderer
 services_discovery_EventManager
 services_discovery_GetLocalizedName
 services_discovery_RemoveAll
 services_discovery_RemoveItem
+services_discovery_RemoveRenderer
 sout_AccessOutControl
 sout_AccessOutDelete
 sout_AccessOutNew
