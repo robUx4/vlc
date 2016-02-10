@@ -32,6 +32,10 @@
 
 #include <vlc_common.h>
 #include <vlc_plugin.h>
+#if defined(_MSC_VER) && _MSC_VER >= 1900
+#define timezone _timezone
+#endif
+
 #include <vlc_access.h>    /* DVB-specific things */
 #include <vlc_demux.h>
 #include <vlc_input.h>
