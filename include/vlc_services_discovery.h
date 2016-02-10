@@ -73,7 +73,8 @@ enum services_discovery_category_e
     SD_CAT_DEVICES = 1,           /**< Devices, like portable music players */
     SD_CAT_LAN,                   /**< LAN/WAN services, like Upnp or SAP */
     SD_CAT_INTERNET,              /**< Internet or Website channels services */
-    SD_CAT_MYCOMPUTER             /**< Computer services, like Discs or Apps */
+    SD_CAT_MYCOMPUTER,            /**< Computer services, like Discs or Apps */
+    SD_CAT_RENDERER               /**< Network Devices to send audio/video to */
 };
 
 /**
@@ -158,7 +159,10 @@ VLC_API vlc_event_manager_t * services_discovery_EventManager( services_discover
 VLC_API void services_discovery_AddItem( services_discovery_t * p_this, input_item_t * p_item, const char * psz_category );
 VLC_API void services_discovery_RemoveItem( services_discovery_t * p_this, input_item_t * p_item );
 VLC_API void services_discovery_RemoveAll( services_discovery_t * p_sd );
-
+VLC_API void services_discovery_AddRenderer( services_discovery_t * p_this,
+                                             vlc_renderer_item * p_item );
+VLC_API void services_discovery_RemoveRenderer( services_discovery_t * p_this,
+                                                vlc_renderer_item * p_item );
 
 /* SD probing */
 
