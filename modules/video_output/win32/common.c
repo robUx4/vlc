@@ -39,7 +39,9 @@
 #include <assert.h>
 
 #define COBJMACROS
+#if !VLC_WINSTORE_APP
 #include <shobjidl.h>
+#endif
 
 #include "common.h"
 
