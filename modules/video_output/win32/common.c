@@ -39,7 +39,9 @@
 #include <assert.h>
 
 #define COBJMACROS
+#if !VLC_WINSTORE_APP
 #include <shobjidl.h>
+#endif
 
 #define vout_display_sys_win32_t vout_display_sys_t
 
