@@ -1,0 +1,20 @@
+--- cmake/Source/cmVisualStudio10TargetGenerator.cxx.orig	2016-02-10 16:55:08.918336100 +0100
++++ cmake/Source/cmVisualStudio10TargetGenerator.cxx	2016-02-10 16:55:43.804057900 +0100
+@@ -2579,7 +2579,7 @@ cmVisualStudio10TargetGenerator::Compute
+ 
+     if(linkOptions.IsDebug() || flags.find("/debug") != flags.npos)
+       {
+-      if (this->LocalGenerator->GetVersion() >=
++      if (false && this->LocalGenerator->GetVersion() >=
+           cmGlobalVisualStudioGenerator::VS14)
+         {
+         linkOptions.AddFlag("GenerateDebugInformation", "Debug");
+@@ -2591,7 +2591,7 @@ cmVisualStudio10TargetGenerator::Compute
+       }
+     else
+       {
+-      if (this->LocalGenerator->GetVersion() >=
++      if ( false && this->LocalGenerator->GetVersion() >=
+           cmGlobalVisualStudioGenerator::VS14)
+         {
+         linkOptions.AddFlag("GenerateDebugInformation", "No");
