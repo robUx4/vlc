@@ -68,6 +68,7 @@ cmake-$(CMAKE_VERSION).tar.gz:
 
 cmake: cmake-$(CMAKE_VERSION).tar.gz
 	$(UNPACK)
+	$(APPLY) cmake-3.4.3.patch
 	$(MOVE)
 
 .cmake: cmake
