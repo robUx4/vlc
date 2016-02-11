@@ -32,8 +32,11 @@
 
 #include "chromecast.h"
 
+#include <vlc_access.h>
+#include <vlc_input.h>
 #include <vlc_playlist.h>
-#include <vlc_threads.h>
+#include <vlc_services_discovery.h>
+#include <vlc_url.h>
 
 #include <cassert>
 #include <cerrno>
@@ -42,6 +45,9 @@
 #endif
 
 #include "../../misc/webservices/json.h"
+
+static const vlc_fourcc_t DEFAULT_TRANSCODE_AUDIO = VLC_CODEC_MP3;
+static const vlc_fourcc_t DEFAULT_TRANSCODE_VIDEO = VLC_CODEC_H264;
 
 #define PACKET_MAX_LEN 10 * 1024
 
@@ -57,6 +63,7 @@ static const int CHROMECAST_CONTROL_PORT = 8009;
 #define PONG_WAIT_TIME 500
 #define PONG_WAIT_RETRIES 2
 
+#define VAR_RENDERER_CONFIG  "renderer-config"
 #define CONTROL_CFG_PREFIX "chromecast-"
 
 static const std::string NAMESPACE_DEVICEAUTH       = "urn:x-cast:com.google.cast.tp.deviceauth";
@@ -69,9 +76,23 @@ static const std::string NAMESPACE_RECEIVER         = "urn:x-cast:com.google.cas
  *****************************************************************************/
 static int Open(vlc_object_t *);
 static void Close(vlc_object_t *);
-static void Clean(intf_thread_t *);
 
+static int CurrentChanged( vlc_object_t *, char const *,
+                          vlc_value_t, vlc_value_t, void * );
+static int InputEvent( vlc_object_t *, char const *,
+                       vlc_value_t, vlc_value_t, void * );
+static int MuteChanged( vlc_object_t *, char const *,
+                          vlc_value_t, vlc_value_t, void * );
+static int VolumeChanged( vlc_object_t *, char const *,
+                          vlc_value_t, vlc_value_t, void * );
+static int AddrChangedEvent( vlc_object_t *, char const *,
+                             vlc_value_t, vlc_value_t, void * );
+static int RestartAfterEnd( vlc_object_t *, char const *,
+                            vlc_value_t, vlc_value_t, void * );
 static void *ChromecastThread(void *data);
+
+static int DiscoveryOpen(vlc_object_t *);
+static void DiscoveryClose(vlc_object_t *);
 
 /*****************************************************************************
  * Module descriptor
@@ -87,18 +108,31 @@ static void *ChromecastThread(void *data);
 #define MIME_TEXT N_("MIME content type")
 #define MIME_LONGTEXT N_("This sets the media MIME content type sent to the Chromecast.")
 
+VLC_SD_PROBE_HELPER("chromecast_discovery", "Chromecast devices", SD_CAT_RENDERER)
+
 vlc_module_begin ()
     set_shortname( N_("Chromecast") )
     set_category( CAT_INTERFACE )
     set_subcategory( SUBCAT_INTERFACE_CONTROL )
     set_description( N_("Chromecast interface") )
     set_capability( "interface", 0 )
-    add_shortcut("chromecast")
+    add_shortcut( "chromecast" )
     add_string(CONTROL_CFG_PREFIX "addr", "", IP_TEXT, IP_LONGTEXT, false)
     add_integer(CONTROL_CFG_PREFIX "http-port", HTTP_PORT, HTTP_PORT_TEXT, HTTP_PORT_LONGTEXT, false)
     add_string(CONTROL_CFG_PREFIX "mime", "video/x-matroska", MIME_TEXT, MIME_LONGTEXT, false)
     add_string(CONTROL_CFG_PREFIX "mux", "avformat{mux=matroska}", MUXER_TEXT, MUXER_LONGTEXT, false)
     set_callbacks( Open, Close )
+
+    add_submodule()
+        set_shortname( "chromecast_discovery" )
+        set_category( CAT_INTERFACE )
+        set_subcategory( SUBCAT_INTERFACE_CONTROL )
+        set_description( N_( "Chromecast device discovery" ) )
+        set_capability ("services_discovery", 0)
+        add_shortcut( "chromecast_discovery" )
+        set_callbacks( DiscoveryOpen, DiscoveryClose )
+
+        VLC_SD_PROBE_SUBMODULE
 
 vlc_module_end ()
 
@@ -112,78 +146,73 @@ int Open(vlc_object_t *p_this)
     if (unlikely(p_sys == NULL))
         return VLC_ENOMEM;
 
-    char *psz_ipChromecast = var_InheritString(p_intf, CONTROL_CFG_PREFIX "addr");
-    if (psz_ipChromecast == NULL)
+    playlist_t *p_playlist = pl_Get( p_intf );
+    std::stringstream receiver_addr;
+    char *psz_addrChromecast = NULL;
+    if( !var_Type( p_playlist, VAR_RENDERER_CONFIG ) )
+        /* Don't recreate the same variable over and over and over... */
+        var_Create( p_playlist, VAR_RENDERER_CONFIG, VLC_VAR_STRING );
+
+    psz_addrChromecast = var_InheritString( p_playlist, VAR_RENDERER_CONFIG );
+    if (psz_addrChromecast == NULL)
+        psz_addrChromecast = var_InheritString(p_intf, CONTROL_CFG_PREFIX "addr");
+    else if (psz_addrChromecast[0])
+        msg_Dbg( p_intf, "Using forced address %s", psz_addrChromecast);
+    else
     {
-        msg_Err(p_intf, "No Chromecast receiver IP provided");
-        Clean(p_intf);
-        return VLC_EGENERIC;
+        free(psz_addrChromecast);
+        psz_addrChromecast = var_InheritString(p_intf, CONTROL_CFG_PREFIX "addr");
     }
 
-    p_sys->i_sock_fd = p_sys->connectChromecast(psz_ipChromecast);
-    free(psz_ipChromecast);
-    if (p_sys->i_sock_fd < 0)
+    if (psz_addrChromecast == NULL)
+        msg_Info(p_intf, "No Chromecast receiver IP/Name provided");
+    else
     {
-        msg_Err(p_intf, "Could not connect the Chromecast");
-        Clean(p_intf);
-        return VLC_EGENERIC;
+        vlc_url_t url;
+        vlc_UrlParse(&url, psz_addrChromecast);
+        free(psz_addrChromecast);
+        if (url.psz_host && url.psz_host[0])
+        {
+            int i_port = url.i_port ? url.i_port : CHROMECAST_CONTROL_PORT;
+            receiver_addr << url.psz_host << ':' << i_port;
+        }
+        vlc_UrlClean(&url);
     }
-    p_sys->setConnectionStatus(CHROMECAST_TLS_CONNECTED);
-
-    char psz_localIP[NI_MAXNUMERICHOST];
-    if (net_GetSockAddress(p_sys->i_sock_fd, psz_localIP, NULL))
-    {
-        msg_Err(p_this, "Cannot get local IP address");
-        Clean(p_intf);
-        return VLC_EGENERIC;
-    }
-    p_sys->serverIP = psz_localIP;
+    var_SetString( p_playlist, VAR_RENDERER_CONFIG, receiver_addr.str().c_str() );
 
     char *psz_mux = var_InheritString(p_intf, CONTROL_CFG_PREFIX "mux");
     if (psz_mux == NULL)
     {
-        Clean(p_intf);
-        return VLC_EGENERIC;
+        msg_Err(p_intf, "Bad muxer provided");
+        goto error;
     }
+    p_sys->muxer = psz_mux; /* TODO get the MIME type from the playlist/input ? */
+    free(psz_mux);
 
-    // Start the Chromecast event thread.
-    if (vlc_clone(&p_sys->chromecastThread, ChromecastThread, p_intf,
-                  VLC_THREAD_PRIORITY_LOW))
+    psz_mux = var_InheritString(p_intf, CONTROL_CFG_PREFIX "mime");
+    if (psz_mux == NULL)
     {
-        msg_Err(p_intf, "Could not start the Chromecast talking thread");
-        Clean(p_intf);
-        return VLC_EGENERIC;
+        msg_Err(p_intf, "Bad MIME type provided");
+        goto error;
     }
-
-    /* Ugly part:
-     * We want to be sure that the Chromecast receives the first data packet sent by
-     * the HTTP server. */
-
-    // Lock the sout thread until we have sent the media loading command to the Chromecast.
-    int i_ret = 0;
-    const mtime_t deadline = mdate() + 6 * CLOCK_FREQ;
-    vlc_mutex_lock(&p_sys->lock);
-    while (p_sys->getConnectionStatus() != CHROMECAST_MEDIA_LOAD_SENT)
-    {
-        i_ret = vlc_cond_timedwait(&p_sys->loadCommandCond, &p_sys->lock, deadline);
-        if (i_ret == ETIMEDOUT)
-        {
-            msg_Err(p_intf, "Timeout reached before sending the media loading command");
-            vlc_mutex_unlock(&p_sys->lock);
-            vlc_cancel(p_sys->chromecastThread);
-            Clean(p_intf);
-            return VLC_EGENERIC;
-        }
-    }
-    vlc_mutex_unlock(&p_sys->lock);
-
-    /* Even uglier: sleep more to let to the Chromecast initiate the connection
-     * to the http server. */
-    msleep(2 * CLOCK_FREQ);
+    p_sys->mime = psz_mux; /* TODO get the MIME type from the playlist/input ? */
+    free(psz_mux);
 
     p_intf->p_sys = p_sys;
 
+    var_AddCallback( p_playlist, "input-prepare", CurrentChanged, p_intf );
+    var_AddCallback( p_playlist, "mute", MuteChanged, p_intf );
+    var_AddCallback( p_playlist, "volume", VolumeChanged, p_intf );
+
+    p_sys->ipChangedEvent( receiver_addr.str().c_str() );
+
+    var_AddCallback( p_playlist, VAR_RENDERER_CONFIG, AddrChangedEvent, p_intf );
+
     return VLC_SUCCESS;
+
+error:
+    delete p_sys;
+    return VLC_EGENERIC;
 }
 
 
@@ -195,103 +224,561 @@ void Close(vlc_object_t *p_this)
     intf_thread_t *p_intf = reinterpret_cast<intf_thread_t*>(p_this);
     intf_sys_t *p_sys = p_intf->p_sys;
 
-    vlc_cancel(p_sys->chromecastThread);
-    vlc_join(p_sys->chromecastThread, NULL);
-
-    switch (p_sys->getConnectionStatus())
-    {
-    case CHROMECAST_MEDIA_LOAD_SENT:
-    case CHROMECAST_APP_STARTED:
-        // Generate the close messages.
-        p_sys->msgReceiverClose(p_sys->appTransportId);
-        // ft
-    case CHROMECAST_AUTHENTICATED:
-        p_sys->msgReceiverClose(DEFAULT_CHOMECAST_RECEIVER);
-        // ft
-    default:
-        break;
-    }
-
-    Clean(p_intf);
-}
-
-/**
- * @brief Clean and release the variables in a sout_stream_sys_t structure
- */
-void Clean(intf_thread_t *p_stream)
-{
-    intf_sys_t *p_sys = p_stream->p_sys;
-
-    p_sys->disconnectChromecast();
+    playlist_t *p_playlist = pl_Get( p_intf );
+    var_DelCallback( p_playlist, VAR_RENDERER_CONFIG, AddrChangedEvent, p_intf );
+    var_DelCallback( p_playlist, "input-prepare", CurrentChanged, p_intf );
+    var_DelCallback( p_playlist, "mute", MuteChanged, p_intf );
+    var_DelCallback( p_playlist, "volume", VolumeChanged, p_intf );
 
     delete p_sys;
 }
 
-/**
- * @brief Build a CastMessage to send to the Chromecast
- * @param namespace_ the message namespace
- * @param payloadType the payload type (CastMessage_PayloadType_STRING or
- * CastMessage_PayloadType_BINARY
- * @param payload the payload
- * @param destinationId the destination idenifier
- * @return the generated CastMessage
- */
-void intf_sys_t::buildMessage(const std::string & namespace_,
-                              const std::string & payload,
-                              const std::string & destinationId,
-                              castchannel::CastMessage_PayloadType payloadType)
-{
-    castchannel::CastMessage msg;
-
-    msg.set_protocol_version(castchannel::CastMessage_ProtocolVersion_CASTV2_1_0);
-    msg.set_namespace_(namespace_);
-    msg.set_payload_type(payloadType);
-    msg.set_source_id("sender-vlc");
-    msg.set_destination_id(destinationId);
-    if (payloadType == castchannel::CastMessage_PayloadType_STRING)
-        msg.set_payload_utf8(payload);
-    else // CastMessage_PayloadType_BINARY
-        msg.set_payload_binary(payload);
-
-    sendMessage(msg);
-}
-
+/*****************************************************************************
+ * intf_sys_t: class definition
+ *****************************************************************************/
 intf_sys_t::intf_sys_t(intf_thread_t * const p_this)
- : p_stream(p_this)
- , p_tls(NULL)
- , conn_status(CHROMECAST_DISCONNECTED)
- , i_receiver_requestId(0)
- , i_requestId(0)
+    :p_intf(p_this)
+    ,p_input(NULL)
+    ,devicePort(CHROMECAST_CONTROL_PORT)
+    ,receiverState(RECEIVER_IDLE)
+    ,canDisplay(DISPLAY_UNKNOWN)
+    ,currentStopped(true)
+    ,i_sock_fd(-1)
+    ,p_creds(NULL)
+    ,p_tls(NULL)
+    ,date_play_start(-1)
+    ,playback_start_chromecast(-1)
+    ,playback_start_local(0)
+    ,m_seektime(-1)
+    ,i_seektime(-1)
+    ,restartState(RESTART_NONE)
+    ,conn_status(CHROMECAST_DISCONNECTED)
+    ,cmd_status(NO_CMD_PENDING)
+    ,i_receiver_requestId(0)
+    ,i_requestId(0)
+    ,i_sout_id(0)
+    ,b_restart_playback(false)
+    ,b_has_restart_callback(false)
+    ,b_forcing_position(false)
 {
     vlc_mutex_init(&lock);
     vlc_cond_init(&loadCommandCond);
+    vlc_cond_init(&seekCommandCond);
 }
 
 intf_sys_t::~intf_sys_t()
 {
+    ipChangedEvent( NULL );
+
+    vlc_cond_destroy(&seekCommandCond);
     vlc_cond_destroy(&loadCommandCond);
     vlc_mutex_destroy(&lock);
 }
 
+static int AddrChangedEvent(vlc_object_t *p_this, char const *psz_var,
+                          vlc_value_t oldval, vlc_value_t val, void *p_data )
+{
+    VLC_UNUSED( p_this );
+    VLC_UNUSED( psz_var );
+    VLC_UNUSED( oldval );
+    intf_thread_t *p_intf = static_cast<intf_thread_t *>(p_data);
+    p_intf->p_sys->ipChangedEvent( val.psz_string );
+    return VLC_SUCCESS;
+}
+
+void intf_sys_t::ipChangedEvent(const char *psz_new_ip)
+{
+    if (psz_new_ip == NULL)
+        psz_new_ip = "";
+
+    vlc_url_t url;
+    vlc_UrlParse(&url, psz_new_ip);
+    if (url.psz_host)
+        psz_new_ip = url.psz_host;
+    else
+        psz_new_ip = "";
+
+    if (deviceIP != psz_new_ip)
+    {
+        msg_Dbg(p_intf,"ipChangedEvent '%s' from '%s'", psz_new_ip, deviceIP.c_str());
+        if ( !deviceIP.empty() )
+        {
+            /* disconnect the current Chromecast */
+            switch (getConnectionStatus())
+            {
+            case CHROMECAST_APP_STARTED:
+                // Generate the close messages.
+                msgReceiverClose(appTransportId);
+                // ft
+            case CHROMECAST_TLS_CONNECTED:
+            case CHROMECAST_AUTHENTICATED:
+                msgReceiverClose(DEFAULT_CHOMECAST_RECEIVER);
+                // ft
+            case CHROMECAST_DISCONNECTED:
+            case CHROMECAST_CONNECTION_DEAD:
+            default:
+                break;
+            }
+
+            vlc_cancel(chromecastThread);
+            vlc_join(chromecastThread, NULL);
+
+            disconnectChromecast();
+        }
+
+        /* connect the new Chromecast (if needed) */
+        deviceIP = psz_new_ip;
+        devicePort = url.i_port ? url.i_port : CHROMECAST_CONTROL_PORT;
+
+        if ( !deviceIP.empty() )
+        {
+            // Start the new Chromecast event thread.
+            if (vlc_clone(&chromecastThread, ChromecastThread, p_intf,
+                          VLC_THREAD_PRIORITY_LOW))
+            {
+                msg_Err(p_intf, "Could not start the Chromecast talking thread");
+            }
+
+            playlist_t *p_playlist = pl_Get( p_intf );
+            PL_LOCK;
+            input_thread_t *p_input = playlist_CurrentInput(p_playlist);
+            PL_UNLOCK;
+            InputUpdated( p_input );
+            if ( p_input )
+                vlc_object_release( p_input );
+
+        }
+        else
+        {
+            if (b_has_restart_callback)
+            {
+                if ( p_input )
+                {
+#ifndef NDEBUG
+                    msg_Dbg(p_intf, "del unneeded RestartAfterEnd callback %p on p_input:%p", RestartAfterEnd, p_input);
+#endif
+                    var_DelCallback( p_input, "intf-event", RestartAfterEnd, p_intf );
+                }
+                b_has_restart_callback = false;
+            }
+
+            InputUpdated( NULL );
+
+            // make sure we unblock the demuxer
+            i_seektime = -1;
+            vlc_cond_signal(&seekCommandCond);
+        }
+    }
+    vlc_UrlClean(&url);
+}
+
+static int MuteChanged( vlc_object_t *p_this, char const *psz_var,
+                          vlc_value_t oldval, vlc_value_t val, void *p_data )
+{
+    VLC_UNUSED( p_this );
+    VLC_UNUSED( psz_var );
+    VLC_UNUSED( oldval );
+    intf_thread_t *p_intf = static_cast<intf_thread_t *>(p_data);
+    intf_sys_t *p_sys = p_intf->p_sys;
+
+    if (!p_sys->mediaSessionId.empty())
+        p_sys->msgPlayerSetMute( val.b_bool );
+
+    return VLC_SUCCESS;
+}
+
+static int VolumeChanged( vlc_object_t *p_this, char const *psz_var,
+                          vlc_value_t oldval, vlc_value_t val, void *p_data )
+{
+    VLC_UNUSED( p_this );
+    VLC_UNUSED( psz_var );
+    VLC_UNUSED( oldval );
+    intf_thread_t *p_intf = static_cast<intf_thread_t *>(p_data);
+    intf_sys_t *p_sys = p_intf->p_sys;
+
+    if ( !p_sys->mediaSessionId.empty() )
+        p_sys->msgPlayerSetVolume( val.f_float );
+
+    return VLC_SUCCESS;
+}
+
+static int CurrentChanged( vlc_object_t *p_this, char const *psz_var,
+                          vlc_value_t oldval, vlc_value_t val, void *p_data )
+{
+    intf_thread_t *p_intf = static_cast<intf_thread_t *>(p_data);
+    intf_sys_t *p_sys = p_intf->p_sys;
+    input_thread_t *p_input = static_cast<input_thread_t *>(val.p_address);
+
+    VLC_UNUSED(p_this);
+    VLC_UNUSED(psz_var);
+
+    assert( p_sys->p_input == NULL || p_sys->p_input == oldval.p_address );
+
+    p_sys->InputUpdated( p_input );
+
+    return VLC_SUCCESS;
+}
+
+bool intf_sys_t::canDecodeVideo( const es_format_t *p_es ) const
+{
+    if (p_es->i_codec == VLC_CODEC_H264 || p_es->i_codec == VLC_CODEC_VP8)
+        return true;
+    return false;
+}
+
+bool intf_sys_t::canDecodeAudio( const es_format_t *p_es ) const
+{
+    if (p_es->i_codec == VLC_CODEC_VORBIS ||
+        p_es->i_codec == VLC_CODEC_MP4A ||
+        p_es->i_codec == VLC_FOURCC('h', 'a', 'a', 'c') ||
+        p_es->i_codec == VLC_FOURCC('l', 'a', 'a', 'c') ||
+        p_es->i_codec == VLC_FOURCC('s', 'a', 'a', 'c') ||
+        p_es->i_codec == VLC_CODEC_MPGA ||
+        p_es->i_codec == VLC_CODEC_MP3 ||
+        p_es->i_codec == VLC_CODEC_A52 ||
+        p_es->i_codec == VLC_CODEC_EAC3)
+        return true;
+    return false;
+}
+
+void intf_sys_t::unplugOutputRedirection()
+{
+    msg_Dbg( p_intf, "unplug output redirection from input %s", input_GetItem( p_input )->psz_name );
+    if ( var_Type( p_input->p_parent, SOUT_INTF_ADDRESS ) )
+    {
+        var_Destroy( p_input->p_parent, SOUT_INTF_ADDRESS );
+        var_SetString( p_input, "demux-filter", NULL );
+        var_SetString( p_input, "sout", NULL );
+    }
+}
+
+void intf_sys_t::plugOutputRedirection()
+{
+    msg_Dbg( p_intf, "plug output redirection on input %s", input_GetItem( p_input )->psz_name );
+    if ( !var_Type( p_input->p_parent, SOUT_INTF_ADDRESS) )
+    {
+        var_Create( p_input->p_parent, SOUT_INTF_ADDRESS, VLC_VAR_ADDRESS );
+        var_SetAddress( p_input->p_parent, SOUT_INTF_ADDRESS, p_intf );
+        msg_Dbg(p_intf, "force sout to %s", s_sout.c_str());
+        var_SetString( p_input, "sout", s_sout.c_str() );
+        var_SetString( p_input, "demux-filter", "cc_demux" );
+    }
+}
+
+void intf_sys_t::InputUpdated( input_thread_t *p_input )
+{
+    vlc_mutex_lock(&lock);
+    msg_Dbg( p_intf, "%ld InputUpdated p_input:%p was:%p b_restart_playback:%d playlist_Status:%d", GetCurrentThreadId(), (void*)p_input, (void*)this->p_input, b_restart_playback, playlist_Status( pl_Get(p_intf) ) );
+
+    if (deviceIP.empty())
+    {
+        if ( restartState == RESTART_STARTING && p_input != NULL )
+        {
+            b_restart_playback = false;
+            restartState = RESTART_NONE;
+            msg_Dbg( p_intf, "force restart position:%f", f_restart_position );
+            b_forcing_position = true;
+            input_Control( p_input, INPUT_SET_POSITION, f_restart_position);
+        }
+        /* we will connect when we start the thread */
+        p_input = NULL;
+    }
+
+    if ( this->p_input == p_input )
+    {
+        vlc_mutex_unlock(&lock);
+        return;
+    }
+
+    if( this->p_input != NULL )
+    {
+        vlc_mutex_unlock(&lock);
+        var_DelCallback( this->p_input, "intf-event", InputEvent, p_intf );
+        if (b_has_restart_callback)
+        {
+#ifndef NDEBUG
+            msg_Dbg(p_intf, "input gone, del RestartAfterEnd callback %p on p_input:%p", RestartAfterEnd, this->p_input);
+#endif
+            var_DelCallback( this->p_input, "intf-event", RestartAfterEnd, p_intf );
+            b_has_restart_callback = false;
+        }
+        vlc_mutex_lock(&lock);
+        unplugOutputRedirection();
+    }
+
+    setCurrentStopped( true );
+    this->p_input = p_input;
+
+    if( this->p_input != NULL )
+    {
+        var_AddCallback( p_input, "intf-event", InputEvent, p_intf );
+
+        mutex_cleanup_push(&lock);
+        while ((deviceIP.empty() || canDisplay == DISPLAY_UNKNOWN) && conn_status != CHROMECAST_CONNECTION_DEAD)
+        {
+            msg_Dbg(p_intf, "InputUpdated waiting for Chromecast connection, current %d", conn_status);
+            vlc_cond_wait(&loadCommandCond, &lock);
+        }
+        vlc_cleanup_pop();
+
+        if (conn_status == CHROMECAST_CONNECTION_DEAD)
+        {
+            msg_Warn(p_intf, "no Chromecast hook possible");
+            vlc_mutex_unlock(&lock);
+            return;
+        }
+
+        assert(!p_input->b_preparsing);
+
+        canRemux = false;
+        canDoDirect = false;
+        vlc_fourcc_t i_codec_video = 0, i_codec_audio = 0;
+
+        input_item_t * p_item = input_GetItem(p_input);
+        if ( p_item )
+        {
+            canRemux = true;
+            for (int i=0; i<p_item->i_es; ++i)
+            {
+                es_format_t *p_es = p_item->es[i];
+                if (p_es->i_cat == AUDIO_ES)
+                {
+                    if (!canDecodeAudio( p_es ))
+                    {
+                        msg_Dbg( p_intf, "can't remux audio track %d codec %4.4s", p_es->i_id, (const char*)&p_es->i_codec );
+                        canRemux = false;
+                    }
+                    else if (i_codec_audio == 0)
+                        i_codec_audio = p_es->i_codec;
+                }
+                else if (canDisplay==HAS_VIDEO && p_es->i_cat == VIDEO_ES)
+                {
+                    if (!canDecodeVideo( p_es ))
+                    {
+                        msg_Dbg( p_intf, "can't remux video track %d codec %4.4s", p_es->i_id, (const char*)&p_es->i_codec );
+                        canRemux = false;
+                    }
+                    else if (i_codec_video == 0)
+                        i_codec_video = p_es->i_codec;
+                }
+                else
+                {
+                    p_es->i_priority = ES_PRIORITY_NOT_SELECTABLE;
+                    msg_Dbg( p_intf, "disable non audio/video track %d i_cat:%d codec %4.4s canDisplay:%d", p_es->i_id, p_es->i_cat, (const char*)&p_es->i_codec, canDisplay );
+                }
+            }
+        }
+
+        int i_port = var_InheritInteger(p_intf, CONTROL_CFG_PREFIX "http-port");
+
+        if (deviceIP.empty())
+            s_sout = "";
+        else
+        {
+            std::stringstream ssout;
+            ssout << '#';
+            if ( !canRemux )
+            {
+                if ( i_codec_audio == 0 )
+                    i_codec_audio = DEFAULT_TRANSCODE_AUDIO;
+                /* avcodec AAC encoder is experimental */
+                if ( i_codec_audio == VLC_CODEC_MP4A ||
+                     i_codec_audio == VLC_FOURCC('h', 'a', 'a', 'c') ||
+                     i_codec_audio == VLC_FOURCC('l', 'a', 'a', 'c') ||
+                     i_codec_audio == VLC_FOURCC('s', 'a', 'a', 'c'))
+                    i_codec_audio = DEFAULT_TRANSCODE_AUDIO;
+
+                if ( i_codec_video == 0 )
+                    i_codec_video = DEFAULT_TRANSCODE_VIDEO;
+
+                /* TODO: provide audio samplerate and channels */
+                ssout << "transcode{acodec=";
+                char s_fourcc[5];
+                vlc_fourcc_to_char( i_codec_audio, s_fourcc );
+                s_fourcc[4] = '\0';
+                ssout << s_fourcc;
+                if ( canDisplay==HAS_VIDEO )
+                {
+                    /* TODO: provide maxwidth,maxheight */
+                    ssout << ",vcodec=";
+                    vlc_fourcc_to_char( i_codec_video, s_fourcc );
+                    s_fourcc[4] = '\0';
+                    ssout << s_fourcc;
+                }
+                ssout << "}:";
+            }
+            if (mime == "video/x-matroska" && canDisplay==HAS_VIDEO && i_codec_audio == VLC_CODEC_VORBIS && i_codec_video == VLC_CODEC_VP8 )
+                mime == "video/webm";
+            if (mime == "video/x-matroska" && !canDisplay==HAS_VIDEO )
+                mime == "audio/x-matroska";
+            ssout << "cc_sout{http-port=" << i_port << ",mux=" << muxer << ",mime=" << mime << ",uid=" << i_sout_id++ << "}";
+            s_sout = ssout.str();
+        }
+
+        if (conn_status == CHROMECAST_CONNECTION_DEAD)
+            b_restart_playback = false;
+        else if (b_restart_playback)
+        {
+            b_restart_playback = false;
+            restartState = RESTART_NONE;
+            msg_Dbg( p_intf, "force restart position:%f", f_restart_position );
+            b_forcing_position = true;
+            input_Control( this->p_input, INPUT_SET_POSITION, f_restart_position);
+        }
+        else if ( input_HasESOut( p_input ) )
+        {
+            char *psz_old_sout = var_GetString( p_input, "sout" );
+            b_restart_playback = !psz_old_sout || !psz_old_sout[0];
+            if ( b_restart_playback )
+                msg_Dbg( p_intf, "there's no sout defined yet status:%d", playlist_Status( pl_Get( p_intf ) ) );
+            free(psz_old_sout);
+        }
+        else
+        {
+            msg_Dbg( p_intf, "no need to restart to set the sout" );
+            b_restart_playback = false;
+        }
+        msg_Dbg( p_intf, "%ld new b_restart_playback:%d", GetCurrentThreadId(), b_restart_playback );
+
+        if ( b_restart_playback )
+        {
+            if (deviceIP.empty() || conn_status == CHROMECAST_APP_STARTED)
+            {
+                /* the MediaApp is already connected we need to stop now */
+                restartDoStop();
+            }
+        }
+        else
+        {
+            if (b_has_restart_callback)
+            {
+#ifndef NDEBUG
+                msg_Dbg(p_intf, "normal plug, del RestartAfterEnd callback %p on p_input:%p", RestartAfterEnd, this->p_input);
+#endif
+                var_DelCallback( this->p_input, "intf-event", RestartAfterEnd, p_intf );
+                b_has_restart_callback = false;
+            }
+            if (conn_status != CHROMECAST_CONNECTION_DEAD)
+            {
+                plugOutputRedirection();
+            }
+        }
+    }
+    else if ( !b_restart_playback )
+    {
+        restartDoStop();
+    }
+    vlc_mutex_unlock(&lock);
+}
+
+void intf_sys_t::setCurrentStopped(bool stopped) {
+    if (currentStopped != stopped)
+    {
+#ifndef NDEBUG
+        msg_Dbg(p_intf, "change current file stopped, now %d", stopped);
+#endif
+        currentStopped = stopped;
+    }
+}
+
+void intf_sys_t::sendPlayerCmd()
+{
+    if (!p_input)
+    {
+        msg_Warn(p_intf, "no input");
+        return;
+    }
+
+    assert(!p_input->b_preparsing);
+
+    if (conn_status != CHROMECAST_APP_STARTED)
+    {
+        msg_Dbg(p_intf, "don't send playback command until the app is started");
+        return;
+    }
+
+#ifndef NDEBUG
+    msg_Dbg( p_intf, "sendPlayerCmd input_state:%d mediaSessionId:'%s' cmd_status:%d", (int)var_GetInteger( p_input, "state" ), mediaSessionId.c_str(), cmd_status );
+#endif
+    switch( var_GetInteger( p_input, "state" ) )
+    {
+    case OPENING_S:
+        if (!mediaSessionId.empty()) {
+            msg_Warn(p_intf, "opening when a session was still opened:%s", mediaSessionId.c_str());
+        }
+        else
+        //playback_start_chromecast = -1;
+        if (cmd_status == NO_CMD_PENDING) {
+            playback_start_local = 0;
+            msgPlayerLoad();
+            setPlayerStatus(CMD_LOAD_SENT);
+        }
+        break;
+    case PLAYING_S:
+        if (!mediaSessionId.empty() && receiverState != RECEIVER_IDLE && currentStopped) {
+            msgPlayerPlay();
+            setPlayerStatus(CMD_PLAYBACK_SENT);
+        } else if (cmd_status == NO_CMD_PENDING) {
+            msgPlayerLoad();
+            setPlayerStatus(CMD_LOAD_SENT);
+        }
+        break;
+    case PAUSE_S:
+        if (!mediaSessionId.empty() && receiverState != RECEIVER_IDLE && currentStopped) {
+            msgPlayerPause();
+            setPlayerStatus(CMD_PLAYBACK_SENT);
+        } else if (cmd_status == NO_CMD_PENDING) {
+            msgPlayerLoad();
+            setPlayerStatus(CMD_LOAD_SENT);
+        }
+        break;
+    case END_S:
+        break;
+    default:
+        break;
+    }
+}
+
+static int InputEvent( vlc_object_t *p_this, char const *psz_var,
+                       vlc_value_t oldval, vlc_value_t val, void *p_data )
+{
+    input_thread_t *p_input = reinterpret_cast<input_thread_t*>(p_this);
+    intf_thread_t *p_intf = static_cast<intf_thread_t*>(p_data);
+    intf_sys_t *p_sys = p_intf->p_sys;
+
+    VLC_UNUSED(psz_var);
+    VLC_UNUSED(oldval);
+
+    assert(p_input == p_sys->p_input);
+
+    if( val.i_int == INPUT_EVENT_STATE )
+    {
+        msg_Info(p_this, "%ld playback state changed %d", GetCurrentThreadId(), (int)var_GetInteger( p_input, "state" ));
+        vlc_mutex_locker locker(&p_sys->lock);
+        p_sys->sendPlayerCmd();
+    }
+
+    return VLC_SUCCESS;
+}
+
 /**
  * @brief Connect to the Chromecast
- * @param p_stream the sout_stream_t structure
  * @return the opened socket file descriptor or -1 on error
  */
-int intf_sys_t::connectChromecast(char *psz_ipChromecast)
+int intf_sys_t::connectChromecast()
 {
-    int fd = net_ConnectTCP(p_stream, psz_ipChromecast, CHROMECAST_CONTROL_PORT);
+    int fd = net_ConnectTCP(p_intf, deviceIP.c_str(), devicePort);
     if (fd < 0)
         return -1;
 
-    p_creds = vlc_tls_ClientCreate(VLC_OBJECT(p_stream));
+    p_creds = vlc_tls_ClientCreate(VLC_OBJECT(p_intf));
     if (p_creds == NULL)
     {
         net_Close(fd);
         return -1;
     }
 
-    p_tls = vlc_tls_ClientSessionCreateFD(p_creds, fd, psz_ipChromecast,
+    p_tls = vlc_tls_ClientSessionCreateFD(p_creds, fd, deviceIP.c_str(),
                                                "tcps", NULL, NULL);
 
     if (p_tls == NULL)
@@ -316,19 +803,22 @@ void intf_sys_t::disconnectChromecast()
         vlc_tls_Delete(p_creds);
         p_tls = NULL;
         setConnectionStatus(CHROMECAST_DISCONNECTED);
+        setPlayerStatus(NO_CMD_PENDING);
+        setCurrentStopped( true );
+        receiverState = RECEIVER_IDLE;
     }
 }
 
 
 /**
  * @brief Receive a data packet from the Chromecast
- * @param p_stream the sout_stream_t structure
+ * @param p_intf the sout_stream_t structure
  * @param b_msgReceived returns true if a message has been entirely received else false
  * @param i_payloadSize returns the payload size of the message received
  * @return the number of bytes received of -1 on error
  */
 // Use here only C linkage and POD types as this function is a cancelation point.
-extern "C" int recvPacket(vlc_object_t *p_stream, bool &b_msgReceived,
+extern "C" int recvPacket(vlc_object_t *p_intf, bool &b_msgReceived,
                           uint32_t &i_payloadSize, int i_sock_fd, vlc_tls_t *p_tls,
                           unsigned *pi_received, uint8_t *p_data, bool *pb_pingTimeout,
                           int *pi_wait_delay, int *pi_wait_retries)
@@ -347,7 +837,7 @@ extern "C" int recvPacket(vlc_object_t *p_stream, bool &b_msgReceived,
         {
             if (!*pi_wait_retries)
             {
-                msg_Err(p_stream, "No PONG answer received from the Chromecast");
+                msg_Err(p_intf, "No PONG answer received from the Chromecast");
                 return 0; // Connection died
             }
             (*pi_wait_retries)--;
@@ -357,7 +847,7 @@ extern "C" int recvPacket(vlc_object_t *p_stream, bool &b_msgReceived,
             /* now expect a pong */
             *pi_wait_delay = PONG_WAIT_TIME;
             *pi_wait_retries = PONG_WAIT_RETRIES;
-            msg_Warn(p_stream, "No PING received from the Chromecast, sending a PING");
+            msg_Warn(p_intf, "No PING received from the Chromecast, sending a PING");
         }
         *pb_pingTimeout = true;
     }
@@ -393,7 +883,7 @@ extern "C" int recvPacket(vlc_object_t *p_stream, bool &b_msgReceived,
     if (i_payloadSize > i_maxPayloadSize)
     {
         // Error case: the packet sent by the Chromecast is too long: we drop it.
-        msg_Err(p_stream, "Packet too long: droping its data");
+        msg_Err(p_intf, "Packet too long: droping its data");
 
         uint32_t i_size = i_payloadSize - (*pi_received - PACKET_HEADER_LEN);
         if (i_size > i_maxPayloadSize)
@@ -427,6 +917,97 @@ extern "C" int recvPacket(vlc_object_t *p_stream, bool &b_msgReceived,
     return i_ret;
 }
 
+void intf_sys_t::stateChangedForRestart( input_thread_t *p_input )
+{
+    playlist_t *p_playlist = pl_Get( p_intf );
+    PL_LOCK;
+    msg_Dbg(p_intf, "%ld RestartAfterEnd state changed %d", GetCurrentThreadId(), (int)var_GetInteger( p_input, "state" ));
+    if ( var_GetInteger( p_input, "state" ) == END_S )
+    {
+        msg_Info(p_intf, "%ld RestartAfterEnd play this file again", GetCurrentThreadId() );
+        if ( restartDoPlay() )
+        {
+            restartState = RESTART_STARTING;
+            /* no need to unhook the callback it will be when the input is destroyed */
+            //var_DelCallback( p_input, "intf-event", RestartAfterEnd, p_intf );
+        }
+    }
+    PL_UNLOCK;
+}
+
+static int RestartAfterEnd( vlc_object_t *p_this, char const *psz_var,
+                            vlc_value_t oldval, vlc_value_t val, void *p_data )
+{
+    VLC_UNUSED( oldval );
+    VLC_UNUSED( psz_var );
+    input_thread_t *p_input = reinterpret_cast<input_thread_t*>(p_this);
+    intf_thread_t *p_intf = static_cast<intf_thread_t*>(p_data);
+
+    if( val.i_int == INPUT_EVENT_STATE )
+    {
+        p_intf->p_sys->stateChangedForRestart( p_input );
+    }
+
+    return VLC_SUCCESS;
+}
+
+bool intf_sys_t::restartDoPlay()
+{
+    if ( b_restart_playback )
+    {
+#ifndef NDEBUG
+        msg_Dbg( p_intf, "restart playback p_input:%p playlist_Play() b_restart_playback:1 position:%f", (void*)p_input, f_restart_position );
+#endif
+        playlist_Play( pl_Get(p_intf) );
+        //b_restart_playback = false;
+        return true;
+    }
+    return false;
+}
+
+void intf_sys_t::restartDoStop()
+{
+    /* save the position */
+    playlist_t *p_playlist = pl_Get( p_intf );
+    PL_LOCK;
+    input_thread_t *p_input = playlist_CurrentInput( p_playlist );
+    if (p_input == NULL)
+    {
+        msg_Warn( p_intf, "cannot restart non playing source" );
+        PL_UNLOCK;
+        return;
+    }
+    if (!b_has_restart_callback)
+    {
+#ifndef NDEBUG
+        msg_Dbg(p_intf, "add RestartAfterEnd callback %p on p_input:%p", RestartAfterEnd, p_input);
+#endif
+        var_AddCallback( p_input, "intf-event", RestartAfterEnd, p_intf );
+        b_has_restart_callback = true;
+    }
+    b_restart_playback = true;
+    input_Control(p_input, INPUT_GET_POSITION, &f_restart_position);
+#ifndef NDEBUG
+    msg_Dbg( p_intf, "Current %p position:%f", (void*)p_input, f_restart_position );
+#endif
+    vlc_object_release(p_input);
+
+    restartState = RESTART_STOPPING;
+    msg_Dbg(p_intf, "%ld playlist_Stop()", GetCurrentThreadId());
+#if 0
+    plugOutputRedirection();
+    input_Control( p_input, INPUT_RESTART_OUTPUT );
+#elif 0
+    input_Control( p_input, INPUT_RESTART_ES, -VIDEO_ES );
+    input_Control( p_input, INPUT_RESTART_ES, -AUDIO_ES );
+    input_Control( p_input, INPUT_RESTART_ES, -SPU_ES );
+    input_Control( p_input, INPUT_SET_POSITION, f_restart_position );
+#else
+    playlist_Stop( p_playlist );
+#endif
+    PL_UNLOCK;
+}
+
 /**
  * @brief Process a message received from the Chromecast
  * @param msg the CastMessage to process
@@ -437,7 +1018,7 @@ void intf_sys_t::processMessage(const castchannel::CastMessage &msg)
     const std::string & namespace_ = msg.namespace_();
 
 #ifndef NDEBUG
-    msg_Dbg(p_stream,"processMessage: %s->%s %s", namespace_.c_str(), msg.destination_id().c_str(), msg.payload_utf8().c_str());
+    msg_Dbg(p_intf,"processMessage: %s->%s %s", namespace_.c_str(), msg.destination_id().c_str(), msg.payload_utf8().c_str());
 #endif
 
     if (namespace_ == NAMESPACE_DEVICEAUTH)
@@ -447,18 +1028,18 @@ void intf_sys_t::processMessage(const castchannel::CastMessage &msg)
 
         if (authMessage.has_error())
         {
-            msg_Err(p_stream, "Authentification error: %d", authMessage.error().error_type());
+            msg_Err(p_intf, "Authentification error: %d", authMessage.error().error_type());
         }
         else if (!authMessage.has_response())
         {
-            msg_Err(p_stream, "Authentification message has no response field");
+            msg_Err(p_intf, "Authentification message has no response field");
         }
         else
         {
             vlc_mutex_locker locker(&lock);
             setConnectionStatus(CHROMECAST_AUTHENTICATED);
             msgConnect(DEFAULT_CHOMECAST_RECEIVER);
-            msgReceiverLaunchApp();
+            msgReceiverGetStatus();
         }
     }
     else if (namespace_ == NAMESPACE_HEARTBEAT)
@@ -468,16 +1049,16 @@ void intf_sys_t::processMessage(const castchannel::CastMessage &msg)
 
         if (type == "PING")
         {
-            msg_Dbg(p_stream, "PING received from the Chromecast");
+            msg_Dbg(p_intf, "PING received from the Chromecast");
             msgPong();
         }
         else if (type == "PONG")
         {
-            msg_Dbg(p_stream, "PONG received from the Chromecast");
+            msg_Dbg(p_intf, "PONG received from the Chromecast");
         }
         else
         {
-            msg_Warn(p_stream, "Heartbeat command not supported: %s", type.c_str());
+            msg_Warn(p_intf, "Heartbeat command not supported: %s", type.c_str());
         }
 
         json_value_free(p_data);
@@ -515,9 +1096,23 @@ void intf_sys_t::processMessage(const castchannel::CastMessage &msg)
                 {
                     msgConnect(appTransportId);
                     setConnectionStatus(CHROMECAST_APP_STARTED);
-                    msgPlayerLoad();
-                    setConnectionStatus(CHROMECAST_MEDIA_LOAD_SENT);
-                    vlc_cond_signal(&loadCommandCond);
+
+                    playlist_t *p_playlist = pl_Get( p_intf );
+                    msg_Dbg( p_intf, "app started b_restart_playback:%d playlist_Status:%d", b_restart_playback, playlist_Status( p_playlist ) );
+                    if (!b_restart_playback || playlist_Status( p_playlist ) == PLAYLIST_STOPPED)
+                    {
+                        /* now we can start the Chromecast playback */
+                        sendPlayerCmd();
+                        b_restart_playback = false;
+                    }
+                    else
+                    {
+                        restartDoStop();
+                    }
+                }
+                else
+                {
+                    msgPlayerGetStatus();
                 }
             }
             else
@@ -526,15 +1121,14 @@ void intf_sys_t::processMessage(const castchannel::CastMessage &msg)
                 {
                 /* If the app is no longer present */
                 case CHROMECAST_APP_STARTED:
-                case CHROMECAST_MEDIA_LOAD_SENT:
-                    msg_Warn(p_stream, "app is no longer present. closing");
+                    msg_Warn(p_intf, "app is no longer present. closing");
                     msgReceiverClose(appTransportId);
-                    setConnectionStatus(CHROMECAST_CONNECTION_DEAD);
                     break;
 
                 case CHROMECAST_AUTHENTICATED:
-                    msg_Dbg(p_stream, "Chromecast was running no app, launch media_app");
+                    msg_Dbg(p_intf, "Chromecast was running no app, launch media_app");
                     appTransportId = "";
+                    receiverState = RECEIVER_IDLE;
                     msgReceiverLaunchApp();
                     break;
 
@@ -547,12 +1141,12 @@ void intf_sys_t::processMessage(const castchannel::CastMessage &msg)
         else if (type == "LAUNCH_ERROR")
         {
             json_value reason = (*p_data)["reason"];
-            msg_Err(p_stream, "Failed to start the MediaPlayer: %s",
+            msg_Err(p_intf, "Failed to start the MediaPlayer: %s",
                     (const char *)reason);
         }
         else
         {
-            msg_Warn(p_stream, "Receiver command not supported: %s",
+            msg_Warn(p_intf, "Receiver command not supported: %s",
                     msg.payload_utf8().c_str());
         }
 
@@ -566,24 +1160,143 @@ void intf_sys_t::processMessage(const castchannel::CastMessage &msg)
         if (type == "MEDIA_STATUS")
         {
             json_value status = (*p_data)["status"];
-            msg_Dbg(p_stream, "Player state: %s sessionId:%d",
+            msg_Dbg(p_intf, "Player state: %s sessionId:%d",
                     status[0]["playerState"].operator const char *(),
                     (int)(json_int_t) status[0]["mediaSessionId"]);
+
+            vlc_mutex_locker locker(&lock);
+            receiver_state oldPlayerState = receiverState;
+            std::string newPlayerState = status[0]["playerState"].operator const char *();
+
+            if (newPlayerState == "IDLE") {
+                receiverState = RECEIVER_IDLE;
+                mediaSessionId = ""; // this session is not valid anymore
+            }
+            else if (newPlayerState == "PLAYING")
+                receiverState = RECEIVER_PLAYING;
+            else if (newPlayerState == "BUFFERING")
+                receiverState = RECEIVER_BUFFERING;
+            else if (newPlayerState == "PAUSED")
+                receiverState = RECEIVER_PAUSED;
+            else if (!newPlayerState.empty())
+                msg_Warn(p_intf, "Unknown Chromecast state %s", newPlayerState.c_str());
+
+            char session_id[32];
+            if( snprintf( session_id, sizeof(session_id), "%" PRId64, (json_int_t) status[0]["mediaSessionId"] ) >= (int)sizeof(session_id) )
+            {
+                msg_Err( p_intf, "snprintf() truncated string for mediaSessionId" );
+                session_id[sizeof(session_id) - 1] = '\0';
+            }
+            if (!mediaSessionId.empty() && session_id[0] && mediaSessionId != session_id) {
+                msg_Warn(p_intf, "different mediaSessionId detected %s was %s", mediaSessionId.c_str(), this->mediaSessionId.c_str());
+                //msgPlayerLoad();
+            }
+
+            mediaSessionId = session_id;
+
+            if (receiverState != oldPlayerState)
+            {
+#ifndef NDEBUG
+                msg_Dbg(p_intf, "change Chromecast player state from %d to %d", oldPlayerState, receiverState);
+#endif
+                switch( receiverState )
+                {
+                case RECEIVER_BUFFERING:
+                    if ( double(status[0]["currentTime"]) == 0.0 )
+                    {
+                        receiverState = oldPlayerState;
+                        msg_Dbg(p_intf, "Invalid buffering time, keep previous state %d", oldPlayerState);
+                    }
+                    else
+                    {
+                        if (!mediaSessionId.empty())
+                        {
+                            playlist_t *p_playlist = pl_Get( p_intf );
+                            msgPlayerSetMute( var_GetBool( p_playlist, "mute") );
+                            msgPlayerSetVolume( var_GetFloat( p_playlist, "volume") );
+                        }
+
+                        playback_start_chromecast = (1 + mtime_t( double( status[0]["currentTime"] ) ) ) * 1000000L;
+                        msg_Dbg(p_intf, "Playback pending with an offset of %" PRId64, playback_start_chromecast);
+                    }
+                    date_play_start = -1;
+                    break;
+
+                case RECEIVER_PLAYING:
+                    /* TODO reset demux PCR ? */
+                    if (unlikely(playback_start_chromecast == -1)) {
+                        msg_Warn(p_intf, "start playing without buffering f_restart_position:%f", f_restart_position );
+                        playback_start_chromecast = (1 + mtime_t( double( status[0]["currentTime"] ) ) ) * 1000000L;
+                    }
+                    setCurrentStopped( false );
+                    setPlayerStatus(CMD_PLAYBACK_SENT);
+                    date_play_start = mdate();
+#ifndef NDEBUG
+                    msg_Dbg(p_intf, "Playback started with an offset of %" PRId64 " now:%" PRId64 " playback_start_local:%" PRId64, playback_start_chromecast, date_play_start, playback_start_local);
+#endif
+                    break;
+
+                case RECEIVER_PAUSED:
+                    if (!mediaSessionId.empty())
+                    {
+                        playlist_t *p_playlist = pl_Get( p_intf );
+                        msgPlayerSetMute( var_GetBool( p_playlist, "mute") );
+                        msgPlayerSetVolume( var_GetFloat( p_playlist, "volume") );
+                    }
+
+                    playback_start_chromecast = (1 + mtime_t( double( status[0]["currentTime"] ) ) ) * 1000000L;
+#ifndef NDEBUG
+                    msg_Dbg(p_intf, "Playback paused with an offset of %" PRId64 " date_play_start:%" PRId64, playback_start_chromecast, date_play_start);
+#endif
+
+                    if (date_play_start != -1 && oldPlayerState == RECEIVER_PLAYING)
+                    {
+                        /* this is a pause generated remotely */
+                        playback_start_local += mdate() - date_play_start;
+#ifndef NDEBUG
+                        msg_Dbg(p_intf, "updated playback_start_local:%" PRId64, playback_start_local);
+#endif
+                    }
+                    date_play_start = -1;
+                    break;
+
+                case RECEIVER_IDLE:
+                    setCurrentStopped( false );
+                    /* fall through */
+                default:
+                    setPlayerStatus(NO_CMD_PENDING);
+                    sendPlayerCmd();
+                    date_play_start = -1;
+                    break;
+                }
+            }
+
+            if (receiverState == RECEIVER_BUFFERING && i_seektime != -1)
+            {
+                msg_Dbg(p_intf, "Chromecast seeking possibly done");
+                vlc_cond_signal( &seekCommandCond );
+            }
+
+            if (cmd_status == CMD_LOAD_SENT)
+                sendPlayerCmd();
         }
         else if (type == "LOAD_FAILED")
         {
-            msg_Err(p_stream, "Media load failed");
-            msgReceiverClose(appTransportId);
+            msg_Err(p_intf, "Media load failed");
             vlc_mutex_locker locker(&lock);
-            setConnectionStatus(CHROMECAST_CONNECTION_DEAD);
+            /* close the app to restart it */
+            if (getConnectionStatus() == CHROMECAST_APP_STARTED)
+                msgReceiverClose(appTransportId);
+            else
+                msgReceiverGetStatus();
         }
         else if (type == "INVALID_REQUEST")
         {
-            msg_Dbg(p_stream, "We sent an invalid request reason:%s", (*p_data)["reason"].operator const char *());
+            msg_Dbg(p_intf, "We sent an invalid request reason:%s", (*p_data)["reason"].operator const char *());
         }
         else
         {
-            msg_Warn(p_stream, "Media command not supported: %s",
+            msg_Warn(p_intf, "Media command not supported: %s",
                     msg.payload_utf8().c_str());
         }
 
@@ -597,19 +1310,20 @@ void intf_sys_t::processMessage(const castchannel::CastMessage &msg)
 
         if (type == "CLOSE")
         {
-            msg_Warn(p_stream, "received close message");
+            msg_Warn(p_intf, "received close message");
             vlc_mutex_locker locker(&lock);
             setConnectionStatus(CHROMECAST_CONNECTION_DEAD);
+            ipChangedEvent(NULL);
         }
         else
         {
-            msg_Warn(p_stream, "Connection command not supported: %s",
+            msg_Warn(p_intf, "Connection command not supported: %s",
                     type.c_str());
         }
     }
     else
     {
-        msg_Err(p_stream, "Unknown namespace: %s", msg.namespace_().c_str());
+        msg_Err(p_intf, "Unknown namespace: %s", msg.namespace_().c_str());
     }
 }
 
@@ -621,35 +1335,42 @@ void intf_sys_t::msgAuth()
     castchannel::DeviceAuthMessage authMessage;
     authMessage.mutable_challenge();
 
-    buildMessage(NAMESPACE_DEVICEAUTH, authMessage.SerializeAsString(),
-                 DEFAULT_CHOMECAST_RECEIVER, castchannel::CastMessage_PayloadType_BINARY);
+    pushMessage( NAMESPACE_DEVICEAUTH, authMessage.SerializeAsString(),
+                 DEFAULT_CHOMECAST_RECEIVER, castchannel::CastMessage_PayloadType_BINARY );
 }
 
 
 void intf_sys_t::msgPing()
 {
     std::string s("{\"type\":\"PING\"}");
-    buildMessage(NAMESPACE_HEARTBEAT, s);
+    pushMessage( NAMESPACE_HEARTBEAT, s );
 }
 
 
 void intf_sys_t::msgPong()
 {
     std::string s("{\"type\":\"PONG\"}");
-    buildMessage(NAMESPACE_HEARTBEAT, s);
+    pushMessage( NAMESPACE_HEARTBEAT, s );
 }
 
 void intf_sys_t::msgConnect(const std::string & destinationId)
 {
     std::string s("{\"type\":\"CONNECT\"}");
-    buildMessage(NAMESPACE_CONNECTION, s, destinationId);
+    pushMessage( NAMESPACE_CONNECTION, s, destinationId );
 }
 
 
 void intf_sys_t::msgReceiverClose(std::string destinationId)
 {
     std::string s("{\"type\":\"CLOSE\"}");
-    buildMessage(NAMESPACE_CONNECTION, s, destinationId);
+    pushMessage( NAMESPACE_CONNECTION, s, destinationId );
+    if (appTransportId != destinationId)
+        setConnectionStatus( CHROMECAST_DISCONNECTED );
+    else
+    {
+        appTransportId = "";
+        setConnectionStatus( CHROMECAST_AUTHENTICATED );
+    }
 }
 
 void intf_sys_t::msgReceiverGetStatus()
@@ -658,7 +1379,7 @@ void intf_sys_t::msgReceiverGetStatus()
     ss << "{\"type\":\"GET_STATUS\","
        <<  "\"requestId\":" << i_receiver_requestId++ << "}";
 
-    buildMessage(NAMESPACE_RECEIVER, ss.str());
+    pushMessage( NAMESPACE_RECEIVER, ss.str() );
 }
 
 void intf_sys_t::msgReceiverLaunchApp()
@@ -668,56 +1389,132 @@ void intf_sys_t::msgReceiverLaunchApp()
        <<  "\"appId\":\"" << APP_ID << "\","
        <<  "\"requestId\":" << i_receiver_requestId++ << "}";
 
-    buildMessage(NAMESPACE_RECEIVER, ss.str());
+    pushMessage( NAMESPACE_RECEIVER, ss.str() );
 }
 
+void intf_sys_t::msgPlayerGetStatus()
+{
+    std::stringstream ss;
+    ss << "{\"type\":\"GET_STATUS\","
+       <<  "\"requestId\":" << i_requestId++
+       << "}";
+
+    pushMediaPlayerMessage( ss );
+}
+
+
+std::string intf_sys_t::GetMedia()
+{
+    std::stringstream ss;
+
+    input_item_t * p_item = input_GetItem(p_input);
+    if ( p_item )
+    {
+        char *psz_name = input_item_GetTitleFbName( p_item );
+        ss << "\"metadata\":{"
+           << " \"metadataType\":0"
+           << ",\"title\":\"" << psz_name << "\"";
+
+        char *psz_arturl = input_item_GetArtworkURL( p_item );
+        if ( psz_arturl && !strncmp(psz_arturl, "http", 4))
+            ss << ",\"images\":[\"" << psz_arturl << "\"]";
+        free( psz_arturl );
+
+        ss << "},";
+        free( psz_name );
+
+        std::stringstream chromecast_url;
+        if ( canDoDirect && canRemux )
+        {
+            char *psz_uri = input_item_GetURI(p_item);
+            chromecast_url << psz_uri;
+            msg_Dbg( p_intf, "using direct URL: %s", psz_uri );
+            free( psz_uri );
+        }
+        else
+        {
+            int i_port = var_InheritInteger(p_intf, CONTROL_CFG_PREFIX "http-port");
+            chromecast_url << "http://" << serverIP << ":" << i_port << "/stream";
+        }
+        s_chromecast_url = chromecast_url.str();
+
+        msg_Dbg(p_intf,"s_chromecast_url: %s", s_chromecast_url.c_str());
+    }
+
+    ss << "\"contentId\":\"" << s_chromecast_url << "\""
+       << ",\"streamType\":\"LIVE\""
+       << ",\"contentType\":\"" << mime << "\"";
+
+    return ss.str();
+}
 
 void intf_sys_t::msgPlayerLoad()
 {
-    char *psz_mime = var_InheritString(p_stream, CONTROL_CFG_PREFIX "mime");
-    if (psz_mime == NULL)
+    std::stringstream ss;
+    ss << "{\"type\":\"LOAD\","
+       <<  "\"media\":{" << GetMedia() << "},"
+       <<  "\"autoplay\":\"false\","
+       <<  "\"requestId\":" << i_requestId++
+       << "}";
+
+    pushMediaPlayerMessage( ss );
+}
+
+void intf_sys_t::msgPlayerPlay()
+{
+    assert(!mediaSessionId.empty());
+
+    std::stringstream ss;
+    ss << "{\"type\":\"PLAY\","
+       <<  "\"mediaSessionId\":" << mediaSessionId << ","
+       <<  "\"requestId\":" << i_requestId++
+       << "}";
+
+    pushMediaPlayerMessage( ss );
+}
+
+void intf_sys_t::msgPlayerPause()
+{
+    assert(!mediaSessionId.empty());
+
+    std::stringstream ss;
+    ss << "{\"type\":\"PAUSE\","
+       <<  "\"mediaSessionId\":" << mediaSessionId << ","
+       <<  "\"requestId\":" << i_requestId++
+       << "}";
+
+    pushMediaPlayerMessage( ss );
+}
+
+void intf_sys_t::msgPlayerSetVolume(float f_volume)
+{
+    assert(!mediaSessionId.empty());
+
+    if ( f_volume < 0.0 || f_volume > 1.0)
         return;
 
     std::stringstream ss;
-    ss << "{\"type\":\"LOAD\","
-       <<  "\"media\":{\"contentId\":\"http://" << serverIP << ":"
-           << var_InheritInteger(p_stream, CONTROL_CFG_PREFIX"http-port")
-           << "/stream\","
-       <<             "\"streamType\":\"LIVE\","
-       <<             "\"contentType\":\"" << std::string(psz_mime) << "\"},"
-       <<  "\"requestId\":" << i_requestId++ << "}";
+    ss << "{\"type\":\"SET_VOLUME\","
+       <<  "\"volume\":{\"level\":" << f_volume << "},"
+       <<  "\"mediaSessionId\":" << mediaSessionId << ","
+       <<  "\"requestId\":" << i_requestId++
+       << "}";
 
-    free(psz_mime);
-
-    buildMessage(NAMESPACE_MEDIA, ss.str(), appTransportId);
+    pushMediaPlayerMessage( ss );
 }
 
-/**
- * @brief Send a message to the Chromecast
- * @param msg the CastMessage to send
- * @return vlc error code
- */
-int intf_sys_t::sendMessage(const castchannel::CastMessage &msg)
+void intf_sys_t::msgPlayerSetMute(bool b_mute)
 {
-    int i_size = msg.ByteSize();
-    uint8_t *p_data = new(std::nothrow) uint8_t[PACKET_HEADER_LEN + i_size];
-    if (p_data == NULL)
-        return VLC_ENOMEM;
+    assert(!mediaSessionId.empty());
 
-#ifndef NDEBUG
-    msg_Dbg(p_stream, "sendMessage: %s->%s %s", msg.namespace_().c_str(), msg.destination_id().c_str(), msg.payload_utf8().c_str());
-#endif
+    std::stringstream ss;
+    ss << "{\"type\":\"SET_VOLUME\","
+       <<  "\"volume\":{\"muted\":" << ( b_mute ? "true" : "false" ) << "},"
+       <<  "\"mediaSessionId\":" << mediaSessionId << ","
+       <<  "\"requestId\":" << i_requestId++
+       << "}";
 
-    SetDWBE(p_data, i_size);
-    msg.SerializeWithCachedSizesToArray(p_data + PACKET_HEADER_LEN);
-
-    vlc_mutex_locker locker(&lock);
-    int i_ret = tls_Send(p_tls, p_data, PACKET_HEADER_LEN + i_size);
-    delete[] p_data;
-    if (i_ret == PACKET_HEADER_LEN + i_size)
-        return VLC_SUCCESS;
-
-    return VLC_EGENERIC;
+    pushMediaPlayerMessage( ss );
 }
 
 /*****************************************************************************
@@ -725,12 +1522,52 @@ int intf_sys_t::sendMessage(const castchannel::CastMessage &msg)
  *****************************************************************************/
 static void* ChromecastThread(void* p_data)
 {
-    int canc = vlc_savecancel();
-    // Not cancellation-safe part.
-    intf_thread_t *p_stream = reinterpret_cast<intf_thread_t*>(p_data);
-    intf_sys_t *p_sys = p_stream->p_sys;
+    int canc;
+    intf_thread_t *p_intf = reinterpret_cast<intf_thread_t*>(p_data);
+    intf_sys_t *p_sys = p_intf->p_sys;
+    p_sys->setConnectionStatus( CHROMECAST_DISCONNECTED );
+
+    p_sys->i_sock_fd = p_sys->connectChromecast();
+    if (p_sys->i_sock_fd < 0)
+    {
+        canc = vlc_savecancel();
+        msg_Err(p_intf, "Could not connect the Chromecast");
+        vlc_mutex_lock(&p_sys->lock);
+        p_sys->setConnectionStatus(CHROMECAST_CONNECTION_DEAD);
+        vlc_mutex_unlock(&p_sys->lock);
+        vlc_restorecancel(canc);
+        return NULL;
+    }
+
+    char psz_localIP[NI_MAXNUMERICHOST];
+    if (net_GetSockAddress(p_sys->i_sock_fd, psz_localIP, NULL))
+    {
+        canc = vlc_savecancel();
+        msg_Err(p_intf, "Cannot get local IP address");
+        vlc_mutex_lock(&p_sys->lock);
+        p_sys->setConnectionStatus(CHROMECAST_CONNECTION_DEAD);
+        vlc_mutex_unlock(&p_sys->lock);
+        vlc_restorecancel(canc);
+        return NULL;
+    }
+
+    canc = vlc_savecancel();
+    p_sys->serverIP = psz_localIP;
+
+    vlc_mutex_lock(&p_sys->lock);
+    p_sys->setConnectionStatus(CHROMECAST_TLS_CONNECTED);
+    vlc_mutex_unlock(&p_sys->lock);
 
     p_sys->msgAuth();
+
+    /* HACK: determine if this is a Chromecast Audio */
+    std::stringstream s_video_test;
+    s_video_test << "http://" << p_sys->deviceIP << ":8008/apps/YouTube";
+    access_t *p_test_app = vlc_access_NewMRL( VLC_OBJECT(p_intf), s_video_test.str().c_str() );
+    p_sys->setCanDisplay( p_test_app != NULL ? HAS_VIDEO : AUDIO_ONLY );
+    if ( p_test_app )
+        vlc_access_Delete( p_test_app );
+
     vlc_restorecancel(canc);
 
     while (1)
@@ -756,7 +1593,7 @@ void intf_sys_t::handleMessages()
 
     bool b_msgReceived = false;
     uint32_t i_payloadSize = 0;
-    int i_ret = recvPacket(VLC_OBJECT(p_stream), b_msgReceived, i_payloadSize, i_sock_fd,
+    int i_ret = recvPacket(VLC_OBJECT(p_intf), b_msgReceived, i_payloadSize, i_sock_fd,
                            p_tls, &i_received, p_packet, &b_pingTimeout,
                            &i_waitdelay, &i_retries);
 
@@ -769,7 +1606,7 @@ void intf_sys_t::handleMessages()
     if ((i_ret < 0 && errno != EAGAIN) || i_ret == 0)
 #endif
     {
-        msg_Err(p_stream, "The connection to the Chromecast died (receiving).");
+        msg_Err(p_intf, "The connection to the Chromecast died (receiving).");
         vlc_mutex_locker locker(&lock);
         setConnectionStatus(CHROMECAST_CONNECTION_DEAD);
         vlc_restorecancel(canc);
@@ -790,4 +1627,152 @@ void intf_sys_t::handleMessages()
     }
 
     vlc_restorecancel(canc);
+}
+
+/*****************************************************************************
+ * Device discovery
+ *****************************************************************************/
+
+extern "C" void discovery_event_received( const vlc_event_t * p_event, void * user_data );
+
+struct services_discovery_sys_t
+{
+    services_discovery_sys_t(services_discovery_t * const p_sd, services_discovery_t * const microdns)
+        :p_this(p_sd)
+        ,p_microdns(microdns)
+    {
+    }
+
+    ~services_discovery_sys_t()
+    {
+        vlc_sd_Stop( p_microdns );
+
+        vlc_event_manager_t *em = services_discovery_EventManager( p_microdns );
+        vlc_event_detach( em, vlc_ServicesDiscoveryItemAdded, discovery_event_received, p_this );
+        vlc_event_detach( em, vlc_ServicesDiscoveryItemRemoved, discovery_event_received, p_this );
+        vlc_event_detach( em, vlc_ServicesDiscoveryItemRemoveAll, discovery_event_received, p_this );
+
+        vlc_sd_Destroy(p_microdns);
+    }
+
+    input_item_t *forward_device_added(input_item_t *p_device)
+    {
+        if ( !p_device )
+            return NULL;
+
+        vlc_url_t url;
+        vlc_UrlParse( &url, p_device->psz_uri );
+
+        if ( !url.psz_host || !url.psz_host[0] )
+            return NULL;
+
+        /* determine if it's audio-only by checking the YouTube app */
+        char deviceURI[64];
+        snprintf(deviceURI, sizeof(deviceURI), "http://%s:8008/apps/YouTube", url.psz_host );
+        access_t *p_test_app = vlc_access_NewMRL( VLC_OBJECT(p_this), deviceURI );
+        if ( !p_test_app )
+            input_item_AddOption( p_device, ":audio_only=1", 0 );
+        else
+            vlc_access_Delete( p_test_app );
+        vlc_UrlClean( &url );
+
+        input_item_AddOption( p_device, ":module=ctrl_chromecast", 0 );
+
+        input_item_Hold( p_device );
+        return p_device;
+    }
+
+    input_item_t *forward_device_removed(input_item_t *p_device)
+    {
+        if ( p_device )
+            input_item_AddOption( p_device, ":module=ctrl_chromecast", 0 );
+        return p_device;
+    }
+
+private:
+    services_discovery_t * const p_this;
+    services_discovery_t * const p_microdns;
+};
+
+int DiscoveryOpen(vlc_object_t *p_this)
+{
+    services_discovery_t *p_sd = reinterpret_cast<services_discovery_t*>(p_this);
+    vlc_event_manager_t *em = NULL;
+
+    services_discovery_t *p_microdns = vlc_sd_Create( p_this, "microdns{name=._googlecast._tcp.local}" );
+    if (p_microdns == NULL)
+    {
+        msg_Err(p_this, "Could not load the microDNS service");
+        goto error;
+    }
+
+    em = services_discovery_EventManager( p_microdns );
+    vlc_event_attach( em, vlc_ServicesDiscoveryItemAdded, discovery_event_received, p_sd );
+    vlc_event_attach( em, vlc_ServicesDiscoveryItemRemoved, discovery_event_received, p_sd );
+    vlc_event_attach( em, vlc_ServicesDiscoveryItemRemoveAll, discovery_event_received, p_sd );
+
+    if ( !vlc_sd_Start( p_microdns ) )
+    {
+        msg_Err(p_this, "Could not start the microDNS service");
+        goto error;
+    }
+
+    p_sd->p_sys = new(std::nothrow) services_discovery_sys_t( p_sd, p_microdns );
+    if (unlikely(p_sd->p_sys == NULL))
+        goto error;
+
+    return VLC_SUCCESS;
+error:
+    if (p_microdns)
+    {
+        if (em)
+        {
+            vlc_event_detach( em, vlc_ServicesDiscoveryItemAdded, discovery_event_received, p_sd );
+            vlc_event_detach( em, vlc_ServicesDiscoveryItemRemoved, discovery_event_received, p_sd );
+            vlc_event_detach( em, vlc_ServicesDiscoveryItemRemoveAll, discovery_event_received, p_sd );
+        }
+
+        vlc_sd_Destroy(p_microdns);
+    }
+    return VLC_EGENERIC;
+}
+
+void DiscoveryClose(vlc_object_t *p_this)
+{
+    services_discovery_t *p_sd = reinterpret_cast<services_discovery_t*>( p_this );
+    delete p_sd->p_sys;
+}
+
+extern "C" void discovery_event_received( const vlc_event_t * p_event, void * user_data )
+{
+    services_discovery_t *p_sd = reinterpret_cast<services_discovery_t*>(user_data);
+    input_item_t *p_item;
+
+    switch(p_event->type)
+    {
+    case vlc_ServicesDiscoveryItemAdded:
+        p_item = p_event->u.services_discovery_item_added.p_new_item;
+        p_item = p_sd->p_sys->forward_device_added( p_item );
+        if ( p_item )
+        {
+            services_discovery_AddItem( p_sd, p_item, p_event->u.services_discovery_item_added.psz_category );
+            input_item_Release( p_item );
+        }
+        break;
+    case vlc_ServicesDiscoveryItemRemoved:
+        p_item = p_event->u.services_discovery_item_removed.p_item;
+        p_item = p_sd->p_sys->forward_device_removed( p_item );
+        if ( p_item )
+        {
+            services_discovery_RemoveItem( p_sd, p_item );
+            input_item_Release( p_item );
+        }
+        break;
+    case vlc_ServicesDiscoveryItemRemoveAll:
+        services_discovery_RemoveAll( p_sd );
+        break;
+    default:
+        msg_Dbg( p_sd, "unexpected event %d", p_event->type );
+        break;
+    }
 }

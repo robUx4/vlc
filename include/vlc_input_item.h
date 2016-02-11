@@ -111,6 +111,7 @@ enum input_item_type_e
     ITEM_TYPE_STREAM,
     ITEM_TYPE_PLAYLIST,
     ITEM_TYPE_NODE,
+    ITEM_TYPE_RENDERER,
 
     /* This one is not a real type but the number of input_item types. */
     ITEM_TYPE_NUMBER

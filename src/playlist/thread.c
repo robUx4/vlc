@@ -207,6 +207,9 @@ static bool PlayItem( playlist_t *p_playlist, playlist_item_t *p_item )
 
     input_thread_t *p_input_thread = input_Create( p_playlist, p_input, NULL,
                                                    p_sys->p_input_resource );
+
+    var_SetAddress( p_playlist, "input-prepare", p_input_thread );
+
     if( likely(p_input_thread != NULL) )
     {
         var_AddCallback( p_input_thread, "intf-event",
@@ -451,6 +454,7 @@ static void LoopInput( playlist_t *p_playlist )
         PL_DEBUG( "dead input" );
         PL_UNLOCK;
 
+        var_SetAddress( p_playlist, "input-prepare", NULL );
         var_SetAddress( p_playlist, "input-current", NULL );
 
         /* WARNING: Input resource manipulation and callback deletion are

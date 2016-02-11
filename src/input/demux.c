@@ -84,7 +84,7 @@ demux_t *demux_New( vlc_object_t *p_obj, const char *psz_name,
     return demux_NewAdvanced( p_obj, NULL,
                               (s == NULL) ? psz_name : "",
                               (s != NULL) ? psz_name : "",
-                              psz_location, s, out, false );
+                              psz_location, s, out, false, NULL );
 }
 
 /*****************************************************************************
@@ -95,7 +95,7 @@ demux_t *demux_New( vlc_object_t *p_obj, const char *psz_name,
 demux_t *demux_NewAdvanced( vlc_object_t *p_obj, input_thread_t *p_parent_input,
                             const char *psz_access, const char *psz_demux,
                             const char *psz_location,
-                            stream_t *s, es_out_t *out, bool b_quick )
+                            stream_t *s, es_out_t *out, bool b_quick, demux_t *p_wrapped )
 {
     demux_t *p_demux = vlc_custom_create( p_obj, sizeof( *p_demux ), "demux" );
     if( unlikely(p_demux == NULL) )
@@ -116,6 +116,7 @@ demux_t *demux_NewAdvanced( vlc_object_t *p_obj, input_thread_t *p_parent_input,
     p_demux->psz_demux = strdup( psz_demux );
     p_demux->psz_location = strdup( psz_location );
     p_demux->psz_file = get_path( psz_location ); /* parse URL */
+    p_demux->p_source = p_wrapped;
 
     if( unlikely(p_demux->psz_access == NULL
               || p_demux->psz_demux == NULL
@@ -275,7 +276,7 @@ demux_t *input_DemuxNew( vlc_object_t *obj, const char *access_name,
     }
     else /* Try access_demux first */
         demux = demux_NewAdvanced( obj, input, access_name, demux_name, path,
-                                   NULL, out, false );
+                                   NULL, out, false, NULL );
 
     if( demux == NULL )
     {   /* Then try a real access,stream,demux chain */
@@ -323,7 +324,7 @@ demux_t *input_DemuxNew( vlc_object_t *obj, const char *access_name,
         }
 
         demux = demux_NewAdvanced( obj, input, access_name, demux_name, path,
-                                   stream, out, quick );
+                                   stream, out, quick, NULL );
         if( demux == NULL )
         {
             msg_Err( obj, "cannot parse %s://%s", access_name, path );
@@ -656,3 +657,75 @@ static bool SkipAPETag( demux_t *p_demux )
     return true;
 }
 
+demux_t *demux_FilterChainNew(demux_t *p_demux, const char *psz_chain)
+{
+    if(!psz_chain || !*psz_chain)
+    {
+        return NULL;
+    }
+
+    char *psz_parser = strdup(psz_chain);
+    if(!psz_parser)
+        return NULL;
+
+    vlc_array_t cfg, name;
+    vlc_array_init(&cfg);
+    vlc_array_init(&name);
+
+    /* parse chain */
+    while(psz_parser)
+    {
+        config_chain_t *p_cfg;
+        char *psz_name;
+        char *psz_rest_chain = config_ChainCreate( &psz_name, &p_cfg, psz_parser );
+        free( psz_parser );
+        psz_parser = psz_rest_chain;
+
+        vlc_array_append(&cfg, p_cfg);
+        vlc_array_append(&name, psz_name);
+    }
+
+    int i = vlc_array_count(&name);
+    vlc_array_t module;
+    vlc_array_init(&module);
+    while(i--)
+    {
+        const char *p_name = vlc_array_item_at_index(&name, i);
+        demux_t *p_next = demux_NewAdvanced(VLC_OBJECT(p_demux), p_demux->p_input,
+                                            p_demux->psz_access, p_name,
+                                            p_demux->psz_location, p_demux->s,
+                                            p_demux->out, false, p_demux);
+        if(!p_next)
+            goto error;
+
+        vlc_array_append(&module, p_next);
+        vlc_object_release(p_demux);
+        p_demux = p_next;
+    }
+
+    vlc_array_clear(&name);
+    vlc_array_clear(&cfg);
+    vlc_array_clear(&module);
+
+    return p_demux;
+ error:
+    i++;    /* last module couldn't be created */
+
+    /* destroy all modules created, starting with the last one */
+    int modules = vlc_array_count(&module);
+    while(modules--)
+        demux_Delete(vlc_array_item_at_index(&module, modules));
+    vlc_array_clear(&module);
+
+    /* then destroy all names and config which weren't destroyed by
+     * sout_StreamDelete */
+    while(i--)
+    {
+        free(vlc_array_item_at_index(&name, i));
+        config_ChainDestroy(vlc_array_item_at_index(&cfg, i));
+    }
+    vlc_array_clear(&name);
+    vlc_array_clear(&cfg);
+
+    return NULL;
+}

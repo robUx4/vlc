@@ -220,6 +220,7 @@ input_Start
 input_Stop
 input_vaControl
 input_Close
+input_HasESOut
 intf_Create
 libvlc_InternalAddIntf
 libvlc_InternalPlay

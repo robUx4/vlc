@@ -77,6 +77,9 @@ struct demux_t
 
     /* Weak link to parent input */
     input_thread_t *p_input;
+
+    /* for demux-filter */
+    demux_t *p_source;
 };
 
 /* pf_demux return values */
@@ -394,6 +397,11 @@ VLC_API void demux_PacketizerDestroy( decoder_t *p_packetizer );
     p_demux->p_sys = calloc( 1, sizeof( demux_sys_t ) ); \
     if( !p_demux->p_sys ) return VLC_ENOMEM;\
     } while(0)
+
+/**
+ * This function will create a packetizer suitable for a demuxer that parses
+ */
+VLC_API demux_t *demux_FilterChainNew( demux_t *p_demux, const char *psz_name );
 
 /**
  * @}

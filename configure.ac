@@ -575,7 +575,7 @@ need_libc=false
 dnl Check for usual libc functions
 AC_CHECK_DECLS([nanosleep],,,[#include <time.h>])
 AC_CHECK_FUNCS([daemon fcntl flock fstatvfs fork getenv getpwuid_r isatty lstat memalign mkostemp mmap open_memstream openat pread posix_fadvise posix_madvise setlocale stricmp strnicmp strptime uselocale pthread_cond_timedwait_monotonic_np pthread_condattr_setclock])
-AC_REPLACE_FUNCS([atof atoll dirfd fdopendir ffsll flockfile fsync getdelim getpid lldiv nrand48 poll posix_memalign recvmsg rewind sendmsg setenv strcasecmp strcasestr strdup strlcpy strndup strnlen strnstr strsep strtof strtok_r strtoll swab tdestroy timegm timespec_get strverscmp])
+AC_REPLACE_FUNCS([atof atoll dirfd fdopendir ffsll flockfile fsync getdelim getpid gmtime_r lldiv nrand48 poll posix_memalign recvmsg rewind sendmsg setenv strcasecmp strcasestr strdup strlcpy strndup strnlen strnstr strsep strtof strtok_r strtoll swab tdestroy timegm timespec_get strverscmp])
 AC_REPLACE_FUNCS([gettimeofday])
 AC_CHECK_FUNCS(fdatasync,,
   [AC_DEFINE(fdatasync, fsync, [Alias fdatasync() to fsync() if missing.])
@@ -3759,6 +3759,11 @@ PKG_WITH_MODULES([CHROMECAST],[protobuf-lite >= protobuf_lite_version], [
 ], [(Chromecast streaming support)], [auto])
 AM_CONDITIONAL([BUILD_CHROMECAST], [test "${build_chromecast}" = "yes"])
 m4_popdef([protobuf_lite_version])
+
+dnl
+dnl microdns for Chromecast
+dnl
+PKG_ENABLE_MODULES_VLC([MDNS], [], [microdns], [mDNS discovery service], [auto])
 
 dnl
 dnl  Interface plugins
