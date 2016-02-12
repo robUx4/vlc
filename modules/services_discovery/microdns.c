@@ -94,14 +94,13 @@ static const struct
 {
     const char *psz_protocol;
     const char *psz_service_name;
-    uint16_t    i_default_port;
     bool        b_renderer;
 } protocols[] = {
-    { "ftp", "_ftp._tcp.local", 21, false },
-    { "smb", "_smb._tcp.local", 445, false },
-    { "nfs", "_nfs._tcp.local", 2049, false },
-    { "sftp", "_sftp-ssh._tcp.local", 22, false },
-    { "ctrl_chromecast", "_googlecast._tcp.local", 8009, true },
+    { "ftp", "_ftp._tcp.local", false },
+    { "smb", "_smb._tcp.local", false },
+    { "nfs", "_nfs._tcp.local", false },
+    { "sftp", "_sftp-ssh._tcp.local", false },
+    { "ctrl_chromecast", "_googlecast._tcp.local", true },
 };
 #define NB_PROTOCOLS (sizeof(protocols) / sizeof(*protocols))
 
@@ -354,8 +353,7 @@ new_entries_cb( void *p_this, int i_status,
                     if( p_srv->psz_device_name == NULL )
                         break;
                     p_srv->psz_protocol = protocols[i].psz_protocol;
-                    if( protocols[i].i_default_port != p_entry->data.SRV.port )
-                        p_srv->i_port = p_entry->data.SRV.port;
+                    p_srv->i_port = p_entry->data.SRV.port;
                     p_srv->b_renderer = protocols[i].b_renderer;
                     ++i_srv_idx;
                     break;
