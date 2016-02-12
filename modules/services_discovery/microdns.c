@@ -487,8 +487,7 @@ Open( vlc_object_t *p_obj )
     for( unsigned int i = 0; i < i_count; ++i )
     {
         /* Listen to a protocol only if a module can handle it */
-        if( protocols[i].b_renderer == b_renderer
-         && module_exists( protocols[i].psz_protocol ) )
+        if( protocols[i].b_renderer == b_renderer )
             p_sys->ppsz_service_names[p_sys->i_nb_service_names++] =
                 protocols[i].psz_service_name;
     }
