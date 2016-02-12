@@ -32,6 +32,7 @@
 
 #include <vlc_common.h>
 #include <vlc_access.h>
+#include <vlc_renderer.h>
 #include <vlc_services_discovery.h>
 #include <vlc_url.h>
 
@@ -176,16 +177,14 @@ void RendererDialog::setVisible(bool visible)
             if ( !b_sd_started )
             {
                 vlc_event_manager_t *em = services_discovery_EventManager( p_sd );
-                vlc_event_attach( em, vlc_ServicesDiscoveryItemAdded, discovery_event_received, this );
-                vlc_event_attach( em, vlc_ServicesDiscoveryItemRemoved, discovery_event_received, this );
-                vlc_event_attach( em, vlc_ServicesDiscoveryItemRemoveAll, discovery_event_received, this );
+                vlc_event_attach( em, vlc_ServicesDiscoveryRendererAdded, discovery_event_received, this );
+                vlc_event_attach( em, vlc_ServicesDiscoveryRendererRemoved, discovery_event_received, this );
 
                 b_sd_started = vlc_sd_Start( p_sd );
                 if ( !b_sd_started )
                 {
-                    vlc_event_detach( em, vlc_ServicesDiscoveryItemAdded, discovery_event_received, this);
-                    vlc_event_detach( em, vlc_ServicesDiscoveryItemRemoved, discovery_event_received, this);
-                    vlc_event_detach( em, vlc_ServicesDiscoveryItemRemoveAll, discovery_event_received, this);
+                    vlc_event_detach( em, vlc_ServicesDiscoveryRendererAdded, discovery_event_received, this);
+                    vlc_event_detach( em, vlc_ServicesDiscoveryRendererRemoved, discovery_event_received, this);
                 }
             }
         }
@@ -197,9 +196,8 @@ void RendererDialog::setVisible(bool visible)
             if ( b_sd_started )
             {
                 vlc_event_manager_t *em = services_discovery_EventManager( p_sd );
-                vlc_event_detach( em, vlc_ServicesDiscoveryItemAdded, discovery_event_received, this);
-                vlc_event_detach( em, vlc_ServicesDiscoveryItemRemoved, discovery_event_received, this);
-                vlc_event_detach( em, vlc_ServicesDiscoveryItemRemoveAll, discovery_event_received, this);
+                vlc_event_detach( em, vlc_ServicesDiscoveryRendererAdded, discovery_event_received, this);
+                vlc_event_detach( em, vlc_ServicesDiscoveryRendererRemoved, discovery_event_received, this);
 
                 vlc_sd_Stop( p_sd );
                 b_sd_started = false;
@@ -263,20 +261,20 @@ void RendererDialog::accept()
 
 void RendererDialog::discoveryEventReceived( const vlc_event_t * p_event )
 {
-    if ( p_event->type == vlc_ServicesDiscoveryItemAdded )
+    if ( p_event->type == vlc_ServicesDiscoveryRendererAdded )
     {
-        vlc_url_t url;
-        const input_item_t *p_item =  p_event->u.services_discovery_item_added.p_new_item;
-        vlc_UrlParse(&url, p_item->psz_uri);
+        const vlc_renderer_item *p_item =  p_event->u.services_discovery_renderer_added.p_new_item;
+        const char *psz_module = vlc_renderer_item_module_name(p_item);
 
-        if (!url.psz_protocol || !url.psz_protocol[0])
+        if (!psz_module || !psz_module[0])
             return;
 
-        if (!url.psz_path || !*url.psz_path)
+        const char *psz_path = vlc_renderer_item_name(p_item);
+        if (!psz_path || !*psz_path)
             return;
 
-        unsigned i_port = url.i_port;
-        const char *psz_host = url.psz_host;
+        unsigned i_port = vlc_renderer_item_port(p_item);
+        const char *psz_host = vlc_renderer_item_host(p_item);
 
         if (psz_host)
         {
@@ -289,31 +287,21 @@ void RendererDialog::discoveryEventReceived( const vlc_event_t * p_event )
             }
         }
 
-        char *psz_module = NULL;
-        RendererItem::RendererType type = RendererItem::RendererType::HAS_VIDEO;
-        /* TODO ugly until we have a proper renderer_t type */
-        for( int i = 0; i < p_item->i_options; i++ )
-        {
-            char* psz_src = p_item->ppsz_options[i];
-            if ( psz_src[0] == ':' )
-                psz_src++;
-
-            if (!strncmp( "module=", psz_src, 7 ))
-                psz_module = strdup( psz_src + 7 );
-            if (!strncmp( "audio_only=", psz_src, 11 ))
-                type = RendererItem::RendererType::AUDIO_ONLY;
-        }
-
-        RendererItem *item = new RendererItem( p_item->psz_name, psz_host, i_port,
+        renderer_item_flags e_flags = vlc_renderer_item_flags(p_item);
+        RendererItem::RendererType type;
+        if (e_flags & RENDERER_CAN_VIDEO)
+            type = RendererItem::RendererType::HAS_VIDEO;
+        else
+            type = RendererItem::RendererType::AUDIO_ONLY;
+        RendererItem *item = new RendererItem( psz_path, psz_host, i_port,
                                                type, psz_module );
-        vlc_UrlClean(&url);
-        free(psz_module);
         ui.receiversListWidget->addItem( item );
 
         playlist_t *p_playlist = pl_Get( p_intf );
         char *psz_current_ip = var_GetString( p_playlist, VAR_RENDERER_CONFIG );
         if (psz_current_ip)
         {
+            vlc_url_t url;
             vlc_UrlParse(&url, psz_current_ip);
             free( psz_current_ip );
             if (url.psz_host && item->ipAddress == url.psz_host)
