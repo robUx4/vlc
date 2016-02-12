@@ -100,7 +100,7 @@ static const struct
     { "smb", "_smb._tcp.local", false },
     { "nfs", "_nfs._tcp.local", false },
     { "sftp", "_sftp-ssh._tcp.local", false },
-    { "chromecast", "_googlecast._tcp.local", true },
+    { "ctrl_chromecast", "_googlecast._tcp.local", true },
 };
 #define NB_PROTOCOLS (sizeof(protocols) / sizeof(*protocols))
 
