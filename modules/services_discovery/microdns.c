@@ -178,28 +178,24 @@ items_add_input( services_discovery_t *p_sd, char *psz_uri,
 }
 
 static int
-items_add_renderer( services_discovery_t *p_sd, char *psz_uri,
-                    const char *psz_name )
+items_add_renderer( services_discovery_t *p_sd, const char *psz_module,
+                    const char *psz_host, uint16_t i_port, const char *psz_name )
 {
     services_discovery_sys_t *p_sys = p_sd->p_sys;
 
     struct item *p_item = malloc( sizeof(struct item) );
     if( p_item == NULL )
-    {
-        free( psz_uri );
         return VLC_ENOMEM;
-    }
 
     vlc_renderer_item *p_renderer_item =
-        vlc_renderer_item_new( psz_uri, psz_name );
+        vlc_renderer_item_new( psz_module, psz_host, i_port, psz_name );
     if( p_renderer_item == NULL )
     {
-        free( psz_uri );
         free( p_item );
         return VLC_ENOMEM;
     }
 
-    p_item->psz_uri = psz_uri;
+    p_item->psz_uri = NULL;
     p_item->p_input_item = NULL;
     p_item->p_renderer_item = p_renderer_item;
     p_item->i_last_seen = mdate();
@@ -238,10 +234,38 @@ items_exists( services_discovery_t *p_sd, const char *psz_uri )
     for( int i = 0; i < vlc_array_count( &p_sys->items ); ++i )
     {
         struct item *p_item = vlc_array_item_at_index( &p_sys->items, i );
-        if( strcmp( psz_uri, p_item->psz_uri ) == 0 )
+        if ( p_item->psz_uri != NULL )
         {
-            p_item->i_last_seen = mdate();
-            return true;
+            if( strcmp( psz_uri, p_item->psz_uri ) == 0 )
+            {
+                p_item->i_last_seen = mdate();
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+static bool
+renderer_items_exists( services_discovery_t *p_sd, const char *psz_protocol, const char *psz_ip, uint16_t i_port )
+{
+    services_discovery_sys_t *p_sys = p_sd->p_sys;
+
+    for( int i = 0; i < vlc_array_count( &p_sys->items ); ++i )
+    {
+        struct item *p_item = vlc_array_item_at_index( &p_sys->items, i );
+        if ( p_item->p_renderer_item != NULL )
+        {
+            const char *psz_module = vlc_renderer_item_module_name( p_item->p_renderer_item );
+            const char *psz_host = vlc_renderer_item_host( p_item->p_renderer_item );
+            uint16_t i_item_port = vlc_renderer_item_port( p_item->p_renderer_item );
+            if( strcmp( psz_protocol, psz_module ) == 0 &&
+                strcmp( psz_ip, psz_host ) == 0 &&
+                ( i_port == 0 || i_item_port == 0 || i_port == i_item_port ) )
+            {
+                p_item->i_last_seen = mdate();
+                return true;
+            }
         }
     }
     return false;
@@ -352,20 +376,28 @@ new_entries_cb( void *p_this, int i_status,
         if( p_srv->i_port != 0 )
             sprintf( psz_port, ":%u", p_srv->i_port );
 
-        char *psz_uri;
-        if( asprintf( &psz_uri, "%s://%s%s", p_srv->psz_protocol, psz_ip,
-                      p_srv->i_port != 0 ? psz_port : "" ) < 0 )
-            continue;
-
-        if( items_exists( p_sd, psz_uri ) )
+        if( !p_srv->b_renderer )
         {
-            free( psz_uri );
-            continue;
-        }
-        if( p_srv->b_renderer )
-            items_add_renderer( p_sd, psz_uri, p_srv->psz_device_name );
-        else
+            char *psz_uri;
+            if( asprintf( &psz_uri, "%s://%s%s", p_srv->psz_protocol, psz_ip,
+                          p_srv->i_port != 0 ? psz_port : "" ) < 0 )
+                continue;
+
+            if ( items_exists( p_sd, psz_uri ) )
+            {
+                free( psz_uri );
+                continue;
+            }
             items_add_input( p_sd, psz_uri, p_srv->psz_device_name );
+        }
+        else
+        {
+            if (renderer_items_exists ( p_sd, p_srv->psz_protocol, psz_ip, p_srv->i_port ))
+            {
+                continue;
+            }
+            items_add_renderer( p_sd, p_srv->psz_protocol, psz_ip, p_srv->i_port, p_srv->psz_device_name );
+        }
     }
 
     for( i_srv_idx = 0; i_srv_idx < i_nb_srv; ++i_srv_idx )

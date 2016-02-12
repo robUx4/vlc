@@ -36,11 +36,15 @@ typedef struct vlc_renderer_item vlc_renderer_item;
  * Create a new renderer item
  *
  * @param psz_uri uri of the item, must be valid
+ * @param psz_module name of the module to use with this renderer, must be valid
+ * @param psz_host IP of the item, must be valid
+ * @param i_port TCP/UDP port of the item, must be valid
  * @param psz_name name of the item, must be valid
  * @return a renderer item or NULL in case of error
  */
 VLC_API vlc_renderer_item *
-vlc_renderer_item_new(const char *psz_uri, const char *psz_name) VLC_USED;
+vlc_renderer_item_new(const char *psz_module, const char *psz_host,
+                      uint16_t i_port, const char *psz_name) VLC_USED;
 
 /**
  * Hold a renderer item, i.e. creates a new reference

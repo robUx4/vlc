@@ -32,28 +32,33 @@
 
 struct vlc_renderer_item
 {
-    vlc_url_t url;
+    char *psz_module;
+    char *psz_host;
+    uint16_t i_port;
     char *psz_name;
     atomic_uint refs;
 };
 
 vlc_renderer_item *
-vlc_renderer_item_new(const char *psz_uri, const char *psz_name)
+vlc_renderer_item_new(const char *psz_module, const char *psz_host,
+                      uint16_t i_port, const char *psz_name)
 {
-    assert(psz_uri != NULL && psz_name != NULL);
+    assert(psz_module != NULL && psz_host != NULL && psz_name != NULL);
 
-    vlc_renderer_item *p_item = malloc(sizeof(vlc_renderer_item));
+    vlc_renderer_item *p_item = calloc(1, sizeof(vlc_renderer_item));
     if (p_item == NULL)
         return NULL;
-    vlc_UrlParse(&p_item->url, psz_uri);
 
-    if (p_item->url.psz_protocol == NULL || p_item->url.psz_host == NULL
-     || (p_item->psz_name = strdup(psz_name)) == NULL)
+    if ((p_item->psz_module = strdup(psz_module)) == NULL
+            || (p_item->psz_host = strdup(psz_host)) == NULL
+            || (p_item->psz_name = strdup(psz_name)) == NULL)
     {
-        vlc_UrlClean(&p_item->url);
+        free(p_item->psz_module);
+        free(p_item->psz_host);
         free(p_item);
         return NULL;
     }
+    p_item->i_port = i_port;
     atomic_init(&p_item->refs, 1);
     return p_item;
 }
@@ -71,7 +76,7 @@ vlc_renderer_item_module_name(const vlc_renderer_item *p_item)
 {
     assert(p_item != NULL);
 
-    return p_item->url.psz_protocol;
+    return p_item->psz_module;
 }
 
 const char *
@@ -79,7 +84,7 @@ vlc_renderer_item_host(const vlc_renderer_item *p_item)
 {
     assert(p_item != NULL);
 
-    return p_item->url.psz_host;
+    return p_item->psz_host;
 }
 
 uint16_t
@@ -87,7 +92,7 @@ vlc_renderer_item_port(const vlc_renderer_item *p_item)
 {
     assert(p_item != NULL);
 
-    return p_item->url.i_port;
+    return p_item->i_port;
 }
 
 vlc_renderer_item *
@@ -106,7 +111,8 @@ vlc_renderer_item_release(vlc_renderer_item *p_item)
 
     if (atomic_fetch_sub(&p_item->refs, 1) != 1)
         return;
-    vlc_UrlClean(&p_item->url);
+    free(p_item->psz_module);
+    free(p_item->psz_host);
     free(p_item->psz_name);
     free(p_item);
 }
@@ -117,13 +123,13 @@ vlc_renderer_start(playlist_t *p_playlist, const vlc_renderer_item *p_item)
     assert(p_playlist != NULL && p_item != NULL);
 
     char psz_port[27]; /* max unsigned + ",port=" */
-    if (p_item->url.i_port > 0)
-        sprintf(psz_port, ",port=%u", p_item->url.i_port);
+    if (p_item->i_port > 0)
+        sprintf(psz_port, ",port=%u", p_item->i_port);
 
     char *psz_intf_name;
     if (asprintf(&psz_intf_name, "%s{host=%s%s}",
-                 p_item->url.psz_protocol, p_item->url.psz_host,
-                 p_item->url.i_port > 0 ? psz_port : "") == -1)
+                 p_item->psz_module, p_item->psz_host,
+                 p_item->i_port > 0 ? psz_port : "") == -1)
         return NULL;
 
     intf_thread_t *p_intf = intf_New(p_playlist, psz_intf_name);
