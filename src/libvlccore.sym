@@ -742,5 +742,6 @@ vlc_renderer_item_name
 vlc_renderer_item_module_name
 vlc_renderer_item_host
 vlc_renderer_item_port
+vlc_renderer_item_flags
 vlc_renderer_start
 vlc_renderer_stop

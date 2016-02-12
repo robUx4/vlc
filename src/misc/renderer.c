@@ -35,13 +35,14 @@ struct vlc_renderer_item
     char *psz_module;
     char *psz_host;
     uint16_t i_port;
+    renderer_item_flags e_flags;
     char *psz_name;
     atomic_uint refs;
 };
 
 vlc_renderer_item *
 vlc_renderer_item_new(const char *psz_module, const char *psz_host,
-                      uint16_t i_port, const char *psz_name)
+                      uint16_t i_port, const char *psz_name, renderer_item_flags e_flags)
 {
     assert(psz_module != NULL && psz_host != NULL && psz_name != NULL);
 
@@ -59,6 +60,7 @@ vlc_renderer_item_new(const char *psz_module, const char *psz_host,
         return NULL;
     }
     p_item->i_port = i_port;
+    p_item->e_flags = e_flags;
     atomic_init(&p_item->refs, 1);
     return p_item;
 }
@@ -93,6 +95,14 @@ vlc_renderer_item_port(const vlc_renderer_item *p_item)
     assert(p_item != NULL);
 
     return p_item->i_port;
+}
+
+renderer_item_flags
+vlc_renderer_item_flags(const vlc_renderer_item *p_item)
+{
+    assert(p_item != NULL);
+
+    return p_item->e_flags;
 }
 
 vlc_renderer_item *
