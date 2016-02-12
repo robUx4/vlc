@@ -179,7 +179,8 @@ items_add_input( services_discovery_t *p_sd, char *psz_uri,
 
 static int
 items_add_renderer( services_discovery_t *p_sd, const char *psz_module,
-                    const char *psz_host, uint16_t i_port, const char *psz_name )
+                    const char *psz_host, uint16_t i_port, const char *psz_name,
+                    renderer_item_flags e_flags )
 {
     services_discovery_sys_t *p_sys = p_sd->p_sys;
 
@@ -188,7 +189,7 @@ items_add_renderer( services_discovery_t *p_sd, const char *psz_module,
         return VLC_ENOMEM;
 
     vlc_renderer_item *p_renderer_item =
-        vlc_renderer_item_new( psz_module, psz_host, i_port, psz_name );
+        vlc_renderer_item_new( psz_module, psz_host, i_port, psz_name, e_flags );
     if( p_renderer_item == NULL )
     {
         free( p_item );
@@ -331,6 +332,7 @@ new_entries_cb( void *p_this, int i_status,
 
     /* There is one ip for several srvs, fetch them */
     const char *psz_ip = NULL;
+    const char *psz_model = NULL;
     for( const struct rr_entry *p_entry = p_entries;
          p_entry != NULL; p_entry = p_entry->next )
     {
@@ -353,6 +355,19 @@ new_entries_cb( void *p_this, int i_status,
                     ++i_srv_idx;
                     break;
                 }
+            }
+        }
+        else if( p_entry->type == RR_TXT && psz_model == NULL )
+        {
+            const struct rr_data_txt *p_txt = p_entry->data.TXT;
+            while ( p_txt )
+            {
+                if ( p_txt->txt && !strncmp("md=", p_txt->txt, 3) )
+                {
+                    psz_model = p_txt->txt + 3;
+                    break;
+                }
+                p_txt = p_txt->next;
             }
         }
         else if( p_entry->type == RR_A && psz_ip == NULL )
@@ -396,7 +411,10 @@ new_entries_cb( void *p_this, int i_status,
             {
                 continue;
             }
-            items_add_renderer( p_sd, p_srv->psz_protocol, psz_ip, p_srv->i_port, p_srv->psz_device_name );
+            renderer_item_flags e_flags = RENDERER_CAN_AUDIO;
+            if ( psz_model == NULL || strcmp( psz_model, "Chromecast Audio" ) )
+                e_flags |= RENDERER_CAN_VIDEO;
+            items_add_renderer( p_sd, p_srv->psz_protocol, psz_ip, p_srv->i_port, p_srv->psz_device_name, e_flags );
         }
     }
 
