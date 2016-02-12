@@ -95,16 +95,15 @@ static const struct
 {
     const char *psz_protocol;
     const char *psz_service_name;
-    uint16_t    i_default_port;
     bool        b_renderer;
     vlc_renderer_flags e_renderer_flags;
 } protocols[] = {
-    { "ftp", "_ftp._tcp.local", 21, false, 0 },
-    { "smb", "_smb._tcp.local", 445, false, 0 },
-    { "nfs", "_nfs._tcp.local", 2049, false, 0 },
-    { "sftp", "_sftp-ssh._tcp.local", 22, false, 0 },
-    { "rtsp", "_rtsp._tcp.local", 554, false, 0 },
-    { "chromecast", "_googlecast._tcp.local", 8009, true, VLC_RENDERER_CAN_AUDIO },
+    { "ftp", "_ftp._tcp.local", false, 0 },
+    { "smb", "_smb._tcp.local", false, 0 },
+    { "nfs", "_nfs._tcp.local", false, 0 },
+    { "sftp", "_sftp-ssh._tcp.local", false, 0 },
+    { "rtsp", "_rtsp._tcp.local", false, 0 },
+    { "chromecast", "_googlecast._tcp.local", true, VLC_RENDERER_CAN_AUDIO },
 };
 #define NB_PROTOCOLS (sizeof(protocols) / sizeof(*protocols))
 
@@ -349,8 +348,7 @@ new_entries_cb( void *p_this, int i_status,
                     if( p_srv->psz_device_name == NULL )
                         break;
                     p_srv->psz_protocol = protocols[i].psz_protocol;
-                    if( protocols[i].i_default_port != p_entry->data.SRV.port )
-                        p_srv->i_port = p_entry->data.SRV.port;
+                    p_srv->i_port = p_entry->data.SRV.port;
                     p_srv->b_renderer = protocols[i].b_renderer;
                     p_srv->e_renderer_flags = protocols[i].e_renderer_flags;
                     ++i_srv_idx;
