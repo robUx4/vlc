@@ -58,25 +58,25 @@ vlc_renderer_item_release(vlc_renderer_item *p_item);
  * Get the name of a renderer item
  */
 VLC_API const char *
-vlc_renderer_item_name(vlc_renderer_item *p_item);
+vlc_renderer_item_name(const vlc_renderer_item *p_item);
 
 /**
  * Get the name of the module that can handle this renderer item
  */
 VLC_API const char *
-vlc_renderer_item_module_name(vlc_renderer_item *p_item);
+vlc_renderer_item_module_name(const vlc_renderer_item *p_item);
 
 /**
  * Get the host of a renderer item
  */
 VLC_API const char *
-vlc_renderer_item_host(vlc_renderer_item *p_item);
+vlc_renderer_item_host(const vlc_renderer_item *p_item);
 
 /**
  * Get the port of a renderer item
  */
 VLC_API uint16_t
-vlc_renderer_item_port(vlc_renderer_item *p_item);
+vlc_renderer_item_port(const vlc_renderer_item *p_item);
 
 /**
  * @}
@@ -98,7 +98,7 @@ typedef struct vlc_renderer vlc_renderer;
  * @return a renderer context, need to be stopped with vlc_renderer_stop()
  */
 VLC_API vlc_renderer *
-vlc_renderer_start(playlist_t *p_playlist, vlc_renderer_item *p_item);
+vlc_renderer_start(playlist_t *p_playlist, const vlc_renderer_item *p_item);
 
 /**
  * Stop rendering

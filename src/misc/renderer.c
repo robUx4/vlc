@@ -59,7 +59,7 @@ vlc_renderer_item_new(const char *psz_uri, const char *psz_name)
 }
 
 const char *
-vlc_renderer_item_name(vlc_renderer_item *p_item)
+vlc_renderer_item_name(const vlc_renderer_item *p_item)
 {
     assert(p_item != NULL);
 
@@ -67,7 +67,7 @@ vlc_renderer_item_name(vlc_renderer_item *p_item)
 }
 
 const char *
-vlc_renderer_item_module_name(vlc_renderer_item *p_item)
+vlc_renderer_item_module_name(const vlc_renderer_item *p_item)
 {
     assert(p_item != NULL);
 
@@ -75,7 +75,7 @@ vlc_renderer_item_module_name(vlc_renderer_item *p_item)
 }
 
 const char *
-vlc_renderer_item_host(vlc_renderer_item *p_item)
+vlc_renderer_item_host(const vlc_renderer_item *p_item)
 {
     assert(p_item != NULL);
 
@@ -83,7 +83,7 @@ vlc_renderer_item_host(vlc_renderer_item *p_item)
 }
 
 uint16_t
-vlc_renderer_item_port(vlc_renderer_item *p_item)
+vlc_renderer_item_port(const vlc_renderer_item *p_item)
 {
     assert(p_item != NULL);
 
@@ -112,7 +112,7 @@ vlc_renderer_item_release(vlc_renderer_item *p_item)
 }
 
 VLC_API vlc_renderer *
-vlc_renderer_start(playlist_t *p_playlist, vlc_renderer_item *p_item)
+vlc_renderer_start(playlist_t *p_playlist, const vlc_renderer_item *p_item)
 {
     assert(p_playlist != NULL && p_item != NULL);
 
