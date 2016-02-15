@@ -280,6 +280,8 @@ static GstFlowReturn gst_vlc_video_sink_chain( GstBaseSink *p_bsink,
 static void gst_vlc_video_sink_set_property( GObject *p_object, guint i_prop_id,
         const GValue *p_value, GParamSpec *p_pspec )
 {
+    VLC_UNUSED( p_pspec );
+
     GstVlcVideoSink *p_vsink = GST_VLC_VIDEO_SINK( p_object );
 
     switch( i_prop_id )
@@ -294,7 +296,7 @@ static void gst_vlc_video_sink_set_property( GObject *p_object, guint i_prop_id,
                     gst_object_unref( p_vsink->p_allocator );
                 p_vsink->p_allocator = gst_object_ref( p_allocator );
             } else
-                msg_Warn( p_vsink->p_dec, "Invalid Allocator set");
+                msg_Err( p_vsink->p_dec, "Invalid Allocator set");
         }
         break;
 
@@ -312,6 +314,8 @@ static void gst_vlc_video_sink_set_property( GObject *p_object, guint i_prop_id,
 static void gst_vlc_video_sink_get_property( GObject *p_object, guint i_prop_id,
     GValue *p_value, GParamSpec *p_pspec )
 {
+    VLC_UNUSED( p_pspec );
+
     GstVlcVideoSink *p_vsink = GST_VLC_VIDEO_SINK( p_object );
 
     switch( i_prop_id )
