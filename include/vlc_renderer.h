@@ -21,6 +21,14 @@
 #ifndef VLC_RENDERER_H
 #define VLC_RENDERER_H 1
 
+/* Called from src/libvlc.c */
+vlc_renderer *
+vlc_renderer_singleton_create(vlc_object_t *p_parent);
+
+/* Called from src/libvlc.c */
+void
+vlc_renderer_singleton_release(vlc_renderer *);
+
 /**
  * @defgroup vlc_renderer VLC renderer
  * @{
@@ -105,24 +113,97 @@ vlc_renderer_item_flags(const vlc_renderer_item *p_item);
 typedef struct vlc_renderer vlc_renderer;
 
 /**
- * Start rendering
+ * Create renderer
  *
- * This will create a vlc_renderer that will listen to the playlist events.
- * Medias that are being playing from the playlist will be streamed to the
- * renderer item
+ * TODO
  *
- * @param p_playlist the playlist, must be valid
+ * @param p_parent the parent object 
  * @param p_item the renderer item, must be valid
  * @return a renderer context, need to be stopped with vlc_renderer_stop()
  */
 VLC_API vlc_renderer *
-vlc_renderer_start(playlist_t *p_playlist, const vlc_renderer_item *p_item);
+vlc_renderer_create(vlc_object_t *p_parent, vlc_renderer_item *p_item);
+#define vlc_renderer_create(a) vlc_renderer_create(VLC_OBJECT(a), b)
+
+/**
+ * TODO
+ */
+VLC_API void
+vlc_renderer_release(vlc_renderer *p_renderer);
+
+/**
+ * TODO
+ * to be released with vlc_renderer_item_release()
+ */
+VLC_API vlc_renderer_item *
+vlc_renderer_get_item(vlc_renderer *p_renderer);
+
+/**
+ * Start rendering
+ */
+VLC_API int
+vlc_renderer_start(vlc_renderer *p_renderer, input_thread_t *p_input);
 
 /**
  * Stop rendering
  */
 VLC_API void
-vlc_renderer_stop(playlist_t *p_playlist, vlc_renderer *p_renderer);
+vlc_renderer_stop(vlc_renderer *p_renderer);
+
+/**
+ * TODO
+ */
+VLC_API int
+vlc_renderer_volume_change(vlc_renderer *p_renderer, int i_volume);
+
+/**
+ * TODO
+ */
+VLC_API int
+vlc_renderer_volume_mute(vlc_renderer *p_renderer, bool b_mute);
+
+/**
+ * TODO
+ */
+VLC_API vlc_renderer *
+vlc_renderer_current(vlc_object_t *p_obj);
+
+/**
+ * @}
+ * @defgroup vlc_renderer_module VLC renderer module
+ * @{
+ */
+
+typedef struct vlc_renderer_sys vlc_renderer_sys;
+struct vlc_renderer
+{
+    VLC_COMMON_MEMBERS
+    /**
+     * Open/Close callbacks:
+     * int  Open(vlc_renderer *p_renderer, const vlc_renderer_item *p_item);
+     * void Close(vlc_renderer *p_renderer);
+     */
+    module_t            *p_module;
+    vlc_renderer_sys    *p_sys;
+
+    /**
+     * Called on vlc_renderer_start() or when a new input is playing
+     */
+    int     (*pf_start)(vlc_renderer *p_renderer, input_thread_t *p_input);
+    /**
+     * Called on vlc_renderer_stop() or when the input finished
+     */
+    void    (*pf_stop)(vlc_renderer *p_renderer);
+    /**
+     * Called on vlc_renderer_volume_change()
+     * @param i_volume the volume in percents (0 = mute, 100 = 0dB)
+     */
+    int     (*pf_volume_change)(vlc_renderer *p_renderer, int i_volume);
+    /**
+     * Called on vlc_renderer_volume_mute()
+     */
+    int     (*pf_volume_mute)(vlc_renderer *p_renderer, bool b_mute);
+};
 
 /** @} @} */
 
