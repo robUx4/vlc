@@ -76,7 +76,7 @@ struct services_discovery_sys_t
 
 struct item
 {
-    char *              psz_uri;
+    char *              psz_input_uri;
     input_item_t *      p_input_item;
     vlc_renderer_item * p_renderer_item;
     mtime_t             i_last_seen;
@@ -167,7 +167,7 @@ items_add_input( services_discovery_t *p_sd, char *psz_uri,
         return VLC_ENOMEM;
     }
 
-    p_item->psz_uri = psz_uri;
+    p_item->psz_input_uri = psz_uri;
     p_item->p_input_item = p_input_item;
     p_item->p_renderer_item = NULL;
     p_item->i_last_seen = mdate();
@@ -196,7 +196,7 @@ items_add_renderer( services_discovery_t *p_sd, const char *psz_module,
         return VLC_ENOMEM;
     }
 
-    p_item->psz_uri = NULL;
+    p_item->psz_input_uri = NULL;
     p_item->p_input_item = NULL;
     p_item->p_renderer_item = p_renderer_item;
     p_item->i_last_seen = mdate();
@@ -223,45 +223,48 @@ items_release( services_discovery_t *p_sd, struct item *p_item, bool b_notify )
             services_discovery_RemoveRenderer( p_sd, p_item->p_renderer_item );
     }
 
-    free( p_item->psz_uri );
+    free( p_item->psz_input_uri );
     free( p_item );
 }
 
 static bool
-items_exists( services_discovery_t *p_sd, const char *psz_uri )
+items_input_exists( services_discovery_t *p_sd, const char *psz_uri )
 {
     services_discovery_sys_t *p_sys = p_sd->p_sys;
 
     for( int i = 0; i < vlc_array_count( &p_sys->items ); ++i )
     {
         struct item *p_item = vlc_array_item_at_index( &p_sys->items, i );
-        if ( p_item->psz_uri != NULL )
+        if( p_item->psz_input_uri != NULL
+         && strcmp( p_item->psz_input_uri, psz_uri ) == 0 )
         {
-            if( strcmp( psz_uri, p_item->psz_uri ) == 0 )
-            {
-                p_item->i_last_seen = mdate();
-                return true;
-            }
+            p_item->i_last_seen = mdate();
+            return true;
         }
     }
     return false;
 }
 
 static bool
-renderer_items_exists( services_discovery_t *p_sd, const char *psz_protocol, const char *psz_ip, uint16_t i_port )
+items_renderer_exists( services_discovery_t *p_sd, const char *psz_module,
+                       const char *psz_host, uint16_t i_port )
 {
     services_discovery_sys_t *p_sys = p_sd->p_sys;
 
     for( int i = 0; i < vlc_array_count( &p_sys->items ); ++i )
     {
         struct item *p_item = vlc_array_item_at_index( &p_sys->items, i );
-        if ( p_item->p_renderer_item != NULL )
+        if( p_item->p_renderer_item != NULL )
         {
-            const char *psz_module = vlc_renderer_item_module_name( p_item->p_renderer_item );
-            const char *psz_host = vlc_renderer_item_host( p_item->p_renderer_item );
-            uint16_t i_item_port = vlc_renderer_item_port( p_item->p_renderer_item );
-            if( strcmp( psz_protocol, psz_module ) == 0 &&
-                strcmp( psz_ip, psz_host ) == 0 &&
+            const char *psz_item_module =
+                vlc_renderer_item_module_name( p_item->p_renderer_item );
+            const char *psz_item_host =
+                vlc_renderer_item_host( p_item->p_renderer_item );
+            uint16_t i_item_port =
+                vlc_renderer_item_port( p_item->p_renderer_item );
+
+            if( strcmp( psz_module, psz_item_module ) == 0 &&
+                strcmp( psz_host, psz_item_host ) == 0 &&
                 ( i_port == 0 || i_item_port == 0 || i_port == i_item_port ) )
             {
                 p_item->i_last_seen = mdate();
@@ -360,9 +363,9 @@ new_entries_cb( void *p_this, int i_status,
         else if( p_entry->type == RR_TXT && psz_model == NULL )
         {
             const struct rr_data_txt *p_txt = p_entry->data.TXT;
-            while ( p_txt )
+            while( p_txt )
             {
-                if ( p_txt->txt && !strncmp("md=", p_txt->txt, 3) )
+                if( p_txt->txt && !strncmp("md=", p_txt->txt, 3) )
                 {
                     psz_model = p_txt->txt + 3;
                     break;
@@ -398,7 +401,7 @@ new_entries_cb( void *p_this, int i_status,
                           p_srv->i_port != 0 ? psz_port : "" ) < 0 )
                 continue;
 
-            if ( items_exists( p_sd, psz_uri ) )
+            if( items_input_exists( p_sd, psz_uri ) )
             {
                 free( psz_uri );
                 continue;
@@ -407,14 +410,15 @@ new_entries_cb( void *p_this, int i_status,
         }
         else
         {
-            if (renderer_items_exists ( p_sd, p_srv->psz_protocol, psz_ip, p_srv->i_port ))
-            {
+            if( items_renderer_exists( p_sd, p_srv->psz_protocol, psz_ip,
+                                       p_srv->i_port ) )
                 continue;
-            }
             renderer_item_flags e_flags = RENDERER_CAN_AUDIO;
-            if ( psz_model == NULL || strcmp( psz_model, "Chromecast Audio" ) )
+            if( psz_model == NULL || strcmp( psz_model, "Chromecast Audio" ) )
                 e_flags |= RENDERER_CAN_VIDEO;
-            items_add_renderer( p_sd, p_srv->psz_protocol, psz_ip, p_srv->i_port, p_srv->psz_device_name, e_flags );
+            items_add_renderer( p_sd, p_srv->psz_protocol, psz_ip,
+                                p_srv->i_port, p_srv->psz_device_name,
+                                e_flags );
         }
     }
 
