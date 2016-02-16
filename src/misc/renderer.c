@@ -242,7 +242,12 @@ vlc_renderer_get_item(vlc_renderer *p_renderer)
     assert(p_renderer != NULL);
     struct renderer_priv *p_renderer_priv = renderer_priv(p_renderer);
 
-    return vlc_renderer_item_hold(p_renderer_priv->p_item);
+    vlc_mutex_lock(&p_renderer_priv->lock);
+    vlc_renderer_item *p_item = p_renderer_priv->p_item ?
+        vlc_renderer_item_hold(p_renderer_priv->p_item) : NULL;
+    vlc_mutex_unlock(&p_renderer_priv->lock);
+
+    return p_item;
 }
 
 int
