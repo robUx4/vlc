@@ -136,10 +136,13 @@ vlc_renderer_item_release(vlc_renderer_item *p_item)
     free(p_item);
 }
 
-static inline struct renderer_priv*
-renderer_priv(vlc_renderer *p_renderer)
+static inline struct renderer_priv *
+renderer_priv(vlc_object_t *p_obj)
 {
-    return (struct renderer_priv*) p_renderer;
+    struct renderer_priv *p_priv =
+        (struct renderer_priv *)libvlc_priv(p_obj->p_libvlc)->p_renderer;
+    assert(p_priv != NULL);
+    return p_priv;
 }
 
 static int
@@ -162,20 +165,20 @@ renderer_module_close(void *p_func, va_list ap)
 }
 
 static void
-renderer_unload_locked(vlc_renderer *p_renderer)
+renderer_unload_locked(struct renderer_priv *p_priv)
 {
-    struct renderer_priv *p_renderer_priv = renderer_priv(p_renderer);
+    vlc_renderer *p_renderer = &p_priv->s;
     assert(p_renderer->p_module != NULL);
 
-    if (p_renderer_priv->b_started)
+    if (p_priv->b_started)
         vlc_renderer_stop(p_renderer);
 
     vlc_module_unload(p_renderer->p_module, renderer_module_close, p_renderer);
     p_renderer->p_module = NULL;
-    p_renderer_priv->b_loaded_from_option = false;
+    p_priv->b_loaded_from_option = false;
 
-    vlc_renderer_item_release(p_renderer_priv->p_item);
-    p_renderer_priv->p_item = NULL;
+    vlc_renderer_item_release(p_priv->p_item);
+    p_priv->p_item = NULL;
 
     p_renderer->pf_start = NULL;
     p_renderer->pf_stop = NULL;
@@ -183,25 +186,25 @@ renderer_unload_locked(vlc_renderer *p_renderer)
     p_renderer->pf_volume_mute = NULL;
 }
 
+#undef vlc_renderer_unload
 void
-vlc_renderer_unload(vlc_renderer *p_renderer)
+vlc_renderer_unload(vlc_object_t *p_obj)
 {
-    assert(p_renderer != NULL);
-    struct renderer_priv *p_renderer_priv = renderer_priv(p_renderer);
+    assert(p_obj != NULL);
+    struct renderer_priv *p_priv = renderer_priv(p_obj);
 
-    vlc_mutex_lock(&p_renderer_priv->lock);
-    renderer_unload_locked(p_renderer);
-    vlc_mutex_unlock(&p_renderer_priv->lock);
+    vlc_mutex_lock(&p_priv->lock);
+    renderer_unload_locked(p_priv);
+    vlc_mutex_unlock(&p_priv->lock);
 }
 
 static int
-renderer_load_locked(vlc_renderer *p_renderer, vlc_renderer_item *p_item)
+renderer_load_locked(struct renderer_priv *p_priv, vlc_renderer_item *p_item)
 {
-    struct renderer_priv *p_renderer_priv = renderer_priv(p_renderer);
+    vlc_renderer *p_renderer = &p_priv->s;
 
-    if (p_renderer_priv->b_loaded_from_option)
-        renderer_unload_locked(p_renderer);
-
+    if (p_priv->b_loaded_from_option)
+        renderer_unload_locked(p_priv);
     assert(p_renderer->p_module == NULL);
 
     p_renderer->p_module = vlc_module_load(p_renderer, "renderer",
@@ -211,7 +214,7 @@ renderer_load_locked(vlc_renderer *p_renderer, vlc_renderer_item *p_item)
     if (p_renderer->p_module == NULL)
         return VLC_EGENERIC;
 
-    p_renderer_priv->p_item = vlc_renderer_item_hold(p_item);
+    p_priv->p_item = vlc_renderer_item_hold(p_item);
     assert(p_renderer->pf_start);
     assert(p_renderer->pf_stop);
 
@@ -219,158 +222,163 @@ renderer_load_locked(vlc_renderer *p_renderer, vlc_renderer_item *p_item)
 }
 
 #undef vlc_renderer_load
-vlc_renderer *
-vlc_renderer_load(vlc_object_t *p_parent, vlc_renderer_item *p_item)
+int
+vlc_renderer_load(vlc_object_t *p_obj, vlc_renderer_item *p_item)
 {
-    assert(p_parent != NULL && p_item != NULL);
-    libvlc_priv_t *p_priv = libvlc_priv(p_parent->p_libvlc);
-    vlc_renderer *p_renderer = p_priv->p_renderer;
-    assert(p_renderer != NULL);
-    struct renderer_priv *p_renderer_priv = renderer_priv(p_renderer);
+    assert(p_obj != NULL && p_item != NULL);
+    struct renderer_priv *p_priv = renderer_priv(p_obj);
 
-    vlc_mutex_lock(&p_renderer_priv->lock);
-    int i_ret = renderer_load_locked(p_renderer, p_item);
-    vlc_mutex_unlock(&p_renderer_priv->lock);
+    vlc_mutex_lock(&p_priv->lock);
+    int i_ret = renderer_load_locked(p_priv, p_item);
+    vlc_mutex_unlock(&p_priv->lock);
 
-    return i_ret == VLC_SUCCESS ? p_renderer : NULL;
+    return i_ret;
 }
 
-vlc_renderer *
-vlc_renderer_create(vlc_object_t *p_parent)
-{
-    struct renderer_priv *p_renderer_priv =
-        vlc_custom_create(p_parent, sizeof (*p_renderer_priv), "renderer");
-    if (p_renderer_priv == NULL)
-        return NULL;
-
-    vlc_mutex_init(&p_renderer_priv->lock);
-
-    vlc_renderer_item *p_item = NULL; /* TODO item_from_option(p_parent); */
-    if (p_item != NULL)
-    {
-        int i_ret = renderer_load_locked(&p_renderer_priv->s, p_item);
-        if (i_ret == VLC_SUCCESS)
-            p_renderer_priv->b_loaded_from_option = true;
-        vlc_renderer_item_release(p_item);
-    }
-    return &p_renderer_priv->s;
-}
-
-void
-vlc_renderer_release(vlc_renderer *p_renderer)
-{
-    struct renderer_priv *p_renderer_priv = renderer_priv(p_renderer);
-
-    vlc_mutex_lock(&p_renderer_priv->lock);
-
-    /* If not created by us (i.e. from option), the renderer should not be
-     * loaded */
-    if (p_renderer_priv->b_loaded_from_option)
-        renderer_unload_locked(p_renderer);
-    assert(p_renderer->p_module == NULL);
-
-    vlc_mutex_unlock(&p_renderer_priv->lock);
-
-    vlc_mutex_destroy(&p_renderer_priv->lock);
-    vlc_object_release(p_renderer);
-}
-
+#undef vlc_renderer_get_item
 vlc_renderer_item *
-vlc_renderer_get_item(vlc_renderer *p_renderer)
+vlc_renderer_get_item(vlc_object_t *p_obj)
 {
-    assert(p_renderer != NULL);
-    struct renderer_priv *p_renderer_priv = renderer_priv(p_renderer);
+    assert(p_obj != NULL);
+    struct renderer_priv *p_priv = renderer_priv(p_obj);
 
-    vlc_mutex_lock(&p_renderer_priv->lock);
-    vlc_renderer_item *p_item = p_renderer_priv->p_item ?
-        vlc_renderer_item_hold(p_renderer_priv->p_item) : NULL;
-    vlc_mutex_unlock(&p_renderer_priv->lock);
+    vlc_mutex_lock(&p_priv->lock);
+    vlc_renderer_item *p_item = p_priv->p_item ?
+        vlc_renderer_item_hold(p_priv->p_item) : NULL;
+    vlc_mutex_unlock(&p_priv->lock);
 
     return p_item;
 }
 
+#undef vlc_renderer_start
 int
-vlc_renderer_start(vlc_renderer *p_renderer, input_thread_t *p_input)
+vlc_renderer_start(vlc_object_t *p_obj, input_thread_t *p_input)
 {
-    assert(p_renderer != NULL);
-    struct renderer_priv *p_renderer_priv = renderer_priv(p_renderer);
+    assert(p_obj != NULL && p_input != NULL);
+    struct renderer_priv *p_priv = renderer_priv(p_obj);
+    vlc_renderer *p_renderer = &p_priv->s;
 
-    vlc_mutex_lock(&p_renderer_priv->lock);
-    if (p_renderer->p_module == NULL || p_renderer_priv->b_started)
+    vlc_mutex_lock(&p_priv->lock);
+    if (p_renderer->p_module == NULL || p_priv->b_started)
     {
-        vlc_mutex_unlock(&p_renderer_priv->lock);
+        vlc_mutex_unlock(&p_priv->lock);
         return VLC_EGENERIC;
     }
 
     int i_ret = p_renderer->pf_start(p_renderer, p_input);
     if (i_ret == VLC_SUCCESS)
-        p_renderer_priv->b_started = true;
+        p_priv->b_started = true;
 
-    vlc_mutex_unlock(&p_renderer_priv->lock);
+    vlc_mutex_unlock(&p_priv->lock);
     return i_ret;
 }
 
+#undef vlc_renderer_stop
 void
-vlc_renderer_stop(vlc_renderer *p_renderer)
+vlc_renderer_stop(vlc_object_t *p_obj)
 {
-    assert(p_renderer != NULL);
-    struct renderer_priv *p_renderer_priv = renderer_priv(p_renderer);
+    assert(p_obj != NULL);
+    struct renderer_priv *p_priv = renderer_priv(p_obj);
+    vlc_renderer *p_renderer = &p_priv->s;
 
-    vlc_mutex_lock(&p_renderer_priv->lock);
-    if (p_renderer->p_module == NULL || !p_renderer_priv->b_started)
+    vlc_mutex_lock(&p_priv->lock);
+    if (p_renderer->p_module == NULL || !p_priv->b_started)
     {
-        vlc_mutex_unlock(&p_renderer_priv->lock);
+        vlc_mutex_unlock(&p_priv->lock);
         return;
     }
 
     p_renderer->pf_stop(p_renderer);
-    p_renderer_priv->b_started = false;
+    p_priv->b_started = false;
 
-    vlc_mutex_unlock(&p_renderer_priv->lock);
+    vlc_mutex_unlock(&p_priv->lock);
 }
 
+#undef vlc_renderer_volume_change
 int
-vlc_renderer_volume_change(vlc_renderer *p_renderer, int i_volume)
+vlc_renderer_volume_change(vlc_object_t *p_obj, int i_volume)
 {
-    assert(p_renderer != NULL);
-    struct renderer_priv *p_renderer_priv = renderer_priv(p_renderer);
+    assert(p_obj != NULL);
+    struct renderer_priv *p_priv = renderer_priv(p_obj);
+    vlc_renderer *p_renderer = &p_priv->s;
 
-    vlc_mutex_lock(&p_renderer_priv->lock);
+    vlc_mutex_lock(&p_priv->lock);
     if (p_renderer->pf_volume_change == NULL)
     {
-        vlc_mutex_unlock(&p_renderer_priv->lock);
+        vlc_mutex_unlock(&p_priv->lock);
         return VLC_EGENERIC;
     }
 
     int i_ret = p_renderer->pf_volume_change(p_renderer, i_volume);
-    vlc_mutex_unlock(&p_renderer_priv->lock);
+    vlc_mutex_unlock(&p_priv->lock);
     return i_ret;
 }
 
+#undef vlc_renderer_volume_mute
 int
-vlc_renderer_volume_mute(vlc_renderer *p_renderer, bool b_mute)
+vlc_renderer_volume_mute(vlc_object_t *p_obj, bool b_mute)
 {
-    assert(p_renderer != NULL);
-    struct renderer_priv *p_renderer_priv = renderer_priv(p_renderer);
+    assert(p_obj != NULL);
+    struct renderer_priv *p_priv = renderer_priv(p_obj);
+    vlc_renderer *p_renderer = &p_priv->s;
 
-    vlc_mutex_lock(&p_renderer_priv->lock);
+    vlc_mutex_lock(&p_priv->lock);
     if (p_renderer->pf_volume_mute == NULL)
     {
-        vlc_mutex_unlock(&p_renderer_priv->lock);
+        vlc_mutex_unlock(&p_priv->lock);
         return VLC_EGENERIC;
     }
 
     int i_ret = p_renderer->pf_volume_mute(p_renderer, b_mute);
-    vlc_mutex_unlock(&p_renderer_priv->lock);
+    vlc_mutex_unlock(&p_priv->lock);
     return i_ret;
 }
 
-#undef vlc_renderer_get
-vlc_renderer *
-vlc_renderer_get(vlc_object_t *p_obj)
+void
+vlc_renderer_deinit(libvlc_int_t *p_libvlc)
 {
-    assert(p_obj != NULL);
-    libvlc_priv_t *p_priv = libvlc_priv(p_obj->p_libvlc);
-    assert(p_priv->p_renderer != NULL);
-    return p_priv->p_renderer;
+    struct renderer_priv *p_priv =
+        (struct renderer_priv *) libvlc_priv(p_libvlc)->p_renderer;
+    vlc_renderer *p_renderer = &p_priv->s;
+
+    vlc_mutex_lock(&p_priv->lock);
+
+    /* If not created by us (i.e. from option), the renderer should not be
+     * loaded */
+    if (p_priv->b_loaded_from_option)
+        renderer_unload_locked(p_priv);
+    assert(p_renderer->p_module == NULL);
+
+    vlc_mutex_unlock(&p_priv->lock);
+
+    vlc_mutex_destroy(&p_priv->lock);
+    vlc_object_release(p_renderer);
+    libvlc_priv(p_libvlc)->p_renderer = NULL;
+}
+
+int
+vlc_renderer_init(libvlc_int_t *p_libvlc)
+{
+    struct renderer_priv *p_priv =
+        vlc_custom_create(p_libvlc, sizeof (*p_priv), "renderer");
+    if (p_priv == NULL)
+        return VLC_EGENERIC;
+
+    vlc_mutex_init(&p_priv->lock);
+
+    vlc_renderer_item *p_item = NULL; /* TODO item_from_option(p_obj); */
+    if (p_item != NULL)
+    {
+        int i_ret = renderer_load_locked(p_priv, p_item);
+        vlc_renderer_item_release(p_item);
+        if (i_ret != VLC_SUCCESS)
+        {
+            vlc_mutex_destroy(&p_priv->lock);
+            vlc_object_release(&p_priv->s);
+            return VLC_EGENERIC;
+        }
+        p_priv->b_loaded_from_option = true;
+    }
+    libvlc_priv(p_libvlc)->p_renderer = (vlc_object_t *) p_priv;
+    return VLC_SUCCESS;
 }

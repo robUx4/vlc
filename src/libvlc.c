@@ -244,8 +244,7 @@ int libvlc_InternalInit( libvlc_int_t *p_libvlc, int i_argc,
         return VLC_ENOMEM;
     }
 
-    priv->p_renderer = vlc_renderer_create( VLC_OBJECT(p_libvlc) );
-    if (priv->p_renderer == NULL )
+    if (vlc_renderer_init( p_libvlc ) != VLC_SUCCESS )
     {
         vlc_dialog_provider_release( priv->p_dialog_provider );
         vlc_LogDeinit (p_libvlc);
@@ -522,7 +521,7 @@ void libvlc_InternalCleanup( libvlc_int_t *p_libvlc )
     intf_DestroyAll( p_libvlc );
 
     vlc_dialog_provider_release( priv->p_dialog_provider );
-    vlc_renderer_release( priv->p_renderer );
+    vlc_renderer_deinit( p_libvlc );
 
 #ifdef ENABLE_VLM
     /* Destroy VLM if created in libvlc_InternalInit */
