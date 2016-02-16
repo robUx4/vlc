@@ -121,6 +121,8 @@ services_discovery_t *vlc_sd_Create( vlc_object_t *p_super,
     vlc_event_manager_register_event_type(em, vlc_ServicesDiscoveryItemAdded);
     vlc_event_manager_register_event_type(em, vlc_ServicesDiscoveryItemRemoved);
     vlc_event_manager_register_event_type(em, vlc_ServicesDiscoveryItemRemoveAll);
+    vlc_event_manager_register_event_type(em, vlc_ServicesDiscoveryRendererAdded);
+    vlc_event_manager_register_event_type(em, vlc_ServicesDiscoveryRendererRemoved);
     vlc_event_manager_register_event_type(em, vlc_ServicesDiscoveryStarted);
     vlc_event_manager_register_event_type(em, vlc_ServicesDiscoveryEnded);
 
@@ -244,6 +246,34 @@ services_discovery_RemoveItem ( services_discovery_t * p_sd, input_item_t * p_it
     vlc_event_t event;
     event.type = vlc_ServicesDiscoveryItemRemoved;
     event.u.services_discovery_item_removed.p_item = p_item;
+
+    vlc_event_send( &p_sd->event_manager, &event );
+}
+
+/*******************************************************************//**
+ * Add a renderer to the Service Discovery listing
+ ***********************************************************************/
+void
+services_discovery_AddRenderer ( services_discovery_t * p_sd,
+                                 vlc_renderer_item * p_item )
+{
+    vlc_event_t event;
+    event.type = vlc_ServicesDiscoveryRendererAdded;
+    event.u.services_discovery_renderer_added.p_new_item = p_item;
+
+    vlc_event_send( &p_sd->event_manager, &event );
+}
+
+/*******************************************************************//**
+ * Remove a renderer from the Service Discovery listing
+ ***********************************************************************/
+void
+services_discovery_RemoveRenderer ( services_discovery_t * p_sd,
+                                    vlc_renderer_item *p_item )
+{
+    vlc_event_t event;
+    event.type = vlc_ServicesDiscoveryRendererRemoved;
+    event.u.services_discovery_renderer_removed.p_item = p_item;
 
     vlc_event_send( &p_sd->event_manager, &event );
 }
