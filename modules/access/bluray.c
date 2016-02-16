@@ -31,6 +31,8 @@
 # include <mntent.h>
 # include <sys/stat.h>
 #endif
+#include <fcntl.h>      /* O_* */
+#include <unistd.h>     /* close() */
 
 #ifdef __APPLE__
 # include <sys/stat.h>
@@ -48,6 +50,7 @@
 #include <vlc_vout.h>                       /* vout_PutSubpicture / subpicture_t */
 #include <vlc_url.h>                        /* vlc_path2uri */
 #include <vlc_iso_lang.h>
+#include <vlc_fs.h>
 
 /* FIXME we should find a better way than including that */
 #include "../../src/text/iso-639_def.h"
@@ -78,6 +81,10 @@ static const char *const ppsz_region_code_text[] = {
 #define REGION_DEFAULT   1   /* Index to region list. Actual region code is (1<<REGION_DEFAULT) */
 #define LANGUAGE_DEFAULT ("eng")
 
+#if BLURAY_VERSION >= BLURAY_VERSION_CODE(0,8,0)
+# define BLURAY_DEMUX
+#endif
+
 /* Callbacks */
 static int  blurayOpen (vlc_object_t *);
 static void blurayClose(vlc_object_t *);
@@ -96,6 +103,17 @@ vlc_module_begin ()
     add_shortcut("bluray", "file")
 
     set_callbacks(blurayOpen, blurayClose)
+
+#ifdef BLURAY_DEMUX
+    /* demux module */
+    add_submodule()
+        set_description( "BluRay demuxer" )
+        set_category( CAT_INPUT )
+        set_subcategory( SUBCAT_INPUT_DEMUX )
+        set_capability( "demux", 5 )
+        set_callbacks( blurayOpen, blurayClose )
+#endif
+
 vlc_module_end ()
 
 /* libbluray's overlay.h defines 2 types of overlay (bd_overlay_plane_e). */
@@ -170,6 +188,9 @@ struct  demux_sys_t
     stream_t            *p_parser;
     bool                b_flushed;
     bool                b_pl_playing;       /* true when playing playlist */
+
+    /* stream input */
+    vlc_mutex_t         read_block_lock;
 
     /* Used to store bluray disc path */
     char                *psz_bd_path;
@@ -460,19 +481,170 @@ static void attachThumbnail(demux_t *p_demux)
 }
 
 /*****************************************************************************
+ * stream input
+ *****************************************************************************/
+
+static int probeStream(demux_t *p_demux)
+{
+    /* input must be seekable */
+    bool b_canseek = false;
+    stream_Control( p_demux->s, STREAM_CAN_SEEK, &b_canseek );
+    if (!b_canseek) {
+        return VLC_EGENERIC;
+    }
+
+    /* first sector(s) should be filled with zeros */
+    size_t i_peek;
+    const uint8_t *p_peek;
+    i_peek = stream_Peek( p_demux->s, &p_peek, 2048 );
+    if( i_peek != 2048 ) {
+        return VLC_EGENERIC;
+    }
+    while (i_peek > 0) {
+        if (p_peek[ --i_peek ]) {
+            return VLC_EGENERIC;
+        }
+    }
+
+    return VLC_SUCCESS;
+}
+
+#ifdef BLURAY_DEMUX
+static int blurayReadBlock(void *object, void *buf, int lba, int num_blocks)
+{
+    demux_t *p_demux = (demux_t*)object;
+    demux_sys_t *p_sys = p_demux->p_sys;
+    int result = -1;
+
+    assert(p_demux->s != NULL);
+
+    vlc_mutex_lock(&p_sys->read_block_lock);
+
+    if (stream_Seek( p_demux->s, lba * INT64_C(2048) ) == VLC_SUCCESS) {
+        size_t  req = (size_t)2048 * num_blocks;
+        ssize_t got;
+
+        got = stream_Read( p_demux->s, buf, req);
+        if (got < 0) {
+            msg_Err(p_demux, "read from lba %d failed", lba);
+        } else {
+            result = got / 2048;
+        }
+    } else {
+       msg_Err(p_demux, "seek to lba %d failed", lba);
+    }
+
+    vlc_mutex_unlock(&p_sys->read_block_lock);
+
+    return result;
+}
+#endif
+
+/*****************************************************************************
+ * probing of local files
+ *****************************************************************************/
+
+/* Descriptor Tag (ECMA 167, 3/7.2) */
+static int decode_descriptor_tag(const uint8_t *buf)
+{
+    uint16_t id;
+    uint8_t  checksum = 0;
+    int      i;
+
+    id = buf[0] | (buf[1] << 8);
+
+    /* calculate tag checksum */
+    for (i = 0; i < 4; i++) {
+        checksum = (uint8_t)(checksum + buf[i]);
+    }
+    for (i = 5; i < 16; i++) {
+        checksum = (uint8_t)(checksum + buf[i]);
+    }
+
+    if (checksum != buf[4]) {
+        return -1;
+    }
+
+    return id;
+}
+
+static int probeFile(const char *psz_name)
+{
+    struct stat stat_info;
+    uint8_t peek[2048];
+    unsigned i;
+    int ret = VLC_EGENERIC;
+    int fd;
+
+    fd = vlc_open(psz_name, O_RDONLY | O_NONBLOCK);
+    if (fd == -1) {
+        return VLC_EGENERIC;
+    }
+
+    if (fstat(fd, &stat_info) == -1) {
+        goto bailout;
+    }
+    if (!S_ISREG(stat_info.st_mode) && !S_ISBLK(stat_info.st_mode)) {
+        goto bailout;
+    }
+
+    /* first sector should be filled with zeros */
+    if (read(fd, peek, sizeof(peek)) != sizeof(peek)) {
+        goto bailout;
+    }
+    for (i = 0; i < sizeof(peek); i++) {
+        if (peek[ i ]) {
+            goto bailout;
+        }
+    }
+
+    /* Check AVDP tag checksum */
+    if (lseek(fd, 256 * 2048, SEEK_SET) == -1 ||
+        read(fd, peek, 16) != 16 ||
+        decode_descriptor_tag(peek) != 2) {
+        goto bailout;
+    }
+
+    ret = VLC_SUCCESS;
+
+bailout:
+    close(fd);
+    return ret;
+}
+
+/*****************************************************************************
  * blurayOpen: module init function
  *****************************************************************************/
 static int blurayOpen(vlc_object_t *object)
 {
     demux_t *p_demux = (demux_t*)object;
     demux_sys_t *p_sys;
+    bool forced;
+    uint64_t i_init_pos = 0;
 
     const char *error_msg = NULL;
 #define BLURAY_ERROR(s) do { error_msg = s; goto error; } while(0)
 
-    if (strcmp(p_demux->psz_access, "bluray")) {
-        // TODO BDMV support, once we figure out what to do in libbluray
-        return VLC_EGENERIC;
+    forced = !strcasecmp(p_demux->psz_access, "bluray");
+
+    if (p_demux->s) {
+        if (p_demux->psz_access == NULL || !strcasecmp(p_demux->psz_access, "file")) {
+            /* use access_demux for local files */
+            return VLC_EGENERIC;
+        }
+
+        if (probeStream(p_demux) != VLC_SUCCESS) {
+            return VLC_EGENERIC;
+        }
+
+    } else if (!forced) {
+        if (!p_demux->psz_file) {
+            return VLC_EGENERIC;
+        }
+
+        if (probeFile(p_demux->psz_file) != VLC_SUCCESS) {
+            return VLC_EGENERIC;
+        }
     }
 
     /* */
@@ -493,29 +665,52 @@ static int blurayOpen(vlc_object_t *object)
     TAB_INIT(p_sys->i_title, p_sys->pp_title);
     TAB_INIT(p_sys->i_attachments, p_sys->attachments);
 
-    /* store current bd path */
-    if (p_demux->psz_file)
-        p_sys->psz_bd_path = strdup(p_demux->psz_file);
-
-    /* If we're passed a block device, try to convert it to the mount point. */
-    FindMountPoint(&p_sys->psz_bd_path);
-
-    p_sys->bluray = bd_open(p_sys->psz_bd_path, NULL);
-    if (!p_sys->bluray) {
-        free(p_sys->psz_bd_path);
-        free(p_sys);
-        return VLC_EGENERIC;
-    }
-
     vlc_mutex_init(&p_sys->pl_info_lock);
     vlc_mutex_init(&p_sys->bdj_overlay_lock);
+    vlc_mutex_init(&p_sys->read_block_lock); /* used during bd_open_stream() */
+
+    var_AddCallback( p_demux->p_input, "intf-event", onIntfEvent, p_demux );
+
+    /* Open BluRay */
+#ifdef BLURAY_DEMUX
+    if (p_demux->s) {
+        i_init_pos = stream_Tell(p_demux->s);
+
+        p_sys->bluray = bd_init();
+        if (!bd_open_stream(p_sys->bluray, p_demux, blurayReadBlock)) {
+            bd_close(p_sys->bluray);
+            p_sys->bluray = NULL;
+        }
+    } else
+#endif
+    {
+        if (!p_demux->psz_file) {
+            /* no path provided (bluray://). use default DVD device. */
+            p_sys->psz_bd_path = var_InheritString(object, "dvd");
+        } else {
+            /* store current bd path */
+            p_sys->psz_bd_path = strdup(p_demux->psz_file);
+        }
+
+        /* If we're passed a block device, try to convert it to the mount point. */
+        FindMountPoint(&p_sys->psz_bd_path);
+
+        p_sys->bluray = bd_open(p_sys->psz_bd_path, NULL);
+    }
+    if (!p_sys->bluray) {
+        goto error;
+    }
 
     /* Warning the user about AACS/BD+ */
     const BLURAY_DISC_INFO *disc_info = bd_get_disc_info(p_sys->bluray);
 
     /* Is it a bluray? */
-    if (!disc_info->bluray_detected)
-        BLURAY_ERROR(_("Path doesn't appear to be a Blu-ray"));
+    if (!disc_info->bluray_detected) {
+        if (forced) {
+            BLURAY_ERROR(_("Path doesn't appear to be a Blu-ray"));
+        }
+        goto error;
+    }
 
     msg_Info(p_demux, "First play: %i, Top menu: %i\n"
                       "HDMV Titles: %i, BD-J Titles: %i, Other: %i",
@@ -589,9 +784,9 @@ static int blurayOpen(vlc_object_t *object)
         msg_Err(p_demux, "BD-J menus not supported. Playing without menus. "
                 "BD-J support: %d, JVM found: %d, JVM usable: %d",
                 disc_info->bdj_supported, disc_info->libjvm_detected, disc_info->bdj_handled);
-        dialog_Fatal(p_demux, _("Java required"),
-                     _("This Blu-ray disc needs Java for menus.%s\nDisc is played without menus."),
-                     !disc_info->libjvm_detected ? _(" Java was not found from your system.") : "");
+        vlc_dialog_display_error(p_demux, _("Java required"),
+             _("This Blu-ray disc needs Java for menus.%s\nDisc is played without menus."),
+             !disc_info->libjvm_detected ? _(" Java was not found from your system.") : "");
         p_sys->b_menu = false;
     }
 
@@ -633,8 +828,6 @@ static int blurayOpen(vlc_object_t *object)
     if (unlikely(p_sys->p_out == NULL))
         goto error;
 
-    var_AddCallback( p_demux->p_input, "intf-event", onIntfEvent, p_demux );
-
     blurayResetParser(p_demux);
     if (!p_sys->p_parser) {
         msg_Err(p_demux, "Failed to create TS demuxer");
@@ -648,8 +841,17 @@ static int blurayOpen(vlc_object_t *object)
 
 error:
     if (error_msg)
-        dialog_Fatal(p_demux, _("Blu-ray error"), "%s", error_msg);
+        vlc_dialog_display_error(p_demux, _("Blu-ray error"), "%s", error_msg);
     blurayClose(object);
+
+    if (p_demux->s != NULL) {
+        /* restore stream position */
+        if (stream_Seek(p_demux->s, i_init_pos) != VLC_SUCCESS) {
+            msg_Err(p_demux, "Failed to seek back to stream start");
+            return VLC_ETIMEOUT;
+        }
+    }
+
     return VLC_EGENERIC;
 #undef BLURAY_ERROR
 }
@@ -672,8 +874,9 @@ static void blurayClose(vlc_object_t *object)
      * This will close all the overlays before we release p_vout
      * bd_close(NULL) can crash
      */
-    assert(p_sys->bluray);
-    bd_close(p_sys->bluray);
+    if (p_sys->bluray) {
+        bd_close(p_sys->bluray);
+    }
 
     blurayReleaseVout(p_demux);
 
@@ -695,6 +898,7 @@ static void blurayClose(vlc_object_t *object)
 
     vlc_mutex_destroy(&p_sys->pl_info_lock);
     vlc_mutex_destroy(&p_sys->bdj_overlay_lock);
+    vlc_mutex_destroy(&p_sys->read_block_lock);
 
     free(p_sys->psz_bd_path);
     free(p_sys);
@@ -1705,7 +1909,7 @@ static int blurayControl(demux_t *p_demux, int query, va_list args)
                       p_sys->attachments[p_sys->i_cover_idx]->psz_name );
             vlc_meta_Set( p_meta, vlc_meta_ArtworkURL, psz_url );
         }
-        else if (meta->thumb_count > 0 && meta->thumbnails) {
+        else if (meta->thumb_count > 0 && meta->thumbnails && p_sys->psz_bd_path) {
             char *psz_thumbpath;
             if (asprintf(&psz_thumbpath, "%s" DIR_SEP "BDMV" DIR_SEP "META" DIR_SEP "DL" DIR_SEP "%s",
                           p_sys->psz_bd_path, meta->thumbnails[0].path) > 0) {
@@ -2000,11 +2204,13 @@ static void blurayHandleEvent(demux_t *p_demux, const BD_EVENT *e)
      */
     case BD_EVENT_ERROR:
         /* fatal error (with menus) */
-        dialog_Fatal(p_demux, _("Blu-ray error"), "Playback with BluRay menus failed");
+        vlc_dialog_display_error(p_demux, _("Blu-ray error"),
+                                 "Playback with BluRay menus failed");
         p_sys->b_fatal_error = true;
         break;
     case BD_EVENT_ENCRYPTED:
-        dialog_Fatal(p_demux, _("Blu-ray error"), "This disc seems to be encrypted");
+        vlc_dialog_display_error(p_demux, _("Blu-ray error"),
+                                 "This disc seems to be encrypted");
         p_sys->b_fatal_error = true;
         break;
     case BD_EVENT_READ_ERROR:

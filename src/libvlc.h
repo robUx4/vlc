@@ -124,11 +124,6 @@ void vlc_object_set_destructor (vlc_object_t *, vlc_destructor_t);
 #define vlc_object_set_destructor(a,b) \
         vlc_object_set_destructor (VLC_OBJECT(a), b)
 
-/*
- * To be cleaned-up module stuff:
- */
-module_t *module_find_by_shortcut (const char *psz_shortcut);
-
 #define ZOOM_SECTION N_("Zoom")
 #define ZOOM_QUARTER_KEY_TEXT N_("1:4 Quarter")
 #define ZOOM_HALF_KEY_TEXT N_("1:2 Half")
@@ -138,6 +133,8 @@ module_t *module_find_by_shortcut (const char *psz_shortcut);
 /**
  * Private LibVLC instance data.
  */
+typedef struct vlc_dialog_provider vlc_dialog_provider;
+
 typedef struct libvlc_priv_t
 {
     libvlc_int_t       public_data;
@@ -148,7 +145,7 @@ typedef struct libvlc_priv_t
     /* Singleton objects */
     vlc_logger_t      *logger;
     vlm_t             *p_vlm;  ///< the VLM singleton (or NULL)
-    vlc_object_t      *p_dialog_provider; ///< dialog provider
+    vlc_dialog_provider *p_dialog_provider; ///< dialog provider
     struct playlist_t *playlist; ///< Playlist for interfaces
     struct playlist_preparser_t *parser; ///< Input item meta data handler
     struct vlc_actions *actions; ///< Hotkeys handler

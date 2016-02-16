@@ -827,18 +827,42 @@ static void DecoderGetCc( decoder_t *p_dec, decoder_t *p_dec_cc )
         block_Release( p_cc );
 }
 
-static void DecoderPlayVideo( decoder_t *p_dec, picture_t *p_picture,
-                              int *pi_played_sum, int *pi_lost_sum )
+static int DecoderPlayVideo( decoder_t *p_dec, picture_t *p_picture,
+                             unsigned *restrict pi_lost_sum )
 {
     decoder_owner_sys_t *p_owner = p_dec->p_owner;
     vout_thread_t  *p_vout = p_owner->p_vout;
+    bool prerolled;
+
+    vlc_mutex_lock( &p_owner->lock );
+    if( p_owner->i_preroll_end > p_picture->date )
+    {
+        vlc_mutex_unlock( &p_owner->lock );
+        picture_Release( p_picture );
+        return -1;
+    }
+
+    prerolled = p_owner->i_preroll_end > INT64_MIN;
+    p_owner->i_preroll_end = INT64_MIN;
+    vlc_mutex_unlock( &p_owner->lock );
+
+    if( unlikely(prerolled) )
+    {
+        msg_Dbg( p_dec, "end of video preroll" );
+
+        if( p_vout )
+            vout_Flush( p_vout, VLC_TS_INVALID+1 );
+    }
+
+    if( p_dec->pf_get_cc &&
+        ( !p_owner->p_packetizer || !p_owner->p_packetizer->pf_get_cc ) )
+        DecoderGetCc( p_dec, p_dec );
 
     if( p_picture->date <= VLC_TS_INVALID )
     {
         msg_Warn( p_dec, "non-dated video buffer received" );
-        *pi_lost_sum += 1;
-        picture_Release( p_picture );
-        return;
+        goto discard;
+        return 0;
     }
 
     /* */
@@ -876,6 +900,9 @@ static void DecoderPlayVideo( decoder_t *p_dec, picture_t *p_picture,
     vlc_fifo_Unlock( p_owner->p_fifo );
 
     /* */
+    if( p_vout == NULL )
+        goto discard;
+
     if( p_picture->b_force || p_picture->date > VLC_TS_INVALID )
         /* FIXME: VLC_TS_INVALID -- verify video_output */
     {
@@ -893,102 +920,67 @@ static void DecoderPlayVideo( decoder_t *p_dec, picture_t *p_picture,
             msg_Warn( p_dec, "early picture skipped" );
         else
             msg_Warn( p_dec, "non-dated video buffer received" );
-
-        *pi_lost_sum += 1;
-        picture_Release( p_picture );
-    }
-    int i_tmp_display;
-    int i_tmp_lost;
-    vout_GetResetStatistic( p_vout, &i_tmp_display, &i_tmp_lost );
-
-    *pi_played_sum += i_tmp_display;
-    *pi_lost_sum += i_tmp_lost;
-}
-
-static int DecoderPreparePlayVideo( decoder_t *p_dec, picture_t *p_pic )
-{
-    decoder_owner_sys_t *p_owner = p_dec->p_owner;
-    vout_thread_t  *p_vout = p_owner->p_vout;
-    bool prerolled;
-
-    vlc_mutex_lock( &p_owner->lock );
-    if( p_owner->i_preroll_end > p_pic->date )
-    {
-        vlc_mutex_unlock( &p_owner->lock );
-        picture_Release( p_pic );
-        return -1;
+        goto discard;
     }
 
-    prerolled = p_owner->i_preroll_end > INT64_MIN;
-    p_owner->i_preroll_end = INT64_MIN;
-    vlc_mutex_unlock( &p_owner->lock );
-
-    if( unlikely(prerolled) )
-    {
-        msg_Dbg( p_dec, "end of video preroll" );
-
-        if( p_vout )
-            vout_Flush( p_vout, VLC_TS_INVALID+1 );
-    }
-
-    if( p_dec->pf_get_cc &&
-        ( !p_owner->p_packetizer || !p_owner->p_packetizer->pf_get_cc ) )
-        DecoderGetCc( p_dec, p_dec );
-
+    return 0;
+discard:
+    *pi_lost_sum += 1;
+    picture_Release( p_picture );
     return 0;
 }
 
-static void DecoderUpdateStatVideo( decoder_t *p_dec, int i_decoded,
-                                    int i_lost, int i_displayed )
+static void DecoderUpdateStatVideo( decoder_t *p_dec, unsigned decoded,
+                                    unsigned lost )
 {
     decoder_owner_sys_t *p_owner = p_dec->p_owner;
     input_thread_t *p_input = p_owner->p_input;
+    unsigned displayed = 0;
 
     /* Update ugly stat */
-    if( p_input != NULL && (i_decoded > 0 || i_lost > 0 || i_displayed > 0) )
+    if( p_input == NULL )
+        return;
+
+    if( p_owner->p_vout != NULL )
     {
-        vlc_mutex_lock( &p_input->p->counters.counters_lock );
-        stats_Update( p_input->p->counters.p_decoded_video, i_decoded, NULL );
-        stats_Update( p_input->p->counters.p_lost_pictures, i_lost , NULL);
-        stats_Update( p_input->p->counters.p_displayed_pictures,
-                      i_displayed, NULL);
-        vlc_mutex_unlock( &p_input->p->counters.counters_lock );
+        unsigned vout_lost = 0;
+
+        vout_GetResetStatistic( p_owner->p_vout, &displayed, &vout_lost );
+        lost += vout_lost;
     }
+
+    vlc_mutex_lock( &p_input->p->counters.counters_lock );
+    stats_Update( p_input->p->counters.p_decoded_video, decoded, NULL );
+    stats_Update( p_input->p->counters.p_lost_pictures, lost , NULL);
+    stats_Update( p_input->p->counters.p_displayed_pictures, displayed, NULL);
+    vlc_mutex_unlock( &p_input->p->counters.counters_lock );
 }
 
 static int DecoderQueueVideo( decoder_t *p_dec, picture_t *p_pic )
 {
     assert( p_pic );
-    int i_lost = 0;
-    int i_displayed = 0;
-    int i_ret;
+    unsigned i_lost = 0;
 
-    if( ( i_ret = DecoderPreparePlayVideo( p_dec, p_pic ) ) == 0 )
-        DecoderPlayVideo( p_dec, p_pic, &i_displayed, &i_lost );
+    int ret = DecoderPlayVideo( p_dec, p_pic, &i_lost );
 
-    DecoderUpdateStatVideo( p_dec, 1, i_lost, i_displayed );
-    return i_ret;
+    DecoderUpdateStatVideo( p_dec, 1, i_lost );
+    return ret;
 }
 
 static void DecoderDecodeVideo( decoder_t *p_dec, block_t *p_block )
 {
     picture_t      *p_pic;
     block_t **pp_block = p_block ? &p_block : NULL;
-    int i_lost = 0;
-    int i_decoded = 0;
-    int i_displayed = 0;
+    unsigned i_lost = 0, i_decoded = 0;
 
     while( (p_pic = p_dec->pf_decode_video( p_dec, pp_block ) ) )
     {
         i_decoded++;
 
-        if( DecoderPreparePlayVideo( p_dec, p_pic ) != 0 )
-            continue;
-
-        DecoderPlayVideo( p_dec, p_pic, &i_displayed, &i_lost );
+        DecoderPlayVideo( p_dec, p_pic, &i_lost );
     }
 
-    DecoderUpdateStatVideo( p_dec, i_decoded, i_lost, i_displayed );
+    DecoderUpdateStatVideo( p_dec, i_decoded, i_lost );
 }
 
 /* This function process a video block
@@ -1045,10 +1037,33 @@ static void DecoderProcessVideo( decoder_t *p_dec, block_t *p_block )
     }
 }
 
-static void DecoderPlayAudio( decoder_t *p_dec, block_t *p_audio,
-                              int *pi_played_sum, int *pi_lost_sum )
+static int DecoderPlayAudio( decoder_t *p_dec, block_t *p_audio,
+                             unsigned *restrict pi_lost_sum )
 {
     decoder_owner_sys_t *p_owner = p_dec->p_owner;
+    bool prerolled;
+
+    assert( p_audio != NULL );
+
+    vlc_mutex_lock( &p_owner->lock );
+    if( p_owner->i_preroll_end > p_audio->i_pts )
+    {
+        vlc_mutex_unlock( &p_owner->lock );
+        block_Release( p_audio );
+        return -1;
+    }
+
+    prerolled = p_owner->i_preroll_end > INT64_MIN;
+    p_owner->i_preroll_end = INT64_MIN;
+    vlc_mutex_unlock( &p_owner->lock );
+
+    if( unlikely(prerolled) )
+    {
+        msg_Dbg( p_dec, "end of audio preroll" );
+
+        if( p_owner->p_aout )
+            aout_DecFlush( p_owner->p_aout, false );
+    }
 
     /* */
     if( p_audio->i_pts <= VLC_TS_INVALID ) // FIXME --VLC_TS_INVALID verify audio_output/*
@@ -1056,7 +1071,7 @@ static void DecoderPlayAudio( decoder_t *p_dec, block_t *p_audio,
         msg_Warn( p_dec, "non-dated audio buffer received" );
         *pi_lost_sum += 1;
         block_Release( p_audio );
-        return;
+        return 0;
     }
 
     /* */
@@ -1077,102 +1092,73 @@ static void DecoderPlayAudio( decoder_t *p_dec, block_t *p_audio,
 
     audio_output_t *p_aout = p_owner->p_aout;
 
-    if( p_aout == NULL || p_audio->i_pts <= VLC_TS_INVALID
-     || i_rate < INPUT_RATE_DEFAULT/AOUT_MAX_INPUT_RATE
-     || i_rate > INPUT_RATE_DEFAULT*AOUT_MAX_INPUT_RATE
-     || DecoderTimedWait( p_dec, p_audio->i_pts - AOUT_MAX_PREPARE_TIME ) )
+    if( p_aout != NULL && p_audio->i_pts > VLC_TS_INVALID
+     && i_rate >= INPUT_RATE_DEFAULT/AOUT_MAX_INPUT_RATE
+     && i_rate <= INPUT_RATE_DEFAULT*AOUT_MAX_INPUT_RATE
+     && !DecoderTimedWait( p_dec, p_audio->i_pts - AOUT_MAX_PREPARE_TIME ) )
+    {
+        aout_DecPlay( p_aout, p_audio, i_rate );
+    }
+    else
     {
         msg_Dbg( p_dec, "discarded audio buffer" );
         *pi_lost_sum += 1;
         block_Release( p_audio );
-        return;
     }
-
-    if( aout_DecPlay( p_aout, p_audio, i_rate ) == 0 )
-        *pi_played_sum += 1;
-
-    *pi_lost_sum += aout_DecGetResetLost( p_aout );
-}
-
-static int DecoderPreparePlayAudio( decoder_t *p_dec, block_t *p_aout_buf )
-{
-    decoder_owner_sys_t *p_owner = p_dec->p_owner;
-    bool prerolled;
-
-    vlc_mutex_lock( &p_owner->lock );
-    if( p_owner->i_preroll_end > p_aout_buf->i_pts )
-    {
-        vlc_mutex_unlock( &p_owner->lock );
-        block_Release( p_aout_buf );
-        return -1;
-    }
-
-    prerolled = p_owner->i_preroll_end > INT64_MIN;
-    p_owner->i_preroll_end = INT64_MIN;
-    vlc_mutex_unlock( &p_owner->lock );
-
-    if( unlikely(prerolled) )
-    {
-        msg_Dbg( p_dec, "end of audio preroll" );
-
-        if( p_owner->p_aout )
-            aout_DecFlush( p_owner->p_aout, false );
-    }
-
     return 0;
 }
 
-static void DecoderUpdateStatAudio( decoder_t *p_dec, int i_decoded,
-                                    int i_lost, int i_played )
+static void DecoderUpdateStatAudio( decoder_t *p_dec, unsigned decoded,
+                                    unsigned lost )
 {
     decoder_owner_sys_t *p_owner = p_dec->p_owner;
     input_thread_t *p_input = p_owner->p_input;
+    unsigned played = 0;
 
     /* Update ugly stat */
-    if( p_input != NULL && (i_decoded > 0 || i_lost > 0 || i_played > 0) )
+    if( p_input == NULL )
+        return;
+
+    if( p_owner->p_aout != NULL )
     {
-        vlc_mutex_lock( &p_input->p->counters.counters_lock);
-        stats_Update( p_input->p->counters.p_lost_abuffers, i_lost, NULL );
-        stats_Update( p_input->p->counters.p_played_abuffers, i_played, NULL );
-        stats_Update( p_input->p->counters.p_decoded_audio, i_decoded, NULL );
-        vlc_mutex_unlock( &p_input->p->counters.counters_lock);
+        unsigned aout_lost;
+
+        aout_DecGetResetStats( p_owner->p_aout, &aout_lost, &played );
+        lost += aout_lost;
     }
+
+    vlc_mutex_lock( &p_input->p->counters.counters_lock);
+    stats_Update( p_input->p->counters.p_lost_abuffers, lost, NULL );
+    stats_Update( p_input->p->counters.p_played_abuffers, played, NULL );
+    stats_Update( p_input->p->counters.p_decoded_audio, decoded, NULL );
+    vlc_mutex_unlock( &p_input->p->counters.counters_lock);
 }
 
 static int DecoderQueueAudio( decoder_t *p_dec, block_t *p_aout_buf )
 {
-    assert( p_aout_buf );
-    int i_lost = 0;
-    int i_played = 0;
-    int i_ret;
+    unsigned lost = 0;
 
-    if( ( i_ret = DecoderPreparePlayAudio( p_dec, p_aout_buf ) ) == 0 )
-        DecoderPlayAudio( p_dec, p_aout_buf, &i_played, &i_lost );
+    int ret = DecoderPlayAudio( p_dec, p_aout_buf, &lost );
 
-    DecoderUpdateStatAudio( p_dec, 1, i_lost, i_played );
+    DecoderUpdateStatAudio( p_dec, 1, lost );
 
-    return i_ret;
+    return ret;
 }
 
 static void DecoderDecodeAudio( decoder_t *p_dec, block_t *p_block )
 {
     block_t *p_aout_buf;
     block_t **pp_block = p_block ? &p_block : NULL;
-    int i_decoded = 0;
-    int i_lost = 0;
-    int i_played = 0;
+    unsigned decoded = 0, lost = 0;
 
     while( (p_aout_buf = p_dec->pf_decode_audio( p_dec, pp_block ) ) )
     {
-        i_decoded++;
+        decoded++;
 
-        if( DecoderPreparePlayAudio( p_dec, p_aout_buf ) != 0 )
-            continue;
-
-        DecoderPlayAudio( p_dec, p_aout_buf, &i_played, &i_lost );
+        DecoderPlayAudio( p_dec, p_aout_buf, &lost );
     }
 
-    DecoderUpdateStatAudio( p_dec, i_decoded, i_lost, i_played );
+    DecoderUpdateStatAudio( p_dec, decoded, lost );
 }
 
 /* This function process a audio block
@@ -1772,12 +1758,12 @@ static void DecoderUnsupportedCodec( decoder_t *p_dec, const es_format_t *fmt )
         if (!desc || !*desc)
             desc = N_("No description for this codec");
         msg_Err( p_dec, "Codec `%4.4s' (%s) is not supported.", (char*)&fmt->i_codec, desc );
-        dialog_Fatal( p_dec, _("Codec not supported"),
-                _("VLC could not decode the format \"%4.4s\" (%s)"),
-                (char*)&fmt->i_codec, desc );
+        vlc_dialog_display_error( p_dec, _("Codec not supported"),
+            _("VLC could not decode the format \"%4.4s\" (%s)"),
+            (char*)&fmt->i_codec, desc );
     } else {
         msg_Err( p_dec, "could not identify codec" );
-        dialog_Fatal( p_dec, _("Unidentified codec"),
+        vlc_dialog_display_error( p_dec, _("Unidentified codec"),
             _("VLC could not identify the audio or video codec" ) );
     }
 }
@@ -1797,9 +1783,8 @@ static decoder_t *decoder_New( vlc_object_t *p_parent, input_thread_t *p_input,
     if( p_dec == NULL )
     {
         msg_Err( p_parent, "could not create %s", psz_type );
-        dialog_Fatal( p_parent, _("Streaming / Transcoding failed"),
-                      _("VLC could not open the %s module."),
-                      vlc_gettext( psz_type ) );
+        vlc_dialog_display_error( p_parent, _("Streaming / Transcoding failed"),
+            _("VLC could not open the %s module."), vlc_gettext( psz_type ) );
         return NULL;
     }
 
@@ -2056,8 +2041,9 @@ int input_DecoderSetCcState( decoder_t *p_dec, bool b_decode, int i_channel )
         if( !p_cc )
         {
             msg_Err( p_dec, "could not create decoder" );
-            dialog_Fatal( p_dec, _("Streaming / Transcoding failed"), "%s",
-                          _("VLC could not open the decoder module.") );
+            vlc_dialog_display_error( p_dec,
+                _("Streaming / Transcoding failed"), "%s",
+                _("VLC could not open the decoder module.") );
             return VLC_EGENERIC;
         }
         else if( !p_cc->p_module )

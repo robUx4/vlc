@@ -22,18 +22,6 @@ endif
 
 EXTRA_DIST += gui/eject.c
 
-
-libmacosx_dialog_provider_plugin_la_SOURCES = \
-	gui/macosx_dialog_provider/VLCLoginPanel.h gui/macosx_dialog_provider/VLCLoginPanel.m \
-	gui/macosx_dialog_provider/VLCProgressPanel.h gui/macosx_dialog_provider/VLCProgressPanel.m \
-	gui/macosx_dialog_provider/VLCUIWidgets.h gui/macosx_dialog_provider/VLCUIWidgets.m \
-	gui/macosx_dialog_provider/dialogProvider.h gui/macosx_dialog_provider/dialogProvider.m
-libmacosx_dialog_provider_plugin_la_LDFLAGS = $(AM_LDFLAGS) -rpath '$(guidir)' -Wl,-framework,Cocoa
-
-EXTRA_LTLIBRARIES += libmacosx_dialog_provider_plugin.la
-gui_LTLIBRARIES += $(LTLIBmacosx_dialog_provider)
-
-
 libminimal_macosx_plugin_la_SOURCES = \
 	gui/minimal_macosx/intf.h gui/minimal_macosx/intf.m \
 	gui/minimal_macosx/misc.h gui/minimal_macosx/misc.m \
@@ -43,14 +31,3 @@ libminimal_macosx_plugin_la_OBJCFLAGS = $(AM_OBJCFLAGS) -fobjc-arc -fobjc-except
 libminimal_macosx_plugin_la_LDFLAGS = $(AM_LDFLAGS) -rpath '$(guidir)' -Wl,-framework,Cocoa
 EXTRA_LTLIBRARIES += libminimal_macosx_plugin.la
 gui_LTLIBRARIES += $(LTLIBminimal_macosx)
-
-
-libios_dialog_provider_plugin_la_SOURCES = gui/ios_dialog_provider/dialogProvider.m
-libios_dialog_provider_plugin_la_OBJCFLAGS = $(AM_OBJCFLAGS)
-libios_dialog_provider_plugin_la_LDFLAGS = $(AM_LDFLAGS) -Wl,-framework,UIKit
-if HAVE_IOS
-gui_LTLIBRARIES += libios_dialog_provider_plugin.la
-endif
-if HAVE_TVOS
-gui_LTLIBRARIES += libios_dialog_provider_plugin.la
-endif

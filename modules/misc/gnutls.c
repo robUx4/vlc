@@ -28,6 +28,7 @@
 #include <time.h>
 #include <errno.h>
 #include <assert.h>
+#include <unistd.h>
 
 #include <vlc_common.h>
 #include <vlc_plugin.h>
@@ -145,7 +146,12 @@ static ssize_t vlc_gnutls_read(gnutls_transport_ptr_t ptr, void *buf,
 static ssize_t vlc_gnutls_writev(gnutls_transport_ptr_t ptr,
                                  const giovec_t *giov, int iovcnt)
 {
-    if (unlikely((unsigned)iovcnt > IOV_MAX))
+#ifdef IOV_MAX
+    const long iovmax = IOV_MAX;
+#else
+    const long iovmax = sysconf(_SC_IOV_MAX);
+#endif
+    if (unlikely(iovcnt > iovmax))
     {
         errno = EINVAL;
         return -1;
@@ -484,13 +490,13 @@ error:
             goto error;
     }
 
-    if (dialog_Question(creds, _("Insecure site"),
-        _("You attempted to reach %s. %s\n"
-          "This problem may be stem from an attempt to breach your security, "
-          "compromise your privacy, or a configuration error.\n\n"
-          "If in doubt, abort now.\n"),
-                        _("Abort"), _("View certificate"), NULL,
-                        vlc_gettext(msg), host) != 2)
+    if (vlc_dialog_wait_question(creds, VLC_DIALOG_QUESTION_WARNING,
+            _("Abort"), _("View certificate"), NULL,
+            _("Insecure site"), 
+            _("You attempted to reach %s. %s\n"
+            "This problem may be stem from an attempt to breach your security, "
+            "compromise your privacy, or a configuration error.\n\n"
+            "If in doubt, abort now.\n"), host, vlc_gettext(msg)) != 1)
         goto error;
 
     gnutls_x509_crt_t cert;
@@ -505,20 +511,20 @@ error:
     }
     gnutls_x509_crt_deinit (cert);
 
-    val = dialog_Question(creds, _("Insecure site"),
-         _("This is the certificate presented by %s:\n%s\n\n"
-           "If in doubt, abort now.\n"),
-                          _("Abort"), _("Accept 24 hours"),
-                          _("Accept permanently"), host, desc.data);
+    val = vlc_dialog_wait_question(creds, VLC_DIALOG_QUESTION_WARNING,
+            _("Abort"), _("Accept 24 hours"), _("Accept permanently"),
+            _("Insecure site"),
+            _("This is the certificate presented by %s:\n%s\n\n"
+            "If in doubt, abort now.\n"), host, desc.data);
     gnutls_free (desc.data);
 
     time_t expiry = 0;
     switch (val)
     {
-        case 2:
+        case 1:
             time (&expiry);
             expiry += 24 * 60 * 60;
-        case 3:
+        case 2:
             val = gnutls_store_pubkey (NULL, NULL, host, service,
                                        GNUTLS_CRT_X509, datum, expiry, 0);
             if (val)

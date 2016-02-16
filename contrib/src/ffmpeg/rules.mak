@@ -26,6 +26,7 @@ FFMPEGCONF = \
 	--disable-devices \
 	--disable-avfilter \
 	--disable-filters \
+	--disable-protocol=concat \
 	--disable-bsfs \
 	--disable-bzlib \
 	--disable-avresample
@@ -146,16 +147,21 @@ endif
 
 # Windows
 ifdef HAVE_WIN32
+ifndef HAVE_VISUALSTUDIO
+DEPS_ffmpeg += d3d11
 ifndef HAVE_MINGW_W64
 DEPS_ffmpeg += directx
+endif
 endif
 FFMPEGCONF += --target-os=mingw32 --enable-memalign-hack
 FFMPEGCONF += --enable-w32threads --enable-dxva2
 
 ifdef HAVE_WIN64
 FFMPEGCONF += --cpu=athlon64 --arch=x86_64
-else # !WIN64
+else
+ifeq ($(ARCH),i386) # 32bits intel
 FFMPEGCONF+= --cpu=i686 --arch=x86
+endif
 endif
 
 else # !Windows

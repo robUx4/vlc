@@ -228,13 +228,32 @@ libplaylist_plugin_la_SOURCES = \
 	demux/playlist/playlist.c demux/playlist/playlist.h
 demux_LTLIBRARIES += libplaylist_plugin.la
 
-libts_plugin_la_SOURCES = demux/mpeg/ts.c \
+libts_plugin_la_SOURCES = demux/mpeg/ts.c demux/mpeg/ts.h \
+        demux/mpeg/ts_pid.h demux/mpeg/ts_pid.c \
+        demux/mpeg/ts_psi.h demux/mpeg/ts_psi.c \
+        demux/mpeg/ts_psi_eit.h demux/mpeg/ts_psi_eit.c \
+        demux/mpeg/ts_psip.h demux/mpeg/ts_psip.c \
+        demux/mpeg/ts_psip_dvbpsi_fixes.h demux/mpeg/ts_psip_dvbpsi_fixes.c \
+        demux/mpeg/ts_decoders.h demux/mpeg/ts_decoders.c \
+        demux/mpeg/ts_streams.h demux/mpeg/ts_streams.c \
+        demux/mpeg/ts_scte.h demux/mpeg/ts_scte.c \
+        demux/mpeg/sections.c demux/mpeg/sections.h \
         demux/mpeg/mpeg4_iod.c demux/mpeg/mpeg4_iod.h \
+        demux/mpeg/ts_sl.c demux/mpeg/ts_sl.h \
+        demux/mpeg/ts_hotfixes.c demux/mpeg/ts_hotfixes.h \
+        demux/mpeg/ts_strings.h demux/mpeg/ts_streams_private.h \
         demux/mpeg/pes.h \
-	mux/mpeg/csa.c mux/mpeg/dvbpsi_compat.h \
-	mux/mpeg/streams.h mux/mpeg/tables.c mux/mpeg/tables.h \
+        demux/mpeg/timestamps.h \
+        demux/dvb-text.h \
+        demux/opus.h \
+	mux/mpeg/csa.c \
+        mux/mpeg/dvbpsi_compat.h \
+	mux/mpeg/streams.h \
+        mux/mpeg/tables.c mux/mpeg/tables.h \
 	mux/mpeg/tsutil.c mux/mpeg/tsutil.h \
-	demux/dvb-text.h codec/opus_header.c demux/opus.h
+        codec/scte18.h \
+        codec/atsc_a65.c codec/atsc_a65.h \
+	codec/opus_header.c
 libts_plugin_la_CFLAGS = $(AM_CFLAGS) $(DVBPSI_CFLAGS)
 libts_plugin_la_LIBADD = $(DVBPSI_LIBS) $(SOCKET_LIBS)
 if HAVE_ARIBB24
@@ -413,7 +432,7 @@ libadaptative_plugin_la_SOURCES += $(libadaptative_dash_SOURCES)
 libadaptative_plugin_la_SOURCES += $(libadaptative_smooth_SOURCES)
 libadaptative_plugin_la_SOURCES += demux/adaptative/adaptative.cpp
 libadaptative_plugin_la_SOURCES += demux/mp4/libmp4.c demux/mp4/libmp4.h
-libadaptative_plugin_la_CXXFLAGS = $(AM_CFLAGS) -I$(srcdir)/demux/adaptative
+libadaptative_plugin_la_CXXFLAGS = $(AM_CXXFLAGS) -I$(srcdir)/demux/adaptative
 libadaptative_plugin_la_LIBADD = $(SOCKET_LIBS) $(LIBM)
 if HAVE_ZLIB
 libadaptative_plugin_la_LIBADD += -lz

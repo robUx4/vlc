@@ -182,6 +182,10 @@ libaribsub_plugin_la_LIBADD = $(ARIBB24_LIBS)
 EXTRA_LTLIBRARIES += libaribsub_plugin.la
 codec_LTLIBRARIES += $(LTLIBaribsub)
 
+libscte18_plugin_la_SOURCES = codec/scte18.c codec/scte18.h \
+                              codec/atsc_a65.c codec/atsc_a65.h
+codec_LTLIBRARIES += libscte18_plugin.la
+
 libscte27_plugin_la_SOURCES = codec/scte27.c
 codec_LTLIBRARIES += libscte27_plugin.la
 
@@ -538,7 +542,13 @@ libquicktime_plugin_la_LIBADD = $(LIBM)
 EXTRA_LTLIBRARIES += libquicktime_plugin.la
 codec_LTLIBRARIES += $(LTLIBquicktime)
 
-libgstdecode_plugin_la_SOURCES = codec/gstdecode.c
+libgstdecode_plugin_la_SOURCES = codec/gstreamer/gstdecode.c \
+								 codec/gstreamer/gstvlcpictureplaneallocator.c \
+								 codec/gstreamer/gstvlcpictureplaneallocator.h \
+								 codec/gstreamer/gstvlcvideopool.c \
+								 codec/gstreamer/gstvlcvideopool.h \
+								 codec/gstreamer/gstvlcvideosink.c \
+								 codec/gstreamer/gstvlcvideosink.h
 libgstdecode_plugin_la_CFLAGS = $(AM_CFLAGS) $(GST_VIDEO_CFLAGS) $(GST_APP_CFLAGS)
 libgstdecode_plugin_la_LIBADD = $(GST_VIDEO_LIBS) $(GST_APP_LIBS)
 if HAVE_GST_DECODE

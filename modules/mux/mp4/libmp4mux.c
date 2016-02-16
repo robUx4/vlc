@@ -22,7 +22,6 @@
  *****************************************************************************/
 #include "libmp4mux.h"
 #include "../demux/mp4/libmp4.h" /* flags */
-#include "../demux/mpeg/mpeg_parser_helpers.h"
 #include "../packetizer/hevc_nal.h"
 #include "../packetizer/h264_nal.h" /* h264_get_spspps */
 #include "../packetizer/hxxx_nal.h"
@@ -33,6 +32,7 @@
 
 #include <vlc_es.h>
 #include <vlc_iso_lang.h>
+#include <vlc_bits.h>
 #include <assert.h>
 #include <time.h>
 
@@ -313,7 +313,7 @@ static bo_t *GetDec3Tag(es_format_t *p_fmt, block_t *a52_frame)
 
     strmtyp = bs_read(&s, 2);
 
-    if (strmtyp & 0x1) // dependant or reserved stream
+    if (strmtyp & 0x1) // dependent or reserved stream
         return NULL;
 
     if (bs_read(&s, 3) != 0x0) // substreamid: we don't support more than 1 stream
@@ -344,7 +344,7 @@ static bo_t *GetDec3Tag(es_format_t *p_fmt, block_t *a52_frame)
             bs_skip(&s, 8); // compr2
     }
 
-    if (strmtyp == 0x1) // dependant stream XXX: unsupported
+    if (strmtyp == 0x1) // dependent stream XXX: unsupported
         if (bs_read1(&s)) // chanmape
             bs_skip(&s, 16); // chanmap
 
@@ -359,7 +359,7 @@ static bo_t *GetDec3Tag(es_format_t *p_fmt, block_t *a52_frame)
         if (lfeon)
             if (bs_read1(&s))
                 bs_skip(&s, 5); // lfemixlevcod
-        if (strmtyp == 0) { // independant stream
+        if (strmtyp == 0) { // independent stream
             if (bs_read1(&s)) // pgmscle
                 bs_skip(&s, 6); // pgmscl
             if (acmod == 0x0) // dual mono
@@ -527,6 +527,32 @@ static void hevcParseVPS(uint8_t * p_buffer, size_t i_buffer, uint8_t *general,
     /* copy the first 12 bytes of profile tier */
     for(unsigned i=0; i<12; i++)
         general[i] = bs_read( &bs, 8 );
+}
+
+static inline void hevc_skip_profile_tiers_level( bs_t * bs, int32_t max_sub_layer_minus1 )
+{
+    uint8_t sub_layer_profile_present_flag[8];
+    uint8_t sub_layer_level_present_flag[8];
+
+    /* skipping useless fields of the VPS see https://www.itu.int/rec/dologin_pub.asp?lang=e&id=T-REC-H.265-201304-I!!PDF-E&type=item */
+    bs_skip( bs, 2 + 1 + 5 + 32 + 1 + 1 + 1 + 1 + 44 + 8 );
+
+    for( int32_t i = 0; i < max_sub_layer_minus1; i++ )
+    {
+        sub_layer_profile_present_flag[i] = bs_read1( bs );
+        sub_layer_level_present_flag[i] = bs_read1( bs );
+    }
+
+    if(max_sub_layer_minus1 > 0)
+        bs_skip( bs, (8 - max_sub_layer_minus1) * 2 );
+
+    for( int32_t i = 0; i < max_sub_layer_minus1; i++ )
+    {
+        if( sub_layer_profile_present_flag[i] )
+            bs_skip( bs, 2 + 1 + 5 + 32 + 1 + 1 + 1 + 1 + 44 );
+        if( sub_layer_level_present_flag[i] )
+            bs_skip( bs, 8 );
+    }
 }
 
 static void hevcParseSPS(uint8_t * p_buffer, size_t i_buffer, uint8_t * chroma_idc,

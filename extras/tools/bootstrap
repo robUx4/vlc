@@ -75,7 +75,7 @@ check automake 1.14
 check m4 1.4.16
 check libtool 2.4
 check pkg-config
-check cmake 3.1.0
+check cmake 3.4.3
 check yasm
 check_tar
 check ragel
@@ -90,7 +90,7 @@ CPUS=
 CC=
 CXX=
 case `uname` in
-    Linux)
+    Linux|MINGW32*|MINGW64*)
         CPUS=`grep -c ^processor /proc/cpuinfo`
      ;;
     Darwin)
@@ -109,6 +109,7 @@ esac
 
 cat > Makefile << EOF
 MAKEFLAGS += -j$CPUS
+CMAKEFLAGS += --parallel=$CPUS
 $CC
 $CXX
 PREFIX=\$(abspath ./build)

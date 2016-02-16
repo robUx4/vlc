@@ -91,15 +91,12 @@ static int RestartAfterEnd( vlc_object_t *, char const *,
                             vlc_value_t, vlc_value_t, void * );
 static void *ChromecastThread(void *data);
 
-static int DiscoveryOpen(vlc_object_t *);
-static void DiscoveryClose(vlc_object_t *);
-
 /*****************************************************************************
  * Module descriptor
  *****************************************************************************/
 
 #define IP_TEXT N_("Chromecast IP address")
-#define IP_LONGTEXT N_("This sets the IP adress of the Chromecast receiver.")
+#define IP_LONGTEXT N_("This sets the IP address of the Chromecast receiver.")
 #define HTTP_PORT_TEXT N_("HTTP port")
 #define HTTP_PORT_LONGTEXT N_("This sets the HTTP port of the server " \
                               "used to stream the media to the Chromecast.")
@@ -107,8 +104,6 @@ static void DiscoveryClose(vlc_object_t *);
 #define MUXER_LONGTEXT N_("This sets the muxer used to stream to the Chromecast.")
 #define MIME_TEXT N_("MIME content type")
 #define MIME_LONGTEXT N_("This sets the media MIME content type sent to the Chromecast.")
-
-VLC_SD_PROBE_HELPER("chromecast_discovery", "Chromecast devices", SD_CAT_RENDERER)
 
 vlc_module_begin ()
     set_shortname( N_("Chromecast") )
@@ -122,17 +117,6 @@ vlc_module_begin ()
     add_string(CONTROL_CFG_PREFIX "mime", "video/x-matroska", MIME_TEXT, MIME_LONGTEXT, false)
     add_string(CONTROL_CFG_PREFIX "mux", "avformat{mux=matroska}", MUXER_TEXT, MUXER_LONGTEXT, false)
     set_callbacks( Open, Close )
-
-    add_submodule()
-        set_shortname( "chromecast_discovery" )
-        set_category( CAT_INTERFACE )
-        set_subcategory( SUBCAT_INTERFACE_CONTROL )
-        set_description( N_( "Chromecast device discovery" ) )
-        set_capability ("services_discovery", 0)
-        add_shortcut( "chromecast_discovery" )
-        set_callbacks( DiscoveryOpen, DiscoveryClose )
-
-        VLC_SD_PROBE_SUBMODULE
 
 vlc_module_end ()
 
@@ -1627,152 +1611,4 @@ void intf_sys_t::handleMessages()
     }
 
     vlc_restorecancel(canc);
-}
-
-/*****************************************************************************
- * Device discovery
- *****************************************************************************/
-
-extern "C" void discovery_event_received( const vlc_event_t * p_event, void * user_data );
-
-struct services_discovery_sys_t
-{
-    services_discovery_sys_t(services_discovery_t * const p_sd, services_discovery_t * const microdns)
-        :p_this(p_sd)
-        ,p_microdns(microdns)
-    {
-    }
-
-    ~services_discovery_sys_t()
-    {
-        vlc_sd_Stop( p_microdns );
-
-        vlc_event_manager_t *em = services_discovery_EventManager( p_microdns );
-        vlc_event_detach( em, vlc_ServicesDiscoveryItemAdded, discovery_event_received, p_this );
-        vlc_event_detach( em, vlc_ServicesDiscoveryItemRemoved, discovery_event_received, p_this );
-        vlc_event_detach( em, vlc_ServicesDiscoveryItemRemoveAll, discovery_event_received, p_this );
-
-        vlc_sd_Destroy(p_microdns);
-    }
-
-    input_item_t *forward_device_added(input_item_t *p_device)
-    {
-        if ( !p_device )
-            return NULL;
-
-        vlc_url_t url;
-        vlc_UrlParse( &url, p_device->psz_uri );
-
-        if ( !url.psz_host || !url.psz_host[0] )
-            return NULL;
-
-        /* determine if it's audio-only by checking the YouTube app */
-        char deviceURI[64];
-        snprintf(deviceURI, sizeof(deviceURI), "http://%s:8008/apps/YouTube", url.psz_host );
-        access_t *p_test_app = vlc_access_NewMRL( VLC_OBJECT(p_this), deviceURI );
-        if ( !p_test_app )
-            input_item_AddOption( p_device, ":audio_only=1", 0 );
-        else
-            vlc_access_Delete( p_test_app );
-        vlc_UrlClean( &url );
-
-        input_item_AddOption( p_device, ":module=ctrl_chromecast", 0 );
-
-        input_item_Hold( p_device );
-        return p_device;
-    }
-
-    input_item_t *forward_device_removed(input_item_t *p_device)
-    {
-        if ( p_device )
-            input_item_AddOption( p_device, ":module=ctrl_chromecast", 0 );
-        return p_device;
-    }
-
-private:
-    services_discovery_t * const p_this;
-    services_discovery_t * const p_microdns;
-};
-
-int DiscoveryOpen(vlc_object_t *p_this)
-{
-    services_discovery_t *p_sd = reinterpret_cast<services_discovery_t*>(p_this);
-    vlc_event_manager_t *em = NULL;
-
-    services_discovery_t *p_microdns = vlc_sd_Create( p_this, "microdns{name=._googlecast._tcp.local}" );
-    if (p_microdns == NULL)
-    {
-        msg_Err(p_this, "Could not load the microDNS service");
-        goto error;
-    }
-
-    em = services_discovery_EventManager( p_microdns );
-    vlc_event_attach( em, vlc_ServicesDiscoveryItemAdded, discovery_event_received, p_sd );
-    vlc_event_attach( em, vlc_ServicesDiscoveryItemRemoved, discovery_event_received, p_sd );
-    vlc_event_attach( em, vlc_ServicesDiscoveryItemRemoveAll, discovery_event_received, p_sd );
-
-    if ( !vlc_sd_Start( p_microdns ) )
-    {
-        msg_Err(p_this, "Could not start the microDNS service");
-        goto error;
-    }
-
-    p_sd->p_sys = new(std::nothrow) services_discovery_sys_t( p_sd, p_microdns );
-    if (unlikely(p_sd->p_sys == NULL))
-        goto error;
-
-    return VLC_SUCCESS;
-error:
-    if (p_microdns)
-    {
-        if (em)
-        {
-            vlc_event_detach( em, vlc_ServicesDiscoveryItemAdded, discovery_event_received, p_sd );
-            vlc_event_detach( em, vlc_ServicesDiscoveryItemRemoved, discovery_event_received, p_sd );
-            vlc_event_detach( em, vlc_ServicesDiscoveryItemRemoveAll, discovery_event_received, p_sd );
-        }
-
-        vlc_sd_Destroy(p_microdns);
-    }
-    return VLC_EGENERIC;
-}
-
-void DiscoveryClose(vlc_object_t *p_this)
-{
-    services_discovery_t *p_sd = reinterpret_cast<services_discovery_t*>( p_this );
-    delete p_sd->p_sys;
-}
-
-extern "C" void discovery_event_received( const vlc_event_t * p_event, void * user_data )
-{
-    services_discovery_t *p_sd = reinterpret_cast<services_discovery_t*>(user_data);
-    input_item_t *p_item;
-
-    switch(p_event->type)
-    {
-    case vlc_ServicesDiscoveryItemAdded:
-        p_item = p_event->u.services_discovery_item_added.p_new_item;
-        p_item = p_sd->p_sys->forward_device_added( p_item );
-        if ( p_item )
-        {
-            services_discovery_AddItem( p_sd, p_item, p_event->u.services_discovery_item_added.psz_category );
-            input_item_Release( p_item );
-        }
-        break;
-    case vlc_ServicesDiscoveryItemRemoved:
-        p_item = p_event->u.services_discovery_item_removed.p_item;
-        p_item = p_sd->p_sys->forward_device_removed( p_item );
-        if ( p_item )
-        {
-            services_discovery_RemoveItem( p_sd, p_item );
-            input_item_Release( p_item );
-        }
-        break;
-    case vlc_ServicesDiscoveryItemRemoveAll:
-        services_discovery_RemoveAll( p_sd );
-        break;
-    default:
-        msg_Dbg( p_sd, "unexpected event %d", p_event->type );
-        break;
-    }
 }

@@ -465,6 +465,12 @@ dnl
 dnl checks for mingw
 AS_IF([test "${SYS}" = "mingw32"], [
 
+AC_PREPROC_IFELSE([AC_LANG_SOURCE([
+#if !defined(__MINGW32__)
+# error Not compiling with mingw
+#endif
+    ])], [
+
 dnl Check for broken versions of mingw-runtime compatability library
     AC_MSG_CHECKING(for broken mingw-runtime)
     AC_PREPROC_IFELSE([AC_LANG_SOURCE([
@@ -496,6 +502,9 @@ dnl Check for broken versions of mingw-runtime compatability library
             [VLC_ADD_LIBS([libvlccore],[-lmingwex])])
     )
     VLC_RESTORE_FLAGS
+    ], [
+        AC_MSG_RESULT([Not compiling with mingw])
+    ])
 
     dnl Check for fnative-struct or mms-bitfields support for mingw32
     VLC_SAVE_FLAGS
@@ -524,6 +533,7 @@ AS_IF([test "${SYS}" = "mingw32"],[
   AS_IF([test "${enable_winstore_app}" = "yes"], [
     vlc_winstore_app=1
      VLC_ADD_LIBS([libvlccore], [-lole32 -lruntimeobject])
+     AC_LIBOBJ([gai_strerror])
     ],[
      VLC_ADD_LIBS([libvlccore],[-lwinmm])
     ])
@@ -566,6 +576,7 @@ dnl Check for usual libc functions
 AC_CHECK_DECLS([nanosleep],,,[#include <time.h>])
 AC_CHECK_FUNCS([daemon fcntl flock fstatvfs fork getenv getpwuid_r isatty lstat memalign mkostemp mmap open_memstream openat pread posix_fadvise posix_madvise setlocale stricmp strnicmp strptime uselocale pthread_cond_timedwait_monotonic_np pthread_condattr_setclock])
 AC_REPLACE_FUNCS([atof atoll dirfd fdopendir ffsll flockfile fsync getdelim getpid gmtime_r lldiv nrand48 poll posix_memalign recvmsg rewind sendmsg setenv strcasecmp strcasestr strdup strlcpy strndup strnlen strnstr strsep strtof strtok_r strtoll swab tdestroy timegm timespec_get strverscmp])
+AC_REPLACE_FUNCS([gettimeofday])
 AC_CHECK_FUNCS(fdatasync,,
   [AC_DEFINE(fdatasync, fsync, [Alias fdatasync() to fsync() if missing.])
 ])
@@ -611,6 +622,10 @@ AC_CHECK_TYPES([struct pollfd],,,
 # include <winsock2.h>
 #endif
 ])
+
+dnl Check for struct timespec
+AC_CHECK_TYPES([struct timespec],,,
+[#include <time.h>])
 
 dnl Checks for socket stuff
 VLC_SAVE_FLAGS
@@ -886,10 +901,10 @@ dnl
 dnl  Compiler warnings
 dnl
 
-RDC_PROG_CC_WFLAGS([all extra sign-compare undef pointer-arith bad-function-cast write-strings missing-prototypes volatile-register-var error-implicit-function-declaration init-self logical-op])
+RDC_PROG_CC_WFLAGS([all extra sign-compare undef pointer-arith bad-function-cast write-strings missing-prototypes volatile-register-var error-implicit-function-declaration init-self logical-op format-security])
 RDC_PROG_CC_FLAGS([-pipe])
 AC_LANG_PUSH([C++])
-RDC_PROG_CXX_WFLAGS([all extra sign-compare undef pointer-arith volatile-register-var])
+RDC_PROG_CXX_WFLAGS([all extra sign-compare undef pointer-arith volatile-register-var format-security])
 AC_LANG_POP([C++])
 
 dnl
@@ -1547,7 +1562,7 @@ then
     AC_MSG_ERROR([Could not find the LUA byte compiler.])
   ])
   AS_IF([test -d "${CONTRIB_DIR}" -a -f "${CONTRIB_DIR}/lib/liblua.a" -a `echo|${LUAC} -o - -|od -j 8 -N 2 -t x2|head -n 1|tr -s ' '|cut -d' ' -f2` != 0404], [
-    AC_MSG_ERROR([You need 32-bits luac when using using lua from contrib.])
+    AC_MSG_ERROR([You need 32-bits luac when using lua from contrib.])
   ])
 fi
 AM_CONDITIONAL(BUILD_LUA, [test "${have_lua}" = "yes"])
@@ -2612,7 +2627,7 @@ dnl
 dnl libvpx decoder plugin
 dnl
 AC_ARG_ENABLE(vpx,
-    AS_HELP_STRING([--enable-vpx],[libvpx VP8/VP9 decoder (default auto)]))
+    AS_HELP_STRING([--enable-vpx],[libvpx VP8/VP9 encoder and decoder (default auto)]))
 AS_IF([test "${enable_vpx}" != "no"],[
     PKG_CHECK_MODULES([VPX], [vpx] , [
         VLC_ADD_PLUGIN([vpx])
@@ -2623,6 +2638,12 @@ AS_IF([test "${enable_vpx}" != "no"],[
         ], [], [${VPX_LIBS}])
         AC_CHECK_LIB([vpx],[vpx_codec_vp9_dx], [
             VLC_ADD_CPPFLAGS([vpx], [-DENABLE_VP9_DECODER])
+        ], [], [${VPX_LIBS}])
+        AC_CHECK_LIB([vpx],[vpx_codec_vp8_cx], [
+            VLC_ADD_CPPFLAGS([vpx], [-DENABLE_VP8_ENCODER])
+        ], [], [${VPX_LIBS}])
+        AC_CHECK_LIB([vpx],[vpx_codec_vp9_cx], [
+            VLC_ADD_CPPFLAGS([vpx], [-DENABLE_VP9_ENCODER])
         ], [], [${VPX_LIBS}])
     ], [
     AS_IF([test "${enable_vpx}" = "yes"],[
@@ -3266,11 +3287,15 @@ AM_CONDITIONAL([HAVE_HARFBUZZ], [test "${have_harfbuzz}" = "yes"])
 dnl
 dnl SAPI (text to Speech renderer for Windows)
 dnl
-AC_CHECK_HEADERS(sapi.h, [
+AC_LANG_PUSH([C++])
+AC_CHECK_TYPES([ISpObjectToken],[
               have_sapi="yes"
-            ],[AC_MSG_WARN([sapi.h not found. Text to Speech renderer for Windows disabled])])
-
+            ],[AC_MSG_WARN([sapi.h not found. Text to Speech renderer for Windows disabled])],
+              [#include <windows.h>
+               #include <sapi.h>
+               #include <sphelper.h>])
 AM_CONDITIONAL([HAVE_SAPI], [test "${have_sapi}" = "yes"])
+AC_LANG_POP([C++])
 
 dnl
 dnl  QuartzText vout module (iOS/Mac OS)
@@ -3736,11 +3761,6 @@ AM_CONDITIONAL([BUILD_CHROMECAST], [test "${build_chromecast}" = "yes"])
 m4_popdef([protobuf_lite_version])
 
 dnl
-dnl microdns for Chromecast
-dnl
-PKG_ENABLE_MODULES_VLC([MDNS], [], [microdns], [mDNS discovery service], [auto])
-
-dnl
 dnl  Interface plugins
 dnl
 
@@ -3922,17 +3942,6 @@ then
 fi
 
 dnl
-dnl  MacOS X dialog provider
-dnl
-AC_ARG_ENABLE(macosx-dialog-provider,
-  [  --enable-macosx-dialog-provider Mac OS X dialog module (default enabled on Mac OS X)])
-if test "x${enable_macosx_dialog_provider}" != "xno" &&
-  (test "${SYS}" = "darwin" || test "${enable_macosx_dialog_provider}" = "yes")
-then
-  VLC_ADD_PLUGIN([macosx_dialog_provider])
-fi
-
-dnl
 dnl  VideoToolbox plugins
 AC_CHECK_HEADERS(VideoToolbox/VideoToolbox.h, [
     VLC_ADD_PLUGIN([videotoolbox])
@@ -4014,8 +4023,8 @@ AS_IF([test "${enable_vsxu}" != "no"],
 
 EXTEND_HELP_STRING([Service Discovery plugins:])
 dnl
-dnl  Bonjour services discovery
-PKG_ENABLE_MODULES_VLC([BONJOUR], [], [avahi-client >= 0.6], [Bonjour services discovery], [auto])
+dnl  Avahi-Zeroconf services discovery
+PKG_ENABLE_MODULES_VLC([AVAHI], [], [avahi-client >= 0.6], [Zeroconf services discovery], [auto])
 
 dnl
 dnl  libudev services discovery
@@ -4029,6 +4038,12 @@ dnl
 dnl UPnP Plugin (Intel SDK)
 dnl
 PKG_ENABLE_MODULES_VLC([UPNP], [upnp], [libupnp], [Intel UPNP SDK],[auto])
+
+dnl
+dnl mDNS using libmicrodns
+dnl
+PKG_ENABLE_MODULES_VLC([MICRODNS], [], [microdns], [mDNS services discovery], [auto])
+
 
 EXTEND_HELP_STRING([Misc options:])
 

@@ -136,7 +136,11 @@ find_closest_path(vlc_keystore_entry *p_entries, unsigned i_count,
         vlc_keystore_entry *p_entry = &p_entries[i];
         const char *psz_entry_path = p_entry->ppsz_values[KEY_PATH];
         if (psz_entry_path == NULL)
+        {
+            if (p_match_entry == NULL)
+                p_match_entry = p_entry;
             continue;
+        }
         size_t i_entry_pathlen = strlen(psz_entry_path);
 
         if (strncasecmp(psz_decoded_path, psz_entry_path, i_entry_pathlen) == 0
@@ -153,8 +157,15 @@ find_closest_path(vlc_keystore_entry *p_entries, unsigned i_count,
 static bool
 is_credential_valid(vlc_credential *p_credential)
 {
-    return p_credential->psz_username && *p_credential->psz_username != '\0'
-        && p_credential->psz_password;
+    if (p_credential->psz_username && *p_credential->psz_username != '\0'
+     && p_credential->psz_password)
+        return true;
+    else
+    {
+        p_credential->psz_username = p_credential->psz_password = NULL;
+        return false;
+    }
+
 }
 
 /* Default port for each protocol */
@@ -383,42 +394,40 @@ vlc_credential_get(vlc_credential *p_credential, vlc_object_t *p_parent,
         case GET_FROM_DIALOG:
             if (!psz_dialog_title || !psz_dialog_fmt)
                 return false;
+            char *psz_dialog_username = NULL;
+            char *psz_dialog_password = NULL;
+            va_list ap;
+            va_start(ap, psz_dialog_fmt);
+            bool *p_store = p_credential->p_keystore != NULL ?
+                            &p_credential->b_store : NULL;
+            int i_ret =
+                vlc_dialog_wait_login_va(p_parent,
+                                         &psz_dialog_username,
+                                         &psz_dialog_password, p_store,
+                                         p_credential->psz_username,
+                                         psz_dialog_title, psz_dialog_fmt, ap);
+            va_end(ap);
 
+            /* Free previous dialog strings after vlc_dialog_wait_login_va call
+             * since p_credential->psz_username (default username) can be a
+             * pointer to p_credential->psz_dialog_username */
             free(p_credential->psz_dialog_username);
             free(p_credential->psz_dialog_password);
-            p_credential->psz_dialog_username =
-            p_credential->psz_dialog_password = NULL;
+            p_credential->psz_dialog_username = psz_dialog_username;
+            p_credential->psz_dialog_password = psz_dialog_password;
 
-            /* TODO: save previously saved username and print it in dialog */
-            va_list ap;
-            char *psz_dialog_text;
-            va_start(ap, psz_dialog_fmt);
-            if (vasprintf(&psz_dialog_text, psz_dialog_fmt, ap) == -1)
-            {
-                va_end(ap);
-                return false;
-            }
-            va_end(ap);
-            dialog_Login(p_parent, p_credential->psz_username,
-                         &p_credential->psz_dialog_username,
-                         &p_credential->psz_dialog_password,
-                         p_credential->p_keystore ? &p_credential->b_store : NULL,
-                         psz_dialog_title, psz_dialog_text);
-            free(psz_dialog_text);
-            if (p_credential->psz_dialog_username
-             && p_credential->psz_dialog_password)
-            {
-                p_credential->psz_username = p_credential->psz_dialog_username;
-                p_credential->psz_password = p_credential->psz_dialog_password;
-
-                if (protocol_is_smb(p_url))
-                    smb_split_domain(p_credential);
-            }
-            else
+            if (i_ret != 1)
             {
                 p_credential->psz_username = p_credential->psz_password = NULL;
                 return false;
             }
+
+            p_credential->psz_username = p_credential->psz_dialog_username;
+            p_credential->psz_password = p_credential->psz_dialog_password;
+
+            if (protocol_is_smb(p_url))
+                smb_split_domain(p_credential);
+
             break;
         }
     }

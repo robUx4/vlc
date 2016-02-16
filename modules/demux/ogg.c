@@ -2017,8 +2017,6 @@ static int Ogg_FindLogicalStreams( demux_t *p_demux )
                 {
                     msg_Dbg( p_demux, "stream %d is of unknown type",
                              p_ogg->i_streams-1 );
-                    FREENULL( p_stream );
-                    p_ogg->i_streams--;
                 }
 
                 /* we'll need to get all headers */
@@ -2203,7 +2201,9 @@ static void Ogg_CleanSpecificData( logical_stream_t *p_stream )
 #ifdef HAVE_LIBVORBIS
     if ( p_stream->fmt.i_codec == VLC_CODEC_VORBIS )
     {
+        vorbis_info_clear( p_stream->special.vorbis.p_info );
         FREENULL( p_stream->special.vorbis.p_info );
+        vorbis_comment_clear( p_stream->special.vorbis.p_comment );
         FREENULL( p_stream->special.vorbis.p_comment );
         p_stream->special.vorbis.i_headers_flags = 0;
     }

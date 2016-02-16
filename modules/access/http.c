@@ -47,10 +47,6 @@
 #include <vlc_interrupt.h>
 #include <vlc_keystore.h>
 
-#ifdef HAVE_ZLIB_H
-#   include <zlib.h>
-#endif
-
 #include <assert.h>
 #include <limits.h>
 
@@ -138,12 +134,12 @@ struct access_sys_t
     char    *psz_referrer;
     char    *psz_username;
     char    *psz_password;
-    http_auth_t auth;
+    vlc_http_auth_t auth;
 
     /* Proxy */
     bool b_proxy;
     vlc_url_t  proxy;
-    http_auth_t proxy_auth;
+    vlc_http_auth_t proxy_auth;
     char       *psz_proxy_passbuf;
 
     /* */
@@ -153,14 +149,6 @@ struct access_sys_t
     char       *psz_location;
     bool b_mms;
     bool b_icecast;
-#ifdef HAVE_ZLIB_H
-    bool b_compressed;
-    struct
-    {
-        z_stream   stream;
-        uint8_t   *p_buffer;
-    } inflate;
-#endif
 
     bool b_chunked;
     int64_t    i_chunk;
@@ -187,7 +175,6 @@ struct access_sys_t
 
 /* */
 static ssize_t Read( access_t *, uint8_t *, size_t );
-static ssize_t ReadCompressed( access_t *, uint8_t *, size_t );
 static int Seek( access_t *, uint64_t );
 static int Control( access_t *, int, va_list );
 
@@ -198,9 +185,9 @@ static void Disconnect( access_t * );
 
 
 static void AuthReply( access_t *p_acces, const char *psz_prefix,
-                       vlc_url_t *p_url, http_auth_t *p_auth );
+                       vlc_url_t *p_url, vlc_http_auth_t *p_auth );
 static int AuthCheckReply( access_t *p_access, const char *psz_header,
-                           vlc_url_t *p_url, http_auth_t *p_auth );
+                           vlc_url_t *p_url, vlc_http_auth_t *p_auth );
 static vlc_http_cookie_jar_t *GetCookieJar( vlc_object_t *p_this );
 
 /*****************************************************************************
@@ -231,17 +218,6 @@ static int Open( vlc_object_t *p_this )
     p_sys->psz_username = NULL;
     p_sys->psz_password = NULL;
     p_sys->b_pace_control = true;
-#ifdef HAVE_ZLIB_H
-    p_sys->b_compressed = false;
-    memset( &p_sys->inflate.stream, 0, sizeof(p_sys->inflate.stream) );
-    /* 15 is the max windowBits, +32 to enable optional gzip decoding */
-    if( inflateInit2( &p_sys->inflate.stream, 32+15 ) != Z_OK )
-        msg_Warn( p_access, "Error during zlib initialisation: %s",
-                  p_sys->inflate.stream.msg );
-    if( zlibCompileFlags() & (1<<17) )
-        msg_Warn( p_access, "Your zlib was compiled without gzip support." );
-    p_sys->inflate.p_buffer = NULL;
-#endif
     p_sys->p_creds = NULL;
     p_sys->p_tls = NULL;
     p_sys->i_icy_meta = 0;
@@ -261,8 +237,8 @@ static int Open( vlc_object_t *p_this )
     else
         p_sys->cookies = NULL;
 
-    http_auth_Init( &p_sys->auth );
-    http_auth_Init( &p_sys->proxy_auth );
+    vlc_http_auth_Init( &p_sys->auth );
+    vlc_http_auth_Init( &p_sys->proxy_auth );
     vlc_UrlParse( &p_sys->url, psz_url );
     vlc_credential_init( &credential, &p_sys->url );
 
@@ -457,11 +433,7 @@ connect:
     if( p_sys->b_reconnect ) msg_Dbg( p_access, "auto re-connect enabled" );
 
     /* Set up p_access */
-#ifdef HAVE_ZLIB_H
-    p_access->pf_read = ReadCompressed;
-#else
     p_access->pf_read = Read;
-#endif
     p_access->pf_control = Control;
     p_access->pf_seek = Seek;
 
@@ -485,9 +457,6 @@ error:
     Disconnect( p_access );
     vlc_tls_Delete( p_sys->p_creds );
 
-#ifdef HAVE_ZLIB_H
-    inflateEnd( &p_sys->inflate.stream );
-#endif
     free( p_sys );
     return ret;
 }
@@ -501,10 +470,10 @@ static void Close( vlc_object_t *p_this )
     access_sys_t *p_sys = p_access->p_sys;
 
     vlc_UrlClean( &p_sys->url );
-    http_auth_Reset( &p_sys->auth );
+    vlc_http_auth_Deinit( &p_sys->auth );
     if( p_sys->b_proxy )
         vlc_UrlClean( &p_sys->proxy );
-    http_auth_Reset( &p_sys->proxy_auth );
+    vlc_http_auth_Deinit( &p_sys->proxy_auth );
 
     free( p_sys->psz_mime );
     free( p_sys->psz_location );
@@ -520,11 +489,6 @@ static void Close( vlc_object_t *p_this )
 
     Disconnect( p_access );
     vlc_tls_Delete( p_sys->p_creds );
-
-#ifdef HAVE_ZLIB_H
-    inflateEnd( &p_sys->inflate.stream );
-    free( p_sys->inflate.p_buffer );
-#endif
 
     free( p_sys );
 }
@@ -742,43 +706,6 @@ static int ReadICYMeta( access_t *p_access )
 
     return VLC_SUCCESS;
 }
-
-#ifdef HAVE_ZLIB_H
-static ssize_t ReadCompressed( access_t *p_access, uint8_t *p_buffer,
-                               size_t i_len )
-{
-    access_sys_t *p_sys = p_access->p_sys;
-
-    if( p_sys->b_compressed )
-    {
-        int i_ret;
-
-        if( !p_sys->inflate.p_buffer )
-            p_sys->inflate.p_buffer = malloc( 256 * 1024 );
-
-        if( p_sys->inflate.stream.avail_in == 0 )
-        {
-            ssize_t i_read = Read( p_access, p_sys->inflate.p_buffer, 256 * 1024 );
-            if( i_read <= 0 ) return i_read;
-            p_sys->inflate.stream.next_in = p_sys->inflate.p_buffer;
-            p_sys->inflate.stream.avail_in = i_read;
-        }
-
-        p_sys->inflate.stream.avail_out = i_len;
-        p_sys->inflate.stream.next_out = p_buffer;
-
-        i_ret = inflate( &p_sys->inflate.stream, Z_SYNC_FLUSH );
-        if ( i_ret != Z_OK && i_ret != Z_STREAM_END )
-            msg_Warn( p_access, "inflate return value: %d, %s", i_ret, p_sys->inflate.stream.msg );
-
-        return i_len - p_sys->inflate.stream.avail_out;
-    }
-    else
-    {
-        return Read( p_access, p_buffer, i_len );
-    }
-}
-#endif
 
 /*****************************************************************************
  * Seek: close and re-open a connection at the right place
@@ -1240,14 +1167,6 @@ static int Request( access_t *p_access, uint64_t i_tell )
         else if( !strcasecmp( psz, "Content-Encoding" ) )
         {
             msg_Dbg( p_access, "Content-Encoding: %s", p );
-            if( !strcasecmp( p, "identity" ) )
-                ;
-#ifdef HAVE_ZLIB_H
-            else if( !strcasecmp( p, "gzip" ) || !strcasecmp( p, "deflate" ) )
-                p_sys->b_compressed = true;
-#endif
-            else
-                msg_Warn( p_access, "Unknown content coding: %s", p );
         }
         else if( !strcasecmp( psz, "Pragma" ) )
         {
@@ -1357,14 +1276,14 @@ static int Request( access_t *p_access, uint64_t i_tell )
         else if( !strcasecmp( psz, "www-authenticate" ) )
         {
             msg_Dbg( p_access, "Authentication header: %s", p );
-            http_auth_ParseWwwAuthenticateHeader( VLC_OBJECT(p_access),
-                                                  &p_sys->auth, p );
+            vlc_http_auth_ParseWwwAuthenticateHeader( VLC_OBJECT(p_access),
+                                                      &p_sys->auth, p );
         }
         else if( !strcasecmp( psz, "proxy-authenticate" ) )
         {
             msg_Dbg( p_access, "Proxy authentication header: %s", p );
-            http_auth_ParseWwwAuthenticateHeader( VLC_OBJECT(p_access),
-                                                  &p_sys->proxy_auth, p );
+            vlc_http_auth_ParseWwwAuthenticateHeader( VLC_OBJECT(p_access),
+                                                      &p_sys->proxy_auth, p );
         }
         else if( !strcasecmp( psz, "authentication-info" ) )
         {
@@ -1413,15 +1332,15 @@ static void Disconnect( access_t *p_access )
  *****************************************************************************/
 
 static void AuthReply( access_t *p_access, const char *psz_prefix,
-                       vlc_url_t *p_url, http_auth_t *p_auth )
+                       vlc_url_t *p_url, vlc_http_auth_t *p_auth )
 {
     char *psz_value;
 
     psz_value =
-        http_auth_FormatAuthorizationHeader( VLC_OBJECT(p_access), p_auth,
-                                             "GET", p_url->psz_path,
-                                             p_url->psz_username,
-                                             p_url->psz_password );
+        vlc_http_auth_FormatAuthorizationHeader( VLC_OBJECT(p_access), p_auth,
+                                                 "GET", p_url->psz_path,
+                                                 p_url->psz_username,
+                                                 p_url->psz_password );
     if ( psz_value == NULL )
         return;
 
@@ -1430,14 +1349,15 @@ static void AuthReply( access_t *p_access, const char *psz_prefix,
 }
 
 static int AuthCheckReply( access_t *p_access, const char *psz_header,
-                           vlc_url_t *p_url, http_auth_t *p_auth )
+                           vlc_url_t *p_url, vlc_http_auth_t *p_auth )
 {
     return
-        http_auth_ParseAuthenticationInfoHeader( VLC_OBJECT(p_access), p_auth,
-                                                 psz_header, "",
-                                                 p_url->psz_path,
-                                                 p_url->psz_username,
-                                                 p_url->psz_password );
+        vlc_http_auth_ParseAuthenticationInfoHeader( VLC_OBJECT(p_access),
+                                                     p_auth,
+                                                     psz_header, "",
+                                                     p_url->psz_path,
+                                                     p_url->psz_username,
+                                                     p_url->psz_password );
 }
 
 /*****************************************************************************

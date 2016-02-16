@@ -155,7 +155,7 @@ access_LTLIBRARIES += $(LTLIBlinsys_hdsdi) $(LTLIBlinsys_sdi)
 EXTRA_LTLIBRARIES += liblinsys_hdsdi_plugin.la liblinsys_sdi_plugin.la
 
 libdecklink_plugin_la_SOURCES = access/decklink.cpp access/sdi.c access/sdi.h
-libdecklink_plugin_la_CXXFLAGS = $(AM_CFLAGS) $(CPPFLAGS_decklink)
+libdecklink_plugin_la_CXXFLAGS = $(AM_CXXFLAGS) $(CPPFLAGS_decklink)
 libdecklink_plugin_la_LIBADD = $(LIBS_decklink) $(LIBDL) -lpthread
 if HAVE_DECKLINK
 access_LTLIBRARIES += libdecklink_plugin.la
@@ -367,9 +367,6 @@ access_LTLIBRARIES += libftp_plugin.la
 
 libhttp_plugin_la_SOURCES = access/http.c
 libhttp_plugin_la_LIBADD = $(SOCKET_LIBS)
-if HAVE_ZLIB
-libhttp_plugin_la_LIBADD += -lz
-endif
 access_LTLIBRARIES += libhttp_plugin.la
 
 liblive555_plugin_la_SOURCES = access/live555.cpp access/mms/asf.c access/mms/buffer.c
@@ -425,7 +422,7 @@ EXTRA_LTLIBRARIES += libsftp_plugin.la
 
 libnfs_plugin_la_SOURCES = access/nfs.c
 libnfs_plugin_la_CFLAGS = $(AM_CFLAGS) $(NFS_CFLAGS)
-libnfs_plugin_la_LIBADD = $(NFS_LIBS)
+libnfs_plugin_la_LIBADD = $(NFS_LIBS) $(SOCKET_LIBS)
 libnfs_plugin_la_LDFLAGS = $(AM_LDFLAGS) -rpath '$(accessdir)'
 access_LTLIBRARIES += $(LTLIBnfs)
 EXTRA_LTLIBRARIES += libnfs_plugin.la

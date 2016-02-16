@@ -330,10 +330,12 @@ static int st_validateServerCertificate (vlc_tls_t *session, const char *hostnam
              "This problem may be caused by a configuration error "
              "or an attempt to breach your security or your privacy.\n\n"
              "If in doubt, abort now.\n");
-    int answer = dialog_Question(session->obj, _("Insecure site"), vlc_gettext (msg),
-                                  _("Abort"), _("Accept certificate temporarily"), NULL, hostname);
-
-    if (answer == 2) {
+    int answer = vlc_dialog_wait_question(session->obj,
+                                          VLC_DIALOG_QUESTION_WARNING, _("Abort"),
+                                          _("Accept certificate temporarily"),
+                                          NULL, _("Insecure site"),
+                                          vlc_gettext (msg), hostname);
+    if (answer == 1) {
         msg_Warn(session->obj, "Proceeding despite of failed certificate validation");
 
         /* save leaf certificate in whitelist */
@@ -413,7 +415,7 @@ static int st_Handshake (vlc_tls_creds_t *crd, vlc_tls_t *session,
             msg_Err(crd, "cipher suite negotiation failed");
             return -1;
         case errSSLFatalAlert:
-            msg_Err(crd, "fatal error occured during handshake");
+            msg_Err(crd, "fatal error occurred during handshake");
             return -1;
 
         default:
@@ -708,7 +710,7 @@ static int st_ServerSessionOpen (vlc_tls_creds_t *crd, vlc_tls_t *tls,
         goto error;
     }
 
-    vlc_tls_sys_t *sys = session->sys;
+    vlc_tls_sys_t *sys = tls->sys;
     vlc_tls_creds_sys_t *p_cred_sys = crd->sys;
     sys->b_server_mode = true;
 
@@ -721,8 +723,8 @@ static int st_ServerSessionOpen (vlc_tls_creds_t *crd, vlc_tls_t *tls,
     return VLC_SUCCESS;
 
 error:
-    st_SessionShutdown(session, true);
-    st_SessionClose(session);
+    st_SessionShutdown(tls, true);
+    st_SessionClose(tls);
     return VLC_EGENERIC;
 }
 

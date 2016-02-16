@@ -37,6 +37,7 @@ Attribute::Attribute(const std::string &name_, const std::string &value_)
 uint64_t Attribute::decimal() const
 {
     std::istringstream is(value);
+    is.imbue(std::locale("C"));
     uint64_t ret;
     is >> ret;
     return ret;
@@ -60,6 +61,7 @@ std::vector<uint8_t> Attribute::hexSequence() const
         {
             unsigned val;
             std::stringstream ss(value.substr(i, 2));
+            ss.imbue(std::locale("C"));
             ss >> std::hex >> val;
             ret.push_back(val);
         }
@@ -72,6 +74,7 @@ std::pair<std::size_t,std::size_t> Attribute::getByteRange() const
     std::size_t length = 0;
     std::size_t offset = 0;
     std::istringstream is(value);
+    is.imbue(std::locale("C"));
 
     if(!is.eof())
     {
@@ -92,6 +95,7 @@ std::pair<int, int> Attribute::getResolution() const
     int w = 0, h = 0;
 
     std::istringstream is(value);
+    is.imbue(std::locale("C"));
     if(!is.eof())
     {
         is >> w;

@@ -34,6 +34,13 @@
 #undef NDEBUG
 #include <assert.h>
 
+/*
+ * Build and exec all keystore tests:
+ * $ cd vlc/build-<name>/test
+ * $ make test_modules_keystore
+ * $ ./test_modules_keystore -a
+ */
+
 static const struct
 {
     const char *psz_module;
@@ -44,7 +51,8 @@ static const struct
     /* Following keystores are tested only when asked explicitly by the tester
      * (with "-a" argv) */
     { "secret", false },
-    { "kwallet", false }
+    { "kwallet", false },
+    { "keychain", false }
 };
 
 static void
@@ -78,7 +86,8 @@ ks_find(vlc_keystore *p_keystore, const char *const ppsz_values[KEY_MAX],
             assert(strcmp(psz_value1, psz_value2) == 0);
         }
     }
-    vlc_keystore_release_entries(p_entries, i_entries);
+    if (i_entries > 0)
+        vlc_keystore_release_entries(p_entries, i_entries);
     return i_entries;
 }
 

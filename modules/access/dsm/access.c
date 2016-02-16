@@ -256,9 +256,12 @@ static int get_address( access_t *p_access )
                 struct sockaddr_in *in = (struct sockaddr_in *)p_info->ai_addr;
                 p_sys->addr.s_addr = in->sin_addr.s_addr;
             }
-            freeaddrinfo( p_info );
             if( p_info->ai_family != AF_INET )
+            {
+                freeaddrinfo( p_info );
                 return VLC_EGENERIC;
+            }
+            freeaddrinfo( p_info );
         }
         else
             return VLC_EGENERIC;
@@ -323,7 +326,7 @@ static int login( access_t *p_access )
     vlc_UrlParse( &url, p_access->psz_url );
     vlc_credential_init( &credential, &url );
     psz_var_domain = var_InheritString( p_access, "smb-domain" );
-    credential.psz_realm = psz_var_domain ? psz_var_domain : p_sys->netbios_name;
+    credential.psz_realm = psz_var_domain ? psz_var_domain : NULL;
 
     vlc_credential_get( &credential, p_access, "smb-user", "smb-pwd",
                         NULL, NULL );
@@ -339,7 +342,7 @@ static int login( access_t *p_access )
         psz_login = credential.psz_username;
         psz_password = credential.psz_password;
     }
-    psz_domain = credential.psz_realm;
+    psz_domain = credential.psz_realm ? credential.psz_realm : p_sys->netbios_name;
 
     /* Try to authenticate on the remote machine */
     if( smb_connect( p_access, psz_login, psz_password, psz_domain )
@@ -352,7 +355,8 @@ static int login( access_t *p_access )
             b_guest = false;
             psz_login = credential.psz_username;
             psz_password = credential.psz_password;
-            psz_domain = credential.psz_realm;
+            psz_domain = credential.psz_realm ? credential.psz_realm
+                                              : p_sys->netbios_name;
             if( smb_connect( p_access, psz_login, psz_password, psz_domain )
                              == VLC_SUCCESS )
                 goto success;
@@ -371,11 +375,13 @@ static int login( access_t *p_access )
 success:
     msg_Warn( p_access, "Creds: username = '%s', domain = '%s'",
              psz_login, psz_domain );
-    if( p_sys->psz_share != NULL && !b_guest )
+    if( !b_guest )
     {
         if( asprintf( &p_sys->psz_user_opt, "smb-user=%s", psz_login ) == -1 )
             p_sys->psz_user_opt = NULL;
-        if( asprintf( &p_sys->psz_domain_opt, "smb-domain=%s", psz_domain ) == -1 )
+        if( credential.psz_realm != NULL
+         && asprintf( &p_sys->psz_domain_opt, "smb-domain=%s",
+                      credential.psz_realm ) == -1 )
             p_sys->psz_domain_opt = NULL;
 
         if( !vlc_credential_store( &credential )

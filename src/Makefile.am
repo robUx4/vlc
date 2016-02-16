@@ -116,7 +116,6 @@ noinst_HEADERS = \
 	../include/vlc_update.h \
 	../include/vlc_vod.h \
 	../include/vlc_vout_wrapper.h \
-	../include/vlc_windows_interfaces.h \
 	$(NULL)
 
 ../include/vlc_about.h: Makefile.am $(top_srcdir)/COPYING $(top_srcdir)/THANKS $(top_srcdir)/AUTHORS
@@ -417,6 +416,7 @@ SOURCES_libvlc_common = \
 	audio_output/output.c \
 	audio_output/volume.c \
 	network/getaddrinfo.c \
+	network/http_auth.c \
 	network/io.c \
 	network/tcp.c \
 	network/udp.c \
@@ -483,7 +483,6 @@ SOURCES_libvlc_common = \
 	misc/addons.c \
 	misc/filter.c \
 	misc/filter_chain.c \
-	misc/http_auth.c \
 	misc/httpcookies.c \
 	misc/fingerprinter.c \
 	misc/text_style.c \

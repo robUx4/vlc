@@ -114,7 +114,7 @@ VLC_API void vlc_LogSet(libvlc_int_t *, vlc_log_cb cb, void *data);
 /*@}*/
 
 /* Interface dialog ids for dialog providers */
-typedef enum vlc_dialog {
+typedef enum vlc_intf_dialog {
     INTF_DIALOG_FILE_SIMPLE = 1,
     INTF_DIALOG_FILE,
     INTF_DIALOG_DISC,
@@ -147,7 +147,7 @@ typedef enum vlc_dialog {
     INTF_DIALOG_VLM,
 
     INTF_DIALOG_EXIT = 99
-} vlc_dialog_t;
+} vlc_intf_dialog;
 
 /* Useful text messages shared by interfaces */
 #define INTF_ABOUT_MSG LICENSE_MSG
@@ -158,7 +158,7 @@ typedef enum vlc_dialog {
                          "oga", "ogg", "oma", "opus", "qcp", "ra", "rmi", "s3m", "sid", "spx", "tak", "thd", "tta", \
                          "voc", "vqf", "w64", "wav", "wma", "wv", "xa", "xm"
 
-#define EXTENSIONS_VIDEO_CSV "3g2", "3gp", "3gp2", "3gpp", "amv", "asf", "avi", "bik", "divx", "drc", "dv", \
+#define EXTENSIONS_VIDEO_CSV "3g2", "3gp", "3gp2", "3gpp", "amv", "asf", "avi", "bik", "crf", "divx", "drc", "dv", \
                              "evo", "f4v", "flv", "gvi", "gxf", "iso", \
                              "m1v", "m2v", "m2t", "m2ts", "m4v", "mkv", "mov",\
                              "mp2", "mp2v", "mp4", "mp4v", "mpe", "mpeg", "mpeg1", \
@@ -226,7 +226,7 @@ typedef enum vlc_dialog {
     "*.xa;"  \
     "*.xm"
 
-#define EXTENSIONS_VIDEO "*.3g2;*.3gp;*.3gp2;*.3gpp;*.amv;*.asf;*.avi;*.bik;*.bin;*.divx;*.drc;*.dv;*.evo;*.f4v;*.flv;*.gvi;*.gxf;*.iso;*.m1v;*.m2v;" \
+#define EXTENSIONS_VIDEO "*.3g2;*.3gp;*.3gp2;*.3gpp;*.amv;*.asf;*.avi;*.bik;*.bin;*.crf;*.divx;*.drc;*.dv;*.evo;*.f4v;*.flv;*.gvi;*.gxf;*.iso;*.m1v;*.m2v;" \
                          "*.m2t;*.m2ts;*.m4v;*.mkv;*.mov;*.mp2;*.mp2v;*.mp4;*.mp4v;*.mpe;*.mpeg;*.mpeg1;" \
                          "*.mpeg2;*.mpeg4;*.mpg;*.mpv2;*.mts;*.mtv;*.mxf;*.mxg;*.nsv;*.nuv;" \
                          "*.ogg;*.ogm;*.ogv;*.ogx;*.ps;" \

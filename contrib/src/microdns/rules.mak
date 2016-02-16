@@ -1,29 +1,22 @@
-# microdns
+# libmicrodns
 
-MICRODNS_VERSION := git
-MICRODNS_HASH := HEAD
-MICRODNS_GITURL := https://github.com/videolabs/libmicrodns.git
+LIBMICRODNS_VERSION := 0.0.1
+LIBMICRODNS_URL := https://github.com/videolabs/libmicrodns/releases/download/$(LIBMICRODNS_VERSION)/microdns-$(LIBMICRODNS_VERSION).tar.gz
 
-PKGS += microdns
-ifeq ($(call need_pkg,"microdns"),)
-PKGS_FOUND += microdns
+ifeq ($(call need_pkg,"microdns >= 0.0.1"),)
+PKGS_FOUND += libmicrodns
 endif
 
-$(TARBALLS)/microdns-$(MICRODNS_HASH).tar.xz:
-	$(call download_git,$(MICRODNS_GITURL),,$(MICRODNS_HASH))
+$(TARBALLS)/microdns-$(LIBMICRODNS_VERSION).tar.gz:
+	$(call download,$(LIBMICRODNS_URL))
 
-.sum-microdns: $(TARBALLS)/microdns-$(HASH).tar.xz
-	$(warning Not implemented.)
-	touch $@
+.sum-microdns: $(TARBALLS)/microdns-$(LIBMICRODNS_VERSION).tar.gz
 
-microdns: microdns-$(HASH).tar.xz .sum-microdns
-	rm -Rf $@ $@-$(HASH)
-	mkdir -p $@-$(HASH)
-	$(XZCAT) "$<" | (cd $@-$(HASH) && tar xv --strip-components=1)
-	$(MOVE)
+microdns: microdns-$(LIBMICRODNS_VERSION).tar.gz .sum-microdns
+	$(UNPACK)
+	mv microdns-$(LIBMICRODNS_VERSION) microdns
 
 .microdns: microdns
-	$(RECONF)
 	cd $< && $(HOSTVARS) ./configure $(HOSTCONF)
 	cd $< && $(MAKE) install
 	touch $@

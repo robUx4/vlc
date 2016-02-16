@@ -175,6 +175,8 @@
 #define VLC_CODEC_TDSC            VLC_FOURCC('T','D','S','C')
 #define VLC_CODEC_HQX             VLC_FOURCC('C','H','Q','X')
 #define VLC_CODEC_HQ_HQA          VLC_FOURCC('C','U','V','C')
+#define VLC_CODEC_HAP             VLC_FOURCC('H','A','P','1')
+#define VLC_CODEC_DXV             VLC_FOURCC('D','X','D','3')
 
 /***********
  * Chromas
@@ -500,6 +502,7 @@
 #define VLC_CODEC_BD_PG     VLC_FOURCC('b','d','p','g')
 /* EBU STL (TECH. 3264-E) */
 #define VLC_CODEC_EBU_STL   VLC_FOURCC('S','T','L',' ')
+#define VLC_CODEC_SCTE_18   VLC_FOURCC('S','C','1','8')
 #define VLC_CODEC_SCTE_27   VLC_FOURCC('S','C','2','7')
 /* EIA-608 */
 #define VLC_CODEC_EIA608_1  VLC_FOURCC('c','c','1',' ')
@@ -512,7 +515,7 @@
 #define VLC_CODEC_XYZ12     VLC_FOURCC('X','Y','1','2')
 
 
-/* Special endian dependant values
+/* Special endian dependent values
  * The suffic N means Native
  * The suffix I means Inverted (ie non native) */
 #ifdef WORDS_BIGENDIAN

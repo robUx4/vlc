@@ -45,6 +45,14 @@
 # include <time.h> /* time_t */
 #endif
 
+#ifndef HAVE_GETTIMEOFDAY
+#ifdef _WIN32
+#include <winsock2.h>
+#else
+#include <sys/time.h>
+#endif
+#endif
+
 #ifndef HAVE_LLDIV
 typedef struct
 {
@@ -209,6 +217,11 @@ struct timespec;
 int timespec_get(struct timespec *, int);
 #endif
 
+/* sys/time.h */
+#ifndef HAVE_GETTIMEOFDAY
+int gettimeofday(struct timeval *, struct timezone *);
+#endif
+
 /* unistd.h */
 #ifndef HAVE_GETPID
 pid_t getpid (void) VLC_NOTHROW;
@@ -344,6 +357,13 @@ struct if_nameindex
 # endif
 # define if_nameindex()         (errno = ENOBUFS, NULL)
 # define if_freenameindex(list) (void)0
+#endif
+
+#ifndef HAVE_STRUCT_TIMESPEC
+struct timespec {
+    time_t  tv_sec;   /* Seconds */
+    long    tv_nsec;  /* Nanoseconds */
+};
 #endif
 
 #ifdef _WIN32

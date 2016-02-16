@@ -369,7 +369,7 @@ modules/codec/fdkaac.c
 modules/codec/flac.c
 modules/codec/fluidsynth.c
 modules/codec/g711.c
-modules/codec/gstdecode.c
+modules/codec/gstreamer/gstdecode.c
 modules/codec/jpeg.c
 modules/codec/kate.c
 modules/codec/libass.c
@@ -394,6 +394,8 @@ modules/codec/quicktime.c
 modules/codec/rawvideo.c
 modules/codec/rtpvideo.c
 modules/codec/schroedinger.c
+modules/codec/scte18.c
+modules/codec/scte18.h
 modules/codec/sdl_image.c
 modules/codec/shine.c
 modules/codec/speex.c
@@ -492,6 +494,7 @@ modules/demux/mpeg/mpgv.c
 modules/demux/mpeg/ps.c
 modules/demux/mpeg/ps.h
 modules/demux/mpeg/ts.c
+modules/demux/mpeg/ts_psi.c
 modules/demux/nsc.c
 modules/demux/nsv.c
 modules/demux/nuv.c
@@ -553,11 +556,6 @@ modules/gui/macosx/coredialogs.h
 modules/gui/macosx/coredialogs.m
 modules/gui/macosx/CoreInteraction.h
 modules/gui/macosx/CoreInteraction.m
-modules/gui/macosx_dialog_provider/dialogProvider.m
-modules/gui/macosx_dialog_provider/VLCLoginPanel.h
-modules/gui/macosx_dialog_provider/VLCLoginPanel.m
-modules/gui/macosx_dialog_provider/VLCProgressPanel.h
-modules/gui/macosx_dialog_provider/VLCProgressPanel.m
 modules/gui/macosx/ExtensionsDialogProvider.h
 modules/gui/macosx/ExtensionsDialogProvider.m
 modules/gui/macosx/ExtensionsManager.h
@@ -945,6 +943,7 @@ modules/hw/vdpau/chroma.c
 modules/hw/vdpau/deinterlace.c
 modules/hw/vdpau/display.c
 modules/hw/vdpau/sharpen.c
+modules/keystore/keychain.m
 modules/lua/demux.c
 modules/lua/intf.c
 modules/lua/libs/configuration.c
@@ -1015,7 +1014,8 @@ modules/packetizer/mpeg4audio.c
 modules/packetizer/mpeg4video.c
 modules/packetizer/mpegvideo.c
 modules/packetizer/vc1.c
-modules/services_discovery/bonjour.c
+modules/services_discovery/avahi.c
+modules/services_discovery/bonjour.m
 modules/services_discovery/mediadirs.c
 modules/services_discovery/mtp.c
 modules/services_discovery/os2drive.c
@@ -1031,6 +1031,7 @@ modules/stream_filter/cache_block.c
 modules/stream_filter/cache_read.c
 modules/stream_filter/decomp.c
 modules/stream_filter/hds/hds.c
+modules/stream_filter/inflate.c
 modules/stream_filter/prefetch.c
 modules/stream_filter/record.c
 modules/stream_out/autodel.c
@@ -1102,6 +1103,7 @@ modules/video_filter/dynamicoverlay/dynamicoverlay_commands.c
 modules/video_filter/dynamicoverlay/dynamicoverlay.h
 modules/video_filter/dynamicoverlay/dynamicoverlay_list.c
 modules/video_filter/dynamicoverlay/dynamicoverlay_queue.c
+modules/video_filter/edgedetection.c
 modules/video_filter/erase.c
 modules/video_filter/extract.c
 modules/video_filter/filter_event_info.h

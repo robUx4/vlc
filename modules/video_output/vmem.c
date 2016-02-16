@@ -2,7 +2,7 @@
  * vmem.c: memory video driver for vlc
  *****************************************************************************
  * Copyright (C) 2008 VLC authors and VideoLAN
- * Copyrgiht (C) 2010 Rémi Denis-Courmont
+ * Copyright (C) 2010 Rémi Denis-Courmont
  *
  * Authors: Sam Hocevar <sam@zoy.org>
  *
@@ -82,7 +82,6 @@ vlc_module_end()
  * Local prototypes
  *****************************************************************************/
 struct picture_sys_t {
-    vout_display_sys_t *sys;
     void *id;
 };
 
@@ -105,21 +104,8 @@ typedef unsigned (*vlc_format_cb)(void **, char *, unsigned *, unsigned *,
                                   unsigned *, unsigned *);
 
 static picture_pool_t *Pool  (vout_display_t *, unsigned);
-static void           Prepare(vout_display_t *, picture_t *, subpicture_t *);
 static void           Display(vout_display_t *, picture_t *, subpicture_t *);
 static int            Control(vout_display_t *, int, va_list);
-
-static void Lock(void *data, picture_t *pic)
-{
-    vout_display_sys_t *sys = data;
-    picture_sys_t *picsys = pic->p_sys;
-    void *planes[PICTURE_PLANE_MAX];
-
-    picsys->id = sys->lock(sys->opaque, planes);
-
-    for (int i = 0; i < pic->i_planes; i++)
-        pic->p[i].p_pixels = planes[i];
-}
 
 static void Unlock(void *data, picture_t *pic)
 {
@@ -132,9 +118,7 @@ static void Unlock(void *data, picture_t *pic)
     for (int i = 0; i < pic->i_planes; i++)
         planes[i] = pic->p[i].p_pixels;
 
-    if (sys->unlock != NULL)
-        sys->unlock(sys->opaque, picsys->id, planes);
-
+    sys->unlock(sys->opaque, picsys->id, planes);
 }
 
 /*****************************************************************************
@@ -247,7 +231,7 @@ static int Open(vlc_object_t *object)
     vd->fmt     = fmt;
     vd->info    = info;
     vd->pool    = Pool;
-    vd->prepare = Prepare;
+    vd->prepare = NULL;
     vd->display = Display;
     vd->control = Control;
     vd->manage  = NULL;
@@ -269,7 +253,8 @@ static void Close(vlc_object_t *object)
 
     if (sys->pool)
     {
-        picture_pool_Enum(sys->pool, Unlock, sys);
+        if (sys->unlock != NULL)
+            picture_pool_Enum(sys->pool, Unlock, sys);
         picture_pool_Release(sys->pool);
     }
     free(sys);
@@ -294,14 +279,15 @@ static picture_pool_t *Pool(vout_display_t *vd, unsigned count)
             count = i;
             break;
         }
-        picsys->sys = sys;
         picsys->id = NULL;
 
         picture_resource_t rsc = { .p_sys = picsys };
+        void *planes[PICTURE_PLANE_MAX];
+
+        picsys->id = sys->lock(sys->opaque, planes);
 
         for (unsigned i = 0; i < PICTURE_PLANE_MAX; i++) {
-            /* vmem-lock is responsible for the allocation */
-            rsc.p[i].p_pixels = NULL;
+            rsc.p[i].p_pixels = planes[i];
             rsc.p[i].i_lines  = sys->lines[i];
             rsc.p[i].i_pitch  = sys->pitches[i];
         }
@@ -321,16 +307,8 @@ static picture_pool_t *Pool(vout_display_t *vd, unsigned count)
             picture_Release(pictures[i]);
     }
 
-    picture_pool_Enum(sys->pool, Lock, sys);
     return sys->pool;
 }
-
-static void Prepare(vout_display_t *vd, picture_t *pic, subpicture_t *subpic)
-{
-    Unlock(vd->sys, pic);
-    VLC_UNUSED(subpic);
-}
-
 
 static void Display(vout_display_t *vd, picture_t *pic, subpicture_t *subpic)
 {
@@ -339,7 +317,6 @@ static void Display(vout_display_t *vd, picture_t *pic, subpicture_t *subpic)
     if (sys->display != NULL)
         sys->display(sys->opaque, pic->p_sys->id);
 
-    Lock(sys, pic);
     picture_Release(pic);
     VLC_UNUSED(subpic);
 }

@@ -61,6 +61,7 @@
 #include <vlc_interface.h>
 
 #include <vlc_charset.h>
+#include <vlc_dialog.h>
 #include <vlc_fs.h>
 #include <vlc_cpu.h>
 #include <vlc_url.h>
@@ -100,7 +101,6 @@ libvlc_int_t * libvlc_InternalCreate( void )
 
     priv = libvlc_priv (p_libvlc);
     priv->playlist = NULL;
-    priv->p_dialog_provider = NULL;
     priv->p_vlm = NULL;
 
     vlc_ExitInit( &priv->exit );
@@ -234,6 +234,14 @@ int libvlc_InternalInit( libvlc_int_t *p_libvlc, int i_argc,
         var_SetString( p_libvlc, "pidfile", "" );
     }
 #endif
+
+    priv->p_dialog_provider = vlc_dialog_provider_new();
+    if( priv->p_dialog_provider == NULL )
+    {
+        vlc_LogDeinit (p_libvlc);
+        module_EndBank (true);
+        return VLC_ENOMEM;
+    }
 
 /* FIXME: could be replaced by using Unix sockets */
 #ifdef HAVE_DBUS
@@ -503,6 +511,8 @@ void libvlc_InternalCleanup( libvlc_int_t *p_libvlc )
     libvlc_Quit( p_libvlc );
     intf_DestroyAll( p_libvlc );
 
+    vlc_dialog_provider_release( priv->p_dialog_provider );
+
 #ifdef ENABLE_VLM
     /* Destroy VLM if created in libvlc_InternalInit */
     if( priv->p_vlm )
@@ -623,6 +633,8 @@ int libvlc_MetaRequest(libvlc_int_t *libvlc, input_item_t *item,
     vlc_mutex_lock( &item->lock );
     if( item->i_preparse_depth == 0 )
         item->i_preparse_depth = 1;
+    if( i_options & META_REQUEST_OPTION_DO_INTERACT )
+        item->b_preparse_interact = true;
     vlc_mutex_unlock( &item->lock );
     playlist_preparser_Push(priv->parser, item, i_options);
     return VLC_SUCCESS;
