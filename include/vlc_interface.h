@@ -88,9 +88,6 @@ struct intf_dialog_args_t
 
 VLC_API int intf_Create( playlist_t *, const char * );
 
-VLC_API intf_thread_t *intf_New( playlist_t *, const char * );
-VLC_API void intf_Release( playlist_t *, intf_thread_t * );
-
 VLC_API void libvlc_Quit( libvlc_int_t * );
 
 static inline playlist_t *pl_Get( struct intf_thread_t *intf )

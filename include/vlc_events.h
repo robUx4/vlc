@@ -129,8 +129,6 @@ typedef enum vlc_event_type_t {
     vlc_ServicesDiscoveryItemAdded,
     vlc_ServicesDiscoveryItemRemoved,
     vlc_ServicesDiscoveryItemRemoveAll,
-    vlc_ServicesDiscoveryRendererAdded,
-    vlc_ServicesDiscoveryRendererRemoved,
     vlc_ServicesDiscoveryStarted,
     vlc_ServicesDiscoveryEnded,
 
@@ -201,14 +199,6 @@ typedef struct vlc_event_t
         {
             input_item_t * p_item;
         } services_discovery_item_removed;
-        struct vlc_services_discovery_renderer_added
-        {
-            vlc_renderer_item * p_new_item;
-        } services_discovery_renderer_added;
-        struct vlc_services_discovery_renderer_removed
-        {
-            vlc_renderer_item * p_item;
-        } services_discovery_renderer_removed;
         struct vlc_services_discovery_started
         {
             void * unused;

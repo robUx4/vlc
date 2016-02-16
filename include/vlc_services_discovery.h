@@ -159,10 +159,7 @@ VLC_API vlc_event_manager_t * services_discovery_EventManager( services_discover
 VLC_API void services_discovery_AddItem( services_discovery_t * p_this, input_item_t * p_item, const char * psz_category );
 VLC_API void services_discovery_RemoveItem( services_discovery_t * p_this, input_item_t * p_item );
 VLC_API void services_discovery_RemoveAll( services_discovery_t * p_sd );
-VLC_API void services_discovery_AddRenderer( services_discovery_t * p_this,
-                                             vlc_renderer_item * p_item );
-VLC_API void services_discovery_RemoveRenderer( services_discovery_t * p_this,
-                                                vlc_renderer_item * p_item );
+
 
 /* SD probing */
 
