@@ -75,6 +75,12 @@ VLC_API void
 vlc_renderer_item_release(vlc_renderer_item *p_item);
 
 /**
+  * Compare two renderer items and return true if they're equal
+  */
+VLC_API bool vlc_renderer_item_equals(const vlc_renderer_item *p_item1,
+                                      const vlc_renderer_item *p_item2);
+
+/**
  * Get the name of a renderer item
  */
 VLC_API const char *

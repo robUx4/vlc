@@ -81,6 +81,15 @@ vlc_renderer_item_name(const vlc_renderer_item *p_item)
     return p_item->psz_name;
 }
 
+bool vlc_renderer_item_equals(const vlc_renderer_item *p_item1,
+                              const vlc_renderer_item *p_item2)
+{
+    return p_item1 && p_item2
+            && (p_item1->i_port == p_item2->i_port || !p_item1->i_port || !p_item2->i_port)
+            && !strcmp(p_item1->psz_host, p_item2->psz_host)
+            && !strcmp(p_item1->psz_module, p_item2->psz_module);
+}
+
 const char *
 vlc_renderer_item_module_name(const vlc_renderer_item *p_item)
 {
