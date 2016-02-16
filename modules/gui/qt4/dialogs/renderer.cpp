@@ -38,32 +38,22 @@
 
 #include "dialogs/renderer.hpp"
 
-#define VAR_RENDERER_CONFIG  "renderer-config"
-
 class RendererItem : public QListWidgetItem
 {
 public:
-    enum RendererType {
-        HAS_VIDEO = UserType,
-        AUDIO_ONLY
-    };
-
-    RendererItem(const char *psz_name, const char *psz_ip,
-                       uint16_t i_port, RendererType type, const char * psz_module)
-        : QListWidgetItem( type==AUDIO_ONLY ? QIcon( ":/sidebar/music" ) : QIcon( ":/sidebar/movie" ),
-                           qfu( psz_name ).append(" (").append(psz_ip).append(')'))
-        , ipAddress( qfu( psz_ip ) )
-        , port(i_port)
-        , type(type)
-        , module(psz_module ? psz_module : "")
+    RendererItem(vlc_renderer_item *obj)
+        : QListWidgetItem( vlc_renderer_item_flags(obj) & RENDERER_CAN_VIDEO ? QIcon( ":/sidebar/movie" ) : QIcon( ":/sidebar/music" ),
+                           qfu( vlc_renderer_item_name(obj) ).append(" (").append(vlc_renderer_item_host(obj)).append(')'))
     {
+        m_obj = vlc_renderer_item_hold(obj);
+    }
+    ~RendererItem()
+    {
+        vlc_renderer_item_release(m_obj);
     }
 
 protected:
-    QString ipAddress;
-    uint16_t port;
-    RendererType type;
-    std::string module;
+    vlc_renderer_item* m_obj;
 
     friend class RendererDialog;
 };
@@ -101,9 +91,8 @@ RendererDialog::~RendererDialog()
 void RendererDialog::onReject()
 {
     /* set the renderer config */
-    playlist_t *p_playlist = pl_Get( p_intf );
-    if( var_Type( p_playlist, VAR_RENDERER_CONFIG ) )
-        var_SetString( p_playlist, VAR_RENDERER_CONFIG, NULL );
+    vlc_renderer *p_renderer = vlc_renderer_current( VLC_OBJECT(p_intf) );
+    vlc_renderer_release( p_renderer );
 
     QVLCDialog::reject();
 }
@@ -152,23 +141,17 @@ void RendererDialog::setVisible(bool visible)
         if ( p_sd != NULL )
         {
             int row = -1;
-            playlist_t *p_playlist = pl_Get( p_intf );
-            char *psz_current_ip = var_GetString( p_playlist, VAR_RENDERER_CONFIG );
-            if (psz_current_ip != NULL)
+            vlc_renderer *p_renderer = vlc_renderer_current( VLC_OBJECT(p_intf) );
+            vlc_renderer_item *p_current_renderer = vlc_renderer_get_item( p_renderer );
+            if (p_current_renderer != NULL)
             {
-                vlc_url_t url;
-                vlc_UrlParse(&url, psz_current_ip);
-                free( psz_current_ip );
-                if (url.psz_host)
+                for ( row = 0 ; row < ui.receiversListWidget->count(); row++ )
                 {
-                    for ( row = 0 ; row < ui.receiversListWidget->count(); row++ )
-                    {
-                        RendererItem *rowItem = reinterpret_cast<RendererItem*>( ui.receiversListWidget->item( row ) );
-                        if (rowItem->ipAddress == url.psz_host)
-                            break;
-                    }
+                    RendererItem *rowItem = reinterpret_cast<RendererItem*>( ui.receiversListWidget->item( row ) );
+                    if (vlc_renderer_item_equals( rowItem->m_obj, p_current_renderer ))
+                        break;
                 }
-                vlc_UrlClean(&url);
+                vlc_renderer_item_release( p_current_renderer );
                 if ( row == ui.receiversListWidget->count() )
                     row = -1;
             }
@@ -212,10 +195,12 @@ void RendererDialog::accept()
     QListWidgetItem *current = ui.receiversListWidget->currentItem();
     if (current != NULL)
     {
-        RendererItem *item = reinterpret_cast<RendererItem*>(current);
-        std::string psz_ip   = item->ipAddress.toUtf8().constData();
-        std::string psz_name = item->text().toUtf8().constData();
-        msg_Dbg( p_intf, "selecting Renderer %s %s:%u", psz_name.c_str(), psz_ip.c_str(), item->port );
+        RendererItem *rowItem = reinterpret_cast<RendererItem*>(current);
+        msg_Dbg( p_intf, "selecting Renderer %s %s:%u", vlc_renderer_item_name(rowItem->m_obj),
+                 vlc_renderer_item_host(rowItem->m_obj), vlc_renderer_item_port(rowItem->m_obj) );
+
+        vlc_renderer_create( VLC_OBJECT(p_intf), rowItem->m_obj );
+#if 0
 
         std::stringstream ss;
         ss << psz_ip;
@@ -254,6 +239,7 @@ void RendererDialog::accept()
             /* Don't recreate the same variable over and over and over... */
             var_Create( p_playlist, VAR_RENDERER_CONFIG, VLC_VAR_STRING );
         var_SetString( p_playlist, VAR_RENDERER_CONFIG, ss.str().c_str() );
+#endif
     }
 
     QVLCDialog::accept();
@@ -263,7 +249,7 @@ void RendererDialog::discoveryEventReceived( const vlc_event_t * p_event )
 {
     if ( p_event->type == vlc_ServicesDiscoveryRendererAdded )
     {
-        const vlc_renderer_item *p_item =  p_event->u.services_discovery_renderer_added.p_new_item;
+        vlc_renderer_item *p_item =  p_event->u.services_discovery_renderer_added.p_new_item;
         const char *psz_module = vlc_renderer_item_module_name(p_item);
 
         if (!psz_module || !psz_module[0])
@@ -273,40 +259,24 @@ void RendererDialog::discoveryEventReceived( const vlc_event_t * p_event )
         if (!psz_path || !*psz_path)
             return;
 
-        unsigned i_port = vlc_renderer_item_port(p_item);
-        const char *psz_host = vlc_renderer_item_host(p_item);
-
-        if (psz_host)
+        int row = 0;
+        for ( ; row < ui.receiversListWidget->count(); row++ )
         {
-            int row = 0;
-            for ( ; row < ui.receiversListWidget->count(); row++ )
-            {
-                RendererItem *rowItem = reinterpret_cast<RendererItem*>( ui.receiversListWidget->item( row ) );
-                if (rowItem->ipAddress == psz_host)
-                    return;
-            }
+            RendererItem *rowItem = reinterpret_cast<RendererItem*>( ui.receiversListWidget->item( row ) );
+            if (vlc_renderer_item_equals(rowItem->m_obj, p_item))
+                return;
         }
 
-        renderer_item_flags e_flags = vlc_renderer_item_flags(p_item);
-        RendererItem::RendererType type;
-        if (e_flags & RENDERER_CAN_VIDEO)
-            type = RendererItem::RendererType::HAS_VIDEO;
-        else
-            type = RendererItem::RendererType::AUDIO_ONLY;
-        RendererItem *item = new RendererItem( psz_path, psz_host, i_port,
-                                               type, psz_module );
-        ui.receiversListWidget->addItem( item );
+        RendererItem *newItem = new RendererItem(p_item);
+        ui.receiversListWidget->addItem( newItem );
 
-        playlist_t *p_playlist = pl_Get( p_intf );
-        char *psz_current_ip = var_GetString( p_playlist, VAR_RENDERER_CONFIG );
-        if (psz_current_ip)
+        vlc_renderer *p_renderer = vlc_renderer_current( VLC_OBJECT(p_intf) );
+        vlc_renderer_item *p_current_renderer = vlc_renderer_get_item( p_renderer );
+        if (p_current_renderer)
         {
-            vlc_url_t url;
-            vlc_UrlParse(&url, psz_current_ip);
-            free( psz_current_ip );
-            if (url.psz_host && item->ipAddress == url.psz_host)
-                ui.receiversListWidget->setCurrentItem( item );
-            vlc_UrlClean(&url);
+            if (vlc_renderer_item_equals(p_current_renderer, p_item))
+                ui.receiversListWidget->setCurrentItem( newItem );
+            vlc_renderer_item_release( p_current_renderer );
         }
     }
 }
