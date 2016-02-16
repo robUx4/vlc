@@ -91,8 +91,7 @@ RendererDialog::~RendererDialog()
 void RendererDialog::onReject()
 {
     /* set the renderer config */
-    vlc_renderer *p_renderer = vlc_renderer_current( VLC_OBJECT(p_intf) );
-    vlc_renderer_release( p_renderer );
+    vlc_renderer_unload( p_intf );
 
     QVLCDialog::reject();
 }
@@ -141,8 +140,7 @@ void RendererDialog::setVisible(bool visible)
         if ( p_sd != NULL )
         {
             int row = -1;
-            vlc_renderer *p_renderer = vlc_renderer_current( VLC_OBJECT(p_intf) );
-            vlc_renderer_item *p_current_renderer = vlc_renderer_get_item( p_renderer );
+            vlc_renderer_item *p_current_renderer = vlc_renderer_get_item( p_intf );
             if (p_current_renderer != NULL)
             {
                 for ( row = 0 ; row < ui.receiversListWidget->count(); row++ )
@@ -199,7 +197,7 @@ void RendererDialog::accept()
         msg_Dbg( p_intf, "selecting Renderer %s %s:%u", vlc_renderer_item_name(rowItem->m_obj),
                  vlc_renderer_item_host(rowItem->m_obj), vlc_renderer_item_port(rowItem->m_obj) );
 
-        vlc_renderer_create( VLC_OBJECT(p_intf), rowItem->m_obj );
+        vlc_renderer_load( p_intf, rowItem->m_obj );
 #if 0
 
         std::stringstream ss;
@@ -270,8 +268,7 @@ void RendererDialog::discoveryEventReceived( const vlc_event_t * p_event )
         RendererItem *newItem = new RendererItem(p_item);
         ui.receiversListWidget->addItem( newItem );
 
-        vlc_renderer *p_renderer = vlc_renderer_current( VLC_OBJECT(p_intf) );
-        vlc_renderer_item *p_current_renderer = vlc_renderer_get_item( p_renderer );
+        vlc_renderer_item *p_current_renderer = vlc_renderer_get_item( p_intf );
         if (p_current_renderer)
         {
             if (vlc_renderer_item_equals(p_current_renderer, p_item))
