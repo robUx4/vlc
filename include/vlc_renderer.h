@@ -22,12 +22,12 @@
 #define VLC_RENDERER_H 1
 
 /* Called from src/libvlc.c */
-vlc_renderer *
-vlc_renderer_singleton_create(vlc_object_t *p_parent);
+int
+vlc_renderer_init(libvlc_int_t *p_libvlc);
 
 /* Called from src/libvlc.c */
 void
-vlc_renderer_singleton_release(vlc_renderer *);
+vlc_renderer_deinit(libvlc_int_t *p_libvlc);
 
 /**
  * @defgroup vlc_renderer VLC renderer
@@ -116,63 +116,60 @@ vlc_renderer_item_flags(const vlc_renderer_item *p_item);
  * @{
  */
 
-typedef struct vlc_renderer vlc_renderer;
-
 /**
  * Create renderer
  *
  * TODO
  *
- * @param p_parent the parent object 
  * @param p_item the renderer item, must be valid
- * @return a renderer context, need to be stopped with vlc_renderer_stop()
+ * @return VLC_SUCCESS on success, must be unloaded with vlc_renderer_unload()
  */
-VLC_API vlc_renderer *
-vlc_renderer_create(vlc_object_t *p_parent, vlc_renderer_item *p_item);
-#define vlc_renderer_create(a) vlc_renderer_create(VLC_OBJECT(a), b)
+VLC_API int
+vlc_renderer_load(vlc_object_t *p_obj, vlc_renderer_item *p_item);
+#define vlc_renderer_load(a, b) vlc_renderer_load(VLC_OBJECT(a), b)
 
 /**
  * TODO
  */
 VLC_API void
-vlc_renderer_release(vlc_renderer *p_renderer);
+vlc_renderer_unload(vlc_object_t *p_obj);
+#define vlc_renderer_unload(a) vlc_renderer_unload(VLC_OBJECT(a))
 
 /**
  * TODO
  * to be released with vlc_renderer_item_release()
  */
 VLC_API vlc_renderer_item *
-vlc_renderer_get_item(vlc_renderer *p_renderer);
+vlc_renderer_get_item(vlc_object_t *p_obj);
+#define vlc_renderer_get_item(a) vlc_renderer_get_item(VLC_OBJECT(a))
 
 /**
  * Start rendering
  */
 VLC_API int
-vlc_renderer_start(vlc_renderer *p_renderer, input_thread_t *p_input);
+vlc_renderer_start(vlc_object_t *p_obj, input_thread_t *p_input);
+#define vlc_renderer_start(a, b) vlc_renderer_start(VLC_OBJECT(a), b)
 
 /**
  * Stop rendering
  */
 VLC_API void
-vlc_renderer_stop(vlc_renderer *p_renderer);
+vlc_renderer_stop(vlc_object_t *p_obj);
+#define vlc_renderer_stop(a) vlc_renderer_stop(VLC_OBJECT(a))
 
 /**
  * TODO
  */
 VLC_API int
-vlc_renderer_volume_change(vlc_renderer *p_renderer, int i_volume);
+vlc_renderer_volume_change(vlc_object_t *p_obj, int i_volume);
+#define vlc_renderer_volume_change(a, b) vlc_renderer_volume_change(VLC_OBJECT(a), b)
 
 /**
  * TODO
  */
 VLC_API int
-vlc_renderer_volume_mute(vlc_renderer *p_renderer, bool b_mute);
-
-/**
- * TODO
- */
-VLC_API vlc_renderer *
-vlc_renderer_current(vlc_object_t *p_obj);
+vlc_renderer_volume_mute(vlc_object_t *p_obj, bool b_mute);
+#define vlc_renderer_volume_mute(a, b) vlc_renderer_volume_mute(VLC_OBJECT(a), b)
 
 /**
  * @}
@@ -180,6 +177,7 @@ vlc_renderer_current(vlc_object_t *p_obj);
  * @{
  */
 
+typedef struct vlc_renderer vlc_renderer;
 typedef struct vlc_renderer_sys vlc_renderer_sys;
 struct vlc_renderer
 {
