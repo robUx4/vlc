@@ -146,6 +146,7 @@ Service Discovery:
  * New NetBios service discovery using libdsm
  * New mDNS services discovery using libmicrodns
  * New mDNS services discovery using Bonjour (Mac OS X, tvOS, iOS)
+ * New Chromecast devices service discovery
  * Rewrite of the UPnP service discovery
 
 Mac OS X Interface

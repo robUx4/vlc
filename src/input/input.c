@@ -103,7 +103,7 @@ enum {
 };
 
 static void input_SubtitleAdd( input_thread_t *, const char *, unsigned );
-static void input_SubtitleFileAdd( input_thread_t *, char *, unsigned );
+static void input_SubtitleFileAdd( input_thread_t *, const char *, unsigned, bool );
 static void input_ChangeState( input_thread_t *p_input, int i_state ); /* TODO fix name */
 
 #undef input_Create
@@ -946,7 +946,7 @@ static void LoadSubtitles( input_thread_t *p_input )
     if( psz_subtitle != NULL )
     {
         msg_Dbg( p_input, "forced subtitle: %s", psz_subtitle );
-        input_SubtitleFileAdd( p_input, psz_subtitle, i_flags );
+        input_SubtitleFileAdd( p_input, psz_subtitle, i_flags, true );
         i_flags = SUB_NOFLAG;
     }
 
@@ -962,7 +962,7 @@ static void LoadSubtitles( input_thread_t *p_input )
             if( !psz_subtitle || strcmp( psz_subtitle, ppsz_subs[i] ) )
             {
                 i_flags |= SUB_CANFAIL;
-                input_SubtitleFileAdd( p_input, ppsz_subs[i], i_flags );
+                input_SubtitleFileAdd( p_input, ppsz_subs[i], i_flags, false );
                 i_flags = SUB_NOFLAG;
             }
 
@@ -1877,7 +1877,7 @@ static bool Control( input_thread_t *p_input,
 
         case INPUT_CONTROL_ADD_SUBTITLE:
             if( val.psz_string )
-                input_SubtitleFileAdd( p_input, val.psz_string, true );
+                input_SubtitleFileAdd( p_input, val.psz_string, SUB_FORCED, true );
             break;
 
         case INPUT_CONTROL_ADD_SLAVE:
@@ -2832,32 +2832,35 @@ static void input_SubtitleAdd( input_thread_t *p_input,
     var_FreeList( &list, NULL );
 }
 
-static void input_SubtitleFileAdd( input_thread_t *p_input, char *psz_subtitle,
-                                   unsigned i_flags )
+static void input_SubtitleFileAdd( input_thread_t *p_input,
+                                   const char *psz_subtitle, unsigned i_flags,
+                                   bool b_check_idx )
 {
     /* if we are provided a subtitle.sub file,
      * see if we don't have a subtitle.idx and use it instead */
-    char *psz_path = strdup( psz_subtitle );
-    if( likely(psz_path != NULL) )
+    char *psz_idxpath = NULL;
+    char *psz_extension = b_check_idx ? strrchr( psz_subtitle, '.') : NULL;
+    if( psz_extension && strcmp( psz_extension, ".sub" ) == 0 )
     {
-        char *psz_extension = strrchr( psz_path, '.');
-        if( psz_extension && strcmp( psz_extension, ".sub" ) == 0 )
+        psz_idxpath = strdup( psz_subtitle );
+        if( psz_idxpath )
         {
             struct stat st;
 
+            psz_extension = psz_extension - psz_subtitle + psz_idxpath;
             strcpy( psz_extension, ".idx" );
 
-            if( !vlc_stat( psz_path, &st ) && S_ISREG( st.st_mode ) )
+            if( !vlc_stat( psz_idxpath, &st ) && S_ISREG( st.st_mode ) )
             {
                 msg_Dbg( p_input, "using %s as subtitle file instead of %s",
-                         psz_path, psz_subtitle );
-                strcpy( psz_subtitle, psz_path ); /* <- FIXME! constify */
+                         psz_idxpath, psz_subtitle );
+                psz_subtitle = psz_idxpath;
             }
         }
-        free( psz_path );
     }
 
     char *url = vlc_path2uri( psz_subtitle, NULL );
+    free( psz_idxpath );
     if( url == NULL )
         return;
 
