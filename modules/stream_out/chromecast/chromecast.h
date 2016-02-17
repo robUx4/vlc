@@ -207,7 +207,6 @@ struct vlc_renderer_sys
     void ipChangedEvent(const char *psz_new_ip);
     int connectChromecast();
     void disconnectChromecast();
-    void stateChangedForRestart( input_thread_t * );
 
     float msgPlayerGetVolume();
     void msgPlayerSetVolume(float volume);
@@ -259,8 +258,6 @@ private:
     std::string       s_chromecast_url;
     bool              canRemux;
     bool              canDoDirect;
-    bool              b_restart_playback;
-    bool              b_has_restart_callback;
     bool              b_forcing_position;
     double            f_restart_position;
 
@@ -275,9 +272,6 @@ private:
     void plugOutputRedirection();
     void unplugOutputRedirection();
     void setCurrentStopped(bool);
-
-    void restartDoStop();
-    bool restartDoPlay();
 };
 
 #endif /* VLC_CHROMECAST_H */

@@ -78,18 +78,12 @@ static void Close(vlc_object_t *);
 static int Start(vlc_renderer *p_renderer, input_thread_t *p_input);
 static void Stop(vlc_renderer *p_renderer);
 
-static int CurrentChanged( vlc_object_t *, char const *,
-                          vlc_value_t, vlc_value_t, void * );
 static int InputEvent( vlc_object_t *, char const *,
                        vlc_value_t, vlc_value_t, void * );
 static int MuteGet( vlc_renderer *p_renderer, bool *pb_mute );
 static int MuteChanged( vlc_renderer *p_renderer, bool b_mute );
 static int VolumeGet( vlc_renderer *p_renderer, float *pf_volume );
 static int VolumeChanged( vlc_renderer *p_renderer, float f_volume );
-static int AddrChangedEvent( vlc_object_t *, char const *,
-                             vlc_value_t, vlc_value_t, void * );
-static int RestartAfterEnd( vlc_object_t *, char const *,
-                            vlc_value_t, vlc_value_t, void * );
 static void *ChromecastThread(void *data);
 
 /*****************************************************************************
@@ -202,8 +196,6 @@ vlc_renderer_sys::vlc_renderer_sys(vlc_renderer * const p_this)
     ,i_receiver_requestId(0)
     ,i_requestId(0)
     ,i_sout_id(0)
-    ,b_restart_playback(false)
-    ,b_has_restart_callback(false)
     ,b_forcing_position(false)
     ,f_volume(1.0)
     ,b_muted(false)
@@ -220,17 +212,6 @@ vlc_renderer_sys::~vlc_renderer_sys()
     vlc_cond_destroy(&seekCommandCond);
     vlc_cond_destroy(&loadCommandCond);
     vlc_mutex_destroy(&lock);
-}
-
-static int AddrChangedEvent(vlc_object_t *p_this, char const *psz_var,
-                          vlc_value_t oldval, vlc_value_t val, void *p_data )
-{
-    VLC_UNUSED( p_this );
-    VLC_UNUSED( psz_var );
-    VLC_UNUSED( oldval );
-    vlc_renderer *p_intf = static_cast<vlc_renderer *>(p_data);
-    p_intf->p_sys->ipChangedEvent( val.psz_string );
-    return VLC_SUCCESS;
 }
 
 void vlc_renderer_sys::ipChangedEvent(const char *psz_new_ip)
@@ -299,18 +280,6 @@ void vlc_renderer_sys::ipChangedEvent(const char *psz_new_ip)
         }
         else
         {
-            if (b_has_restart_callback)
-            {
-                if ( p_input )
-                {
-#ifndef NDEBUG
-                    msg_Dbg(p_intf, "del unneeded RestartAfterEnd callback %p on p_input:%p", RestartAfterEnd, p_input);
-#endif
-                    var_DelCallback( p_input, "intf-event", RestartAfterEnd, p_intf );
-                }
-                b_has_restart_callback = false;
-            }
-
             InputUpdated( NULL );
 
             // make sure we unblock the demuxer
@@ -372,24 +341,6 @@ static void Stop(vlc_renderer *p_renderer)
     p_sys->InputUpdated( NULL );
 }
 
-
-static int CurrentChanged( vlc_object_t *p_this, char const *psz_var,
-                          vlc_value_t oldval, vlc_value_t val, void *p_data )
-{
-    vlc_renderer *p_intf = static_cast<vlc_renderer *>(p_data);
-    vlc_renderer_sys *p_sys = p_intf->p_sys;
-    input_thread_t *p_input = static_cast<input_thread_t *>(val.p_address);
-
-    VLC_UNUSED(p_this);
-    VLC_UNUSED(psz_var);
-
-    assert( p_sys->p_input == NULL || p_sys->p_input == oldval.p_address );
-
-    p_sys->InputUpdated( p_input );
-
-    return VLC_SUCCESS;
-}
-
 bool vlc_renderer_sys::canDecodeVideo( const es_format_t *p_es ) const
 {
     if (p_es->i_codec == VLC_CODEC_H264 || p_es->i_codec == VLC_CODEC_VP8)
@@ -438,13 +389,12 @@ void vlc_renderer_sys::plugOutputRedirection()
 void vlc_renderer_sys::InputUpdated( input_thread_t *p_input )
 {
     vlc_mutex_lock(&lock);
-    msg_Dbg( p_intf, "%ld InputUpdated p_input:%p was:%p b_restart_playback:%d playlist_Status:%d", GetCurrentThreadId(), (void*)p_input, (void*)this->p_input, b_restart_playback, this->p_input ? (int)var_GetInteger( this->p_input, "state" ) : -1 );
+    msg_Dbg( p_intf, "%ld InputUpdated p_input:%p was:%p playlist_Status:%d", GetCurrentThreadId(), (void*)p_input, (void*)this->p_input, this->p_input ? (int)var_GetInteger( this->p_input, "state" ) : -1 );
 
     if (deviceIP.empty())
     {
         if ( restartState == RESTART_STARTING && p_input != NULL )
         {
-            b_restart_playback = false;
             restartState = RESTART_NONE;
             msg_Dbg( p_intf, "force restart position:%f", f_restart_position );
             b_forcing_position = true;
@@ -464,14 +414,6 @@ void vlc_renderer_sys::InputUpdated( input_thread_t *p_input )
     {
         vlc_mutex_unlock(&lock);
         var_DelCallback( this->p_input, "intf-event", InputEvent, p_intf );
-        if (b_has_restart_callback)
-        {
-#ifndef NDEBUG
-            msg_Dbg(p_intf, "input gone, del RestartAfterEnd callback %p on p_input:%p", RestartAfterEnd, this->p_input);
-#endif
-            var_DelCallback( this->p_input, "intf-event", RestartAfterEnd, p_intf );
-            b_has_restart_callback = false;
-        }
         vlc_mutex_lock(&lock);
         unplugOutputRedirection();
     }
@@ -585,58 +527,10 @@ void vlc_renderer_sys::InputUpdated( input_thread_t *p_input )
             s_sout = ssout.str();
         }
 
-        if (conn_status == CHROMECAST_CONNECTION_DEAD)
-            b_restart_playback = false;
-        else if (b_restart_playback)
+        if (conn_status != CHROMECAST_CONNECTION_DEAD)
         {
-            b_restart_playback = false;
-            restartState = RESTART_NONE;
-            msg_Dbg( p_intf, "force restart position:%f", f_restart_position );
-            b_forcing_position = true;
-            input_Control( this->p_input, INPUT_SET_POSITION, f_restart_position);
+            plugOutputRedirection();
         }
-        else if ( input_HasESOut( p_input ) )
-        {
-            char *psz_old_sout = var_GetString( p_input, "sout" );
-            b_restart_playback = !psz_old_sout || !psz_old_sout[0];
-            if ( b_restart_playback )
-                msg_Dbg( p_intf, "there's no sout defined yet status:%d", (int)var_GetInteger( p_input, "state" ) );
-            free(psz_old_sout);
-        }
-        else
-        {
-            msg_Dbg( p_intf, "no need to restart to set the sout" );
-            b_restart_playback = false;
-        }
-        msg_Dbg( p_intf, "%ld new b_restart_playback:%d", GetCurrentThreadId(), b_restart_playback );
-
-        if ( b_restart_playback )
-        {
-            if (deviceIP.empty() || conn_status == CHROMECAST_APP_STARTED)
-            {
-                /* the MediaApp is already connected we need to stop now */
-                restartDoStop();
-            }
-        }
-        else
-        {
-            if (b_has_restart_callback)
-            {
-#ifndef NDEBUG
-                msg_Dbg(p_intf, "normal plug, del RestartAfterEnd callback %p on p_input:%p", RestartAfterEnd, this->p_input);
-#endif
-                var_DelCallback( this->p_input, "intf-event", RestartAfterEnd, p_intf );
-                b_has_restart_callback = false;
-            }
-            if (conn_status != CHROMECAST_CONNECTION_DEAD)
-            {
-                plugOutputRedirection();
-            }
-        }
-    }
-    else if ( !b_restart_playback )
-    {
-        restartDoStop();
     }
     vlc_mutex_unlock(&lock);
 }
@@ -891,91 +785,6 @@ extern "C" int recvPacket(vlc_object_t *p_intf, bool &b_msgReceived,
     return i_ret;
 }
 
-void vlc_renderer_sys::stateChangedForRestart( input_thread_t *p_input )
-{
-    msg_Dbg(p_intf, "%ld RestartAfterEnd state changed %d", GetCurrentThreadId(), (int)var_GetInteger( p_input, "state" ));
-    if ( var_GetInteger( p_input, "state" ) == END_S )
-    {
-        msg_Info(p_intf, "%ld RestartAfterEnd play this file again", GetCurrentThreadId() );
-        if ( restartDoPlay() )
-        {
-            restartState = RESTART_STARTING;
-            /* no need to unhook the callback it will be when the input is destroyed */
-            //var_DelCallback( p_input, "intf-event", RestartAfterEnd, p_intf );
-        }
-    }
-}
-
-static int RestartAfterEnd( vlc_object_t *p_this, char const *psz_var,
-                            vlc_value_t oldval, vlc_value_t val, void *p_data )
-{
-    VLC_UNUSED( oldval );
-    VLC_UNUSED( psz_var );
-    input_thread_t *p_input = reinterpret_cast<input_thread_t*>(p_this);
-    vlc_renderer *p_intf = static_cast<vlc_renderer*>(p_data);
-
-    if( val.i_int == INPUT_EVENT_STATE )
-    {
-        p_intf->p_sys->stateChangedForRestart( p_input );
-    }
-
-    return VLC_SUCCESS;
-}
-
-bool vlc_renderer_sys::restartDoPlay()
-{
-    if ( b_restart_playback )
-    {
-#ifndef NDEBUG
-        msg_Dbg( p_intf, "restart playback p_input:%p playlist_Play() b_restart_playback:1 position:%f", (void*)p_input, f_restart_position );
-#endif
-#if TODO
-        playlist_Play( pl_Get(p_intf) );
-#endif
-        //b_restart_playback = false;
-        return true;
-    }
-    return false;
-}
-
-void vlc_renderer_sys::restartDoStop()
-{
-    /* save the position */
-    if (p_input == NULL)
-    {
-        msg_Warn( p_intf, "cannot restart non playing source" );
-        return;
-    }
-    if (!b_has_restart_callback)
-    {
-#ifndef NDEBUG
-        msg_Dbg(p_intf, "add RestartAfterEnd callback %p on p_input:%p", RestartAfterEnd, p_input);
-#endif
-        var_AddCallback( p_input, "intf-event", RestartAfterEnd, p_intf );
-        b_has_restart_callback = true;
-    }
-    b_restart_playback = true;
-    input_Control(p_input, INPUT_GET_POSITION, &f_restart_position);
-#ifndef NDEBUG
-    msg_Dbg( p_intf, "Current %p position:%f", (void*)p_input, f_restart_position );
-#endif
-    vlc_object_release(p_input);
-
-    restartState = RESTART_STOPPING;
-    msg_Dbg(p_intf, "%ld playlist_Stop()", GetCurrentThreadId());
-#if 0
-    plugOutputRedirection();
-    input_Control( p_input, INPUT_RESTART_OUTPUT );
-#elif 1
-    input_Control( p_input, INPUT_RESTART_ES, -VIDEO_ES );
-    input_Control( p_input, INPUT_RESTART_ES, -AUDIO_ES );
-    input_Control( p_input, INPUT_RESTART_ES, -SPU_ES );
-    input_Control( p_input, INPUT_SET_POSITION, f_restart_position );
-#else
-    playlist_Stop( p_playlist );
-#endif
-}
-
 /**
  * @brief Process a message received from the Chromecast
  * @param msg the CastMessage to process
@@ -1078,17 +887,9 @@ void vlc_renderer_sys::processMessage(const castchannel::CastMessage &msg)
                     msgConnect(appTransportId);
                     setConnectionStatus(CHROMECAST_APP_STARTED);
 
-                    msg_Dbg( p_intf, "app started b_restart_playback:%d playlist_Status:%d", b_restart_playback, p_input ? (int)var_GetInteger( p_input, "state" ) : -1 );
-                    if (!b_restart_playback || p_input == NULL)
-                    {
-                        /* now we can start the Chromecast playback */
-                        sendPlayerCmd();
-                        b_restart_playback = false;
-                    }
-                    else
-                    {
-                        restartDoStop();
-                    }
+                    msg_Dbg( p_intf, "app started playlist_Status:%d", p_input ? (int)var_GetInteger( p_input, "state" ) : -1 );
+                    /* now we can start the Chromecast playback */
+                    sendPlayerCmd();
                 }
                 else
                 {
@@ -1284,7 +1085,7 @@ void vlc_renderer_sys::processMessage(const castchannel::CastMessage &msg)
             msg_Warn(p_intf, "received close message");
             vlc_mutex_locker locker(&lock);
             setConnectionStatus(CHROMECAST_CONNECTION_DEAD);
-            ipChangedEvent(NULL);
+            ipChangedEvent( NULL );
         }
         else
         {
