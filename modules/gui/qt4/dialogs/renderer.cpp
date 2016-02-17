@@ -198,46 +198,6 @@ void RendererDialog::accept()
                  vlc_renderer_item_host(rowItem->m_obj), vlc_renderer_item_port(rowItem->m_obj) );
 
         vlc_renderer_load( p_intf, rowItem->m_obj );
-#if 0
-
-        std::stringstream ss;
-        ss << psz_ip;
-        if (item->port)
-            ss << ':' << item->port;
-
-        playlist_t *p_playlist = pl_Get(p_intf);
-        /* load the module needed to handle the renderer */
-        if (!item->module.empty())
-        {
-            bool module_loaded = false;
-            vlc_list_t *l = vlc_list_children( p_playlist );
-            for( int i=0; i < l->i_count; i++ )
-            {
-                vlc_object_t *p_obj = (vlc_object_t *)l->p_values[i].p_address;
-                if ( p_obj->psz_object_type == std::string("interface") )
-                {
-                    char *psz_name = vlc_object_get_name( p_obj );
-                    if ( psz_name && psz_name == item->module )
-                    {
-                        module_loaded = true;
-                        free(psz_name);
-                        break;
-                    }
-                    free(psz_name);
-                }
-            }
-            vlc_list_release( l );
-
-            if ( !module_loaded )
-                intf_Create( p_playlist, item->module.c_str() );
-        }
-
-        /* set the renderer config */
-        if( !var_Type( p_playlist, VAR_RENDERER_CONFIG ) )
-            /* Don't recreate the same variable over and over and over... */
-            var_Create( p_playlist, VAR_RENDERER_CONFIG, VLC_VAR_STRING );
-        var_SetString( p_playlist, VAR_RENDERER_CONFIG, ss.str().c_str() );
-#endif
     }
 
     QVLCDialog::accept();

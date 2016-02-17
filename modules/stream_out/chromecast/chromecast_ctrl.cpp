@@ -62,7 +62,6 @@ static const int CHROMECAST_CONTROL_PORT = 8009;
 #define PONG_WAIT_TIME 500
 #define PONG_WAIT_RETRIES 2
 
-#define VAR_RENDERER_CONFIG  "renderer-config"
 #define CONTROL_CFG_PREFIX "chromecast-"
 
 static const std::string NAMESPACE_DEVICEAUTH       = "urn:x-cast:com.google.cast.tp.deviceauth";
@@ -161,10 +160,6 @@ int Open(vlc_object_t *p_this)
 
     p_sys->ipChangedEvent( vlc_renderer_item_host(p_renderer->p_item) );
 
-#if 0
-    var_AddCallback( p_playlist, VAR_RENDERER_CONFIG, AddrChangedEvent, p_intf );
-#endif
-
     return VLC_SUCCESS;
 
 error:
@@ -181,9 +176,8 @@ void Close(vlc_object_t *p_this)
     vlc_renderer *p_renderer = reinterpret_cast<vlc_renderer*>(p_this);
     vlc_renderer_sys *p_sys = p_renderer->p_sys;
 
-#if 0
+#if TODO
     playlist_t *p_playlist = pl_Get( p_intf );
-    var_DelCallback( p_playlist, VAR_RENDERER_CONFIG, AddrChangedEvent, p_intf );
     var_DelCallback( p_playlist, "mute", MuteChanged, p_intf );
     var_DelCallback( p_playlist, "volume", VolumeChanged, p_intf );
 #endif
