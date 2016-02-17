@@ -223,6 +223,7 @@ private:
     void msgReceiverGetStatus();
 
     void msgPlayerLoad();
+    void msgPlayerStop();
     void msgPlayerPlay();
     void msgPlayerPause();
     void msgPlayerGetStatus();

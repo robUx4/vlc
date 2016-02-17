@@ -668,7 +668,7 @@ void vlc_renderer_sys::sendPlayerCmd()
     }
 
 #ifndef NDEBUG
-    msg_Dbg( p_intf, "sendPlayerCmd input_state:%d mediaSessionId:'%s' cmd_status:%d", (int)var_GetInteger( p_input, "state" ), mediaSessionId.c_str(), cmd_status );
+    msg_Dbg( p_intf, "sendPlayerCmd input_state:%d mediaSessionId:'%s' cmd_status:%d receiverState:%d", (int)var_GetInteger( p_input, "state" ), mediaSessionId.c_str(), cmd_status, receiverState );
 #endif
     switch( var_GetInteger( p_input, "state" ) )
     {
@@ -703,6 +703,10 @@ void vlc_renderer_sys::sendPlayerCmd()
         }
         break;
     case END_S:
+        if (!mediaSessionId.empty() && receiverState != RECEIVER_IDLE) {
+            msgPlayerStop();
+            setPlayerStatus(NO_CMD_PENDING);
+        }
         break;
     default:
         break;
@@ -1421,6 +1425,19 @@ void vlc_renderer_sys::msgPlayerLoad()
     ss << "{\"type\":\"LOAD\","
        <<  "\"media\":{" << GetMedia() << "},"
        <<  "\"autoplay\":\"false\","
+       <<  "\"requestId\":" << i_requestId++
+       << "}";
+
+    pushMediaPlayerMessage( ss );
+}
+
+void vlc_renderer_sys::msgPlayerStop()
+{
+    assert(!mediaSessionId.empty());
+
+    std::stringstream ss;
+    ss << "{\"type\":\"STOP\","
+       <<  "\"mediaSessionId\":" << mediaSessionId << ","
        <<  "\"requestId\":" << i_requestId++
        << "}";
 
