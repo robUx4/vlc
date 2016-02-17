@@ -192,7 +192,6 @@ int Open(vlc_object_t *p_this)
     p_renderer->pf_start = Start;
     p_renderer->pf_stop = Stop;
 
-    //var_AddCallback( p_playlist, "input-prepare", CurrentChanged, p_intf );
 #if TODO
     var_AddCallback( p_playlist, "mute", MuteChanged, p_intf );
     var_AddCallback( p_playlist, "volume", VolumeChanged, p_intf );
@@ -223,7 +222,6 @@ void Close(vlc_object_t *p_this)
 #if 0
     playlist_t *p_playlist = pl_Get( p_intf );
     var_DelCallback( p_playlist, VAR_RENDERER_CONFIG, AddrChangedEvent, p_intf );
-    var_DelCallback( p_playlist, "input-prepare", CurrentChanged, p_intf );
     var_DelCallback( p_playlist, "mute", MuteChanged, p_intf );
     var_DelCallback( p_playlist, "volume", VolumeChanged, p_intf );
 #endif
