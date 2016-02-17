@@ -37,6 +37,7 @@
 #include <vlc_input.h>
 #include <vlc_aout.h>
 #include <vlc_modules.h>
+#include <vlc_renderer.h>
 
 #include "libvlc_internal.h"
 #include "media_player_internal.h"
@@ -332,6 +333,7 @@ void libvlc_audio_set_mute( libvlc_media_player_t *mp, int mute )
         mute = aout_MuteSet( aout, mute );
         vlc_object_release( aout );
     }
+    vlc_renderer_volume_mute( mp, mute );
 }
 
 int libvlc_audio_get_volume( libvlc_media_player_t *mp )
@@ -364,6 +366,7 @@ int libvlc_audio_set_volume( libvlc_media_player_t *mp, int volume )
         ret = aout_VolumeSet( aout, vol );
         vlc_object_release( aout );
     }
+    vlc_renderer_volume_change( mp, vol );
     return ret;
 }
 

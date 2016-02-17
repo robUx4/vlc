@@ -29,6 +29,7 @@
 #include <vlc_common.h>
 #include <vlc_aout.h>
 #include <vlc_playlist.h>
+#include <vlc_renderer.h>
 
 #include "../audio_output/aout_internal.h"
 #include "playlist_internal.h"
@@ -66,6 +67,7 @@ int playlist_VolumeSet (playlist_t *pl, float vol)
         ret = aout_VolumeSet (aout, vol);
         vlc_object_release (aout);
     }
+    vlc_renderer_volume_change( pl, vol );
     return ret;
 }
 
@@ -126,6 +128,7 @@ int playlist_MuteSet (playlist_t *pl, bool mute)
         ret = aout_MuteSet (aout, mute);
         vlc_object_release (aout);
     }
+    vlc_renderer_volume_mute( pl, mute );
     return ret;
 }
 
