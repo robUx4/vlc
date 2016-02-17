@@ -441,9 +441,7 @@ void vlc_renderer_sys::plugOutputRedirection()
 void vlc_renderer_sys::InputUpdated( input_thread_t *p_input )
 {
     vlc_mutex_lock(&lock);
-#if TODO
-    msg_Dbg( p_intf, "%ld InputUpdated p_input:%p was:%p b_restart_playback:%d playlist_Status:%d", GetCurrentThreadId(), (void*)p_input, (void*)this->p_input, b_restart_playback, playlist_Status( pl_Get(p_intf) ) );
-#endif
+    msg_Dbg( p_intf, "%ld InputUpdated p_input:%p was:%p b_restart_playback:%d playlist_Status:%d", GetCurrentThreadId(), (void*)p_input, (void*)this->p_input, b_restart_playback, this->p_input ? (int)var_GetInteger( this->p_input, "state" ) : -1 );
 
     if (deviceIP.empty())
     {
@@ -605,11 +603,7 @@ void vlc_renderer_sys::InputUpdated( input_thread_t *p_input )
             char *psz_old_sout = var_GetString( p_input, "sout" );
             b_restart_playback = !psz_old_sout || !psz_old_sout[0];
             if ( b_restart_playback )
-            {
-#if TODO
-                msg_Dbg( p_intf, "there's no sout defined yet status:%d", playlist_Status( pl_Get( p_intf ) ) );
-#endif
-            }
+                msg_Dbg( p_intf, "there's no sout defined yet status:%d", (int)var_GetInteger( p_input, "state" ) );
             free(psz_old_sout);
         }
         else
@@ -898,9 +892,6 @@ extern "C" int recvPacket(vlc_object_t *p_intf, bool &b_msgReceived,
 
 void vlc_renderer_sys::stateChangedForRestart( input_thread_t *p_input )
 {
-#if TODO
-    playlist_t *p_playlist = pl_Get( p_intf );
-    PL_LOCK;
     msg_Dbg(p_intf, "%ld RestartAfterEnd state changed %d", GetCurrentThreadId(), (int)var_GetInteger( p_input, "state" ));
     if ( var_GetInteger( p_input, "state" ) == END_S )
     {
@@ -912,8 +903,6 @@ void vlc_renderer_sys::stateChangedForRestart( input_thread_t *p_input )
             //var_DelCallback( p_input, "intf-event", RestartAfterEnd, p_intf );
         }
     }
-    PL_UNLOCK;
-#endif
 }
 
 static int RestartAfterEnd( vlc_object_t *p_this, char const *psz_var,
@@ -951,14 +940,9 @@ bool vlc_renderer_sys::restartDoPlay()
 void vlc_renderer_sys::restartDoStop()
 {
     /* save the position */
-#if TODO
-    playlist_t *p_playlist = pl_Get( p_intf );
-    PL_LOCK;
-    input_thread_t *p_input = playlist_CurrentInput( p_playlist );
     if (p_input == NULL)
     {
         msg_Warn( p_intf, "cannot restart non playing source" );
-        PL_UNLOCK;
         return;
     }
     if (!b_has_restart_callback)
@@ -981,15 +965,13 @@ void vlc_renderer_sys::restartDoStop()
 #if 0
     plugOutputRedirection();
     input_Control( p_input, INPUT_RESTART_OUTPUT );
-#elif 0
+#elif 1
     input_Control( p_input, INPUT_RESTART_ES, -VIDEO_ES );
     input_Control( p_input, INPUT_RESTART_ES, -AUDIO_ES );
     input_Control( p_input, INPUT_RESTART_ES, -SPU_ES );
     input_Control( p_input, INPUT_SET_POSITION, f_restart_position );
 #else
     playlist_Stop( p_playlist );
-#endif
-    PL_UNLOCK;
 #endif
 }
 
@@ -1082,10 +1064,8 @@ void vlc_renderer_sys::processMessage(const castchannel::CastMessage &msg)
                     msgConnect(appTransportId);
                     setConnectionStatus(CHROMECAST_APP_STARTED);
 
-#if  TODO
-                    playlist_t *p_playlist = pl_Get( p_intf );
-                    msg_Dbg( p_intf, "app started b_restart_playback:%d playlist_Status:%d", b_restart_playback, playlist_Status( p_playlist ) );
-                    if (!b_restart_playback || playlist_Status( p_playlist ) == PLAYLIST_STOPPED)
+                    msg_Dbg( p_intf, "app started b_restart_playback:%d playlist_Status:%d", b_restart_playback, p_input ? (int)var_GetInteger( p_input, "state" ) : -1 );
+                    if (!b_restart_playback || p_input == NULL)
                     {
                         /* now we can start the Chromecast playback */
                         sendPlayerCmd();
@@ -1095,7 +1075,6 @@ void vlc_renderer_sys::processMessage(const castchannel::CastMessage &msg)
                     {
                         restartDoStop();
                     }
-#endif
                 }
                 else
                 {
