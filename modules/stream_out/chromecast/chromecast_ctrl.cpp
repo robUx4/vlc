@@ -132,42 +132,6 @@ int Open(vlc_object_t *p_this)
     if (unlikely(p_sys == NULL))
         return VLC_ENOMEM;
 
-#if TODO
-    playlist_t *p_playlist = pl_Get( p_intf );
-    std::stringstream receiver_addr;
-    char *psz_addrChromecast = NULL;
-    if( !var_Type( p_playlist, VAR_RENDERER_CONFIG ) )
-        /* Don't recreate the same variable over and over and over... */
-        var_Create( p_playlist, VAR_RENDERER_CONFIG, VLC_VAR_STRING );
-
-    psz_addrChromecast = var_InheritString( p_playlist, VAR_RENDERER_CONFIG );
-    if (psz_addrChromecast == NULL)
-        psz_addrChromecast = var_InheritString(p_intf, CONTROL_CFG_PREFIX "addr");
-    else if (psz_addrChromecast[0])
-        msg_Dbg( p_intf, "Using forced address %s", psz_addrChromecast);
-    else
-    {
-        free(psz_addrChromecast);
-        psz_addrChromecast = var_InheritString(p_intf, CONTROL_CFG_PREFIX "addr");
-    }
-
-    if (psz_addrChromecast == NULL)
-        msg_Info(p_intf, "No Chromecast receiver IP/Name provided");
-    else
-    {
-        vlc_url_t url;
-        vlc_UrlParse(&url, psz_addrChromecast);
-        free(psz_addrChromecast);
-        if (url.psz_host && url.psz_host[0])
-        {
-            int i_port = url.i_port ? url.i_port : CHROMECAST_CONTROL_PORT;
-            receiver_addr << url.psz_host << ':' << i_port;
-        }
-        vlc_UrlClean(&url);
-    }
-    var_SetString( p_playlist, VAR_RENDERER_CONFIG, receiver_addr.str().c_str() );
-#endif
-
     char *psz_mux = var_InheritString(p_renderer, CONTROL_CFG_PREFIX "mux");
     if (psz_mux == NULL)
     {
