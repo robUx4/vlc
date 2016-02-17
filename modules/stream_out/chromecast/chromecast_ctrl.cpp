@@ -82,10 +82,8 @@ static int CurrentChanged( vlc_object_t *, char const *,
                           vlc_value_t, vlc_value_t, void * );
 static int InputEvent( vlc_object_t *, char const *,
                        vlc_value_t, vlc_value_t, void * );
-static int MuteChanged( vlc_object_t *, char const *,
-                          vlc_value_t, vlc_value_t, void * );
-static int VolumeChanged( vlc_object_t *, char const *,
-                          vlc_value_t, vlc_value_t, void * );
+static int MuteChanged( vlc_renderer *p_renderer, bool b_mute );
+static int VolumeChanged( vlc_renderer *p_renderer, float f_volume );
 static int AddrChangedEvent( vlc_object_t *, char const *,
                              vlc_value_t, vlc_value_t, void * );
 static int RestartAfterEnd( vlc_object_t *, char const *,
@@ -152,6 +150,8 @@ int Open(vlc_object_t *p_this)
     p_renderer->p_sys = p_sys;
     p_renderer->pf_start = Start;
     p_renderer->pf_stop = Stop;
+    p_renderer->pf_volume_mute = MuteChanged;
+    p_renderer->pf_volume_change = VolumeChanged;
 
 #if TODO
     var_AddCallback( p_playlist, "mute", MuteChanged, p_intf );
@@ -326,32 +326,22 @@ void vlc_renderer_sys::ipChangedEvent(const char *psz_new_ip)
     vlc_UrlClean(&url);
 }
 
-static int MuteChanged( vlc_object_t *p_this, char const *psz_var,
-                          vlc_value_t oldval, vlc_value_t val, void *p_data )
+static int MuteChanged( vlc_renderer *p_renderer, bool b_mute )
 {
-    VLC_UNUSED( p_this );
-    VLC_UNUSED( psz_var );
-    VLC_UNUSED( oldval );
-    vlc_renderer *p_intf = static_cast<vlc_renderer *>(p_data);
-    vlc_renderer_sys *p_sys = p_intf->p_sys;
+    vlc_renderer_sys *p_sys = p_renderer->p_sys;
 
     if (!p_sys->mediaSessionId.empty())
-        p_sys->msgPlayerSetMute( val.b_bool );
+        p_sys->msgPlayerSetMute( b_mute );
 
     return VLC_SUCCESS;
 }
 
-static int VolumeChanged( vlc_object_t *p_this, char const *psz_var,
-                          vlc_value_t oldval, vlc_value_t val, void *p_data )
+static int VolumeChanged( vlc_renderer *p_renderer, float f_volume )
 {
-    VLC_UNUSED( p_this );
-    VLC_UNUSED( psz_var );
-    VLC_UNUSED( oldval );
-    vlc_renderer *p_intf = static_cast<vlc_renderer *>(p_data);
-    vlc_renderer_sys *p_sys = p_intf->p_sys;
+    vlc_renderer_sys *p_sys = p_renderer->p_sys;
 
     if ( !p_sys->mediaSessionId.empty() )
-        p_sys->msgPlayerSetVolume( val.f_float );
+        p_sys->msgPlayerSetVolume( f_volume );
 
     return VLC_SUCCESS;
 }
