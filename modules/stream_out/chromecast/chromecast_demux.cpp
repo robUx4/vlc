@@ -49,7 +49,7 @@ vlc_module_end ()
 
 struct demux_sys_t
 {
-    demux_sys_t(demux_t *demux, intf_thread_t *intf)
+    demux_sys_t(demux_t *demux, vlc_renderer *intf)
         :p_demux(demux)
         ,p_intf(intf)
         ,i_length(-1)
@@ -167,7 +167,7 @@ struct demux_sys_t
 
 protected:
     demux_t       *p_demux;
-    intf_thread_t *p_intf;
+    vlc_renderer  *p_intf;
     mtime_t       i_length;
     bool          demuxReady;
     bool          canSeek;
@@ -303,7 +303,7 @@ int DemuxOpen(vlc_object_t *p_this)
     if (p_demux->p_source == NULL)
         return VLC_EBADVAR;
 
-    intf_thread_t *p_intf = static_cast<intf_thread_t*>(var_InheritAddress(p_demux, SOUT_INTF_ADDRESS));
+    vlc_renderer *p_intf = static_cast<vlc_renderer*>(var_InheritAddress(p_demux, SOUT_INTF_ADDRESS));
     if (p_intf == NULL) {
         msg_Err(p_demux, "Missing the control interface to work");
         return VLC_EBADVAR;

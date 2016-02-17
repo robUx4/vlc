@@ -36,7 +36,7 @@
 
 static const mtime_t SEEK_FORWARD_OFFSET = 1000000;
 
-bool intf_sys_t::seekTo(mtime_t pos)
+bool vlc_renderer_sys::seekTo(mtime_t pos)
 {
     vlc_mutex_locker locker(&lock);
     if (conn_status == CHROMECAST_CONNECTION_DEAD)
@@ -67,7 +67,7 @@ bool intf_sys_t::seekTo(mtime_t pos)
  * @param msg the CastMessage to send
  * @return vlc error code
  */
-int intf_sys_t::sendMessage(const castchannel::CastMessage &msg)
+int vlc_renderer_sys::sendMessage(const castchannel::CastMessage &msg)
 {
     int i_size = msg.ByteSize();
     uint8_t *p_data = new(std::nothrow) uint8_t[PACKET_HEADER_LEN + i_size];
@@ -99,7 +99,7 @@ int intf_sys_t::sendMessage(const castchannel::CastMessage &msg)
  * CastMessage_PayloadType_BINARY
  * @return the generated CastMessage
  */
-void intf_sys_t::pushMessage(const std::string & namespace_,
+void vlc_renderer_sys::pushMessage(const std::string & namespace_,
                              const std::string & payload,
                              const std::string & destinationId,
                              castchannel::CastMessage_PayloadType payloadType)
@@ -119,12 +119,12 @@ void intf_sys_t::pushMessage(const std::string & namespace_,
     sendMessage(msg);
 }
 
-void intf_sys_t::pushMediaPlayerMessage(const std::stringstream & payload) {
+void vlc_renderer_sys::pushMediaPlayerMessage(const std::stringstream & payload) {
     assert(!appTransportId.empty());
     pushMessage( NAMESPACE_MEDIA, payload.str(), appTransportId );
 }
 
-void intf_sys_t::msgPlayerSeek(const std::string & currentTime)
+void vlc_renderer_sys::msgPlayerSeek(const std::string & currentTime)
 {
     assert(!mediaSessionId.empty());
 

@@ -38,7 +38,7 @@
 
 struct sout_stream_sys_t
 {
-    sout_stream_sys_t(intf_thread_t *intf, sout_stream_t *sout)
+    sout_stream_sys_t(vlc_renderer *intf, sout_stream_t *sout)
         : p_out(sout)
         , p_intf(intf)
     {
@@ -58,7 +58,7 @@ struct sout_stream_sys_t
     }
 
     sout_stream_t * const p_out;
-    intf_thread_t * const p_intf;
+    vlc_renderer * const p_intf;
 };
 
 #define SOUT_CFG_PREFIX "sout-chromecast-"
@@ -163,13 +163,13 @@ static int Open(vlc_object_t *p_this)
 {
     sout_stream_t *p_stream = reinterpret_cast<sout_stream_t*>(p_this);
     sout_stream_sys_t *p_sys = NULL;
-    intf_thread_t *p_intf = NULL;
+    vlc_renderer *p_intf = NULL;
     char *psz_mux = NULL;
     char *psz_var_mime = NULL;
     sout_stream_t *p_sout = NULL;
     std::stringstream ss;
 
-    p_intf = static_cast<intf_thread_t*>(var_InheritAddress(p_stream, SOUT_INTF_ADDRESS));
+    p_intf = static_cast<vlc_renderer*>(var_InheritAddress(p_stream, SOUT_INTF_ADDRESS));
     if (p_intf == NULL) {
         msg_Err(p_stream, "Missing the control interface to work");
         goto error;

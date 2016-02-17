@@ -30,8 +30,8 @@
 #define VLC_CHROMECAST_H
 
 #include <vlc_common.h>
-#include <vlc_interface.h>
 #include <vlc_plugin.h>
+#include <vlc_renderer.h>
 #include <vlc_tls.h>
 
 #include <sstream>
@@ -85,12 +85,12 @@ enum restart_state {
 };
 
 /*****************************************************************************
- * intf_sys_t: description and status of interface
+ * vlc_renderer_sys: description and status of interface
  *****************************************************************************/
-struct intf_sys_t
+struct vlc_renderer_sys
 {
-    intf_sys_t(intf_thread_t * const intf);
-    ~intf_sys_t();
+    vlc_renderer_sys(vlc_renderer * const intf);
+    ~vlc_renderer_sys();
 
     bool isFinishedPlaying() {
         vlc_mutex_locker locker(&lock);
@@ -136,7 +136,7 @@ struct intf_sys_t
 #endif
     }
 
-    intf_thread_t  * const p_intf;
+    vlc_renderer  * const p_intf;
     input_thread_t *p_input;
     uint16_t       devicePort;
     std::string    deviceIP;
