@@ -145,25 +145,6 @@ renderer_priv(vlc_object_t *p_obj)
     return p_priv;
 }
 
-static int
-renderer_module_open(void *p_func, va_list ap)
-{
-    vlc_renderer *p_renderer = va_arg(ap, vlc_renderer *);
-    const vlc_renderer_item *p_item = va_arg(ap, const vlc_renderer_item *);
-    int (*pf_open)(vlc_renderer *, const vlc_renderer_item *) = p_func;
-
-    return pf_open(p_renderer, p_item);
-}
-
-static void
-renderer_module_close(void *p_func, va_list ap)
-{
-    vlc_renderer *p_renderer = va_arg(ap, vlc_renderer *);
-    void (*pf_close)(vlc_renderer *) = p_func;
-
-    pf_close(p_renderer);
-}
-
 static void
 renderer_unload_locked(struct renderer_priv *p_priv)
 {
@@ -173,12 +154,13 @@ renderer_unload_locked(struct renderer_priv *p_priv)
     if (p_priv->b_started)
         vlc_renderer_stop(p_renderer);
 
-    vlc_module_unload(p_renderer->p_module, renderer_module_close, p_renderer);
+    module_unneed(p_renderer, p_renderer->p_module);
     p_renderer->p_module = NULL;
     p_priv->b_loaded_from_option = false;
 
     vlc_renderer_item_release(p_priv->p_item);
     p_priv->p_item = NULL;
+    p_renderer->p_item = NULL;
 
     p_renderer->pf_start = NULL;
     p_renderer->pf_stop = NULL;
@@ -207,14 +189,19 @@ renderer_load_locked(struct renderer_priv *p_priv, vlc_renderer_item *p_item)
         renderer_unload_locked(p_priv);
     assert(p_renderer->p_module == NULL);
 
-    p_renderer->p_module = vlc_module_load(p_renderer, "renderer",
-                                           p_item->psz_module, true,
-                                           renderer_module_open, p_renderer,
-                                           p_item);
-    if (p_renderer->p_module == NULL)
-        return VLC_EGENERIC;
-
     p_priv->p_item = vlc_renderer_item_hold(p_item);
+    p_renderer->p_item = p_priv->p_item;
+
+    p_renderer->p_module = module_need(p_renderer, "renderer",
+                                       p_item->psz_module, true);
+    if (p_renderer->p_module == NULL)
+    {
+        vlc_renderer_item_release(p_priv->p_item);
+        p_priv->p_item = NULL;
+        p_renderer->p_item = NULL;
+        return VLC_EGENERIC;
+    }
+
     assert(p_renderer->pf_start);
     assert(p_renderer->pf_stop);
 

@@ -177,12 +177,11 @@ struct vlc_renderer
 {
     VLC_COMMON_MEMBERS
     /**
-     * Open/Close callbacks:
-     * int  Open(vlc_renderer *p_renderer, const vlc_renderer_item *p_item);
-     * void Close(vlc_renderer *p_renderer);
      */
     module_t            *p_module;
     vlc_renderer_sys    *p_sys;
+
+    const vlc_renderer_item *p_item;
 
     /**
      * Called on vlc_renderer_start() or when a new input is playing
