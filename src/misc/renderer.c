@@ -292,7 +292,7 @@ vlc_renderer_stop(vlc_object_t *p_obj)
 
 #undef vlc_renderer_volume_change
 int
-vlc_renderer_volume_change(vlc_object_t *p_obj, int i_volume)
+vlc_renderer_volume_change(vlc_object_t *p_obj, float f_volume)
 {
     assert(p_obj != NULL);
     struct renderer_priv *p_priv = renderer_priv(p_obj);
@@ -305,7 +305,7 @@ vlc_renderer_volume_change(vlc_object_t *p_obj, int i_volume)
         return VLC_EGENERIC;
     }
 
-    int i_ret = p_renderer->pf_volume_change(p_renderer, i_volume);
+    int i_ret = p_renderer->pf_volume_change(p_renderer, f_volume);
     vlc_mutex_unlock(&p_priv->lock);
     return i_ret;
 }

@@ -161,7 +161,7 @@ vlc_renderer_stop(vlc_object_t *p_obj);
  * TODO
  */
 VLC_API int
-vlc_renderer_volume_change(vlc_object_t *p_obj, int i_volume);
+vlc_renderer_volume_change(vlc_object_t *p_obj, float f_volume);
 #define vlc_renderer_volume_change(a, b) vlc_renderer_volume_change(VLC_OBJECT(a), b)
 
 /**
@@ -199,9 +199,9 @@ struct vlc_renderer
     void    (*pf_stop)(vlc_renderer *p_renderer);
     /**
      * Called on vlc_renderer_volume_change()
-     * @param i_volume the volume in percents (0 = mute, 100 = 0dB)
+     * @param f_volume the volume (0.0 to 1.0)
      */
-    int     (*pf_volume_change)(vlc_renderer *p_renderer, int i_volume);
+    int     (*pf_volume_change)(vlc_renderer *p_renderer, float f_volume);
     /**
      * Called on vlc_renderer_volume_mute()
      */
