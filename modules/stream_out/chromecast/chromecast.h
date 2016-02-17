@@ -209,7 +209,9 @@ struct vlc_renderer_sys
     void disconnectChromecast();
     void stateChangedForRestart( input_thread_t * );
 
+    float msgPlayerGetVolume();
     void msgPlayerSetVolume(float volume);
+    bool msgPlayerGetMute();
     void msgPlayerSetMute(bool mute);
 
 private:
@@ -260,6 +262,9 @@ private:
     bool              b_has_restart_callback;
     bool              b_forcing_position;
     double            f_restart_position;
+
+    float             f_volume;
+    bool              b_muted;
 
     std::string GetMedia();
 

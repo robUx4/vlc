@@ -82,7 +82,9 @@ static int CurrentChanged( vlc_object_t *, char const *,
                           vlc_value_t, vlc_value_t, void * );
 static int InputEvent( vlc_object_t *, char const *,
                        vlc_value_t, vlc_value_t, void * );
+static int MuteGet( vlc_renderer *p_renderer, bool *pb_mute );
 static int MuteChanged( vlc_renderer *p_renderer, bool b_mute );
+static int VolumeGet( vlc_renderer *p_renderer, float *pf_volume );
 static int VolumeChanged( vlc_renderer *p_renderer, float f_volume );
 static int AddrChangedEvent( vlc_object_t *, char const *,
                              vlc_value_t, vlc_value_t, void * );
@@ -150,13 +152,10 @@ int Open(vlc_object_t *p_this)
     p_renderer->p_sys = p_sys;
     p_renderer->pf_start = Start;
     p_renderer->pf_stop = Stop;
-    p_renderer->pf_volume_mute = MuteChanged;
-    p_renderer->pf_volume_change = VolumeChanged;
-
-#if TODO
-    var_AddCallback( p_playlist, "mute", MuteChanged, p_intf );
-    var_AddCallback( p_playlist, "volume", VolumeChanged, p_intf );
-#endif
+    p_renderer->pf_mute_set = MuteChanged;
+    p_renderer->pf_mute_get = MuteGet;
+    p_renderer->pf_volume_set = VolumeChanged;
+    p_renderer->pf_volume_get = VolumeGet;
 
     p_sys->ipChangedEvent( vlc_renderer_item_host(p_renderer->p_item) );
 
@@ -175,12 +174,6 @@ void Close(vlc_object_t *p_this)
 {
     vlc_renderer *p_renderer = reinterpret_cast<vlc_renderer*>(p_this);
     vlc_renderer_sys *p_sys = p_renderer->p_sys;
-
-#if TODO
-    playlist_t *p_playlist = pl_Get( p_intf );
-    var_DelCallback( p_playlist, "mute", MuteChanged, p_intf );
-    var_DelCallback( p_playlist, "volume", VolumeChanged, p_intf );
-#endif
 
     delete p_sys;
 }
@@ -212,6 +205,8 @@ vlc_renderer_sys::vlc_renderer_sys(vlc_renderer * const p_this)
     ,b_restart_playback(false)
     ,b_has_restart_callback(false)
     ,b_forcing_position(false)
+    ,f_volume(1.0)
+    ,b_muted(false)
 {
     vlc_mutex_init(&lock);
     vlc_cond_init(&loadCommandCond);
@@ -329,21 +324,39 @@ void vlc_renderer_sys::ipChangedEvent(const char *psz_new_ip)
 static int MuteChanged( vlc_renderer *p_renderer, bool b_mute )
 {
     vlc_renderer_sys *p_sys = p_renderer->p_sys;
+    p_sys->msgPlayerSetMute( b_mute );
+    return VLC_SUCCESS;
+}
+
+static int MuteGet( vlc_renderer *p_renderer, bool *pb_mute )
+{
+    vlc_renderer_sys *p_sys = p_renderer->p_sys;
 
     if (!p_sys->mediaSessionId.empty())
-        p_sys->msgPlayerSetMute( b_mute );
-
-    return VLC_SUCCESS;
+    {
+        *pb_mute = p_sys->msgPlayerGetMute( );
+        return VLC_SUCCESS;
+    }
+    return VLC_ENOOBJ;
 }
 
 static int VolumeChanged( vlc_renderer *p_renderer, float f_volume )
 {
     vlc_renderer_sys *p_sys = p_renderer->p_sys;
+    p_sys->msgPlayerSetVolume( f_volume );
+    return VLC_SUCCESS;
+}
+
+static int VolumeGet( vlc_renderer *p_renderer, float *pf_volume )
+{
+    vlc_renderer_sys *p_sys = p_renderer->p_sys;
 
     if ( !p_sys->mediaSessionId.empty() )
-        p_sys->msgPlayerSetVolume( f_volume );
-
-    return VLC_SUCCESS;
+    {
+        *pf_volume = p_sys->msgPlayerGetVolume( );
+        return VLC_SUCCESS;
+    }
+    return VLC_ENOOBJ;
 }
 
 static int Start(vlc_renderer *p_renderer, input_thread_t *p_input)
@@ -1022,21 +1035,34 @@ void vlc_renderer_sys::processMessage(const castchannel::CastMessage &msg)
         if (type == "RECEIVER_STATUS")
         {
             json_value applications = (*p_data)["status"]["applications"];
+            json_value volume = (*p_data)["status"]["volume"];
             const json_value *p_app = NULL;
 
-            vlc_mutex_locker locker(&lock);
-            for (unsigned i = 0; i < applications.u.array.length; ++i)
+            if (volume.type == json_object)
             {
-                std::string appId(applications[i]["appId"]);
-                if (appId == APP_ID)
+                json_value volume_level = volume["level"];
+                json_value volume_muted = volume["muted"];
+
+                this->f_volume = (double)volume_level;
+                this->b_muted = (bool)volume_muted;
+            }
+
+            vlc_mutex_locker locker(&lock);
+            if (applications.type == json_array)
+            {
+                for (unsigned i = 0; i < applications.u.array.length; ++i)
                 {
-                    const char *pz_transportId = applications[i]["transportId"];
-                    if (pz_transportId != NULL)
+                    std::string appId(applications[i]["appId"]);
+                    if (appId == APP_ID)
                     {
-                        appTransportId = std::string(pz_transportId);
-                        p_app = &applications[i];
+                        const char *pz_transportId = applications[i]["transportId"];
+                        if (pz_transportId != NULL)
+                        {
+                            appTransportId = std::string(pz_transportId);
+                            p_app = &applications[i];
+                        }
+                        break;
                     }
-                    break;
                 }
             }
 
@@ -1085,7 +1111,6 @@ void vlc_renderer_sys::processMessage(const castchannel::CastMessage &msg)
                 default:
                     break;
                 }
-
             }
         }
         else if (type == "LAUNCH_ERROR")
@@ -1159,14 +1184,8 @@ void vlc_renderer_sys::processMessage(const castchannel::CastMessage &msg)
                     }
                     else
                     {
-                        if (!mediaSessionId.empty())
-                        {
-#if TODO
-                            playlist_t *p_playlist = pl_Get( p_intf );
-                            msgPlayerSetMute( var_GetBool( p_playlist, "mute") );
-                            msgPlayerSetVolume( var_GetFloat( p_playlist, "volume") );
-#endif
-                        }
+                        msgPlayerSetMute( b_muted );
+                        msgPlayerSetVolume( f_volume );
 
                         playback_start_chromecast = (1 + mtime_t( double( status[0]["currentTime"] ) ) ) * 1000000L;
                         msg_Dbg(p_intf, "Playback pending with an offset of %" PRId64, playback_start_chromecast);
@@ -1189,14 +1208,8 @@ void vlc_renderer_sys::processMessage(const castchannel::CastMessage &msg)
                     break;
 
                 case RECEIVER_PAUSED:
-                    if (!mediaSessionId.empty())
-                    {
-#if TODO
-                        playlist_t *p_playlist = pl_Get( p_intf );
-                        msgPlayerSetMute( var_GetBool( p_playlist, "mute") );
-                        msgPlayerSetVolume( var_GetFloat( p_playlist, "volume") );
-#endif
-                    }
+                    msgPlayerSetMute( b_muted );
+                    msgPlayerSetVolume( f_volume );
 
                     playback_start_chromecast = (1 + mtime_t( double( status[0]["currentTime"] ) ) ) * 1000000L;
 #ifndef NDEBUG
@@ -1440,35 +1453,49 @@ void vlc_renderer_sys::msgPlayerPause()
     pushMediaPlayerMessage( ss );
 }
 
+float vlc_renderer_sys::msgPlayerGetVolume()
+{
+    return f_volume;
+}
+
 void vlc_renderer_sys::msgPlayerSetVolume(float f_volume)
 {
-    assert(!mediaSessionId.empty());
-
     if ( f_volume < 0.0 || f_volume > 1.0)
         return;
 
-    std::stringstream ss;
-    ss << "{\"type\":\"SET_VOLUME\","
-       <<  "\"volume\":{\"level\":" << f_volume << "},"
-       <<  "\"mediaSessionId\":" << mediaSessionId << ","
-       <<  "\"requestId\":" << i_requestId++
-       << "}";
+    if (!mediaSessionId.empty())
+    {
+        std::stringstream ss;
+        ss << "{\"type\":\"SET_VOLUME\","
+           <<  "\"volume\":{\"level\":" << f_volume << "},"
+           <<  "\"mediaSessionId\":" << mediaSessionId << ","
+           <<  "\"requestId\":" << i_requestId++
+           << "}";
 
-    pushMediaPlayerMessage( ss );
+        pushMediaPlayerMessage( ss );
+    }
+    this->f_volume = f_volume;
+}
+
+bool vlc_renderer_sys::msgPlayerGetMute()
+{
+    return b_muted;
 }
 
 void vlc_renderer_sys::msgPlayerSetMute(bool b_mute)
 {
-    assert(!mediaSessionId.empty());
+    if (!mediaSessionId.empty())
+    {
+        std::stringstream ss;
+        ss << "{\"type\":\"SET_VOLUME\","
+           <<  "\"volume\":{\"muted\":" << ( b_mute ? "true" : "false" ) << "},"
+           <<  "\"mediaSessionId\":" << mediaSessionId << ","
+           <<  "\"requestId\":" << i_requestId++
+           << "}";
 
-    std::stringstream ss;
-    ss << "{\"type\":\"SET_VOLUME\","
-       <<  "\"volume\":{\"muted\":" << ( b_mute ? "true" : "false" ) << "},"
-       <<  "\"mediaSessionId\":" << mediaSessionId << ","
-       <<  "\"requestId\":" << i_requestId++
-       << "}";
-
-    pushMediaPlayerMessage( ss );
+        pushMediaPlayerMessage( ss );
+    }
+    b_muted = b_mute;
 }
 
 /*****************************************************************************
