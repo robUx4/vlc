@@ -161,15 +161,29 @@ vlc_renderer_stop(vlc_object_t *p_obj);
  * TODO
  */
 VLC_API int
-vlc_renderer_volume_change(vlc_object_t *p_obj, float f_volume);
-#define vlc_renderer_volume_change(a, b) vlc_renderer_volume_change(VLC_OBJECT(a), b)
+vlc_renderer_volume_get(vlc_object_t *p_obj, float *f_volume);
+#define vlc_renderer_volume_get(a, b) vlc_renderer_volume_get(VLC_OBJECT(a), b)
 
 /**
  * TODO
  */
 VLC_API int
-vlc_renderer_volume_mute(vlc_object_t *p_obj, bool b_mute);
-#define vlc_renderer_volume_mute(a, b) vlc_renderer_volume_mute(VLC_OBJECT(a), b)
+vlc_renderer_volume_set(vlc_object_t *p_obj, float f_volume);
+#define vlc_renderer_volume_set(a, b) vlc_renderer_volume_set(VLC_OBJECT(a), b)
+
+/**
+ * TODO
+ */
+VLC_API int
+vlc_renderer_mute_get(vlc_object_t *p_obj, bool *b_mute);
+#define vlc_renderer_mute_get(a, b) vlc_renderer_mute_get(VLC_OBJECT(a), b)
+
+/**
+ * TODO
+ */
+VLC_API int
+vlc_renderer_mute_set(vlc_object_t *p_obj, bool b_mute);
+#define vlc_renderer_mute_set(a, b) vlc_renderer_mute_set(VLC_OBJECT(a), b)
 
 /**
  * @}
@@ -198,14 +212,23 @@ struct vlc_renderer
      */
     void    (*pf_stop)(vlc_renderer *p_renderer);
     /**
-     * Called on vlc_renderer_volume_change()
+     * Called on vlc_renderer_volume_get()
+     * @param pf_volume the volume (0.0 to 1.0)
+     */
+    int     (*pf_volume_get)(vlc_renderer *p_renderer, float *pf_volume);
+    /**
+     * Called on vlc_renderer_volume_set()
      * @param f_volume the volume (0.0 to 1.0)
      */
-    int     (*pf_volume_change)(vlc_renderer *p_renderer, float f_volume);
+    int     (*pf_volume_set)(vlc_renderer *p_renderer, float f_volume);
     /**
-     * Called on vlc_renderer_volume_mute()
+     * Called on vlc_renderer_volume_get()
      */
-    int     (*pf_volume_mute)(vlc_renderer *p_renderer, bool b_mute);
+    int     (*pf_mute_get)(vlc_renderer *p_renderer, bool *pb_mute);
+    /**
+     * Called on vlc_renderer_volume_set()
+     */
+    int     (*pf_mute_set)(vlc_renderer *p_renderer, bool b_mute);
 };
 
 /** @} @} */

@@ -749,5 +749,7 @@ vlc_renderer_unload
 vlc_renderer_get_item
 vlc_renderer_start
 vlc_renderer_stop
-vlc_renderer_volume_change
-vlc_renderer_volume_mute
+vlc_renderer_volume_get
+vlc_renderer_volume_set
+vlc_renderer_mute_get
+vlc_renderer_mute_set

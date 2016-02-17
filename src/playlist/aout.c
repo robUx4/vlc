@@ -48,26 +48,33 @@ float playlist_VolumeGet (playlist_t *pl)
 {
     float volume = -1.f;
 
-    audio_output_t *aout = playlist_GetAout (pl);
-    if (aout != NULL)
+    int ret = vlc_renderer_volume_get( pl, &volume );
+    if (ret == VLC_ENOOBJ)
     {
-        volume = aout_VolumeGet (aout);
-        vlc_object_release (aout);
+        audio_output_t *aout = playlist_GetAout (pl);
+        if (aout != NULL)
+        {
+            volume = aout_VolumeGet (aout);
+            vlc_object_release (aout);
+        }
     }
     return volume;
 }
 
 int playlist_VolumeSet (playlist_t *pl, float vol)
 {
-    int ret = -1;
+    int ret;
 
-    audio_output_t *aout = playlist_GetAout (pl);
-    if (aout != NULL)
+    ret = vlc_renderer_volume_set( pl, vol );
+    if (ret == VLC_ENOOBJ)
     {
-        ret = aout_VolumeSet (aout, vol);
-        vlc_object_release (aout);
+        audio_output_t *aout = playlist_GetAout (pl);
+        if (aout != NULL)
+        {
+            ret = aout_VolumeSet (aout, vol);
+            vlc_object_release (aout);
+        }
     }
-    vlc_renderer_volume_change( pl, vol );
     return ret;
 }
 
@@ -84,23 +91,18 @@ int playlist_VolumeUp (playlist_t *pl, int value, float *volp)
 
     float delta = value * stepSize;
 
-    audio_output_t *aout = playlist_GetAout (pl);
-    if (aout != NULL)
+    float vol = playlist_VolumeGet( pl );
+    if (vol >= 0.f)
     {
-        float vol = aout_VolumeGet (aout);
-        if (vol >= 0.f)
-        {
-            vol += delta;
-            if (vol < 0.f)
-                vol = 0.f;
-            if (vol > 2.f)
-                vol = 2.f;
-            vol = (roundf (vol / stepSize)) * stepSize;
-            if (volp != NULL)
-                *volp = vol;
-            ret = aout_VolumeSet (aout, vol);
-        }
-        vlc_object_release (aout);
+        vol += delta;
+        if (vol < 0.f)
+            vol = 0.f;
+        if (vol > 2.f)
+            vol = 2.f;
+        vol = (roundf (vol / stepSize)) * stepSize;
+        if (volp != NULL)
+            *volp = vol;
+        ret = playlist_VolumeSet (pl, vol);
     }
     return ret;
 }
@@ -109,26 +111,36 @@ int playlist_MuteGet (playlist_t *pl)
 {
     int mute = -1;
 
-    audio_output_t *aout = playlist_GetAout (pl);
-    if (aout != NULL)
+    bool b_muted;
+    int ret = vlc_renderer_mute_get( pl, &b_muted );
+    if (ret == VLC_SUCCESS)
+        mute = b_muted;
+    else if (ret == VLC_ENOOBJ)
     {
-        mute = aout_MuteGet (aout);
-        vlc_object_release (aout);
+        audio_output_t *aout = playlist_GetAout (pl);
+        if (aout != NULL)
+        {
+            mute = aout_MuteGet (aout);
+            vlc_object_release (aout);
+        }
     }
     return mute;
 }
 
 int playlist_MuteSet (playlist_t *pl, bool mute)
 {
-    int ret = -1;
+    int ret;
 
-    audio_output_t *aout = playlist_GetAout (pl);
-    if (aout != NULL)
+    ret = vlc_renderer_mute_set( pl, mute );
+    if (ret == VLC_ENOOBJ)
     {
-        ret = aout_MuteSet (aout, mute);
-        vlc_object_release (aout);
+        audio_output_t *aout = playlist_GetAout (pl);
+        if (aout != NULL)
+        {
+            ret = aout_MuteSet (aout, mute);
+            vlc_object_release (aout);
+        }
     }
-    vlc_renderer_volume_mute( pl, mute );
     return ret;
 }
 

@@ -316,36 +316,55 @@ int libvlc_audio_get_mute( libvlc_media_player_t *mp )
 {
     int mute = -1;
 
-    audio_output_t *aout = GetAOut( mp );
-    if( aout != NULL )
+    bool b_mute;
+    int ret = vlc_renderer_mute_get( mp, &b_mute );
+    if (ret == VLC_SUCCESS)
+        mute = b_mute;
+    else if (ret == VLC_ENOOBJ)
     {
-        mute = aout_MuteGet( aout );
-        vlc_object_release( aout );
+        audio_output_t *aout = GetAOut( mp );
+        if( aout != NULL )
+        {
+            mute = aout_MuteGet( aout );
+            vlc_object_release( aout );
+        }
     }
     return mute;
 }
 
 void libvlc_audio_set_mute( libvlc_media_player_t *mp, int mute )
 {
-    audio_output_t *aout = GetAOut( mp );
-    if( aout != NULL )
+    int ret = vlc_renderer_mute_set( mp, mute );
+    if (ret == VLC_ENOOBJ)
     {
-        mute = aout_MuteSet( aout, mute );
-        vlc_object_release( aout );
+        audio_output_t *aout = GetAOut( mp );
+        if( aout != NULL )
+        {
+            mute = aout_MuteSet( aout, mute );
+            vlc_object_release( aout );
+        }
     }
-    vlc_renderer_volume_mute( mp, mute );
 }
 
 int libvlc_audio_get_volume( libvlc_media_player_t *mp )
 {
     int volume = -1;
 
-    audio_output_t *aout = GetAOut( mp );
-    if( aout != NULL )
+    float vol;
+    int ret = vlc_renderer_volume_get( mp, &vol );
+    if (ret == VLC_SUCCESS)
     {
-        float vol = aout_VolumeGet( aout );
-        vlc_object_release( aout );
         volume = lroundf( vol * 100.f );
+    }
+    else if (ret == VLC_ENOOBJ)
+    {
+        audio_output_t *aout = GetAOut( mp );
+        if( aout != NULL )
+        {
+            vol = aout_VolumeGet( aout );
+            vlc_object_release( aout );
+            volume = lroundf( vol * 100.f );
+        }
     }
     return volume;
 }
@@ -359,14 +378,16 @@ int libvlc_audio_set_volume( libvlc_media_player_t *mp, int volume )
         return -1;
     }
 
-    int ret = -1;
-    audio_output_t *aout = GetAOut( mp );
-    if( aout != NULL )
+    int ret = vlc_renderer_volume_set( mp, vol );
+    if (ret == VLC_ENOOBJ)
     {
-        ret = aout_VolumeSet( aout, vol );
-        vlc_object_release( aout );
+        audio_output_t *aout = GetAOut( mp );
+        if( aout != NULL )
+        {
+            ret = aout_VolumeSet( aout, vol );
+            vlc_object_release( aout );
+        }
     }
-    vlc_renderer_volume_change( mp, vol );
     return ret;
 }
 
