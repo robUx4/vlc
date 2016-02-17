@@ -334,15 +334,12 @@ int libvlc_audio_get_mute( libvlc_media_player_t *mp )
 
 void libvlc_audio_set_mute( libvlc_media_player_t *mp, int mute )
 {
-    int ret = vlc_renderer_mute_set( mp, mute );
-    if (ret == VLC_ENOOBJ)
+    vlc_renderer_mute_set( mp, mute );
+    audio_output_t *aout = GetAOut( mp );
+    if( aout != NULL )
     {
-        audio_output_t *aout = GetAOut( mp );
-        if( aout != NULL )
-        {
-            mute = aout_MuteSet( aout, mute );
-            vlc_object_release( aout );
-        }
+        mute = aout_MuteSet( aout, mute );
+        vlc_object_release( aout );
     }
 }
 
@@ -378,15 +375,13 @@ int libvlc_audio_set_volume( libvlc_media_player_t *mp, int volume )
         return -1;
     }
 
-    int ret = vlc_renderer_volume_set( mp, vol );
-    if (ret == VLC_ENOOBJ)
+    vlc_renderer_volume_set( mp, vol );
+    int ret = -1;
+    audio_output_t *aout = GetAOut( mp );
+    if( aout != NULL )
     {
-        audio_output_t *aout = GetAOut( mp );
-        if( aout != NULL )
-        {
-            ret = aout_VolumeSet( aout, vol );
-            vlc_object_release( aout );
-        }
+        ret = aout_VolumeSet( aout, vol );
+        vlc_object_release( aout );
     }
     return ret;
 }
