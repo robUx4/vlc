@@ -297,7 +297,7 @@ void vlc_renderer_sys::ipChangedEvent(const char *psz_new_ip)
                 msg_Err(p_intf, "Could not start the Chromecast talking thread");
             }
 
-#if TODO
+#if 0
             playlist_t *p_playlist = pl_Get( p_intf );
             PL_LOCK;
             input_thread_t *p_input = playlist_CurrentInput(p_playlist);
@@ -372,7 +372,7 @@ static int Start(vlc_renderer *p_renderer, input_thread_t *p_input)
 static void Stop(vlc_renderer *p_renderer)
 {
     vlc_renderer_sys *p_sys = p_renderer->p_sys;
-    p_sys->ipChangedEvent( NULL );
+    p_sys->InputUpdated( NULL );
 }
 
 
