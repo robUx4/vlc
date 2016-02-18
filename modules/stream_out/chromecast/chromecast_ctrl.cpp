@@ -103,7 +103,7 @@ static void *ChromecastThread(void *data);
 vlc_module_begin ()
     set_shortname( N_("Chromecast") )
     set_category(CAT_ADVANCED)
-    set_subcategory(SUBCAT_ADVANCED_NETWORK)
+    set_subcategory(SUBCAT_ADVANCED_RENDERER)
     set_description( N_("Chromecast interface") )
     set_capability( "renderer", 0 )
     add_shortcut( "chromecast" )
