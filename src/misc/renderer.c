@@ -52,12 +52,14 @@ vlc_renderer_item *
 vlc_renderer_item_new(const char *psz_module, const char *psz_host,
                       uint16_t i_port, const char *psz_name, renderer_item_flags e_flags)
 {
-    assert(psz_module != NULL && psz_host != NULL && psz_name != NULL);
+    assert(psz_module != NULL && psz_host != NULL);
 
     vlc_renderer_item *p_item = calloc(1, sizeof(vlc_renderer_item));
     if (p_item == NULL)
         return NULL;
 
+    if (psz_name == NULL)
+        psz_name = "";
     if ((p_item->psz_module = strdup(psz_module)) == NULL
             || (p_item->psz_host = strdup(psz_host)) == NULL
             || (p_item->psz_name = strdup(psz_name)) == NULL)
