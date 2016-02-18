@@ -386,7 +386,7 @@ void vlc_renderer_sys::plugOutputRedirection()
 void vlc_renderer_sys::InputUpdated( input_thread_t *p_input )
 {
     vlc_mutex_lock(&lock);
-    msg_Dbg( p_intf, "%ld InputUpdated p_input:%p was:%p playlist_Status:%d", GetCurrentThreadId(), (void*)p_input, (void*)this->p_input, this->p_input ? (int)var_GetInteger( this->p_input, "state" ) : -1 );
+    msg_Dbg( p_intf, "%ld InputUpdated p_input:%p was:%p playlist_Status:%d device:%s", GetCurrentThreadId(), (void*)p_input, (void*)this->p_input, this->p_input ? (int)var_GetInteger( this->p_input, "state" ) : -1, deviceIP.c_str() );
 
     if (deviceIP.empty())
     {
@@ -412,6 +412,11 @@ void vlc_renderer_sys::InputUpdated( input_thread_t *p_input )
         vlc_mutex_unlock(&lock);
         var_DelCallback( this->p_input, "intf-event", InputEvent, p_intf );
         vlc_mutex_lock(&lock);
+        if (!mediaSessionId.empty() && receiverState != RECEIVER_IDLE) {
+            msgPlayerStop();
+            receiverState = RECEIVER_IDLE;
+            setPlayerStatus(NO_CMD_PENDING);
+        }
         unplugOutputRedirection();
     }
 
