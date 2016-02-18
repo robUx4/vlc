@@ -46,7 +46,7 @@ static const std::string DEFAULT_CHOMECAST_RECEIVER = "receiver-0";
 /* see https://developers.google.com/cast/docs/reference/messages */
 static const std::string NAMESPACE_MEDIA            = "urn:x-cast:com.google.cast.media";
 
-#define HTTP_PORT               8010
+#define HTTP_PORT               8010  /* TODO move */
 
 // Status
 enum connection_status
@@ -138,7 +138,7 @@ struct vlc_renderer_sys
 
     vlc_renderer  * const p_intf;
     input_thread_t *p_input;
-    uint16_t       devicePort;
+    uint16_t       devicePort; /* TODO remove */
     std::string    deviceIP;
     std::string    serverIP;
     std::string    mime;
@@ -165,7 +165,7 @@ struct vlc_renderer_sys
     mtime_t           m_seektime;
     /* seek time with Chromecast relative timestamp */
     mtime_t           i_seektime;
-    restart_state     restartState;
+    restart_state     restartState; /* TODO remove this */
 
 
     vlc_mutex_t  lock;
@@ -256,8 +256,8 @@ private:
 
     std::string       s_sout;
     std::string       s_chromecast_url;
-    bool              canRemux;
-    bool              canDoDirect;
+    bool              canRemux;    ///< can be played by just remuxing
+    bool              canDoDirect; ///< can use the URL directly
     bool              b_forcing_position;
     double            f_restart_position;
 
