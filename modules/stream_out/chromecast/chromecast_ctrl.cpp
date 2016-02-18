@@ -151,7 +151,7 @@ int Open(vlc_object_t *p_this)
     p_renderer->pf_volume_set = VolumeChanged;
     p_renderer->pf_volume_get = VolumeGet;
 
-    p_sys->ipChangedEvent( vlc_renderer_item_host(p_renderer->p_item) );
+    p_sys->deviceChanged( p_renderer->p_item );
 
     return VLC_SUCCESS;
 
@@ -207,28 +207,24 @@ vlc_renderer_sys::vlc_renderer_sys(vlc_renderer * const p_this)
 
 vlc_renderer_sys::~vlc_renderer_sys()
 {
-    ipChangedEvent( NULL );
+    deviceChanged( NULL );
 
     vlc_cond_destroy(&seekCommandCond);
     vlc_cond_destroy(&loadCommandCond);
     vlc_mutex_destroy(&lock);
 }
 
-void vlc_renderer_sys::ipChangedEvent(const char *psz_new_ip)
+void vlc_renderer_sys::deviceChanged(const vlc_renderer_item *p_item)
 {
+    const char *psz_new_ip = NULL;
+    if (p_item != NULL)
+        psz_new_ip = vlc_renderer_item_host( p_item );
     if (psz_new_ip == NULL)
-        psz_new_ip = "";
-
-    vlc_url_t url;
-    vlc_UrlParse(&url, psz_new_ip);
-    if (url.psz_host)
-        psz_new_ip = url.psz_host;
-    else
         psz_new_ip = "";
 
     if (deviceIP != psz_new_ip)
     {
-        msg_Dbg(p_intf,"ipChangedEvent '%s' from '%s'", psz_new_ip, deviceIP.c_str());
+        msg_Dbg(p_intf,"deviceChanged '%s' from '%s'", psz_new_ip, deviceIP.c_str());
         if ( !deviceIP.empty() )
         {
             /* disconnect the current Chromecast */
@@ -256,7 +252,9 @@ void vlc_renderer_sys::ipChangedEvent(const char *psz_new_ip)
 
         /* connect the new Chromecast (if needed) */
         deviceIP = psz_new_ip;
-        devicePort = url.i_port ? url.i_port : CHROMECAST_CONTROL_PORT;
+        devicePort = p_item ? vlc_renderer_item_port( p_item ) : 0;
+        if (devicePort == 0)
+            devicePort = CHROMECAST_CONTROL_PORT;
 
         if ( !deviceIP.empty() )
         {
@@ -287,7 +285,6 @@ void vlc_renderer_sys::ipChangedEvent(const char *psz_new_ip)
             vlc_cond_signal(&seekCommandCond);
         }
     }
-    vlc_UrlClean(&url);
 }
 
 static int MuteChanged( vlc_renderer *p_renderer, bool b_mute )
@@ -1085,7 +1082,7 @@ void vlc_renderer_sys::processMessage(const castchannel::CastMessage &msg)
             msg_Warn(p_intf, "received close message");
             vlc_mutex_locker locker(&lock);
             setConnectionStatus(CHROMECAST_CONNECTION_DEAD);
-            ipChangedEvent( NULL );
+            deviceChanged( NULL );
         }
         else
         {

@@ -204,7 +204,7 @@ struct vlc_renderer_sys
         }
     }
 
-    void ipChangedEvent(const char *psz_new_ip);
+    void deviceChanged(const vlc_renderer_item *p_item);
     int connectChromecast();
     void disconnectChromecast();
 
