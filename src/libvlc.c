@@ -62,6 +62,7 @@
 
 #include <vlc_charset.h>
 #include <vlc_dialog.h>
+#include <vlc_renderer.h>
 #include <vlc_fs.h>
 #include <vlc_cpu.h>
 #include <vlc_url.h>
@@ -237,6 +238,14 @@ int libvlc_InternalInit( libvlc_int_t *p_libvlc, int i_argc,
 
     if( libvlc_dialog_provider_init( p_libvlc ) != VLC_SUCCESS )
     {
+        vlc_LogDeinit (p_libvlc);
+        module_EndBank (true);
+        return VLC_ENOMEM;
+    }
+
+    if (libvlc_renderer_init( p_libvlc ) != VLC_SUCCESS )
+    {
+        libvlc_dialog_provider_deinit( p_libvlc );
         vlc_LogDeinit (p_libvlc);
         module_EndBank (true);
         return VLC_ENOMEM;
@@ -511,6 +520,7 @@ void libvlc_InternalCleanup( libvlc_int_t *p_libvlc )
     intf_DestroyAll( p_libvlc );
 
     libvlc_dialog_provider_deinit( p_libvlc );
+    libvlc_renderer_deinit( p_libvlc );
 
 #ifdef ENABLE_VLM
     /* Destroy VLM if created in libvlc_InternalInit */

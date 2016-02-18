@@ -208,6 +208,8 @@ typedef struct playlist_item_t playlist_item_t;
 typedef struct services_discovery_t services_discovery_t;
 typedef struct services_discovery_sys_t services_discovery_sys_t;
 typedef struct playlist_add_t playlist_add_t;
+typedef struct vlc_renderer_item vlc_renderer_item;
+typedef struct vlc_renderer vlc_renderer;
 
 /* Modules */
 typedef struct module_t module_t;
