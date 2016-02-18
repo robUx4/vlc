@@ -37,6 +37,7 @@
 #include <vlc_input.h>
 #include <vlc_aout.h>
 #include <vlc_modules.h>
+#include <vlc_renderer.h>
 
 #include "libvlc_internal.h"
 #include "media_player_internal.h"
@@ -315,17 +316,25 @@ int libvlc_audio_get_mute( libvlc_media_player_t *mp )
 {
     int mute = -1;
 
-    audio_output_t *aout = GetAOut( mp );
-    if( aout != NULL )
+    bool b_mute;
+    int ret = vlc_renderer_mute_get( mp, &b_mute );
+    if( ret == VLC_SUCCESS )
+        mute = b_mute;
+    else if( ret == VLC_ENOOBJ )
     {
-        mute = aout_MuteGet( aout );
-        vlc_object_release( aout );
+        audio_output_t *aout = GetAOut( mp );
+        if( aout != NULL )
+        {
+            mute = aout_MuteGet( aout );
+            vlc_object_release( aout );
+        }
     }
     return mute;
 }
 
 void libvlc_audio_set_mute( libvlc_media_player_t *mp, int mute )
 {
+    vlc_renderer_mute_set( mp, mute );
     audio_output_t *aout = GetAOut( mp );
     if( aout != NULL )
     {
@@ -338,12 +347,21 @@ int libvlc_audio_get_volume( libvlc_media_player_t *mp )
 {
     int volume = -1;
 
-    audio_output_t *aout = GetAOut( mp );
-    if( aout != NULL )
+    float vol;
+    int ret = vlc_renderer_volume_get( mp, &vol );
+    if( ret == VLC_SUCCESS )
     {
-        float vol = aout_VolumeGet( aout );
-        vlc_object_release( aout );
         volume = lroundf( vol * 100.f );
+    }
+    else if( ret == VLC_ENOOBJ )
+    {
+        audio_output_t *aout = GetAOut( mp );
+        if( aout != NULL )
+        {
+            vol = aout_VolumeGet( aout );
+            vlc_object_release( aout );
+            volume = lroundf( vol * 100.f );
+        }
     }
     return volume;
 }
@@ -357,6 +375,7 @@ int libvlc_audio_set_volume( libvlc_media_player_t *mp, int volume )
         return -1;
     }
 
+    vlc_renderer_volume_set( mp, vol );
     int ret = -1;
     audio_output_t *aout = GetAOut( mp );
     if( aout != NULL )
