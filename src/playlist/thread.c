@@ -33,6 +33,7 @@
 #include <vlc_interface.h>
 #include <vlc_playlist.h>
 #include <vlc_rand.h>
+#include <vlc_renderer.h>
 #include "playlist_internal.h"
 
 /*****************************************************************************
@@ -212,8 +213,10 @@ static bool PlayItem( playlist_t *p_playlist, playlist_item_t *p_item )
         var_AddCallback( p_input_thread, "intf-event",
                          InputEvent, p_playlist );
 
+        vlc_renderer_start( p_playlist, p_input_thread );
         if( input_Start( p_input_thread ) )
         {
+            vlc_renderer_stop( p_playlist );
             var_DelCallback( p_input_thread, "intf-event",
                              InputEvent, p_playlist );
             vlc_object_release( p_input_thread );
@@ -451,6 +454,7 @@ static void LoopInput( playlist_t *p_playlist )
         PL_DEBUG( "dead input" );
         PL_UNLOCK;
 
+        vlc_renderer_stop( p_playlist );
         var_SetAddress( p_playlist, "input-current", NULL );
 
         /* WARNING: Input resource manipulation and callback deletion are
