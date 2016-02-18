@@ -41,6 +41,7 @@ libvlc_la_SOURCES = \
 	error.c \
 	log.c \
 	playlist.c \
+	renderer.c \
 	vlm.c \
 	video.c \
 	audio.c \

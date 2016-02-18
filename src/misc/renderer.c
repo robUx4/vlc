@@ -29,6 +29,7 @@
 #include <vlc_renderer.h>
 #include <vlc_modules.h>
 #include <libvlc.h>
+#include "../lib/libvlc_internal.h"
 
 struct vlc_renderer_item
 {
@@ -417,4 +418,51 @@ vlc_renderer_init(libvlc_int_t *p_libvlc)
     }
     libvlc_priv(p_libvlc)->p_renderer = (vlc_object_t *) p_priv;
     return VLC_SUCCESS;
+}
+
+int
+libvlc_InternalSetRenderer( libvlc_int_t *p_libvlc, const char *name )
+{
+    struct renderer_priv *p_priv =
+        (struct renderer_priv *) libvlc_priv(p_libvlc)->p_renderer;
+    char *module;
+    char *p_host = NULL;
+    char *p_name = NULL;
+    config_chain_t *p_cfg = NULL;
+
+    if (name == NULL || name[0]=='\0')
+    {
+        vlc_mutex_lock(&p_priv->lock);
+        renderer_unload_locked( p_priv );
+        vlc_mutex_unlock(&p_priv->lock);
+        return VLC_SUCCESS;
+    }
+
+    free( config_ChainCreate( &module, &p_cfg, name ) );
+
+    config_chain_t *p_read_cfg = p_cfg;
+    while (p_read_cfg)
+    {
+        if (!strcmp(p_cfg->psz_name, "host"))
+            p_host = p_cfg->psz_value;
+        if (!strcmp(p_cfg->psz_name, "name"))
+            p_name = p_cfg->psz_value;
+        p_read_cfg = p_read_cfg->p_next;
+    }
+
+    if (module == NULL || p_host == NULL)
+    {
+        free( module );
+        config_ChainDestroy( p_cfg );
+        return VLC_EGENERIC;
+    }
+
+    vlc_renderer_item *p_renderer_item = vlc_renderer_item_new(module, p_host, 0, p_name, 0);
+    free( module );
+    config_ChainDestroy( p_cfg );
+
+    vlc_mutex_lock(&p_priv->lock);
+    int i_ret = renderer_load_locked( p_priv, p_renderer_item );
+    vlc_mutex_unlock(&p_priv->lock);
+    return i_ret;
 }

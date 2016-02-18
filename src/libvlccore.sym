@@ -228,6 +228,7 @@ libvlc_InternalCleanup
 libvlc_InternalCreate
 libvlc_InternalDestroy
 libvlc_InternalInit
+libvlc_InternalSetRenderer
 libvlc_Quit
 libvlc_SetExitHandler
 libvlc_MetaRequest

@@ -124,6 +124,7 @@ int libvlc_InternalInit( libvlc_int_t *p_libvlc, int i_argc,
     char *       psz_modules = NULL;
     char *       psz_parser = NULL;
     char *       psz_control = NULL;
+    char *       psz_renderer = NULL;
     char        *psz_val;
 
     /* System specific initialization code */
@@ -474,6 +475,11 @@ dbus_out:
 
     if( var_InheritBool( p_libvlc, "network-synchronisation") )
         libvlc_InternalAddIntf( p_libvlc, "netsync,none" );
+
+    psz_renderer = var_CreateGetNonEmptyString( p_libvlc, "renderer" );
+    if (psz_renderer)
+        libvlc_InternalSetRenderer( p_libvlc, psz_renderer );
+    free( psz_renderer );
 
 #ifdef __APPLE__
     var_Create( p_libvlc, "drawable-view-top", VLC_VAR_INTEGER );
