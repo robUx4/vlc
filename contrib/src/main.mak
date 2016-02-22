@@ -457,6 +457,11 @@ else
 	echo "set(CMAKE_SYSTEM_NAME Windows)" >> $@
 endif
 endif
+	echo "set(CMAKE_AR $(AR) CACHE FILEPATH Archiver)" >> $@
+	echo "set(CMAKE_C_ARCHIVE_CREATE \"sh.exe $(AR) qc <TARGET> <LINK_FLAGS> <OBJECTS>\")" >> $@
+	echo "set(CMAKE_C_ARCHIVE_APPEND \"sh.exe $(AR) q  <TARGET> <LINK_FLAGS> <OBJECTS>\")" >> $@
+	echo "set(CMAKE_CXX_ARCHIVE_CREATE \"sh.exe $(AR) qc <TARGET> <LINK_FLAGS> <OBJECTS>\")" >> $@
+	echo "set(CMAKE_CXX_ARCHIVE_APPEND \"sh.exe $(AR) q  <TARGET> <LINK_FLAGS> <OBJECTS>\")" >> $@
 ifndef WITH_OPTIMIZATION
 	echo "set(CMAKE_BUILD_TYPE Debug)" >> $@
 else
