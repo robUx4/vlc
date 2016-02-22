@@ -165,6 +165,12 @@ EXTRA_LDFLAGS += -m32
 endif
 endif
 
+ifdef HAVE_WINSTORE
+ifdef HAVE_VISUALSTUDIO
+EXTRA_CMAKE_FLAGS += -FI`cygpath -w ../../../../headers/fixup.h`
+endif
+endif
+
 cppcheck = $(shell $(CC) $(CFLAGS) -E -dM - < /dev/null | grep -E $(1))
 
 EXTRA_CFLAGS += -I$(PREFIX)/include
