@@ -311,6 +311,12 @@ HOSTTOOLS := \
 	CC="$(CC)" CXX="$(CXX)" LD="$(LD)" \
 	AR="$(AR)" CCAS="$(CCAS)" RANLIB="$(RANLIB)" STRIP="$(STRIP)" \
 	PATH="$(PREFIX)/bin:$(PATH)"
+
+ifdef HAVE_VISUALSTUDIO
+HOSTTOOLS += ac_cv_func_getenv=yes ac_cv_func_putenv=yes ac_cv_func_getpid=yes ac_cv_have_decl_strdup=yes \
+	ac_cv_func_strnlen=yes ac_cv_have_decl_strnlen=yes ac_cv_func_timespec_get=yes ac_cv_func_strdup=yes
+endif
+
 HOSTVARS := $(HOSTTOOLS) \
 	CPPFLAGS="$(CPPFLAGS)" \
 	CFLAGS="$(CFLAGS)" \
