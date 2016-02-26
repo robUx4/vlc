@@ -176,7 +176,6 @@ struct vout_display_sys_t
     HINSTANCE                hd3dcompiler_dll; /* handle of the opened d3dcompiler dll */
     IDXGIFactory2            *dxgifactory2;    /* DXGI factory */
     /* We should find a better way to store this or atleast a shorter name */
-    PFN_D3D11_CREATE_DEVICE_AND_SWAP_CHAIN OurD3D11CreateDeviceAndSwapChain;
     PFN_D3D11_CREATE_DEVICE                OurD3D11CreateDevice;
     pD3DCompile                            OurD3DCompile;
 #endif

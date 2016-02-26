@@ -34,6 +34,9 @@
 #define COBJMACROS
 #define INITGUID
 #include <d3d11.h>
+#if 0
+#include <dxgi1_3.h>
+#endif
 
 /* avoided until we can pass ISwapchainPanel without c++/cx mode
 # include <windows.ui.xaml.media.dxinterop.h> */
@@ -777,7 +780,6 @@ static void Direct3D11Destroy(vout_display_t *vd)
     /* TODO : add release of d3d11 objects here */
 
     sys->OurD3D11CreateDevice = NULL;
-    sys->OurD3D11CreateDeviceAndSwapChain = NULL;
     sys->OurD3DCompile = NULL;
     sys->hdxgi_dll = NULL;
     sys->hd3d11_dll = NULL;
@@ -841,15 +843,29 @@ static int Direct3D11Open(vout_display_t *vd, video_format_t *fmt)
         D3D_DRIVER_TYPE_REFERENCE,
     };
 
+    static const D3D_FEATURE_LEVEL featureLevels[] =
+    {
+        0xc000 /* D3D_FEATURE_LEVEL_12_1 */,
+        0xc100 /* D3D_FEATURE_LEVEL_12_0 */,
+        D3D_FEATURE_LEVEL_11_1,
+        D3D_FEATURE_LEVEL_11_0,
+        D3D_FEATURE_LEVEL_10_1,
+        D3D_FEATURE_LEVEL_10_0,
+        D3D_FEATURE_LEVEL_9_3,
+        D3D_FEATURE_LEVEL_9_2,
+        D3D_FEATURE_LEVEL_9_1,
+    };
+
     for (UINT driver = 0; driver < ARRAYSIZE(driverAttempts); driver++) {
+        D3D_FEATURE_LEVEL i_feature_level;
         hr = D3D11CreateDevice(NULL, driverAttempts[driver], NULL, creationFlags,
-                    NULL, 0, D3D11_SDK_VERSION,
-                    &sys->d3ddevice, NULL, &sys->d3dcontext);
+                    featureLevels, 9, D3D11_SDK_VERSION,
+                    &sys->d3ddevice, &i_feature_level, &sys->d3dcontext);
         if (SUCCEEDED(hr)) {
 #ifndef NDEBUG
-            msg_Dbg(vd, "Created the D3D11 device 0x%p ctx 0x%p type %d.",
+            msg_Dbg(vd, "Created the D3D11 device 0x%p ctx 0x%p type %d level %d.",
                     (void *)sys->d3ddevice, (void *)sys->d3dcontext,
-                    driverAttempts[driver]);
+                    driverAttempts[driver], i_feature_level);
 #endif
             break;
         }
@@ -873,6 +889,25 @@ static int Direct3D11Open(vout_display_t *vd, video_format_t *fmt)
        msg_Err(vd, "Could not get the DXGI Adapter. (hr=0x%lX)", hr);
        return VLC_EGENERIC;
     }
+
+#if 0
+    for (UINT ui_output_index = 0;; ++ui_output_index)
+    {
+        IDXGIOutput *pOutput;
+        hr = IDXGIAdapter_EnumOutputs(dxgiadapter, ui_output_index, &pOutput);
+        if (FAILED(hr))
+            break;
+        IDXGIOutput2 *pOutput2;
+        hr = IDXGIOutput_QueryInterface(pOutput, &IID_IDXGIOutput2, (void **)&pOutput2);
+        if (!FAILED(hr))
+        {
+            BOOL supportsOverlay = IDXGIOutput2_SupportsOverlays(pOutput2);
+            msg_Dbg(vd, "Adapter output supports overlay: %d", supportsOverlay);
+            IDXGIOutput2_Release(pOutput2);
+        }
+        IDXGIOutput_Release(pOutput);
+    }
+#endif
 
     hr = IDXGIAdapter_GetParent(dxgiadapter, &IID_IDXGIFactory2, (void **)&sys->dxgifactory2);
     IDXGIAdapter_Release(dxgiadapter);
