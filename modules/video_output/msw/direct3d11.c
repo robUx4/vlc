@@ -818,7 +818,6 @@ static int Direct3D11Open(vout_display_t *vd, video_format_t *fmt)
 
     DXGI_SWAP_CHAIN_DESC1 scd;
     memset(&scd, 0, sizeof(scd));
-    scd.BufferCount = 1;
     scd.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
     scd.SampleDesc.Count = 1;
     scd.SampleDesc.Quality = 0;
@@ -831,7 +830,8 @@ static int Direct3D11Open(vout_display_t *vd, video_format_t *fmt)
     //scd.Scaling = DXGI_SCALING_ASPECT_RATIO_STRETCH;
     //scd.Windowed = TRUE;
     //scd.OutputWindow = sys->hvideownd;
-    scd.SwapEffect = DXGI_SWAP_EFFECT_DISCARD; /* TODO: user DXGI_SWAP_EFFECT_FLIP_SEQUENTIAL */
+    scd.BufferCount = 2;
+    scd.SwapEffect = DXGI_SWAP_EFFECT_FLIP_SEQUENTIAL;
     scd.AlphaMode = DXGI_ALPHA_MODE_UNSPECIFIED;
 
     IDXGIAdapter *dxgiadapter;
