@@ -43,11 +43,7 @@
 #include "../../video_chroma/dxgi_fmt.h"
 
 #if !VLC_WINSTORE_APP
-# if USE_DXGI
-#  define D3D11CreateDeviceAndSwapChain(args...) sys->OurD3D11CreateDeviceAndSwapChain(args)
-# else
-#  define D3D11CreateDevice(args...)             sys->OurD3D11CreateDevice(args)
-# endif
+# define D3D11CreateDevice(args...)             sys->OurD3D11CreateDevice(args)
 # define D3DCompile(args...)                    sys->OurD3DCompile(args)
 #endif
 
@@ -150,14 +146,6 @@ static void UpdatePicQuadPosition(vout_display_t *);
 static void UpdateQuadOpacity(vout_display_t *, const d3d_quad_t *, float);
 
 static void Manage(vout_display_t *vd);
-
-/* All the #if USE_DXGI contain an alternative method to setup dx11
-   They both need to be benchmarked to see which performs better */
-#if USE_DXGI
-/* I have no idea why MS decided dxgi headers do not define this
-   As they do have prototypes for d3d11 functions */
-typedef HRESULT(WINAPI *PFN_CREATE_DXGI_FACTORY)(REFIID riid, void **ppFactory);
-#endif
 
 /* TODO: Move to a direct3d11_shaders header */
 static const char* globVertexShaderDefault = "\
@@ -365,15 +353,6 @@ static int Open(vlc_object_t *object)
         FreeLibrary(hd3d11_dll);
         return VLC_EGENERIC;
     }
-
-# if USE_DXGI
-    HINSTANCE hdxgi_dll = LoadLibrary(TEXT("DXGI.DLL"));
-    if (!hdxgi_dll) {
-        msg_Warn(vd, "cannot load dxgi.dll, aborting");
-        return VLC_EGENERIC;
-    }
-# endif
-
 #else
     IDXGISwapChain1* dxgiswapChain  = var_InheritInteger(vd, "winrt-swapchain");
     if (!dxgiswapChain)
@@ -401,35 +380,6 @@ static int Open(vlc_object_t *object)
         return VLC_EGENERIC;
     }
 
-# if USE_DXGI
-    sys->hdxgi_dll = hdxgi_dll;
-
-    /* TODO : enable all dxgi versions from 1.3 -> 1.1 */
-    PFN_CREATE_DXGI_FACTORY OurCreateDXGIFactory =
-        (void *)GetProcAddress(sys->hdxgi_dll, "CreateDXGIFactory");
-    if (!OurCreateDXGIFactory) {
-        msg_Err(vd, "Cannot locate reference to CreateDXGIFactory in dxgi DLL");
-        Direct3D11Destroy(vd);
-        return VLC_EGENERIC;
-    }
-
-    /* TODO : detect the directx version supported and use IID_IDXGIFactory3 or 2 */
-    HRESULT hr = OurCreateDXGIFactory(&IID_IDXGIFactory, (void **)&sys->dxgifactory);
-    if (FAILED(hr)) {
-        msg_Err(vd, "Could not create dxgi factory. (hr=0x%lX)", hr);
-        Direct3D11Destroy(vd);
-        return VLC_EGENERIC;
-    }
-
-    sys->OurD3D11CreateDeviceAndSwapChain =
-        (void *)GetProcAddress(sys->hd3d11_dll, "D3D11CreateDeviceAndSwapChain");
-    if (!sys->OurD3D11CreateDeviceAndSwapChain) {
-        msg_Err(vd, "Cannot locate reference to D3D11CreateDeviceAndSwapChain in d3d11 DLL");
-        Direct3D11Destroy(vd);
-        return VLC_EGENERIC;
-    }
-
-# else
     sys->OurD3D11CreateDevice =
         (void *)GetProcAddress(sys->hd3d11_dll, "D3D11CreateDevice");
     if (!sys->OurD3D11CreateDevice) {
@@ -437,8 +387,6 @@ static int Open(vlc_object_t *object)
         Direct3D11Destroy(vd);
         return VLC_EGENERIC;
     }
-# endif
-
 #else
     sys->dxgiswapChain = dxgiswapChain;
     sys->d3ddevice     = d3ddevice;
@@ -801,7 +749,9 @@ static void Display(vout_display_t *vd, picture_t *picture, subpicture_t *subpic
         }
     }
 
-    HRESULT hr = IDXGISwapChain_Present(sys->dxgiswapChain, 0, 0);
+    DXGI_PRESENT_PARAMETERS presentParams;
+    memset(&presentParams, 0, sizeof(presentParams));
+    HRESULT hr = IDXGISwapChain1_Present1(sys->dxgiswapChain, 0, 0, &presentParams);
     if (hr == DXGI_ERROR_DEVICE_REMOVED || hr == DXGI_ERROR_DEVICE_RESET)
     {
         /* TODO device lost */
@@ -818,11 +768,6 @@ static void Direct3D11Destroy(vout_display_t *vd)
 {
 #if !VLC_WINSTORE_APP
     vout_display_sys_t *sys = vd->sys;
-
-# if USE_DXGI
-    if (sys->hdxgi_dll)
-        FreeLibrary(sys->hdxgi_dll);
-# endif
 
     if (sys->hd3d11_dll)
         FreeLibrary(sys->hd3d11_dll);
@@ -864,86 +809,32 @@ static int Direct3D11Open(vout_display_t *vd, video_format_t *fmt)
     *fmt = vd->source;
 
 #if !VLC_WINSTORE_APP
-
     UINT creationFlags = D3D11_CREATE_DEVICE_VIDEO_SUPPORT;
     HRESULT hr = S_OK;
 
-# if !defined(NDEBUG) && defined(_MSC_VER)
+# if !defined(NDEBUG) //&& defined(_MSC_VER)
     creationFlags |= D3D11_CREATE_DEVICE_DEBUG;
 # endif
 
-    DXGI_SWAP_CHAIN_DESC scd;
+    DXGI_SWAP_CHAIN_DESC1 scd;
     memset(&scd, 0, sizeof(scd));
     scd.BufferCount = 1;
     scd.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
     scd.SampleDesc.Count = 1;
     scd.SampleDesc.Quality = 0;
-    scd.BufferDesc.Width = fmt->i_visible_width;
-    scd.BufferDesc.Height = fmt->i_visible_height;
-    scd.BufferDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-
-    scd.Windowed = TRUE;
-    scd.OutputWindow = sys->hvideownd;
+    scd.Width = fmt->i_visible_width;
+    scd.Height = fmt->i_visible_height;
+    scd.Format = DXGI_FORMAT_R8G8B8A8_UNORM; /* TODO: use DXGI_FORMAT_NV12 */
+#if 0
+    scd.Flags = 512; // DXGI_SWAP_CHAIN_FLAG_YUV_VIDEO;
+#endif
+    //scd.Scaling = DXGI_SCALING_ASPECT_RATIO_STRETCH;
+    //scd.Windowed = TRUE;
+    //scd.OutputWindow = sys->hvideownd;
+    scd.SwapEffect = DXGI_SWAP_EFFECT_DISCARD; /* TODO: user DXGI_SWAP_EFFECT_FLIP_SEQUENTIAL */
+    scd.AlphaMode = DXGI_ALPHA_MODE_UNSPECIFIED;
 
     IDXGIAdapter *dxgiadapter;
-# if USE_DXGI
-    static const D3D_FEATURE_LEVEL featureLevels[] =
-    {
-        D3D_FEATURE_LEVEL_11_1,
-        D3D_FEATURE_LEVEL_11_0,
-        D3D_FEATURE_LEVEL_10_1,
-        D3D_FEATURE_LEVEL_10_0,
-        D3D_FEATURE_LEVEL_9_3,
-        D3D_FEATURE_LEVEL_9_2,
-        D3D_FEATURE_LEVEL_9_1
-    };
-
-    /* TODO : list adapters for the user to choose from */
-    hr = IDXGIFactory_EnumAdapters(sys->dxgifactory, 0, &dxgiadapter);
-    if (FAILED(hr)) {
-       msg_Err(vd, "Could not create find factory. (hr=0x%lX)", hr);
-       return VLC_EGENERIC;
-    }
-
-    IDXGIOutput* output;
-    hr = IDXGIAdapter_EnumOutputs(dxgiadapter, 0, &output);
-    if (FAILED(hr)) {
-       msg_Err(vd, "Could not Enumerate DXGI Outputs. (hr=0x%lX)", hr);
-       IDXGIAdapter_Release(dxgiadapter);
-       return VLC_EGENERIC;
-    }
-
-    DXGI_MODE_DESC md;
-    memset(&md, 0, sizeof(md));
-    md.Width  = fmt->i_visible_width;
-    md.Height = fmt->i_visible_height;
-    md.Format = scd.BufferDesc.Format;
-    md.Scaling = DXGI_MODE_SCALING_UNSPECIFIED;
-
-    hr = IDXGIOutput_FindClosestMatchingMode(output, &md, &scd.BufferDesc, NULL);
-    if (FAILED(hr)) {
-       msg_Err(vd, "Failed to find a supported video mode. (hr=0x%lX)", hr);
-       IDXGIAdapter_Release(dxgiadapter);
-       return VLC_EGENERIC;
-    }
-
-    /* mode desc doesn't carry over the width and height*/
-    scd.BufferDesc.Width = fmt->i_visible_width;
-    scd.BufferDesc.Height = fmt->i_visible_height;
-
-    hr = D3D11CreateDeviceAndSwapChain(dxgiadapter,
-                    D3D_DRIVER_TYPE_UNKNOWN, NULL, creationFlags,
-                    featureLevels, ARRAYSIZE(featureLevels),
-                    D3D11_SDK_VERSION, &scd, &sys->dxgiswapChain,
-                    &sys->d3ddevice, NULL, &sys->d3dcontext);
-    IDXGIAdapter_Release(dxgiadapter);
-    if (FAILED(hr)) {
-       msg_Err(vd, "Could not Create the D3D11 device and SwapChain. (hr=0x%lX)", hr);
-       return VLC_EGENERIC;
-    }
-
-# else
-
     static const D3D_DRIVER_TYPE driverAttempts[] = {
         D3D_DRIVER_TYPE_HARDWARE,
         D3D_DRIVER_TYPE_WARP,
@@ -983,21 +874,20 @@ static int Direct3D11Open(vout_display_t *vd, video_format_t *fmt)
        return VLC_EGENERIC;
     }
 
-    hr = IDXGIAdapter_GetParent(dxgiadapter, &IID_IDXGIFactory, (void **)&sys->dxgifactory);
+    hr = IDXGIAdapter_GetParent(dxgiadapter, &IID_IDXGIFactory2, (void **)&sys->dxgifactory2);
     IDXGIAdapter_Release(dxgiadapter);
     if (FAILED(hr)) {
        msg_Err(vd, "Could not get the DXGI Factory. (hr=0x%lX)", hr);
        return VLC_EGENERIC;
     }
 
-    hr = IDXGIFactory_CreateSwapChain(sys->dxgifactory, (IUnknown *)sys->d3ddevice, &scd, &sys->dxgiswapChain);
-    IDXGIFactory_Release(sys->dxgifactory);
+    hr = IDXGIFactory2_CreateSwapChainForHwnd(sys->dxgifactory2, (IUnknown *)sys->d3ddevice,
+                                              sys->hvideownd, &scd, NULL, NULL, &sys->dxgiswapChain);
+    IDXGIFactory2_Release(sys->dxgifactory2);
     if (FAILED(hr)) {
        msg_Err(vd, "Could not create the SwapChain. (hr=0x%lX)", hr);
        return VLC_EGENERIC;
     }
-
-# endif
 #endif
 
     vlc_fourcc_t i_src_chroma = fmt->i_chroma;
@@ -1605,7 +1495,6 @@ static int Direct3D11MapTexture(picture_t *picture)
     vout_display_t     *vd = p_sys->vd;
     D3D11_MAPPED_SUBRESOURCE mappedResource;
     HRESULT hr;
-    int res;
     hr = ID3D11DeviceContext_Map(vd->sys->d3dcontext, (ID3D11Resource *)p_sys->texture, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource);
     if( FAILED(hr) )
     {
