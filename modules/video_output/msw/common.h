@@ -180,7 +180,7 @@ struct vout_display_sys_t
     PFN_D3D11_CREATE_DEVICE                OurD3D11CreateDevice;
     pD3DCompile                            OurD3DCompile;
 #endif
-    IDXGISwapChain1          *dxgiswapChain;   /* DXGI 1.1 swap chain */
+    IDXGISwapChain1          *dxgiswapChain1;   /* DXGI 1.1 swap chain */
     ID3D11Device             *d3ddevice;       /* D3D device */
     ID3D11DeviceContext      *d3dcontext;      /* D3D context */
     d3d_quad_t               picQuad;

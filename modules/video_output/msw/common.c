@@ -153,13 +153,13 @@ void UpdateRects(vout_display_t *vd,
     uint32_t i_width;
     uint32_t i_height;
     UINT dataSize = sizeof(i_width);
-    HRESULT hr = IDXGISwapChain_GetPrivateData(sys->dxgiswapChain, &GUID_SWAPCHAIN_WIDTH, &dataSize, &i_width);
+    HRESULT hr = IDXGISwapChain1_GetPrivateData(sys->dxgiswapChain1, &GUID_SWAPCHAIN_WIDTH, &dataSize, &i_width);
     if (FAILED(hr)) {
         msg_Err(vd, "Can't get swapchain width, size %d. (hr=0x%lX)", hr, dataSize);
         return;
     }
     dataSize = sizeof(i_height);
-    hr = IDXGISwapChain_GetPrivateData(sys->dxgiswapChain, &GUID_SWAPCHAIN_HEIGHT, &dataSize, &i_height);
+    hr = IDXGISwapChain1_GetPrivateData(sys->dxgiswapChain1, &GUID_SWAPCHAIN_HEIGHT, &dataSize, &i_height);
     if (FAILED(hr)) {
         msg_Err(vd, "Can't get swapchain height, size %d. (hr=0x%lX)", hr, dataSize);
         return;

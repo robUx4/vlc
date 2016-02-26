@@ -354,8 +354,8 @@ static int Open(vlc_object_t *object)
         return VLC_EGENERIC;
     }
 #else
-    IDXGISwapChain1* dxgiswapChain  = var_InheritInteger(vd, "winrt-swapchain");
-    if (!dxgiswapChain)
+    IDXGISwapChain1* dxgiswapChain1  = var_InheritInteger(vd, "winrt-swapchain");
+    if (!dxgiswapChain1)
         return VLC_EGENERIC;
     ID3D11Device* d3ddevice         = var_InheritInteger(vd, "winrt-d3ddevice");
     if (!d3ddevice)
@@ -388,10 +388,10 @@ static int Open(vlc_object_t *object)
         return VLC_EGENERIC;
     }
 #else
-    sys->dxgiswapChain = dxgiswapChain;
+    sys->dxgiswapChain1 = dxgiswapChain1;
     sys->d3ddevice     = d3ddevice;
     sys->d3dcontext    = d3dcontext;
-    IDXGISwapChain_AddRef     (sys->dxgiswapChain);
+    IDXGISwapChain_AddRef     (sys->dxgiswapChain1);
     ID3D11Device_AddRef       (sys->d3ddevice);
     ID3D11DeviceContext_AddRef(sys->d3dcontext);
 #endif
@@ -574,13 +574,13 @@ static HRESULT UpdateBackBuffer(vout_display_t *vd)
     uint32_t i_height = RECTHeight(sys->rect_dest_clipped);
 #if VLC_WINSTORE_APP
     UINT dataSize = sizeof(i_width);
-    hr = IDXGISwapChain_GetPrivateData(sys->dxgiswapChain, &GUID_SWAPCHAIN_WIDTH, &dataSize, &i_width);
+    hr = IDXGISwapChain1_GetPrivateData(sys->dxgiswapChain1, &GUID_SWAPCHAIN_WIDTH, &dataSize, &i_width);
     if (FAILED(hr)) {
         msg_Err(vd, "Can't get swapchain width, size %d. (hr=0x%lX)", hr, dataSize);
         return hr;
     }
     dataSize = sizeof(i_height);
-    hr = IDXGISwapChain_GetPrivateData(sys->dxgiswapChain, &GUID_SWAPCHAIN_HEIGHT, &dataSize, &i_height);
+    hr = IDXGISwapChain1_GetPrivateData(sys->dxgiswapChain1, &GUID_SWAPCHAIN_HEIGHT, &dataSize, &i_height);
     if (FAILED(hr)) {
         msg_Err(vd, "Can't get swapchain height, size %d. (hr=0x%lX)", hr, dataSize);
         return hr;
@@ -596,14 +596,14 @@ static HRESULT UpdateBackBuffer(vout_display_t *vd)
         sys->d3ddepthStencilView = NULL;
     }
 
-    hr = IDXGISwapChain_ResizeBuffers(sys->dxgiswapChain, 0, i_width, i_height,
+    hr = IDXGISwapChain1_ResizeBuffers(sys->dxgiswapChain1, 0, i_width, i_height,
         DXGI_FORMAT_UNKNOWN, 0);
     if (FAILED(hr)) {
        msg_Err(vd, "Failed to resize the backbuffer. (hr=0x%lX)", hr);
        return hr;
     }
 
-    hr = IDXGISwapChain_GetBuffer(sys->dxgiswapChain, 0, &IID_ID3D11Texture2D, (LPVOID *)&pBackBuffer);
+    hr = IDXGISwapChain1_GetBuffer(sys->dxgiswapChain1, 0, &IID_ID3D11Texture2D, (LPVOID *)&pBackBuffer);
     if (FAILED(hr)) {
        msg_Err(vd, "Could not get the backbuffer for the Swapchain. (hr=0x%lX)", hr);
        return hr;
@@ -751,7 +751,7 @@ static void Display(vout_display_t *vd, picture_t *picture, subpicture_t *subpic
 
     DXGI_PRESENT_PARAMETERS presentParams;
     memset(&presentParams, 0, sizeof(presentParams));
-    HRESULT hr = IDXGISwapChain1_Present1(sys->dxgiswapChain, 0, 0, &presentParams);
+    HRESULT hr = IDXGISwapChain1_Present1(sys->dxgiswapChain1, 0, 0, &presentParams);
     if (hr == DXGI_ERROR_DEVICE_REMOVED || hr == DXGI_ERROR_DEVICE_RESET)
     {
         /* TODO device lost */
@@ -882,7 +882,7 @@ static int Direct3D11Open(vout_display_t *vd, video_format_t *fmt)
     }
 
     hr = IDXGIFactory2_CreateSwapChainForHwnd(sys->dxgifactory2, (IUnknown *)sys->d3ddevice,
-                                              sys->hvideownd, &scd, NULL, NULL, &sys->dxgiswapChain);
+                                              sys->hvideownd, &scd, NULL, NULL, &sys->dxgiswapChain1);
     IDXGIFactory2_Release(sys->dxgifactory2);
     if (FAILED(hr)) {
        msg_Err(vd, "Could not create the SwapChain. (hr=0x%lX)", hr);
@@ -1024,10 +1024,10 @@ static void Direct3D11Close(vout_display_t *vd)
         ID3D11Device_Release(sys->d3ddevice);
         sys->d3ddevice = NULL;
     }
-    if (sys->dxgiswapChain)
+    if (sys->dxgiswapChain1)
     {
-        IDXGISwapChain_Release(sys->dxgiswapChain);
-        sys->dxgiswapChain = NULL;
+        IDXGISwapChain1_Release(sys->dxgiswapChain1);
+        sys->dxgiswapChain1 = NULL;
     }
 
     msg_Dbg(vd, "Direct3D11 device adapter closed");
