@@ -80,6 +80,10 @@ static const char *const ppsz_snap_formats[] =
 #define CONTROL_LONGTEXT N_( \
     "You can select control interfaces for VLC.")
 
+#define RENDERER_TEXT N_("Renderer modules")
+#define RENDERER_LONGTEXT N_( \
+    "You can select a device to render audio/video from VLC.")
+
 #define VERBOSE_TEXT N_("Verbosity (0,1,2)")
 #define VERBOSE_LONGTEXT N_( \
     "This is the verbosity level (0=only errors and " \
@@ -2075,6 +2079,10 @@ vlc_module_begin ()
     set_subcategory( SUBCAT_INTERFACE_CONTROL )
     add_module_list_cat( "control", SUBCAT_INTERFACE_CONTROL, NULL,
                          CONTROL_TEXT, CONTROL_LONGTEXT, false )
+
+    set_subcategory( SUBCAT_ADVANCED_RENDERER )
+    add_module_list_cat( "renderer", SUBCAT_ADVANCED_RENDERER, NULL,
+                         RENDERER_TEXT, RENDERER_LONGTEXT, true )
 
 /* Hotkey options*/
     set_subcategory( SUBCAT_INTERFACE_HOTKEYS )
