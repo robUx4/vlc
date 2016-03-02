@@ -37,6 +37,11 @@ void input_resource_SetInput( input_resource_t *, input_thread_t * );
 sout_instance_t *input_resource_RequestSout( input_resource_t *, sout_instance_t *, const char *psz_sout );
 
 /**
+ * This function handles renderer request.
+ */
+vlc_renderer *input_resource_RequestRenderer( input_resource_t *, vlc_renderer *, const char *psz_renderer );
+
+/**
  * This function handles vout request.
  */
 vout_thread_t *input_resource_RequestVout( input_resource_t *, vout_thread_t *, video_format_t *, unsigned dpb_size, bool b_recycle );
