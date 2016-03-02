@@ -734,3 +734,9 @@ addons_manager_Remove
 addon_entry_New
 addon_entry_Hold
 addon_entry_Release
+vlc_renderer_item_new
+vlc_renderer_item_hold
+vlc_renderer_item_release
+vlc_renderer_item_name
+vlc_renderer_item_uri
+vlc_renderer_item_flags
