@@ -36,6 +36,7 @@
 #include <vlc_spu.h>
 #include <vlc_aout.h>
 #include <vlc_sout.h>
+#include <vlc_renderer.h>
 #include "../libvlc.h"
 #include "../stream_output/stream_output.h"
 #include "../audio_output/aout_internal.h"
@@ -57,6 +58,8 @@ struct input_resource_t
     input_thread_t *p_input;
 
     sout_instance_t *p_sout;
+    vlc_renderer    *p_renderer;
+    vlc_renderer    *p_renderer_free;
     vout_thread_t   *p_vout_free;
 
     /* This lock is used to protect vout resources access (for hold)
@@ -135,6 +138,79 @@ static sout_instance_t *RequestSout( input_resource_t *p_resource,
     VLC_UNUSED (p_resource); VLC_UNUSED (p_sout); VLC_UNUSED (psz_sout);
     return NULL;
 #endif
+}
+
+static void DestroyRenderer( input_resource_t *p_resource )
+{
+    if( p_resource->p_renderer_free )
+        vlc_object_release( p_resource->p_renderer_free );
+    p_resource->p_renderer_free = NULL;
+}
+
+static vlc_renderer *RequestRenderer( input_resource_t *p_resource,
+                                      vlc_renderer *p_renderer,
+                                      const char *psz_renderer )
+{
+    if( !p_renderer && !psz_renderer )
+    {
+        if( p_resource->p_renderer_free )
+            msg_Dbg( p_resource->p_renderer_free, "destroying useless renderer" );
+        DestroyRenderer( p_resource );
+        return NULL;
+    }
+
+    assert( !p_renderer || ( !p_resource->p_renderer_free && !psz_renderer ) );
+
+    /* Check the validity of the renderer */
+    if( p_resource->p_renderer_free &&
+        !vlc_renderer_equals( p_resource->p_renderer_free, psz_renderer ) )
+    {
+        msg_Dbg( p_resource->p_parent, "destroying unusable renderer" );
+        DestroyRenderer( p_resource );
+    }
+
+    if( psz_renderer )
+    {
+        if( p_resource->p_renderer_free )
+        {
+            /* Reuse it */
+            msg_Dbg( p_resource->p_parent, "reusing renderer" );
+
+            p_renderer = p_resource->p_renderer_free;
+            p_resource->p_renderer_free = NULL;
+        }
+        else
+        {
+            /* Create a new one */
+            p_renderer = vlc_renderer_new( p_resource->p_parent, psz_renderer );
+            if( !p_renderer )
+                return NULL;
+        }
+        if( p_resource->p_input
+         && vlc_renderer_set_input( p_renderer, p_resource->p_input ) )
+        {
+            msg_Warn( p_resource->p_parent, "vlc_renderer_set_input failed" );
+            vlc_object_release( p_renderer );
+            return NULL;
+        }
+        vlc_mutex_lock( &p_resource->lock_hold );
+        p_resource->p_renderer = p_renderer;
+        vlc_mutex_unlock( &p_resource->lock_hold );
+        return p_renderer;
+    }
+    else
+    {
+        if( p_resource->p_input
+         && vlc_renderer_set_input( p_renderer, NULL ) )
+            msg_Warn( p_resource->p_parent, "vlc_renderer_set_input failed");
+
+        p_resource->p_renderer_free = p_renderer;
+
+        vlc_mutex_lock( &p_resource->lock_hold );
+        p_resource->p_renderer = NULL;
+        vlc_mutex_unlock( &p_resource->lock_hold );
+        return NULL;
+    }
 }
 
 /* */
@@ -428,6 +504,7 @@ void input_resource_Release( input_resource_t *p_resource )
         return;
 
     DestroySout( p_resource );
+    DestroyRenderer( p_resource );
     DestroyVout( p_resource );
     if( p_resource->p_aout != NULL )
         aout_Destroy( p_resource->p_aout );
@@ -448,7 +525,11 @@ void input_resource_SetInput( input_resource_t *p_resource, input_thread_t *p_in
     vlc_mutex_lock( &p_resource->lock );
 
     if( p_resource->p_input && !p_input )
+    {
         assert( p_resource->i_vout == 0 );
+        /* renderer must be released before */
+        assert( p_resource->p_renderer == NULL );
+    }
 
     /* */
     p_resource->p_input = p_input;
@@ -506,9 +587,40 @@ void input_resource_TerminateSout( input_resource_t *p_resource )
     input_resource_RequestSout( p_resource, NULL, NULL );
 }
 
+/* */
+vlc_renderer *input_resource_RequestRenderer( input_resource_t *p_resource,
+                                              vlc_renderer *p_renderer,
+                                              const char *psz_renderer )
+{
+    vlc_mutex_lock( &p_resource->lock );
+    vlc_renderer *p_ret = RequestRenderer( p_resource, p_renderer, psz_renderer );
+    vlc_mutex_unlock( &p_resource->lock );
+
+    return p_ret;
+}
+
+vlc_renderer *input_resource_HoldRenderer( input_resource_t *p_resource )
+{
+    vlc_renderer *p_renderer;
+
+    vlc_mutex_lock( &p_resource->lock_hold );
+    p_renderer = p_resource->p_renderer;
+    if( p_renderer != NULL )
+        vlc_object_hold( p_renderer );
+    vlc_mutex_unlock( &p_resource->lock_hold );
+
+    return p_renderer;
+}
+
+static void input_resource_TerminateRenderer( input_resource_t *p_resource )
+{
+    input_resource_RequestRenderer( p_resource, NULL, NULL );
+}
+
 void input_resource_Terminate( input_resource_t *p_resource )
 {
     input_resource_TerminateSout( p_resource );
+    input_resource_TerminateRenderer( p_resource );
     input_resource_ResetAout( p_resource );
     input_resource_TerminateVout( p_resource );
 }
