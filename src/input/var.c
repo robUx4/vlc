@@ -441,6 +441,7 @@ void input_ConfigVarInit ( input_thread_t *p_input )
         var_Create( p_input, "sub-autodetect-fuzzy", VLC_VAR_INTEGER |
                     VLC_VAR_DOINHERIT );
 
+        var_Create( p_input, "renderer", VLC_VAR_STRING | VLC_VAR_DOINHERIT );
         var_Create( p_input, "sout", VLC_VAR_STRING | VLC_VAR_DOINHERIT );
         var_Create( p_input, "sout-all",   VLC_VAR_BOOL | VLC_VAR_DOINHERIT );
         var_Create( p_input, "sout-audio", VLC_VAR_BOOL | VLC_VAR_DOINHERIT );
