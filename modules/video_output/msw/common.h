@@ -178,6 +178,8 @@ struct vout_display_sys_t
     /* We should find a better way to store this or atleast a shorter name */
     PFN_D3D11_CREATE_DEVICE                OurD3D11CreateDevice;
     pD3DCompile                            OurD3DCompile;
+#else
+    HANDLE                   context_lock;
 #endif
     IDXGISwapChain1          *dxgiswapChain1;   /* DXGI 1.1 swap chain */
     ID3D11Device             *d3ddevice;       /* D3D device */
