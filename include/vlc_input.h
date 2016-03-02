@@ -699,5 +699,12 @@ VLC_API void input_resource_PutAout( input_resource_t *, audio_output_t * );
  */
 VLC_API void input_resource_ResetAout( input_resource_t * );
 
+/**
+ * \return the current renderer if any.
+ *
+ * Use vlc_object_release() to drop the reference.
+ */
+vlc_renderer *input_resource_HoldRenderer( input_resource_t *p_resource );
+
 /** @} */
 #endif
