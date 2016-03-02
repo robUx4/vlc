@@ -324,6 +324,7 @@ static input_thread_t *Create( vlc_object_t *p_parent, input_item_t *p_item,
     TAB_INIT( p_input->p->i_attachment, p_input->p->attachment );
     p_input->p->attachment_demux = NULL;
     p_input->p->p_sout   = NULL;
+    p_input->p->p_renderer = NULL;
     p_input->p->b_out_pace_control = false;
 
     vlc_gc_incref( p_item ); /* Released in Destructor() */
@@ -808,6 +809,24 @@ static int InitSout( input_thread_t * p_input )
     if( p_input->b_preparsing )
         return VLC_SUCCESS;
 
+    char *psz_renderer = var_GetNonEmptyString( p_input, "renderer" );
+    if( psz_renderer )
+    {
+        p_input->p->p_renderer =
+            input_resource_RequestRenderer( p_input->p->p_resource, NULL,
+                                            psz_renderer );
+        free( psz_renderer );
+        if( !p_input->p->p_renderer )
+        {
+            input_ChangeState( p_input, ERROR_S );
+            msg_Err( p_input, "cannot start renderer instance, " \
+                              "aborting" );
+            return VLC_EGENERIC;
+        }
+    }
+    else
+        input_resource_RequestRenderer( p_input->p->p_resource, NULL, NULL );
+
     /* Find a usable sout and attach it to p_input */
     char *psz = var_GetNonEmptyString( p_input, "sout" );
     if( psz && strncasecmp( p_input->p->p_item->psz_uri, "vlc:", 4 ) )
@@ -1249,6 +1268,9 @@ error:
         if( p_input->p->p_sout )
             input_resource_RequestSout( p_input->p->p_resource,
                                          p_input->p->p_sout, NULL );
+        if( p_input->p->p_renderer )
+            input_resource_RequestRenderer( p_input->p->p_resource,
+                                            p_input->p->p_renderer, NULL );
         input_resource_SetInput( p_input->p->p_resource, NULL );
         if( p_input->p->p_resource_private )
             input_resource_Terminate( p_input->p->p_resource_private );
@@ -1286,6 +1308,7 @@ error:
     /* Mark them deleted */
     p_input->p->p_es_out = NULL;
     p_input->p->p_sout = NULL;
+    p_input->p->p_renderer = NULL;
 
     return VLC_EGENERIC;
 }
@@ -1364,6 +1387,8 @@ static void End( input_thread_t * p_input )
     /* */
     input_resource_RequestSout( p_input->p->p_resource,
                                  p_input->p->p_sout, NULL );
+    input_resource_RequestRenderer( p_input->p->p_resource,
+                                    p_input->p->p_renderer, NULL );
     input_resource_SetInput( p_input->p->p_resource, NULL );
     if( p_input->p->p_resource_private )
         input_resource_Terminate( p_input->p->p_resource_private );
