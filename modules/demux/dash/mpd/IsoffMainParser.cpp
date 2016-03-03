@@ -27,33 +27,35 @@
 #endif
 
 #include "IsoffMainParser.h"
-#include "../adaptative/playlist/SegmentTemplate.h"
-#include "../adaptative/playlist/Segment.h"
-#include "../adaptative/playlist/SegmentBase.h"
-#include "../adaptative/playlist/SegmentList.h"
-#include "../adaptative/playlist/SegmentTimeline.h"
-#include "../adaptative/playlist/SegmentInformation.hpp"
+#include "../adaptive/playlist/SegmentTemplate.h"
+#include "../adaptive/playlist/Segment.h"
+#include "../adaptive/playlist/SegmentBase.h"
+#include "../adaptive/playlist/SegmentList.h"
+#include "../adaptive/playlist/SegmentTimeline.h"
+#include "../adaptive/playlist/SegmentInformation.hpp"
 #include "MPD.h"
 #include "Representation.h"
 #include "Period.h"
 #include "AdaptationSet.h"
 #include "ProgramInformation.h"
 #include "DASHSegment.h"
-#include "../adaptative/xml/DOMHelper.h"
-#include "../adaptative/tools/Helper.h"
-#include "../adaptative/tools/Debug.hpp"
-#include "../adaptative/tools/Conversions.hpp"
+#include "../adaptive/xml/DOMHelper.h"
+#include "../adaptive/tools/Helper.h"
+#include "../adaptive/tools/Debug.hpp"
+#include "../adaptive/tools/Conversions.hpp"
 #include <vlc_stream.h>
 #include <cstdio>
 
 using namespace dash::mpd;
-using namespace adaptative::xml;
-using namespace adaptative::playlist;
+using namespace adaptive::xml;
+using namespace adaptive::playlist;
 
-IsoffMainParser::IsoffMainParser    (Node *root_, stream_t *stream, const std::string & streambaseurl_)
+IsoffMainParser::IsoffMainParser    (Node *root_, vlc_object_t *p_object_,
+                                     stream_t *stream, const std::string & streambaseurl_)
 {
     root = root_;
     p_stream = stream;
+    p_object = p_object_;
     playlisturl = streambaseurl_;
 }
 
@@ -73,7 +75,7 @@ void IsoffMainParser::parseMPDBaseUrl(MPD *mpd, Node *root)
 
 MPD * IsoffMainParser::parse()
 {
-    MPD *mpd = new (std::nothrow) MPD(p_stream, getProfile());
+    MPD *mpd = new (std::nothrow) MPD(p_object, getProfile());
     if(mpd)
     {
         parseMPDAttributes(mpd, root);

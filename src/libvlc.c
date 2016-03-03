@@ -62,7 +62,7 @@
 
 #include <vlc_charset.h>
 #include <vlc_dialog.h>
-#include <vlc_renderer.h>
+#include <vlc_keystore.h>
 #include <vlc_fs.h>
 #include <vlc_cpu.h>
 #include <vlc_url.h>
@@ -237,13 +237,14 @@ int libvlc_InternalInit( libvlc_int_t *p_libvlc, int i_argc,
     }
 #endif
 
-    priv->p_dialog_provider = vlc_dialog_provider_new();
-    if( priv->p_dialog_provider == NULL )
+    if( libvlc_InternalDialogInit( p_libvlc ) != VLC_SUCCESS )
     {
         vlc_LogDeinit (p_libvlc);
         module_EndBank (true);
         return VLC_ENOMEM;
     }
+    if( libvlc_InternalKeystoreInit( p_libvlc ) != VLC_SUCCESS )
+        msg_Warn( p_libvlc, "memory keystore init failed" );
 
     if (vlc_renderer_init( p_libvlc ) != VLC_SUCCESS )
     {
@@ -526,7 +527,8 @@ void libvlc_InternalCleanup( libvlc_int_t *p_libvlc )
     libvlc_Quit( p_libvlc );
     intf_DestroyAll( p_libvlc );
 
-    vlc_dialog_provider_release( priv->p_dialog_provider );
+    libvlc_InternalDialogClean( p_libvlc );
+    libvlc_InternalKeystoreClean( p_libvlc );
     vlc_renderer_deinit( p_libvlc );
 
 #ifdef ENABLE_VLM

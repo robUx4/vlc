@@ -1,7 +1,16 @@
 keystoredir = $(pluginsdir)/keystore
 
-libplaintext_keystore_plugin_la_SOURCES = keystore/plaintext.c
-keystore_LTLIBRARIES = libplaintext_keystore_plugin.la
+libmemory_keystore_plugin_la_SOURCES = keystore/memory.c \
+	keystore/list_util.c keystore/list_util.h
+keystore_LTLIBRARIES = libmemory_keystore_plugin.la
+
+libfile_keystore_plugin_la_SOURCES = keystore/file.c \
+	keystore/file_crypt.h \
+	keystore/list_util.c keystore/list_util.h
+if HAVE_ANDROID
+libfile_keystore_plugin_la_SOURCES += keystore/file_crypt_android.c
+endif
+keystore_LTLIBRARIES += libfile_keystore_plugin.la
 
 libsecret_plugin_la_SOURCES = keystore/secret.c
 libsecret_plugin_la_CPPFLAGS = $(AM_CPPFLAGS) $(SECRET_CFLAGS)
@@ -33,7 +42,7 @@ libkeychain_plugin_la_SOURCES = keystore/keychain.m
 libkeychain_plugin_la_OBJCFLAGS = $(AM_CFLAGS) -fobjc-arc
 libkeychain_plugin_la_LDFLAGS = $(AM_LDFLAGS) -rpath '$(keystoredir)' -Wl,-framework,Foundation -Wl,-framework,Security
 
-if HAVE_DARWIN
+if HAVE_OSX
 keystore_LTLIBRARIES += libkeychain_plugin.la
 endif
 

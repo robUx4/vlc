@@ -33,20 +33,20 @@
 #include "mpd/IsoffMainParser.h"
 #include "xml/DOMParser.h"
 #include "xml/Node.h"
-#include "../adaptative/tools/Helper.h"
-#include "../adaptative/http/HTTPConnectionManager.h"
+#include "../adaptive/tools/Helper.h"
+#include "../adaptive/http/HTTPConnectionManager.h"
 #include <vlc_stream.h>
 #include <vlc_demux.h>
 #include <vlc_meta.h>
 #include <vlc_block.h>
-#include "../adaptative/tools/Retrieve.hpp"
+#include "../adaptive/tools/Retrieve.hpp"
 
 #include <algorithm>
 #include <ctime>
 
 using namespace dash;
 using namespace dash::mpd;
-using namespace adaptative::logic;
+using namespace adaptive::logic;
 
 DASHManager::DASHManager(demux_t *demux_, MPD *mpd,
                          AbstractStreamFactory *factory,
@@ -102,11 +102,11 @@ bool DASHManager::updatePlaylist()
         url.append("://");
         url.append(p_demux->psz_location);
 
-        block_t *p_block = Retrieve::HTTP(VLC_OBJECT(p_demux->s), url);
+        block_t *p_block = Retrieve::HTTP(VLC_OBJECT(p_demux), url);
         if(!p_block)
             return false;
 
-        stream_t *mpdstream = stream_MemoryNew(p_demux->s, p_block->p_buffer, p_block->i_buffer, true);
+        stream_t *mpdstream = stream_MemoryNew(p_demux, p_block->p_buffer, p_block->i_buffer, true);
         if(!mpdstream)
         {
             block_Release(p_block);
@@ -130,8 +130,8 @@ bool DASHManager::updatePlaylist()
                 minsegmentTime = segmentTime;
         }
 
-        IsoffMainParser mpdparser(parser.getRootNode(), mpdstream,
-                                Helper::getDirectoryPath(url).append("/"));
+        IsoffMainParser mpdparser(parser.getRootNode(), VLC_OBJECT(p_demux),
+                                  mpdstream, Helper::getDirectoryPath(url).append("/"));
         MPD *newmpd = mpdparser.parse();
         if(newmpd)
         {
@@ -200,7 +200,7 @@ bool DASHManager::isDASH(xml::Node *root)
     std::string ns = root->getAttributeValue("xmlns");
     for( size_t i=0; i<ARRAY_SIZE(namespaces); i++ )
     {
-        if ( adaptative::Helper::ifind(ns, namespaces[i]) )
+        if ( adaptive::Helper::ifind(ns, namespaces[i]) )
             return true;
     }
     return false;

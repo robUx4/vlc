@@ -47,6 +47,7 @@
 #include <limits.h>
 #include <assert.h>
 
+#include <new>
 
 #if defined( _WIN32 )
 #   include <winsock2.h>
@@ -316,6 +317,8 @@ static int  Open ( vlc_object_t *p_this )
 
     /* parse URL for rtsp://[user:[passwd]@]serverip:port/options */
     vlc_UrlParse( &p_sys->url, p_sys->psz_path );
+    /* Add the access protocol to url, it will be used by vlc_credential */
+    p_sys->url.psz_protocol = p_demux->psz_access;
 
     if( ( p_sys->scheduler = BasicTaskScheduler::createNew() ) == NULL )
     {
@@ -608,7 +611,7 @@ createnew:
     if( var_CreateGetBool( p_demux, "rtsp-http" ) )
         i_http_port = var_InheritInteger( p_demux, "rtsp-http-port" );
 
-    p_sys->rtsp = new RTSPClientVlc( *p_sys->env, psz_url,
+    p_sys->rtsp = new (std::nothrow) RTSPClientVlc( *p_sys->env, psz_url,
                                      var_InheritInteger( p_demux, "verbose" ) > 1 ? 1 : 0,
                                      "LibVLC/" VERSION, i_http_port, p_sys );
     if( !p_sys->rtsp )
@@ -679,7 +682,7 @@ describe:
         i_ret = VLC_EGENERIC;
     }
     else
-        vlc_credential_store( &credential );
+        vlc_credential_store( &credential, p_demux );
 
 bailout:
     /* malloc-ated copy */

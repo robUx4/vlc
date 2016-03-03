@@ -29,14 +29,14 @@
 # include "config.h"
 #endif
 
-#include "../adaptative/playlist/SegmentInfoCommon.h"
+#include "../adaptive/playlist/SegmentInfoCommon.h"
 #include "Profile.hpp"
 
 #include <cstdlib>
 
 #include <vlc_common.h>
 
-namespace adaptative
+namespace adaptive
 {
     namespace playlist
     {
@@ -57,13 +57,14 @@ namespace dash
         class AdaptationSet;
         class MPD;
 
-        using namespace adaptative::playlist;
-        using namespace adaptative;
+        using namespace adaptive::playlist;
+        using namespace adaptive;
 
         class IsoffMainParser
         {
             public:
-                IsoffMainParser             (xml::Node *root, stream_t *p_stream, const std::string &);
+                IsoffMainParser             (xml::Node *root, vlc_object_t *p_object,
+                                             stream_t *p_stream, const std::string &);
                 virtual ~IsoffMainParser    ();
                 MPD *   parse();
 
@@ -83,6 +84,7 @@ namespace dash
                 void    parseProgramInformation(xml::Node *, MPD *);
 
                 xml::Node       *root;
+                vlc_object_t    *p_object;
                 stream_t        *p_stream;
                 std::string      playlisturl;
         };

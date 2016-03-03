@@ -60,33 +60,20 @@
 #include <tag.h>
 #include <tbytevector.h>
 
-#if TAGLIB_VERSION >= VERSION_INT(1,7,0)
-# define TAGLIB_HAVE_APEFILE_H
-# include <apefile.h>
-# ifdef TAGLIB_WITH_ASF                     // ASF pictures comes with v1.7.0
-#  define TAGLIB_HAVE_ASFPICTURE_H
-#  include <asffile.h>
-# endif
-#endif
-
-#if TAGLIB_VERSION >= VERSION_INT(1,9,0)
-# include <opusfile.h>
-#endif
-
+#include <apefile.h>
+#include <asffile.h>
 #include <apetag.h>
 #include <flacfile.h>
 #include <mpcfile.h>
 #include <mpegfile.h>
+#include <mp4file.h>
 #include <oggfile.h>
 #include <oggflacfile.h>
+#include <opusfile.h>
 #include "../demux/xiph_metadata.h"
 
 #include <aifffile.h>
 #include <wavfile.h>
-
-#if defined(TAGLIB_WITH_MP4)
-# include <mp4file.h>
-#endif
 
 #include <speexfile.h>
 #include <trueaudiofile.h>
@@ -96,6 +83,57 @@
 #include <attachedpictureframe.h>
 #include <textidentificationframe.h>
 #include <uniquefileidentifierframe.h>
+
+using namespace TagLib;
+
+#define TAGLIB_SYNCDECODE_FIXED_VERSION VERSION_INT(1,11,0)
+
+#include <algorithm>
+
+namespace VLCTagLib
+{
+    template <class T>
+    class ExtResolver : public FileRef::FileTypeResolver
+    {
+        public:
+            ExtResolver(const std::string &);
+            ~ExtResolver() {}
+            virtual File *createFile(FileName, bool, AudioProperties::ReadStyle) const;
+
+        protected:
+            std::string ext;
+    };
+}
+
+template <class T>
+VLCTagLib::ExtResolver<T>::ExtResolver(const std::string & ext) : FileTypeResolver()
+{
+    this->ext = ext;
+    std::transform(this->ext.begin(), this->ext.end(), this->ext.begin(), ::toupper);
+}
+
+template <class T>
+File *VLCTagLib::ExtResolver<T>::createFile(FileName fileName, bool, AudioProperties::ReadStyle) const
+{
+    std::string filename = std::string(fileName);
+    std::size_t namesize = filename.size();
+
+    if (namesize > ext.length())
+    {
+        std::string fext = filename.substr(namesize - ext.length(), ext.length());
+        std::transform(fext.begin(), fext.end(), fext.begin(), ::toupper);
+        if(fext == ext)
+            return new T(fileName, false, AudioProperties::ReadStyle::Fast);
+    }
+
+    return 0;
+}
+
+#if TAGLIB_VERSION >= TAGLIB_SYNCDECODE_FIXED_VERSION
+static VLCTagLib::ExtResolver<MPEG::File> aacresolver(".aac");
+#endif
+static VLCTagLib::ExtResolver<MP4::File> m4vresolver(".m4v");
+static bool b_extensions_registered = false;
 
 // taglib is not thread safe
 static vlc_mutex_t taglib_lock = VLC_STATIC_MUTEX;
@@ -111,8 +149,6 @@ vlc_module_begin ()
         set_capability( "meta writer", 50 )
         set_callbacks( WriteMeta, NULL )
 vlc_module_end ()
-
-using namespace TagLib;
 
 static int ExtractCoupleNumberValues( vlc_meta_t* p_meta, const char *psz_value,
         vlc_meta_type_t first, vlc_meta_type_t second)
@@ -272,7 +308,6 @@ static void ReadMetaFromASF( ASF::Tag* tag, demux_meta_t* p_demux_meta, vlc_meta
 #undef SET
 #undef SET_EXTRA
 
-#ifdef TAGLIB_HAVE_ASFPICTURE_H
     // List the pictures
     list = tag->attributeListMap()["WM/Picture"];
     ASF::AttributeList::Iterator iter;
@@ -314,7 +349,6 @@ static void ReadMetaFromASF( ASF::Tag* tag, demux_meta_t* p_demux_meta, vlc_meta
         }
         free( psz_name );
     }
-#endif
 }
 
 
@@ -618,8 +652,6 @@ static void ReadMetaFromXiph( Ogg::XiphComment* tag, demux_meta_t* p_demux_meta,
     }
 }
 
-
-#if defined(TAGLIB_WITH_MP4)
 /**
  * Read the meta information from mp4 specific tags
  * @param tag: the mp4 tag
@@ -668,8 +700,6 @@ static void ReadMetaFromMP4( MP4::Tag* tag, demux_meta_t *p_demux_meta, vlc_meta
         }
     }
 }
-#endif
-
 
 /**
  * Get the tags from the file using TagLib
@@ -693,6 +723,15 @@ static int ReadMeta( vlc_object_t* p_this)
     free( psz_uri );
     if( psz_path == NULL )
         return VLC_EGENERIC;
+
+    if( !b_extensions_registered )
+    {
+#if TAGLIB_VERSION >= TAGLIB_SYNCDECODE_FIXED_VERSION
+        FileRef::addFileTypeResolver( &aacresolver );
+#endif
+        FileRef::addFileTypeResolver( &m4vresolver );
+        b_extensions_registered = true;
+    }
 
 #if defined(_WIN32)
     wchar_t *wpath = ToWide( psz_path );
@@ -745,23 +784,18 @@ static int ReadMeta( vlc_object_t* p_this)
 
     TAB_INIT( p_demux_meta->i_attachments, p_demux_meta->attachments );
 
-    // Try now to read special tags
-#ifdef TAGLIB_HAVE_APEFILE_H
     if( APE::File* ape = dynamic_cast<APE::File*>(f.file()) )
     {
         if( ape->APETag() )
             ReadMetaFromAPE( ape->APETag(), p_demux_meta, p_meta );
     }
     else
-#endif
-#ifdef TAGLIB_WITH_ASF
     if( ASF::File* asf = dynamic_cast<ASF::File*>(f.file()) )
     {
         if( asf->tag() )
             ReadMetaFromASF( asf->tag(), p_demux_meta, p_meta );
     }
     else
-#endif
     if( FLAC::File* flac = dynamic_cast<FLAC::File*>(f.file()) )
     {
         if( flac->ID3v2Tag() )
@@ -769,13 +803,11 @@ static int ReadMeta( vlc_object_t* p_this)
         else if( flac->xiphComment() )
             ReadMetaFromXiph( flac->xiphComment(), p_demux_meta, p_meta );
     }
-#if defined(TAGLIB_WITH_MP4)
     else if( MP4::File *mp4 = dynamic_cast<MP4::File*>(f.file()) )
     {
         if( mp4->tag() )
             ReadMetaFromMP4( mp4->tag(), p_demux_meta, p_meta );
     }
-#endif
     else if( MPC::File* mpc = dynamic_cast<MPC::File*>(f.file()) )
     {
         if( mpc->APETag() )
@@ -1037,10 +1069,10 @@ static int WriteMeta( vlc_object_t *p_this )
     wchar_t *wpath = ToWide( p_export->psz_file );
     if( wpath == NULL )
         return VLC_EGENERIC;
-    f = FileRef( wpath );
+    f = FileRef( wpath, false );
     free( wpath );
 #else
-    f = FileRef( p_export->psz_file );
+    f = FileRef( p_export->psz_file, false );
 #endif
 
     if( f.isNull() || !f.tag() || f.file()->readOnly() )
@@ -1087,14 +1119,12 @@ static int WriteMeta( vlc_object_t *p_this )
 
 
     // Try now to write special tags
-#ifdef TAGLIB_HAVE_APEFILE_H
     if( APE::File* ape = dynamic_cast<APE::File*>(f.file()) )
     {
         if( ape->APETag() )
             WriteMetaToAPE( ape->APETag(), p_item );
     }
     else
-#endif
     if( FLAC::File* flac = dynamic_cast<FLAC::File*>(f.file()) )
     {
         if( flac->ID3v2Tag() )

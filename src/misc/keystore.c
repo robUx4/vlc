@@ -32,18 +32,15 @@
 #include <assert.h>
 #include <limits.h>
 
-#undef vlc_keystore_create
-vlc_keystore *
-vlc_keystore_create(vlc_object_t *p_parent)
+static vlc_keystore *
+keystore_create(vlc_object_t *p_parent, const char *psz_name)
 {
-    assert(p_parent);
     vlc_keystore *p_keystore = vlc_custom_create(p_parent, sizeof (*p_keystore),
                                                  "keystore");
     if (unlikely(p_keystore == NULL))
         return NULL;
 
-    p_keystore->p_module = module_need(p_keystore, "keystore", "$keystore",
-                                       true);
+    p_keystore->p_module = module_need(p_keystore, "keystore", psz_name, true);
     if (p_keystore->p_module == NULL)
     {
         vlc_object_release(p_keystore);
@@ -54,6 +51,14 @@ vlc_keystore_create(vlc_object_t *p_parent)
     assert(p_keystore->pf_remove);
 
     return p_keystore;
+}
+
+#undef vlc_keystore_create
+vlc_keystore *
+vlc_keystore_create(vlc_object_t *p_parent)
+{
+    assert(p_parent);
+    return keystore_create(p_parent, "$keystore");
 }
 
 void
@@ -120,6 +125,35 @@ vlc_keystore_release_entries(vlc_keystore_entry *p_entries, unsigned int i_count
     free(p_entries);
 }
 
+int
+libvlc_InternalKeystoreInit(libvlc_int_t *p_libvlc)
+{
+    assert(p_libvlc != NULL);
+    libvlc_priv_t *p_priv = libvlc_priv(p_libvlc);
+
+    p_priv->p_memory_keystore = keystore_create(VLC_OBJECT(p_libvlc), "memory");
+    return p_priv->p_memory_keystore != NULL ? VLC_SUCCESS : VLC_EGENERIC;
+}
+
+void
+libvlc_InternalKeystoreClean(libvlc_int_t *p_libvlc)
+{
+    assert(p_libvlc != NULL);
+    libvlc_priv_t *p_priv = libvlc_priv(p_libvlc);
+
+    if (p_priv->p_memory_keystore != NULL)
+    {
+        vlc_keystore_release(p_priv->p_memory_keystore);
+        p_priv->p_memory_keystore = NULL;
+    }
+}
+
+static vlc_keystore *
+get_memory_keystore(vlc_object_t *p_obj)
+{
+    return libvlc_priv(p_obj->p_libvlc)->p_memory_keystore;
+}
+
 static vlc_keystore_entry *
 find_closest_path(vlc_keystore_entry *p_entries, unsigned i_count,
                   const char *psz_path)
@@ -162,17 +196,24 @@ is_credential_valid(vlc_credential *p_credential)
         return true;
     else
     {
-        p_credential->psz_username = p_credential->psz_password = NULL;
+        p_credential->psz_password = NULL;
         return false;
     }
 
+}
+
+static bool
+is_url_valid(const vlc_url_t *p_url)
+{
+    return p_url && p_url->psz_protocol && p_url->psz_protocol[0]
+        && p_url->psz_host && p_url->psz_host[0];
 }
 
 /* Default port for each protocol */
 static struct
 {
     const char *    psz_protocol;
-    unsigned int    i_port;
+    uint16_t        i_port;
 } protocol_default_ports [] = {
     { "rtsp", 80 },
     { "http", 80 },
@@ -184,15 +225,29 @@ static struct
 
 /* Don't store a port if it's the default one */
 static bool
-protocol_is_default_port(const vlc_url_t *p_url)
+protocol_set_port(const vlc_url_t *p_url, char *psz_port)
 {
-    for (unsigned int i = 0; i < sizeof(protocol_default_ports)
-                               / sizeof(*protocol_default_ports); ++i)
+    int i_port = -1;
+
+    if (p_url->i_port != 0 && p_url->i_port <= UINT16_MAX)
+        i_port = p_url->i_port;
+    else
     {
-        if (p_url->i_port == protocol_default_ports[i].i_port
-         && strcasecmp(p_url->psz_protocol,
-                       protocol_default_ports[i].psz_protocol) == 0)
-            return true;
+        for (unsigned int i = 0; i < sizeof(protocol_default_ports)
+                                   / sizeof(*protocol_default_ports); ++i)
+        {
+            if (strcasecmp(p_url->psz_protocol,
+                           protocol_default_ports[i].psz_protocol) == 0)
+            {
+                i_port = protocol_default_ports[i].i_port;
+                break;
+            }
+        }
+    }
+    if (i_port != -1)
+    {
+        sprintf(psz_port, "%u", (uint16_t) i_port);
+        return true;
     }
     return false;
 }
@@ -222,16 +277,16 @@ smb_split_domain(vlc_credential *p_credential)
         size_t i_len = psz_delim - p_credential->psz_username;
         if (i_len > 0)
         {
-            p_credential->psz_split_realm = strndup(p_credential->psz_username,
-                                                    i_len);
-            p_credential->psz_realm = p_credential->psz_split_realm;
+            p_credential->psz_split_username =
+                strndup(p_credential->psz_username, i_len);
+            p_credential->psz_username = p_credential->psz_split_username;
         }
-        p_credential->psz_username = psz_delim + 1;
+        p_credential->psz_realm = psz_delim + 1;
     }
 }
 
 static void
-credential_find_keystore(vlc_credential *p_credential)
+credential_find_keystore(vlc_credential *p_credential, vlc_keystore *p_keystore)
 {
     const vlc_url_t *p_url = p_credential->p_url;
 
@@ -243,26 +298,26 @@ credential_find_keystore(vlc_credential *p_credential)
     ppsz_values[KEY_REALM] = p_credential->psz_realm;
     ppsz_values[KEY_AUTHTYPE] = p_credential->psz_authtype;
     char psz_port[21];
-    if (p_url->i_port > 0 && !protocol_is_default_port(p_url))
-    {
-        sprintf(psz_port, "%u", p_url->i_port);
+    if (protocol_set_port(p_url, psz_port))
         ppsz_values[KEY_PORT] = psz_port;
-    }
 
+    vlc_keystore_entry *p_entries;
+    unsigned int i_entries_count;
+    i_entries_count = vlc_keystore_find(p_keystore, ppsz_values, &p_entries);
+
+    /* Remove last entries after vlc_keystore_find call since
+     * p_credential->psz_username (default username) can be a pointer to an
+     * entry */
     if (p_credential->i_entries_count > 0)
-    {
         vlc_keystore_release_entries(p_credential->p_entries,
                                      p_credential->i_entries_count);
-        p_credential->i_entries_count = 0;
-    }
-
-    p_credential->i_entries_count = vlc_keystore_find(p_credential->p_keystore,
-                                                      ppsz_values,
-                                                      &p_credential->p_entries);
+    p_credential->p_entries = p_entries;
+    p_credential->i_entries_count = i_entries_count;
 
     if (p_credential->i_entries_count > 0)
     {
         vlc_keystore_entry *p_entry;
+
         if (protocol_store_path(p_url))
             p_entry = find_closest_path(p_credential->p_entries,
                                         p_credential->i_entries_count,
@@ -298,15 +353,13 @@ vlc_credential_init(vlc_credential *p_credential, const vlc_url_t *p_url)
 void
 vlc_credential_clean(vlc_credential *p_credential)
 {
+    if (p_credential->i_entries_count > 0)
+        vlc_keystore_release_entries(p_credential->p_entries,
+                                     p_credential->i_entries_count);
     if (p_credential->p_keystore)
-    {
-        if (p_credential->i_entries_count > 0)
-            vlc_keystore_release_entries(p_credential->p_entries,
-                                         p_credential->i_entries_count);
         vlc_keystore_release(p_credential->p_keystore);
-    }
 
-    free(p_credential->psz_split_realm);
+    free(p_credential->psz_split_username);
     free(p_credential->psz_var_username);
     free(p_credential->psz_var_password);
     free(p_credential->psz_dialog_username);
@@ -324,7 +377,7 @@ vlc_credential_get(vlc_credential *p_credential, vlc_object_t *p_parent,
     assert(p_credential && p_parent);
     const vlc_url_t *p_url = p_credential->p_url;
 
-    if (!p_url || !p_url->psz_protocol || !p_url->psz_host)
+    if (!is_url_valid(p_url))
     {
         msg_Err(p_parent, "vlc_credential_get: invalid url");
         return false;
@@ -378,6 +431,18 @@ vlc_credential_get(vlc_credential *p_credential, vlc_object_t *p_parent,
             p_credential->i_get_order++;
             break;
 
+        case GET_FROM_MEMORY_KEYSTORE:
+        {
+            if (!psz_dialog_title || !psz_dialog_fmt)
+                return false;
+
+            vlc_keystore *p_keystore = get_memory_keystore(p_parent);
+            if (p_keystore != NULL)
+                credential_find_keystore(p_credential, p_keystore);
+            p_credential->i_get_order++;
+            break;
+        }
+
         case GET_FROM_KEYSTORE:
             if (!psz_dialog_title || !psz_dialog_fmt)
                 return false;
@@ -385,7 +450,7 @@ vlc_credential_get(vlc_credential *p_credential, vlc_object_t *p_parent,
             if (p_credential->p_keystore == NULL)
                 p_credential->p_keystore = vlc_keystore_create(p_parent);
             if (p_credential->p_keystore != NULL)
-                credential_find_keystore(p_credential);
+                credential_find_keystore(p_credential, p_credential->p_keystore);
 
             p_credential->i_get_order++;
             break;
@@ -434,12 +499,30 @@ vlc_credential_get(vlc_credential *p_credential, vlc_object_t *p_parent,
     return is_credential_valid(p_credential);
 }
 
+#undef vlc_credential_store
 bool
-vlc_credential_store(vlc_credential *p_credential)
+vlc_credential_store(vlc_credential *p_credential, vlc_object_t *p_parent)
 {
-    if (!p_credential->p_keystore || !p_credential->b_store
-     || p_credential->b_from_keystore)
+    if (!is_credential_valid(p_credential))
+        return false;
+    /* Don't need to store again */
+    if (p_credential->b_from_keystore)
         return p_credential->b_from_keystore;
+
+    vlc_keystore *p_keystore;
+    if (p_credential->b_store)
+    {
+        /* Store in permanent keystore */
+        assert(p_credential->p_keystore != NULL);
+        p_keystore = p_credential->p_keystore;
+    }
+    else
+    {
+        /* Store in memory keystore */
+        p_keystore = get_memory_keystore(p_parent);
+    }
+    if (p_keystore == NULL)
+        return false;
 
     const vlc_url_t *p_url = p_credential->p_url;
 
@@ -473,11 +556,8 @@ vlc_credential_store(vlc_credential *p_credential)
     ppsz_values[KEY_AUTHTYPE] = p_credential->psz_authtype;
 
     char psz_port[21];
-    if (p_url->i_port > 0 && !protocol_is_default_port(p_url))
-    {
-        sprintf(psz_port, "%u", p_url->i_port);
+    if (protocol_set_port(p_url, psz_port))
         ppsz_values[KEY_PORT] = psz_port;
-    }
 
     char *psz_label;
     if (asprintf(&psz_label, "LibVLC password for %s://%s%s",
@@ -488,8 +568,10 @@ vlc_credential_store(vlc_credential *p_credential)
         return false;
     }
 
-    bool b_ret = vlc_keystore_store(p_credential->p_keystore, ppsz_values,
-                                    (const uint8_t *)p_credential->psz_password,
+    const uint8_t *p_password = (const uint8_t *)
+        (p_credential->psz_password != NULL ? p_credential->psz_password : "");
+
+    bool b_ret = vlc_keystore_store(p_keystore, ppsz_values, p_password,
                                     -1, psz_label) == VLC_SUCCESS;
     free(psz_label);
     free(psz_path);

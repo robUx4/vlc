@@ -24,12 +24,12 @@
 #include "Parser.hpp"
 #include "HLSSegment.hpp"
 #include "Representation.hpp"
-#include "../adaptative/playlist/BasePeriod.h"
-#include "../adaptative/playlist/BaseAdaptationSet.h"
-#include "../adaptative/playlist/SegmentList.h"
-#include "../adaptative/tools/Retrieve.hpp"
-#include "../adaptative/tools/Helper.h"
-#include "../adaptative/tools/Conversions.hpp"
+#include "../adaptive/playlist/BasePeriod.h"
+#include "../adaptive/playlist/BaseAdaptationSet.h"
+#include "../adaptive/playlist/SegmentList.h"
+#include "../adaptive/tools/Retrieve.hpp"
+#include "../adaptive/tools/Helper.h"
+#include "../adaptive/tools/Conversions.hpp"
 #include "M3U8.hpp"
 #include "Tags.hpp"
 
@@ -41,8 +41,8 @@
 #include <cctype>
 #include <algorithm>
 
-using namespace adaptative;
-using namespace adaptative::playlist;
+using namespace adaptive;
+using namespace adaptive::playlist;
 using namespace hls::playlist;
 
 M3U8Parser::M3U8Parser()
@@ -384,7 +384,7 @@ void M3U8Parser::parseSegments(vlc_object_t *p_obj, Representation *rep, const s
 
     rep->setSegmentList(segmentList);
 }
-M3U8 * M3U8Parser::parse(stream_t *p_stream, const std::string &playlisturl)
+M3U8 * M3U8Parser::parse(vlc_object_t *p_object, stream_t *p_stream, const std::string &playlisturl)
 {
     char *psz_line = stream_ReadLine(p_stream);
     if(!psz_line || strcmp(psz_line, "#EXTM3U"))
@@ -394,7 +394,7 @@ M3U8 * M3U8Parser::parse(stream_t *p_stream, const std::string &playlisturl)
     }
     free(psz_line);
 
-    M3U8 *playlist = new (std::nothrow) M3U8(p_stream);
+    M3U8 *playlist = new (std::nothrow) M3U8(p_object);
     if(!playlist)
         return NULL;
 
@@ -502,7 +502,7 @@ M3U8 * M3U8Parser::parse(stream_t *p_stream, const std::string &playlisturl)
             period->addAdaptationSet(adaptSet);
             AttributesTag *tag = new AttributesTag(AttributesTag::EXTXSTREAMINF, "");
             tag->addAttribute(new Attribute("URI", playlisturl));
-            createAndFillRepresentation(VLC_OBJECT(p_stream), adaptSet, tag, tagslist);
+            createAndFillRepresentation(p_object, adaptSet, tag, tagslist);
             delete tag;
         }
     }

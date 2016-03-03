@@ -2371,7 +2371,9 @@ AS_IF([test "${have_vaapi}" = "yes" -a "${have_avcodec}" = "yes"], [
   case "${avfork}" in
     ffmpeg)
       PKG_CHECK_EXISTS([libavcodec >= 57.10.100], [
-        AC_MSG_ERROR([VA API requires FFmpeg libavcodec < 57.10 or libav.])
+        PKG_CHECK_EXISTS([libavcodec <= 57.12.100], [
+          AC_MSG_ERROR([VA API requires FFmpeg libavcodec < 57.10 or > 57.12 or libav.])
+        ])
       ])
       ;;
   esac
@@ -2405,7 +2407,9 @@ AS_IF([test "${enable_dxva2}" != "no"], [
     case "${avfork}" in
       ffmpeg)
         PKG_CHECK_EXISTS([libavcodec >= 57.10.100], [
-          AC_MSG_ERROR([DXVA2 requires FFmpeg libavcodec < 57.10 or libav.])
+          PKG_CHECK_EXISTS([libavcodec <= 57.12.100], [
+            AC_MSG_ERROR([DXVA2 requires FFmpeg libavcodec < 57.10 or > 57.12 or libav.])
+          ])
         ])
         ;;
     esac
@@ -2425,7 +2429,7 @@ AS_IF([test "${enable_dxva2}" != "no"], [
     AS_IF([test "${enable_dxva2}" = "yes"],
               [AC_MSG_ERROR([Could not find required dxva2api.h])],
               [AC_MSG_WARN([dxva2api.h not found])])
-      ])
+      ],[#include <d3d9.h>])
   ],[
     AS_IF([test "x${enable_dxva2}" != "x"], [
       AC_MSG_ERROR([--enable-dxva2 and --disable-avcodec options are mutually exclusive.])
@@ -2464,7 +2468,7 @@ AS_IF([test "${enable_d3d11va}" != "no"], [
                     AS_IF([test "${enable_d3d11va}" = "yes"],
                           [AC_MSG_ERROR([Could not find required dxva2api.h])],
                           [AC_MSG_WARN([dxva2api.h not found])])
-                  ])
+                  ],[#include <d3d9.h>])
           ],[
             AS_IF([test "${enable_d3d11va}" = "yes"],
                   [AC_MSG_ERROR([Could not find required ID3D11VideoDecoder in d3d11.h])],
@@ -3113,7 +3117,9 @@ AS_IF([test "${have_vdpau}" = "yes" -a "${have_avcodec}" = "yes"], [
     libav) av_vdpau_ver="55.26.0" ;;
     ffmpeg) av_vdpau_ver="55.42.100"
       PKG_CHECK_EXISTS([libavcodec >= 57.10.100], [
-        AC_MSG_ERROR([VDPAU requires FFmpeg libavcodec < 57.10 or libav.])
+        PKG_CHECK_EXISTS([libavcodec <= 57.12.100], [
+          AC_MSG_ERROR([VDPAU requires FFmpeg libavcodec < 57.10 or > 57.12 or libav.])
+        ])
       ])
       ;;
   esac
@@ -3778,11 +3784,11 @@ AC_ARG_ENABLE(qt, [
 AS_IF([test "${enable_qt}" != "no"], [
   PKG_CHECK_MODULES([QT], [Qt5Core >= 5.1.0 Qt5Widgets Qt5Gui], [
       PKG_CHECK_MODULES([QTX11], [Qt5X11Extras], [
-          VLC_ADD_LIBS([qt4],[${QTX11_LIBS}])
-          VLC_ADD_CXXFLAGS([qt4],[${QTX11_CFLAGS} -DQT5_HAS_X11])
+          VLC_ADD_LIBS([qt],[${QTX11_LIBS}])
+          VLC_ADD_CXXFLAGS([qt],[${QTX11_CFLAGS} -DQT5_HAS_X11])
           PKG_CHECK_MODULES([XI], [xi], [
-            VLC_ADD_LIBS([qt4], [${XI_LIBS}])
-            VLC_ADD_CXXFLAGS([qt4], [${XI_CFLAGS} -DHAVE_XI])
+            VLC_ADD_LIBS([qt], [${XI_LIBS}])
+            VLC_ADD_CXXFLAGS([qt], [${XI_CFLAGS} -DHAVE_XI])
           ], [
             PKG_CHECK_EXISTS([Qt5Gui >= 5.5], [
               AC_MSG_ERROR([${XI_PKG_ERRORS}.])
@@ -3814,10 +3820,10 @@ AS_IF([test "${enable_qt}" != "no"], [
     ])
 ])
 AS_IF([test "${enable_qt}" != "no"], [
-  VLC_ADD_PLUGIN([qt4])
+  VLC_ADD_PLUGIN([qt])
   ALIASES="${ALIASES} qvlc"
 ])
-AM_CONDITIONAL(ENABLE_QT4, [test "$enable_qt" != "no"])
+AM_CONDITIONAL(ENABLE_QT, [test "$enable_qt" != "no"])
 
 dnl
 dnl detect kde4-config patch (used for kde solids and kwallet).
@@ -3832,10 +3838,10 @@ dnl Simple test for skins2 dependency
 dnl
 AS_IF([test "$enable_qt" = "no"], [
   AS_IF([test "${enable_skins2}" = "yes"], [
-    AC_MSG_ERROR([The skins2 module depends on the Qt4 interface. Without it you will not be able to open any dialog box from the interface, which makes the skins2 interface rather useless. Install the Qt4 development package or alternatively you can also configure with: --disable-qt4 --disable-skins2.])
+    AC_MSG_ERROR([The skins2 module depends on the Qt interface. Without it you will not be able to open any dialog box from the interface, which makes the skins2 interface rather useless. Install the Qt development package or alternatively you can also configure with: --disable-qt --disable-skins2.])
   ], [
     enable_skins2="no"
-    AC_MSG_WARN([The skins2 module depends on the Qt4 interface, Qt4 is not built so skins2 is disabled.])
+    AC_MSG_WARN([The skins2 module depends on the Qt interface, Qt is not built so skins2 is disabled.])
   ])
 ])
 
@@ -4129,7 +4135,7 @@ AS_IF([test "${SYS}" != "mingw32" -a "${SYS}" != "darwin" \
          -a "${enable_kwallet}" != "no" ], [
   VLC_SAVE_FLAGS
   AC_LANG_PUSH([C++])
-  KWALLET_CXXFLAGS="$QT_CFLAGS $CXXFLAGS_qt4 -I`$KDE4_CONFIG --path include`"
+  KWALLET_CXXFLAGS="$QT_CFLAGS $CXXFLAGS_qt -I`$KDE4_CONFIG --path include`"
   CPPFLAGS="$CPPFLAGS $KWALLET_CXXFLAGS"
   AC_CHECK_HEADER([kwallet.h], [
     KWALLET_LIBS="$QT_LIBS -L`$KDE4_CONFIG --install lib` -lkdeui"
@@ -4304,7 +4310,7 @@ AC_CONFIG_FILES([
   bin/Makefile
   test/Makefile
   modules/gui/macosx/Makefile
-  modules/gui/qt4/Makefile
+  modules/gui/qt/Makefile
   modules/gui/skins2/Makefile
   modules/hw/mmal/Makefile
 ])

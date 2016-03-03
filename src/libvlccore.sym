@@ -223,6 +223,10 @@ input_Close
 input_HasESOut
 intf_Create
 libvlc_InternalAddIntf
+libvlc_InternalDialogInit
+libvlc_InternalDialogClean
+libvlc_InternalKeystoreInit
+libvlc_InternalKeystoreClean
 libvlc_InternalPlay
 libvlc_InternalCleanup
 libvlc_InternalCreate
@@ -529,8 +533,6 @@ vlc_dialog_id_post_action
 vlc_dialog_id_post_login
 vlc_dialog_id_set_context
 vlc_dialog_is_cancelled
-vlc_dialog_provider_new
-vlc_dialog_provider_release
 vlc_dialog_provider_set_callbacks
 vlc_dialog_provider_set_ext_callback
 vlc_dialog_release

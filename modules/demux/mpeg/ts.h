@@ -20,6 +20,9 @@
 #ifndef VLC_TS_H
 #define VLC_TS_H
 
+#include <limits.h>
+#define TS_TIME_DELTA_INVALID    INT64_MAX
+
 #ifdef HAVE_ARIBB24
     typedef struct arib_instance_t arib_instance_t;
 #endif
@@ -98,9 +101,7 @@ struct demux_sys_t
 
     /* */
     bool        b_dvb_meta;
-    int64_t     i_tdt_delta;
-    int64_t     i_dvb_start;
-    int64_t     i_dvb_length;
+    time_t      i_tdt_delta;
     bool        b_broken_charset; /* True if broken encoding is used in EPG/SDT */
 
     /* Selected programs */

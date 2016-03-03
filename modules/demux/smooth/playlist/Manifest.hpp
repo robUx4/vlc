@@ -20,20 +20,20 @@
 #ifndef MANIFEST_HPP
 #define MANIFEST_HPP
 
-#include "../adaptative/playlist/AbstractPlaylist.hpp"
+#include "../adaptive/playlist/AbstractPlaylist.hpp"
 
 namespace smooth
 {
     namespace playlist
     {
-        using namespace adaptative::playlist;
+        using namespace adaptive::playlist;
 
         class Manifest : public AbstractPlaylist
         {
             friend class ManifestParser;
 
             public:
-                Manifest(stream_t *);
+                Manifest(vlc_object_t *);
                 virtual ~Manifest();
 
                 virtual bool                    isLive() const;

@@ -50,6 +50,18 @@
 #include <time.h>
 #include <assert.h>
 
+#ifndef PSI_DEBUG_EIT
+ #define PSI_DEBUG_TIMESHIFT(t)
+#else
+ static time_t i_eit_debug_offset = 0;
+ #define PSI_DEBUG_TIMESHIFT(t) \
+    do {\
+        if( i_eit_debug_offset == 0 )\
+            i_eit_debug_offset = time(NULL) - t;\
+        t = t + i_eit_debug_offset;\
+    } while(0);
+#endif
+
 static char *EITConvertToUTF8( demux_t *p_demux,
                                const unsigned char *psz_instring,
                                size_t i_length,
@@ -283,8 +295,7 @@ static void TDTCallBack( demux_t *p_demux, dvbpsi_tot_t *p_tdt )
 {
     demux_sys_t        *p_sys = p_demux->p_sys;
 
-    p_sys->i_tdt_delta = CLOCK_FREQ * EITConvertStartTime( p_tdt->i_utc_time )
-                         - mdate();
+    p_sys->i_tdt_delta = EITConvertStartTime( p_tdt->i_utc_time ) - time(NULL);
     dvbpsi_tot_delete(p_tdt);
 }
 
@@ -321,28 +332,31 @@ static void EITCallBack( demux_t *p_demux,
         int64_t i_start;
         int i_duration;
         int i_min_age = 0;
-        int64_t i_tot_time = 0;
 
         i_start = EITConvertStartTime( p_evt->i_start_time );
+        PSI_DEBUG_TIMESHIFT(i_start);
         i_duration = EITConvertDuration( p_evt->i_duration );
 
         if( p_sys->arib.e_mode == ARIBMODE_ENABLED )
         {
-            if( p_sys->i_tdt_delta == 0 )
-                p_sys->i_tdt_delta = CLOCK_FREQ * (i_start + i_duration - 5) - mdate();
+            time_t i_now = time(NULL);
+            time_t i_tot_time = 0;
 
-            i_tot_time = (mdate() + p_sys->i_tdt_delta) / CLOCK_FREQ;
+            if( p_sys->i_tdt_delta == TS_TIME_DELTA_INVALID )
+                p_sys->i_tdt_delta = (i_start + i_duration - 5) - i_now;
+
+            i_tot_time = i_now + p_sys->i_tdt_delta;
 
             tzset(); // JST -> UTC
             i_start += timezone; // FIXME: what about DST?
             i_tot_time += timezone;
 
-            if( p_evt->i_running_status == 0x00 &&
+            if( p_evt->i_running_status == TS_PSI_RUNSTATUS_UNDEFINED &&
                 (i_start - 5 < i_tot_time &&
                  i_tot_time < i_start + i_duration + 5) )
             {
-                p_evt->i_running_status = 0x04;
-                msg_Dbg( p_demux, "  EIT running status 0x00 -> 0x04" );
+                p_evt->i_running_status = TS_PSI_RUNSTATUS_RUNNING;
+                msg_Dbg( p_demux, "  EIT running status undefined -> running" );
             }
         }
 
@@ -464,7 +478,7 @@ static void EITCallBack( demux_t *p_demux,
                               *psz_extra ? psz_extra : NULL, i_min_age );
 
         /* Update "now playing" field */
-        if( p_evt->i_running_status == 0x04 && i_start > 0  && psz_name && psz_text )
+        if( p_evt->i_running_status == TS_PSI_RUNSTATUS_RUNNING && i_start > 0  && psz_name && psz_text )
             vlc_epg_SetCurrent( p_epg, i_start );
 
         free( psz_name );
@@ -480,13 +494,18 @@ static void EITCallBack( demux_t *p_demux,
                     p_eit->i_extension
                 ) )
         {
-            p_sys->i_dvb_length = 0;
-            p_sys->i_dvb_start = 0;
-
-            if( p_epg->p_current )
+            ts_pat_t *p_pat = ts_pid_Get(&p_sys->pids, 0)->u.p_pat;
+            ts_pmt_t *p_pmt = ts_pat_Get_pmt(p_pat, p_eit->i_extension);
+            if(p_pmt)
             {
-                p_sys->i_dvb_start = CLOCK_FREQ * p_epg->p_current->i_start;
-                p_sys->i_dvb_length = CLOCK_FREQ * p_epg->p_current->i_duration;
+                p_pmt->eit.i_event_length = 0;
+                p_pmt->eit.i_event_start = 0;
+
+                if( p_epg->p_current )
+                {
+                    p_pmt->eit.i_event_start = p_epg->p_current->i_start;
+                    p_pmt->eit.i_event_length = p_epg->p_current->i_duration;
+                }
             }
         }
         es_out_Control( p_demux->out, ES_OUT_SET_GROUP_EPG,
@@ -538,7 +557,7 @@ static void PSINewTableCallBack( dvbpsi_t *h, uint8_t i_table_id,
             msg_Err( p_demux, "PSINewTableCallback: failed attaching EITCallback" );
     }
     else if( GetPID(p_sys, 0x11)->u.p_psi->i_version != -1 &&
-            (i_table_id == 0x70 /* TDT */ || i_table_id == 0x73 /* TOT */) )
+            (i_table_id == TS_PSI_TDT_TABLE_ID || i_table_id == TS_PSI_TOT_TABLE_ID) )
     {
          msg_Dbg( p_demux, "PSINewTableCallBack: table 0x%x(%d) ext=0x%x(%d)",
                  i_table_id, i_table_id, i_extension, i_extension );

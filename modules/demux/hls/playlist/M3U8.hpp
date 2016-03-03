@@ -21,18 +21,18 @@
 #ifndef M3U8_H_
 #define M3U8_H_
 
-#include "../adaptative/playlist/AbstractPlaylist.hpp"
+#include "../adaptive/playlist/AbstractPlaylist.hpp"
 
 namespace hls
 {
     namespace playlist
     {
-        using namespace adaptative::playlist;
+        using namespace adaptive::playlist;
 
         class M3U8 : public AbstractPlaylist
         {
             public:
-                M3U8(stream_t *);
+                M3U8(vlc_object_t *);
                 virtual ~M3U8();
 
                 virtual bool                    isLive() const;
