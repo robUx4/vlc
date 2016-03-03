@@ -339,6 +339,12 @@ VLC_API bool playlist_IsServicesDiscoveryLoaded( playlist_t *,const char *) VLC_
 /** Query a services discovery */
 VLC_API int playlist_ServicesDiscoveryControl( playlist_t *, const char *, int, ... );
 
+/**
+ * \return the current renderer if any.
+ *
+ * Use vlc_object_release() to drop the reference.
+ */
+VLC_API vlc_renderer *playlist_HoldRenderer( playlist_t * );
 
 
 /********************************************************
