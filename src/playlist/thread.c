@@ -527,3 +527,9 @@ static void *Thread ( void *data )
     input_resource_Terminate( p_sys->p_input_resource );
     return NULL;
 }
+
+vlc_renderer *playlist_HoldRenderer( playlist_t *p_playlist )
+{
+    playlist_private_t *p_sys = pl_priv(p_playlist);
+    return input_resource_HoldRenderer( p_sys->p_input_resource );
+}
