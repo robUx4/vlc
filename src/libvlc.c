@@ -246,6 +246,7 @@ int libvlc_InternalInit( libvlc_int_t *p_libvlc, int i_argc,
     if( libvlc_InternalKeystoreInit( p_libvlc ) != VLC_SUCCESS )
         msg_Warn( p_libvlc, "memory keystore init failed" );
 
+#if 0
     if (vlc_renderer_init( p_libvlc ) != VLC_SUCCESS )
     {
         vlc_dialog_provider_release( priv->p_dialog_provider );
@@ -253,6 +254,7 @@ int libvlc_InternalInit( libvlc_int_t *p_libvlc, int i_argc,
         module_EndBank (true);
         return VLC_ENOMEM;
     }
+#endif
 
 /* FIXME: could be replaced by using Unix sockets */
 #ifdef HAVE_DBUS
@@ -477,11 +479,12 @@ dbus_out:
     if( var_InheritBool( p_libvlc, "network-synchronisation") )
         libvlc_InternalAddIntf( p_libvlc, "netsync,none" );
 
+#if 0
     psz_renderer = var_CreateGetNonEmptyString( p_libvlc, "renderer" );
     if (psz_renderer)
         libvlc_InternalSetRenderer( p_libvlc, psz_renderer );
     free( psz_renderer );
-
+#endif
 #ifdef __APPLE__
     var_Create( p_libvlc, "drawable-view-top", VLC_VAR_INTEGER );
     var_Create( p_libvlc, "drawable-view-left", VLC_VAR_INTEGER );
@@ -529,7 +532,9 @@ void libvlc_InternalCleanup( libvlc_int_t *p_libvlc )
 
     libvlc_InternalDialogClean( p_libvlc );
     libvlc_InternalKeystoreClean( p_libvlc );
+#if 0
     vlc_renderer_deinit( p_libvlc );
+#endif
 
 #ifdef ENABLE_VLM
     /* Destroy VLM if created in libvlc_InternalInit */
