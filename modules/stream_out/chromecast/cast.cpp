@@ -38,22 +38,27 @@
 
 struct sout_stream_sys_t
 {
-    sout_stream_sys_t(intf_sys_t *intf, sout_stream_t *sout)
+    sout_stream_sys_t(vlc_renderer *intf, sout_stream_t *sout)
         : p_out(sout)
         , p_intf(intf)
     {
         assert(p_intf != NULL);
+        vlc_object_hold(p_intf);
     }
     
     ~sout_stream_sys_t()
     {
         sout_StreamChainDelete(p_out, p_out);
+        vlc_object_release(p_intf);
     }
 
-    vlc_thread_t chromecastThread;
+    bool isFinishedPlaying() const {
+        /* check if the Chromecast to be done playing */
+        return p_intf->p_sys->isFinishedPlaying();
+    }
 
     sout_stream_t * const p_out;
-    intf_sys_t * const p_intf;
+    vlc_renderer * const p_intf;
 };
 
 #define SOUT_CFG_PREFIX "sout-chromecast-"
@@ -63,7 +68,6 @@ struct sout_stream_sys_t
  *****************************************************************************/
 static int Open(vlc_object_t *);
 static void Close(vlc_object_t *);
-static void Clean(sout_stream_t *p_stream);
 
 static const char *const ppsz_sout_options[] = {
     "http-port", "mux", "mime", NULL
@@ -81,12 +85,14 @@ static const char *const ppsz_sout_options[] = {
 #define MIME_TEXT N_("MIME content type")
 #define MIME_LONGTEXT N_("This sets the media MIME content type sent to the Chromecast.")
 
+/* sout wrapper that can tell when the Chromecast is finished playing
+ * rather than when data are finished sending */
 vlc_module_begin ()
 
-    set_shortname(N_("Chromecast"))
+    set_shortname( "cc_sout" )
     set_description(N_("Chromecast stream output"))
     set_capability("sout stream", 0)
-    add_shortcut("chromecast")
+    add_shortcut("cc_sout")
     set_category(CAT_SOUT)
     set_subcategory(SUBCAT_SOUT_STREAM)
     set_callbacks(Open, Close)
@@ -104,7 +110,11 @@ vlc_module_end ()
 static sout_stream_id_sys_t *Add(sout_stream_t *p_stream, const es_format_t *p_fmt)
 {
     sout_stream_sys_t *p_sys = p_stream->p_sys;
-
+    if (p_sys->p_intf->p_sys->canDisplay == AUDIO_ONLY)
+    {
+        if (p_fmt->i_cat != AUDIO_ES)
+            return NULL;
+    }
     return sout_StreamIdAdd(p_sys->p_out, p_fmt);
 }
 
@@ -136,6 +146,13 @@ static int Control(sout_stream_t *p_stream, int i_query, va_list args)
 {
     sout_stream_sys_t *p_sys = p_stream->p_sys;
 
+    if (i_query == SOUT_STREAM_EMPTY)
+    {
+        bool *b = va_arg( args, bool * );
+        *b = p_sys->isFinishedPlaying();
+        return VLC_SUCCESS;
+    }
+
     return p_sys->p_out->pf_control( p_sys->p_out, i_query, args );
 }
 
@@ -145,11 +162,18 @@ static int Control(sout_stream_t *p_stream, int i_query, va_list args)
 static int Open(vlc_object_t *p_this)
 {
     sout_stream_t *p_stream = reinterpret_cast<sout_stream_t*>(p_this);
-    sout_stream_sys_t *p_sys;
-    intf_sys_t *p_intf = NULL;
+    sout_stream_sys_t *p_sys = NULL;
+    vlc_renderer *p_intf = NULL;
     char *psz_mux = NULL;
+    char *psz_var_mime = NULL;
     sout_stream_t *p_sout = NULL;
     std::stringstream ss;
+
+    p_intf = static_cast<vlc_renderer*>(var_InheritAddress(p_stream, SOUT_INTF_ADDRESS));
+    if (p_intf == NULL) {
+        msg_Err(p_stream, "Missing the control interface to work");
+        goto error;
+    }
 
     config_ChainParse(p_stream, SOUT_CFG_PREFIX, ppsz_sout_options, p_stream->p_cfg);
 
@@ -158,10 +182,13 @@ static int Open(vlc_object_t *p_this)
     {
         goto error;
     }
+    psz_var_mime = var_GetNonEmptyString(p_stream, SOUT_CFG_PREFIX "mime");
+    if (psz_var_mime == NULL || !psz_var_mime[0])
+        goto error;
 
     ss << "http{dst=:" << var_InheritInteger(p_stream, SOUT_CFG_PREFIX "http-port") << "/stream"
        << ",mux=" << psz_mux
-       << ",access=http}";
+       << ",access=http{mime=" << psz_var_mime << "}}";
 
     p_sout = sout_StreamChainNew( p_stream->p_sout, ss.str().c_str(), NULL, NULL);
     if (p_sout == NULL) {
@@ -182,13 +209,14 @@ static int Open(vlc_object_t *p_this)
 
     p_stream->p_sys = p_sys;
     free(psz_mux);
-
+    free(psz_var_mime);
     return VLC_SUCCESS;
 
 error:
     sout_StreamChainDelete(p_sout, p_sout);
     free(psz_mux);
-    Clean(p_stream);
+    free(psz_var_mime);
+    delete p_sys;
     return VLC_EGENERIC;
 }
 
@@ -199,15 +227,6 @@ static void Close(vlc_object_t *p_this)
 {
     sout_stream_t *p_stream = reinterpret_cast<sout_stream_t*>(p_this);
 
-    Clean(p_stream);
-}
-
-
-/**
- * @brief Clean and release the variables in a sout_stream_sys_t structure
- */
-static void Clean(sout_stream_t *p_stream)
-{
     delete p_stream->p_sys;
 }
 

@@ -95,6 +95,9 @@ Stream filter:
  * Added stream prebuffering plugin
  * Removed HTTP Live streaming stream filter
  * Added zlib (a.k.a. deflate) decompression filter
+ 
+Demux filter:
+ * Added a chain of demuxer to wrap the one used for the input used for playback
 
 Audio output:
  * Complete rewrite of the AudioTrack Android module. This is now the default.
@@ -143,6 +146,7 @@ Service Discovery:
  * New NetBios service discovery using libdsm
  * New mDNS services discovery using libmicrodns
  * New mDNS services discovery using Bonjour (Mac OS X, tvOS, iOS)
+ * New Chromecast devices service discovery
  * Rewrite of the UPnP service discovery
 
 Mac OS X Interface

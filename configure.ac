@@ -575,7 +575,7 @@ need_libc=false
 dnl Check for usual libc functions
 AC_CHECK_DECLS([nanosleep],,,[#include <time.h>])
 AC_CHECK_FUNCS([daemon fcntl flock fstatvfs fork getenv getpwuid_r isatty lstat memalign mkostemp mmap open_memstream openat pread posix_fadvise posix_madvise setlocale stricmp strnicmp strptime uselocale pthread_cond_timedwait_monotonic_np pthread_condattr_setclock])
-AC_REPLACE_FUNCS([atof atoll dirfd fdopendir ffsll flockfile fsync getdelim getpid lldiv nrand48 poll posix_memalign recvmsg rewind sendmsg setenv strcasecmp strcasestr strdup strlcpy strndup strnlen strnstr strsep strtof strtok_r strtoll swab tdestroy timegm timespec_get strverscmp])
+AC_REPLACE_FUNCS([atof atoll dirfd fdopendir ffsll flockfile fsync getdelim getpid gmtime_r lldiv nrand48 poll posix_memalign recvmsg rewind sendmsg setenv strcasecmp strcasestr strdup strlcpy strndup strnlen strnstr strsep strtof strtok_r strtoll swab tdestroy timegm timespec_get strverscmp])
 AC_REPLACE_FUNCS([gettimeofday])
 AC_CHECK_FUNCS(fdatasync,,
   [AC_DEFINE(fdatasync, fsync, [Alias fdatasync() to fsync() if missing.])
@@ -1016,7 +1016,7 @@ AS_IF([test "${enable_optimizations}" != "no"], [
   ])
   AS_IF([test "${ac_cv_c_fast_math}" = "no"], [VLC_RESTORE_FLAGS])
   AH_BOTTOM([
-#ifndef __FAST_MATH__
+#if !defined(__FAST_MATH__) && defined(NDEBUG)
 # ifndef _MSC_VER
 #  pragma STDC FENV_ACCESS OFF
 #  pragma STDC FP_CONTRACT ON

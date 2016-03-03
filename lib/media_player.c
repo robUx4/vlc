@@ -35,6 +35,7 @@
 #include <vlc_vout.h>
 #include <vlc_aout.h>
 #include <vlc_keys.h>
+//#include <vlc_renderer.h>
 
 #include "libvlc_internal.h"
 #include "media_internal.h" // libvlc_media_set_state()
@@ -138,6 +139,7 @@ static void release_input_thread( libvlc_media_player_t *p_mi )
     if( !p_input_thread )
         return;
     p_mi->input.p_thread = NULL;
+    //vlc_renderer_stop( p_mi );
 
     var_DelCallback( p_input_thread, "can-seek",
                      input_seekable_changed, p_mi );
@@ -924,6 +926,7 @@ int libvlc_media_player_play( libvlc_media_player_t *p_mi )
         return -1;
     }
 
+    //vlc_renderer_start( p_mi, p_input_thread );
     var_AddCallback( p_input_thread, "can-seek", input_seekable_changed, p_mi );
     var_AddCallback( p_input_thread, "can-pause", input_pausable_changed, p_mi );
     var_AddCallback( p_input_thread, "program-scrambled", input_scrambled_changed, p_mi );
@@ -932,6 +935,7 @@ int libvlc_media_player_play( libvlc_media_player_t *p_mi )
 
     if( input_Start( p_input_thread ) )
     {
+        //vlc_renderer_stop( p_mi );
         unlock_input(p_mi);
         del_es_callbacks( p_input_thread, p_mi );
         var_DelCallback( p_input_thread, "intf-event", input_event_changed, p_mi );

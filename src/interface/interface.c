@@ -38,6 +38,7 @@
 #endif
 
 #include <unistd.h>
+#include <assert.h>
 
 #include <vlc_common.h>
 #include <vlc_modules.h>
@@ -61,14 +62,8 @@ static int AddIntfCallback( vlc_object_t *, char const *,
  */
 static vlc_mutex_t lock = VLC_STATIC_MUTEX;
 
-/**
- * Create and start an interface.
- *
- * @param playlist playlist and parent object for the interface
- * @param chain configuration chain string
- * @return VLC_SUCCESS or an error code
- */
-int intf_Create( playlist_t *playlist, const char *chain )
+static int intf_CreateEx( playlist_t *playlist, const char *chain,
+                          intf_thread_t **pp_intf )
 {
     /* Allocate structure */
     intf_thread_t *p_intf = vlc_custom_create( playlist, sizeof( *p_intf ),
@@ -123,6 +118,9 @@ int intf_Create( playlist_t *playlist, const char *chain )
     pl_priv( playlist )->interface = p_intf;
     vlc_mutex_unlock( &lock );
 
+    if( pp_intf != NULL )
+        *pp_intf = p_intf;
+
     return VLC_SUCCESS;
 
 error:
@@ -131,6 +129,66 @@ error:
     config_ChainDestroy( p_intf->p_cfg );
     vlc_object_release( p_intf );
     return VLC_EGENERIC;
+}
+
+/**
+ * Create and start an interface.
+ * The interface will be destroyed by intf_DestroyAll()
+ *
+ * @param playlist playlist and parent object for the interface
+ * @param chain configuration chain string
+ * @return VLC_SUCCESS or an error code
+ */
+int intf_Create( playlist_t *playlist, const char *chain )
+{
+    return intf_CreateEx( playlist, chain, NULL );
+}
+
+/**
+ * Create, start and return an interface.
+ * This interface must be destroyed with intf_Release()
+ *
+ * @param playlist playlist and parent object for the interface
+ * @param chain configuration chain string
+ * @return the interface started
+ */
+intf_thread_t *intf_New( playlist_t *playlist, const char *chain )
+{
+    intf_thread_t *p_intf;
+    return intf_CreateEx( playlist, chain, &p_intf ) == VLC_SUCCESS ?
+           p_intf : NULL;
+}
+
+/**
+ * Release an interface created with intf_New()
+ */
+void intf_Release( playlist_t *playlist, intf_thread_t *intf )
+{
+
+    vlc_mutex_lock(&lock);
+    intf_thread_t *it = pl_priv(playlist)->interface;
+
+    if(intf == it )
+        pl_priv(playlist)->interface = intf->p_next;
+    else
+    {
+        while( it != NULL && it->p_next != intf )
+            it = it->p_next;
+        if( it->p_next == intf )
+            it->p_next = intf->p_next;
+        else
+        {
+            /* intf already released */
+            vlc_mutex_unlock(&lock);
+            return;
+        }
+    }
+    vlc_mutex_unlock(&lock);
+
+    module_unneed( intf, intf->p_module );
+    config_ChainDestroy( intf->p_cfg );
+    var_DelCallback( intf, "intf-add", AddIntfCallback, playlist );
+    vlc_object_release( intf );
 }
 
 /**
