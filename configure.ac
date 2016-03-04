@@ -1020,12 +1020,12 @@ AS_IF([test "${enable_optimizations}" != "no"], [
   AS_IF([test "${ac_cv_c_fast_math}" = "no"], [VLC_RESTORE_FLAGS])
   AH_BOTTOM([
 #ifndef __FAST_MATH__
-# ifndef _MSC_VER
-#  pragma STDC FENV_ACCESS OFF
-#  pragma STDC FP_CONTRACT ON
-# else
+# ifdef _MSC_VER
 #  pragma fenv_access(off)
 #  pragma fp_contract(on)
+# elif defined(__STDC_VERSION__) && __STDC_VERSION__ >= 199901L && !defined(__GNUC__)
+#  pragma STDC FENV_ACCESS OFF
+#  pragma STDC FP_CONTRACT ON
 # endif
 #endif
 ])
