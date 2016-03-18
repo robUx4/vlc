@@ -81,6 +81,12 @@ VLC_API int
 vlc_renderer_item_flags(const vlc_renderer_item *p_item);
 
 /**
+  * Check if a renderer corresponds to this URI
+  */
+VLC_API
+bool vlc_renderer_equals(vlc_renderer *p_renderer, const char *psz_uri);
+
+/**
  * @}
  * @defgroup vlc_renderer_module VLC renderer module
  * @{
@@ -120,7 +126,5 @@ vlc_renderer_new(vlc_object_t *p_obj, const char *psz_renderer);
 
 int
 vlc_renderer_set_input(vlc_renderer *p_renderer, input_thread_t *p_input);
-
-bool vlc_renderer_equals(vlc_renderer *p_renderer, const char *psz_renderer);
 
 #endif
