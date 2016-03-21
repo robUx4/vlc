@@ -38,12 +38,11 @@
 
 struct sout_stream_sys_t
 {
-    sout_stream_sys_t(intf_sys_t *intf, sout_stream_t *sout, bool has_video)
+    sout_stream_sys_t(vlc_renderer *renderer, sout_stream_t *sout, bool has_video)
         : p_out(sout)
-        , p_intf(intf)
+        , p_renderer(renderer)
         , b_has_video(has_video)
     {
-        assert(p_intf != NULL);
     }
     
     ~sout_stream_sys_t()
@@ -51,8 +50,9 @@ struct sout_stream_sys_t
         sout_StreamChainDelete(p_out, p_out);
     }
 
+
     sout_stream_t * const p_out;
-    intf_sys_t * const p_intf;
+    vlc_renderer * const p_renderer;
     const bool b_has_video;
 };
 
@@ -84,10 +84,10 @@ static const char *const ppsz_sout_options[] = {
 
 vlc_module_begin ()
 
-    set_shortname(N_("Chromecast"))
+    set_shortname( "cc_sout" )
     set_description(N_("Chromecast stream output"))
     set_capability("sout stream", 0)
-    add_shortcut("chromecast")
+    add_shortcut("cc_sout")
     set_category(CAT_SOUT)
     set_subcategory(SUBCAT_SOUT_STREAM)
     set_callbacks(Open, Close)
@@ -156,7 +156,7 @@ static int Open(vlc_object_t *p_this)
 {
     sout_stream_t *p_stream = reinterpret_cast<sout_stream_t*>(p_this);
     sout_stream_sys_t *p_sys = NULL;
-    intf_sys_t *p_intf = NULL;
+    vlc_renderer *p_renderer = NULL;
     char *psz_mux = NULL;
     char *psz_var_mime = NULL;
     sout_stream_t *p_sout = NULL;
@@ -186,7 +186,7 @@ static int Open(vlc_object_t *p_this)
 
     b_has_video = var_GetBool(p_stream, SOUT_CFG_PREFIX "video");
 
-    p_sys = new(std::nothrow) sout_stream_sys_t(p_intf, p_sout, b_has_video);
+    p_sys = new(std::nothrow) sout_stream_sys_t(p_renderer, p_sout, b_has_video);
     if (unlikely(p_sys == NULL))
         goto error;
 
