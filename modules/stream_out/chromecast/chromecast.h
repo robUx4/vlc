@@ -120,7 +120,7 @@ struct vlc_renderer_sys
         }
     }
 
-    int connectChromecast(char *psz_ipChromecast);
+    int connectChromecast();
     void disconnectChromecast();
 
     void msgAuth();
