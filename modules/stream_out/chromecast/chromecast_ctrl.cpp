@@ -241,6 +241,7 @@ void intf_sys_t::buildMessage(const std::string & namespace_,
  *****************************************************************************/
 intf_sys_t::intf_sys_t(vlc_object_t * const p_this)
  : p_module(p_this)
+ , receiverState(RECEIVER_IDLE)
  , p_tls(NULL)
  , conn_status(CHROMECAST_DISCONNECTED)
  , i_receiver_requestId(0)
@@ -317,6 +318,7 @@ void intf_sys_t::disconnectChromecast()
         vlc_tls_Delete(p_creds);
         p_tls = NULL;
         setConnectionStatus(CHROMECAST_DISCONNECTED);
+        receiverState = RECEIVER_IDLE;
     }
 }
 
@@ -536,6 +538,7 @@ void intf_sys_t::processMessage(const castchannel::CastMessage &msg)
                 case CHROMECAST_AUTHENTICATED:
                     msg_Dbg( p_module, "Chromecast was running no app, launch media_app");
                     appTransportId = "";
+                    receiverState = RECEIVER_IDLE;
                     msgReceiverLaunchApp();
                     break;
 
@@ -571,11 +574,22 @@ void intf_sys_t::processMessage(const castchannel::CastMessage &msg)
                     status[0]["playerState"].operator const char *(),
                     (int)(json_int_t) status[0]["mediaSessionId"]);
 
+            vlc_mutex_locker locker(&lock);
+            receiver_state oldPlayerState = receiverState;
             std::string newPlayerState = status[0]["playerState"].operator const char *();
 
             if (newPlayerState == "IDLE") {
+                receiverState = RECEIVER_IDLE;
                 mediaSessionId = ""; // this session is not valid anymore
             }
+            else if (newPlayerState == "PLAYING")
+                receiverState = RECEIVER_PLAYING;
+            else if (newPlayerState == "BUFFERING")
+                receiverState = RECEIVER_BUFFERING;
+            else if (newPlayerState == "PAUSED")
+                receiverState = RECEIVER_PAUSED;
+            else if (!newPlayerState.empty())
+                msg_Warn( p_module, "Unknown Chromecast state %s", newPlayerState.c_str());
 
             char session_id[32];
             if( snprintf( session_id, sizeof(session_id), "%" PRId64, (json_int_t) status[0]["mediaSessionId"] ) >= (int)sizeof(session_id) )
@@ -588,6 +602,34 @@ void intf_sys_t::processMessage(const castchannel::CastMessage &msg)
             }
 
             mediaSessionId = session_id;
+
+            if (receiverState != oldPlayerState)
+            {
+#ifndef NDEBUG
+                msg_Dbg( p_module, "change Chromecast player state from %d to %d", oldPlayerState, receiverState);
+#endif
+                switch( receiverState )
+                {
+                case RECEIVER_BUFFERING:
+                    if ( double(status[0]["currentTime"]) == 0.0 )
+                    {
+                        receiverState = oldPlayerState;
+                        msg_Dbg( p_module, "Invalid buffering time, keep previous state %d", oldPlayerState);
+                    }
+                    break;
+
+                case RECEIVER_PAUSED:
+#ifndef NDEBUG
+                    msg_Dbg( p_module, "Playback paused");
+#endif
+                    break;
+
+                case RECEIVER_IDLE:
+                    /* fall through */
+                default:
+                    break;
+                }
+            }
         }
         else if (type == "LOAD_FAILED")
         {
