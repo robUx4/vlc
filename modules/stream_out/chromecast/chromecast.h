@@ -32,7 +32,7 @@
 #include <vlc_common.h>
 #include <vlc_interface.h>
 #include <vlc_plugin.h>
-#include <vlc_sout.h>
+#include <vlc_renderer.h>
 #include <vlc_tls.h>
 
 #include <sstream>
@@ -73,12 +73,17 @@ enum receiver_state {
     RECEIVER_PAUSED,
 };
 
-struct intf_sys_t
+
+/*****************************************************************************
+ * vlc_renderer_sys: description and status of interface
+ *****************************************************************************/
+struct vlc_renderer_sys
 {
-    intf_sys_t(vlc_object_t * const p_this);
-    ~intf_sys_t();
+    vlc_renderer_sys(vlc_object_t * const p_this);
+    ~vlc_renderer_sys();
 
     vlc_object_t  * const p_module;
+    input_thread_t *p_input;
     std::string    serverIP;
     std::string    mime;
     std::string    muxer;
@@ -99,6 +104,8 @@ struct intf_sys_t
     void msgReceiverClose(std::string destinationId);
 
     void handleMessages();
+
+    void InputUpdated( input_thread_t * );
 
     connection_status getConnectionStatus() const
     {
