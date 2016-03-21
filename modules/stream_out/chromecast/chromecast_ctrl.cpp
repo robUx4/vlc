@@ -707,6 +707,77 @@ void intf_sys_t::msgPlayerLoad()
     pushMediaPlayerMessage( ss );
 }
 
+void intf_sys_t::msgPlayerPlay()
+{
+    assert(!mediaSessionId.empty());
+
+    std::stringstream ss;
+    ss << "{\"type\":\"PLAY\","
+       <<  "\"mediaSessionId\":" << mediaSessionId << ","
+       <<  "\"requestId\":" << i_requestId++
+       << "}";
+
+    pushMediaPlayerMessage( ss );
+}
+
+void intf_sys_t::msgPlayerPause()
+{
+    assert(!mediaSessionId.empty());
+
+    std::stringstream ss;
+    ss << "{\"type\":\"PAUSE\","
+       <<  "\"mediaSessionId\":" << mediaSessionId << ","
+       <<  "\"requestId\":" << i_requestId++
+       << "}";
+
+    pushMediaPlayerMessage( ss );
+}
+
+void intf_sys_t::msgPlayerSetVolume(float f_volume)
+{
+    assert(!mediaSessionId.empty());
+
+    if ( f_volume < 0.0 || f_volume > 1.0)
+        return;
+
+    std::stringstream ss;
+    ss << "{\"type\":\"SET_VOLUME\","
+       <<  "\"volume\":{\"level\":" << f_volume << "},"
+       <<  "\"mediaSessionId\":" << mediaSessionId << ","
+       <<  "\"requestId\":" << i_requestId++
+       << "}";
+
+    pushMediaPlayerMessage( ss );
+}
+
+void intf_sys_t::msgPlayerSetMute(bool b_mute)
+{
+    assert(!mediaSessionId.empty());
+
+    std::stringstream ss;
+    ss << "{\"type\":\"SET_VOLUME\","
+       <<  "\"volume\":{\"muted\":" << ( b_mute ? "true" : "false" ) << "},"
+       <<  "\"mediaSessionId\":" << mediaSessionId << ","
+       <<  "\"requestId\":" << i_requestId++
+       << "}";
+
+    pushMediaPlayerMessage( ss );
+}
+
+void intf_sys_t::msgPlayerSeek(const std::string & currentTime)
+{
+    assert(!mediaSessionId.empty());
+
+    std::stringstream ss;
+    ss << "{\"type\":\"SEEK\","
+       <<  "\"currentTime\":" << currentTime << ","
+       <<  "\"mediaSessionId\":" << mediaSessionId << ","
+       <<  "\"requestId\":" << i_requestId++
+       << "}";
+
+    pushMediaPlayerMessage( ss );
+}
+
 /**
  * @brief Send a message to the Chromecast
  * @param msg the CastMessage to send
