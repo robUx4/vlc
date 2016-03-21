@@ -59,6 +59,13 @@ enum connection_status
     CHROMECAST_CONNECTION_DEAD,
 };
 
+enum command_status {
+    NO_CMD_PENDING,
+    CMD_LOAD_SENT,
+    CMD_PLAYBACK_SENT,
+    CMD_SEEK_SENT,
+};
+
 enum receiver_state {
     RECEIVER_IDLE,
     RECEIVER_PLAYING,
@@ -140,7 +147,16 @@ private:
 
     void pushMediaPlayerMessage(const std::stringstream & payload);
 
+    void setPlayerStatus(enum command_status status) {
+        if (cmd_status != status)
+        {
+            msg_Dbg(p_module, "change Chromecast command status from %d to %d", cmd_status, status);
+            cmd_status = status;
+        }
+    }
+
     enum connection_status conn_status;
+    enum command_status    cmd_status;
 
     unsigned i_receiver_requestId;
     unsigned i_requestId;

@@ -244,6 +244,7 @@ intf_sys_t::intf_sys_t(vlc_object_t * const p_this)
  , receiverState(RECEIVER_IDLE)
  , p_tls(NULL)
  , conn_status(CHROMECAST_DISCONNECTED)
+ , cmd_status(NO_CMD_PENDING)
  , i_receiver_requestId(0)
  , i_requestId(0)
 {
@@ -318,6 +319,7 @@ void intf_sys_t::disconnectChromecast()
         vlc_tls_Delete(p_creds);
         p_tls = NULL;
         setConnectionStatus(CHROMECAST_DISCONNECTED);
+        setPlayerStatus(NO_CMD_PENDING);
         receiverState = RECEIVER_IDLE;
     }
 }
@@ -618,6 +620,11 @@ void intf_sys_t::processMessage(const castchannel::CastMessage &msg)
                     }
                     break;
 
+                case RECEIVER_PLAYING:
+                    /* TODO reset demux PCR ? */
+                    setPlayerStatus(CMD_PLAYBACK_SENT);
+                    break;
+
                 case RECEIVER_PAUSED:
 #ifndef NDEBUG
                     msg_Dbg( p_module, "Playback paused");
@@ -627,6 +634,7 @@ void intf_sys_t::processMessage(const castchannel::CastMessage &msg)
                 case RECEIVER_IDLE:
                     /* fall through */
                 default:
+                    setPlayerStatus(NO_CMD_PENDING);
                     break;
                 }
             }
