@@ -144,11 +144,6 @@ struct vlc_renderer_sys
 
     void processMessage(const castchannel::CastMessage &msg);
 
-    command_status getPlayerStatus() const
-    {
-        return cmd_status;
-    }
-
 private:
     int sendMessage(const castchannel::CastMessage &msg);
 
