@@ -167,6 +167,8 @@ private:
 
     unsigned i_receiver_requestId;
     unsigned i_requestId;
+
+    const bool canDisplay;
 };
 
 #endif /* VLC_CHROMECAST_H */
