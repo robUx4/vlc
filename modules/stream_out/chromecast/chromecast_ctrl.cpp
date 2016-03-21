@@ -120,7 +120,7 @@ int Open(vlc_object_t *p_module)
         goto error;
     }
 
-    p_sys->i_sock_fd = p_sys->connectChromecast(p_renderer->target.psz_host);
+    p_sys->i_sock_fd = p_sys->connectChromecast();
     if (p_sys->i_sock_fd < 0)
     {
         msg_Err( p_module, "Could not connect the Chromecast");
@@ -338,9 +338,13 @@ void vlc_renderer_sys::InputUpdated( input_thread_t *p_input )
  * @brief Connect to the Chromecast
  * @return the opened socket file descriptor or -1 on error
  */
-int vlc_renderer_sys::connectChromecast(char *psz_ipChromecast)
+int vlc_renderer_sys::connectChromecast()
 {
-    int fd = net_ConnectTCP( p_module, psz_ipChromecast, CHROMECAST_CONTROL_PORT);
+    vlc_renderer *p_renderer = reinterpret_cast<vlc_renderer*>(p_module);
+    unsigned devicePort = p_renderer->target.i_port;
+    if (devicePort == 0)
+        devicePort = CHROMECAST_CONTROL_PORT;
+    int fd = net_ConnectTCP( p_module, p_renderer->target.psz_host, devicePort);
     if (fd < 0)
         return -1;
 
@@ -351,7 +355,7 @@ int vlc_renderer_sys::connectChromecast(char *psz_ipChromecast)
         return -1;
     }
 
-    p_tls = vlc_tls_ClientSessionCreateFD(p_creds, fd, psz_ipChromecast,
+    p_tls = vlc_tls_ClientSessionCreateFD(p_creds, fd, p_renderer->target.psz_host,
                                                "tcps", NULL, NULL);
 
     if (p_tls == NULL)
