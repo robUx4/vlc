@@ -559,6 +559,24 @@ void intf_sys_t::processMessage(const castchannel::CastMessage &msg)
             msg_Dbg( p_module, "Player state: %s sessionId:%d",
                     status[0]["playerState"].operator const char *(),
                     (int)(json_int_t) status[0]["mediaSessionId"]);
+
+            std::string newPlayerState = status[0]["playerState"].operator const char *();
+
+            if (newPlayerState == "IDLE") {
+                mediaSessionId = ""; // this session is not valid anymore
+            }
+
+            char session_id[32];
+            if( snprintf( session_id, sizeof(session_id), "%" PRId64, (json_int_t) status[0]["mediaSessionId"] ) >= (int)sizeof(session_id) )
+            {
+                msg_Err( p_module, "snprintf() truncated string for mediaSessionId" );
+                session_id[sizeof(session_id) - 1] = '\0';
+            }
+            if (!mediaSessionId.empty() && session_id[0] && mediaSessionId != session_id) {
+                msg_Warn( p_module, "different mediaSessionId detected %s was %s", mediaSessionId.c_str(), this->mediaSessionId.c_str());
+            }
+
+            mediaSessionId = session_id;
         }
         else if (type == "LOAD_FAILED")
         {
