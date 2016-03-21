@@ -211,6 +211,7 @@ vlc_renderer_sys::vlc_renderer_sys(vlc_renderer * const p_this)
  , cmd_status(NO_CMD_PENDING)
  , i_receiver_requestId(0)
  , i_requestId(0)
+ , canDisplay( p_this->target.psz_path == NULL || strcasecmp("/audio", p_this->target.psz_path) )
 {
     vlc_mutex_init_recursive(&lock);
     vlc_cond_init(&loadCommandCond);
@@ -326,7 +327,9 @@ void vlc_renderer_sys::InputUpdated( input_thread_t *p_input )
 
         std::stringstream ssout;
         ssout << '#';
-        ssout << "cc_sout{http-port=" << i_port << ",mux=" << muxer << ",mime=" << mime << "}";
+        ssout << "cc_sout{http-port=" << i_port << ",mux=" << muxer << ",mime=" << mime
+              << ",video=" << (canDisplay ? '1' : '0')
+              << "}";
 
         msg_Dbg( p_module, "force sout to %s", ssout.str().c_str());
         var_SetString( this->p_input, "sout", ssout.str().c_str() );
