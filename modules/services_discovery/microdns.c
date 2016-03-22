@@ -64,12 +64,28 @@ vlc_module_begin()
     VLC_SD_PROBE_SUBMODULE
 vlc_module_end ()
 
+static const struct
+{
+    const char *psz_protocol;
+    const char *psz_service_name;
+    bool        b_renderer;
+    int         i_renderer_flags;
+} protocols[] = {
+    { "ftp", "_ftp._tcp.local", false, 0 },
+    { "smb", "_smb._tcp.local", false, 0 },
+    { "nfs", "_nfs._tcp.local", false, 0 },
+    { "sftp", "_sftp-ssh._tcp.local", false, 0 },
+    { "rtsp", "_rtsp._tcp.local", false, 0 },
+    { "chromecast", "_googlecast._tcp.local", true, VLC_RENDERER_CAN_AUDIO },
+};
+#define NB_PROTOCOLS (sizeof(protocols) / sizeof(*protocols))
+
 struct services_discovery_sys_t
 {
     vlc_thread_t        thread;
     atomic_bool         stop;
     struct mdns_ctx *   p_microdns;
-    const char **       ppsz_service_names;
+    const char *        ppsz_service_names[NB_PROTOCOLS];
     unsigned int        i_nb_service_names;
     vlc_array_t         items;
 };
@@ -90,22 +106,6 @@ struct srv
     bool        b_renderer;
     int         i_renderer_flags;
 };
-
-static const struct
-{
-    const char *psz_protocol;
-    const char *psz_service_name;
-    bool        b_renderer;
-    int         i_renderer_flags;
-} protocols[] = {
-    { "ftp", "_ftp._tcp.local", false, 0 },
-    { "smb", "_smb._tcp.local", false, 0 },
-    { "nfs", "_nfs._tcp.local", false, 0 },
-    { "sftp", "_sftp-ssh._tcp.local", false, 0 },
-    { "rtsp", "_rtsp._tcp.local", false, 0 },
-    { "chromecast", "_googlecast._tcp.local", true, VLC_RENDERER_CAN_AUDIO },
-};
-#define NB_PROTOCOLS (sizeof(protocols) / sizeof(*protocols))
 
 static int vlc_sd_probe_Open( vlc_object_t *p_obj )
 {
@@ -479,12 +479,7 @@ Open( vlc_object_t *p_obj )
     bool b_renderer = var_GetBool( p_sd, CFG_PREFIX "renderer" );
 
     /* Listen to protocols that are handled by VLC */
-    const unsigned i_count = NB_PROTOCOLS;
-    p_sys->ppsz_service_names = calloc( i_count, sizeof(char*) );
-    if( !p_sys->ppsz_service_names )
-        goto error;
-
-    for( unsigned int i = 0; i < i_count; ++i )
+    for( unsigned int i = 0; i < NB_PROTOCOLS; ++i )
     {
         if( protocols[i].b_renderer == b_renderer )
             p_sys->ppsz_service_names[p_sys->i_nb_service_names++] =
@@ -518,7 +513,6 @@ Open( vlc_object_t *p_obj )
 error:
     if( p_sys->p_microdns != NULL )
         mdns_destroy( p_sys->p_microdns );
-    free( p_sys->ppsz_service_names );
     free( p_sys );
     return i_ret;
 }
@@ -535,6 +529,5 @@ Close( vlc_object_t *p_this )
     items_clear( p_sd );
     mdns_destroy( p_sys->p_microdns );
 
-    free( p_sys->ppsz_service_names );
     free( p_sys );
 }
