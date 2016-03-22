@@ -65,7 +65,7 @@ static int Open(vlc_object_t *);
 static void Close(vlc_object_t *);
 
 static const char *const ppsz_sout_options[] = {
-    "http-port", "mux", "mime", NULL
+    "http-port", "mux", "mime", "video", NULL
 };
 
 /*****************************************************************************
@@ -106,6 +106,7 @@ vlc_module_end ()
 static sout_stream_id_sys_t *Add(sout_stream_t *p_stream, const es_format_t *p_fmt)
 {
     sout_stream_sys_t *p_sys = p_stream->p_sys;
+
     if (!p_sys->b_has_video)
     {
         if (p_fmt->i_cat != AUDIO_ES)
