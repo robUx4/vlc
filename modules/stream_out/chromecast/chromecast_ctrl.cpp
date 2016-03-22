@@ -203,7 +203,7 @@ vlc_renderer_sys::vlc_renderer_sys(vlc_renderer * const p_this)
  , i_requestId(0)
  , canDisplay( p_this->target.psz_path == NULL || strcasecmp("/audio", p_this->target.psz_path) )
 {
-    vlc_mutex_init(&lock);
+    vlc_mutex_init_recursive(&lock);
     vlc_cond_init(&loadCommandCond);
 }
 
