@@ -214,6 +214,7 @@ vlc_renderer_sys::vlc_renderer_sys(vlc_renderer * const p_this)
  , cmd_status(NO_CMD_PENDING)
  , i_receiver_requestId(0)
  , i_requestId(0)
+ , i_sout_id(0)
  , canDisplay( p_this->target.psz_path == NULL || strcasecmp("/audio", p_this->target.psz_path) )
 {
     vlc_mutex_init_recursive(&lock);
@@ -423,6 +424,7 @@ void vlc_renderer_sys::InputUpdated( input_thread_t *p_input )
             mime == "audio/x-matroska";
         ssout << "cc_sout{http-port=" << i_port << ",mux=" << muxer << ",mime=" << mime
               << ",video=" << (canDisplay ? '1' : '0')
+              << ",uid=" << i_sout_id++
               << "}";
 
         msg_Dbg( p_module, "force sout to %s", ssout.str().c_str());
