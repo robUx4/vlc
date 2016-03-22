@@ -167,6 +167,7 @@ private:
 
     unsigned i_receiver_requestId;
     unsigned i_requestId;
+    unsigned i_sout_id;
 
     bool       canRemux;
     bool       canDoDirect;
