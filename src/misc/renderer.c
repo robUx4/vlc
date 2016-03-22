@@ -162,7 +162,7 @@ vlc_renderer_new(vlc_object_t *p_obj, const char *psz_renderer)
     if (p_renderer->target.psz_protocol == NULL
      || p_renderer->target.psz_host == NULL)
     {
-        vlc_object_release(p_obj);
+        vlc_object_release(p_renderer);
         return NULL;
     }
     p_renderer->p_module = module_need(p_renderer, "renderer",
@@ -170,7 +170,7 @@ vlc_renderer_new(vlc_object_t *p_obj, const char *psz_renderer)
     if (p_renderer->p_module == NULL)
     {
         vlc_UrlClean(&p_renderer->target);
-        vlc_object_release(p_obj);
+        vlc_object_release(p_renderer);
         return NULL;
     }
     assert(p_renderer->pf_set_input);
