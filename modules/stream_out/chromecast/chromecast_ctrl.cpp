@@ -106,7 +106,7 @@ vlc_module_end ()
 int Open(vlc_object_t *p_module)
 {
     vlc_renderer *p_renderer = reinterpret_cast<vlc_renderer*>(p_module);
-    vlc_renderer_sys *p_sys = new(std::nothrow) vlc_renderer_sys(p_module);
+    vlc_renderer_sys *p_sys = new(std::nothrow) vlc_renderer_sys( p_renderer );
     if (unlikely(p_sys == NULL))
         return VLC_ENOMEM;
     p_renderer->p_sys = p_sys;
@@ -190,8 +190,8 @@ void vlc_renderer_sys::buildMessage(const std::string & namespace_,
 /*****************************************************************************
  * vlc_renderer_sys: class definition
  *****************************************************************************/
-vlc_renderer_sys::vlc_renderer_sys(vlc_object_t * const p_this)
- : p_module(p_this)
+vlc_renderer_sys::vlc_renderer_sys(vlc_renderer * const p_this)
+ : p_module( VLC_OBJECT(p_this) )
  , p_input(NULL)
  , receiverState(RECEIVER_IDLE)
  , i_sock_fd(-1)
@@ -260,7 +260,7 @@ void vlc_renderer_sys::InputUpdated( input_thread_t *p_input )
     if( this->p_input != NULL )
     {
         mutex_cleanup_push(&lock);
-        while (canDisplay == DISPLAY_UNKNOWN && conn_status != CHROMECAST_CONNECTION_DEAD)
+        while (conn_status == CHROMECAST_DISCONNECTED)
         {
             msg_Dbg( p_module, "InputUpdated waiting for Chromecast connection, current %d", conn_status);
             vlc_cond_wait(&loadCommandCond, &lock);

@@ -79,7 +79,7 @@ enum receiver_state {
  *****************************************************************************/
 struct vlc_renderer_sys
 {
-    vlc_renderer_sys(vlc_object_t * const p_this);
+    vlc_renderer_sys(vlc_renderer * const p_this);
     ~vlc_renderer_sys();
 
     vlc_object_t  * const p_module;
