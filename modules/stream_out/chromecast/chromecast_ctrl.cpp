@@ -310,7 +310,7 @@ int vlc_renderer_sys::connectChromecast()
     if (fd < 0)
         return -1;
 
-    p_creds = vlc_tls_ClientCreate( p_module );
+    p_creds = vlc_tls_ClientCreate( p_module->p_parent );
     if (p_creds == NULL)
     {
         net_Close(fd);
