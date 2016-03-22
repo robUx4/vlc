@@ -202,7 +202,7 @@ vlc_renderer_sys::vlc_renderer_sys(vlc_renderer * const p_this)
  , i_receiver_requestId(0)
  , i_requestId(0)
 {
-    vlc_mutex_init(&lock);
+    vlc_mutex_init_recursive(&lock);
     vlc_cond_init(&loadCommandCond);
 }
 
