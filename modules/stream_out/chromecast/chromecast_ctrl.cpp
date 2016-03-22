@@ -43,6 +43,9 @@
 
 #include "../../misc/webservices/json.h"
 
+static const vlc_fourcc_t DEFAULT_TRANSCODE_AUDIO = VLC_CODEC_MP3;
+static const vlc_fourcc_t DEFAULT_TRANSCODE_VIDEO = VLC_CODEC_H264;
+
 #define PACKET_MAX_LEN 10 * 1024
 
 // Media player Chromecast app id
@@ -280,6 +283,28 @@ static int SetInput(vlc_renderer *p_renderer, input_thread_t *p_input)
     return VLC_SUCCESS;
 }
 
+bool vlc_renderer_sys::canDecodeVideo( const es_format_t *p_es ) const
+{
+    if (p_es->i_codec == VLC_CODEC_H264 || p_es->i_codec == VLC_CODEC_VP8)
+        return true;
+    return false;
+}
+
+bool vlc_renderer_sys::canDecodeAudio( const es_format_t *p_es ) const
+{
+    if (p_es->i_codec == VLC_CODEC_VORBIS ||
+        p_es->i_codec == VLC_CODEC_MP4A ||
+        p_es->i_codec == VLC_FOURCC('h', 'a', 'a', 'c') ||
+        p_es->i_codec == VLC_FOURCC('l', 'a', 'a', 'c') ||
+        p_es->i_codec == VLC_FOURCC('s', 'a', 'a', 'c') ||
+        p_es->i_codec == VLC_CODEC_MPGA ||
+        p_es->i_codec == VLC_CODEC_MP3 ||
+        p_es->i_codec == VLC_CODEC_A52 ||
+        p_es->i_codec == VLC_CODEC_EAC3)
+        return true;
+    return false;
+}
+
 void vlc_renderer_sys::InputUpdated( input_thread_t *p_input )
 {
     vlc_renderer *p_renderer = reinterpret_cast<vlc_renderer*>( p_module );
@@ -319,10 +344,83 @@ void vlc_renderer_sys::InputUpdated( input_thread_t *p_input )
 
         assert(!p_input->b_preparsing);
 
+        canRemux = false;
+        canDoDirect = false;
+        vlc_fourcc_t i_codec_video = 0, i_codec_audio = 0;
+
+        input_item_t * p_item = input_GetItem(p_input);
+        if ( p_item )
+        {
+            canRemux = true;
+            for (int i=0; i<p_item->i_es; ++i)
+            {
+                es_format_t *p_es = p_item->es[i];
+                if (p_es->i_cat == AUDIO_ES)
+                {
+                    if (!canDecodeAudio( p_es ))
+                    {
+                        msg_Dbg( p_module, "can't remux audio track %d codec %4.4s", p_es->i_id, (const char*)&p_es->i_codec );
+                        canRemux = false;
+                    }
+                    else if (i_codec_audio == 0)
+                        i_codec_audio = p_es->i_codec;
+                }
+                else if (canDisplay && p_es->i_cat == VIDEO_ES)
+                {
+                    if (!canDecodeVideo( p_es ))
+                    {
+                        msg_Dbg( p_module, "can't remux video track %d codec %4.4s", p_es->i_id, (const char*)&p_es->i_codec );
+                        canRemux = false;
+                    }
+                    else if (i_codec_video == 0)
+                        i_codec_video = p_es->i_codec;
+                }
+                else
+                {
+                    p_es->i_priority = ES_PRIORITY_NOT_SELECTABLE;
+                    msg_Dbg( p_module, "disable non audio/video track %d i_cat:%d codec %4.4s canDisplay:%d", p_es->i_id, p_es->i_cat, (const char*)&p_es->i_codec, canDisplay );
+                }
+            }
+        }
+
         int i_port = var_InheritInteger( p_module, CONTROL_CFG_PREFIX "http-port");
 
         std::stringstream ssout;
         ssout << '#';
+        if ( !canRemux )
+        {
+            if ( i_codec_audio == 0 )
+                i_codec_audio = DEFAULT_TRANSCODE_AUDIO;
+            /* avcodec AAC encoder is experimental */
+            if ( i_codec_audio == VLC_CODEC_MP4A ||
+                 i_codec_audio == VLC_FOURCC('h', 'a', 'a', 'c') ||
+                 i_codec_audio == VLC_FOURCC('l', 'a', 'a', 'c') ||
+                 i_codec_audio == VLC_FOURCC('s', 'a', 'a', 'c'))
+                i_codec_audio = DEFAULT_TRANSCODE_AUDIO;
+
+            if ( i_codec_video == 0 )
+                i_codec_video = DEFAULT_TRANSCODE_VIDEO;
+
+            /* TODO: provide audio samplerate and channels */
+            ssout << "transcode{acodec=";
+            char s_fourcc[5];
+            vlc_fourcc_to_char( i_codec_audio, s_fourcc );
+            s_fourcc[4] = '\0';
+            ssout << s_fourcc;
+            if ( canDisplay )
+            {
+                /* TODO: provide maxwidth,maxheight */
+                ssout << ",vcodec=";
+                vlc_fourcc_to_char( i_codec_video, s_fourcc );
+                s_fourcc[4] = '\0';
+                ssout << s_fourcc;
+            }
+            ssout << "}:";
+        }
+        if (mime == "video/x-matroska" && canDisplay && i_codec_audio == VLC_CODEC_VORBIS && i_codec_video == VLC_CODEC_VP8 )
+            mime == "video/webm";
+        if (mime == "video/x-matroska" && !canDisplay )
+            mime == "audio/x-matroska";
         ssout << "cc_sout{http-port=" << i_port << ",mux=" << muxer << ",mime=" << mime
               << ",video=" << (canDisplay ? '1' : '0')
               << "}";
@@ -844,22 +942,60 @@ void vlc_renderer_sys::msgPlayerGetStatus()
     pushMediaPlayerMessage( ss );
 }
 
+std::string vlc_renderer_sys::GetMedia()
+{
+    std::stringstream ss;
+    std::string       s_chromecast_url;
+
+    input_item_t * p_item = input_GetItem(p_input);
+    if ( p_item )
+    {
+        char *psz_name = input_item_GetTitleFbName( p_item );
+        ss << "\"metadata\":{"
+           << " \"metadataType\":0"
+           << ",\"title\":\"" << psz_name << "\"";
+
+        char *psz_arturl = input_item_GetArtworkURL( p_item );
+        if ( psz_arturl && !strncmp(psz_arturl, "http", 4))
+            ss << ",\"images\":[\"" << psz_arturl << "\"]";
+        free( psz_arturl );
+
+        ss << "},";
+        free( psz_name );
+
+        std::stringstream chromecast_url;
+        if ( canDoDirect && canRemux )
+        {
+            char *psz_uri = input_item_GetURI(p_item);
+            chromecast_url << psz_uri;
+            msg_Dbg( p_module, "using direct URL: %s", psz_uri );
+            free( psz_uri );
+        }
+        else
+        {
+            int i_port = var_InheritInteger( p_module, CONTROL_CFG_PREFIX "http-port");
+            chromecast_url << "http://" << serverIP << ":" << i_port << "/stream";
+        }
+        s_chromecast_url = chromecast_url.str();
+
+        msg_Dbg( p_module, "s_chromecast_url: %s", s_chromecast_url.c_str());
+    }
+
+    ss << "\"contentId\":\"" << s_chromecast_url << "\""
+       << ",\"streamType\":\"LIVE\""
+       << ",\"contentType\":\"" << mime << "\"";
+
+    return ss.str();
+}
+
 void vlc_renderer_sys::msgPlayerLoad()
 {
-    char *psz_mime = var_InheritString(p_module, CONTROL_CFG_PREFIX "mime");
-    if (psz_mime == NULL)
-        return;
-
     std::stringstream ss;
     ss << "{\"type\":\"LOAD\","
-       <<  "\"media\":{\"contentId\":\"http://" << serverIP << ":"
-           << var_InheritInteger(p_module, CONTROL_CFG_PREFIX"http-port")
-           << "/stream\","
-       <<             "\"streamType\":\"LIVE\","
-       <<             "\"contentType\":\"" << std::string(psz_mime) << "\"},"
-       <<  "\"requestId\":" << i_requestId++ << "}";
-
-    free(psz_mime);
+       <<  "\"media\":{" << GetMedia() << "},"
+       <<  "\"autoplay\":\"false\","
+       <<  "\"requestId\":" << i_requestId++
+       << "}";
 
     pushMediaPlayerMessage( ss );
 }

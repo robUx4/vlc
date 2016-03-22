@@ -168,7 +168,14 @@ private:
     unsigned i_receiver_requestId;
     unsigned i_requestId;
 
+    bool       canRemux;
+    bool       canDoDirect;
     const bool canDisplay;
+
+    std::string GetMedia();
+
+    bool canDecodeVideo( const es_format_t * ) const;
+    bool canDecodeAudio( const es_format_t * ) const;
 };
 
 #endif /* VLC_CHROMECAST_H */
