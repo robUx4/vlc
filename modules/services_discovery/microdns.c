@@ -403,8 +403,16 @@ new_entries_cb( void *p_this, int i_status,
         else
         {
             char *psz_uri;
-            if( asprintf( &psz_uri, "%s://%s:%u", p_srv->psz_protocol, psz_ip,
-                          p_srv->i_port ) == -1 )
+            const char *pst_path = "";
+            if( strcmp( p_srv->psz_protocol, "chromecast" ) == 0
+             && ( psz_model == NULL
+               || strcasecmp( psz_model, "Chromecast Audio" ) != 0 ) )
+                p_srv->i_renderer_flags |= VLC_RENDERER_CAN_VIDEO;
+            else
+                pst_path = "/audio";
+
+            if( asprintf( &psz_uri, "%s://%s:%u%s", p_srv->psz_protocol, psz_ip,
+                          p_srv->i_port, pst_path ) == -1 )
                 break;
 
             if( items_renderer_exists( p_sd, psz_uri ) )
@@ -412,11 +420,6 @@ new_entries_cb( void *p_this, int i_status,
                 free( psz_uri );
                 continue;
             }
-
-            if( strcmp( p_srv->psz_protocol, "chromecast" ) == 0
-             && ( psz_model == NULL
-               || strcasecmp( psz_model, "Chromecast Audio" ) != 0 ) )
-                p_srv->i_renderer_flags |= VLC_RENDERER_CAN_VIDEO;
 
             items_add_renderer( p_sd, p_srv->psz_device_name, psz_uri,
                                 p_srv->i_renderer_flags );
