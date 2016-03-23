@@ -252,6 +252,8 @@ void vlc_renderer_sys::InputUpdated( input_thread_t *p_input )
     if( this->p_input != NULL )
     {
         var_SetString( this->p_input, "sout", NULL );
+        if ( receiverState != RECEIVER_IDLE )
+            msgPlayerStop();
     }
 
     this->p_input = p_input;
@@ -259,7 +261,7 @@ void vlc_renderer_sys::InputUpdated( input_thread_t *p_input )
     if( this->p_input != NULL )
     {
         mutex_cleanup_push(&lock);
-        while (conn_status == CHROMECAST_DISCONNECTED)
+        while (conn_status != CHROMECAST_APP_STARTED && conn_status != CHROMECAST_CONNECTION_DEAD)
         {
             msg_Dbg( p_module, "InputUpdated waiting for Chromecast connection, current %d", conn_status);
             vlc_cond_wait(&loadCommandCond, &lock);
@@ -282,6 +284,13 @@ void vlc_renderer_sys::InputUpdated( input_thread_t *p_input )
 
         msg_Dbg( p_module, "force sout to %s", ssout.str().c_str());
         var_SetString( this->p_input, "sout", ssout.str().c_str() );
+
+        if ( receiverState == RECEIVER_IDLE )
+        {
+            // we cannot start a new load when the last one is still processing
+            msgPlayerLoad();
+            setPlayerStatus(CMD_LOAD_SENT);
+        }
     }
 }
 
@@ -534,9 +543,6 @@ void vlc_renderer_sys::processMessage(const castchannel::CastMessage &msg)
                 {
                     msgConnect(appTransportId);
                     setConnectionStatus(CHROMECAST_APP_STARTED);
-                    msgPlayerLoad();
-                    setPlayerStatus(CMD_LOAD_SENT);
-                    vlc_cond_signal(&loadCommandCond);
                 }
             }
             else
@@ -649,6 +655,12 @@ void vlc_renderer_sys::processMessage(const castchannel::CastMessage &msg)
                     break;
 
                 case RECEIVER_IDLE:
+                    if ( p_input != NULL )
+                    {
+                        msgPlayerLoad();
+                        setPlayerStatus(CMD_LOAD_SENT);
+                        break;
+                    }
                     /* fall through */
                 default:
                     setPlayerStatus(NO_CMD_PENDING);
