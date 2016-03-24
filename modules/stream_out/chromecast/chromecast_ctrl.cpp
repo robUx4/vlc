@@ -210,6 +210,8 @@ vlc_renderer_sys::vlc_renderer_sys(vlc_renderer * const p_this)
  , i_sock_fd(-1)
  , p_creds(NULL)
  , p_tls(NULL)
+ , date_play_start(-1)
+ , playback_start_local(0)
  , conn_status(CHROMECAST_DISCONNECTED)
  , cmd_status(NO_CMD_PENDING)
  , i_receiver_requestId(0)
@@ -319,6 +321,8 @@ void vlc_renderer_sys::InputUpdated( input_thread_t *p_input )
     if( this->p_input != NULL )
     {
         var_SetString( this->p_input, "sout", NULL );
+        var_SetString( this->p_input, "demux-filter", NULL );
+
 #if 0 /* the Chromecast doesn't work well with consecutives calls if stopped between them */
         if ( receiverState != RECEIVER_IDLE )
             msgPlayerStop();
@@ -429,10 +433,12 @@ void vlc_renderer_sys::InputUpdated( input_thread_t *p_input )
 
         msg_Dbg( p_module, "force sout to %s", ssout.str().c_str());
         var_SetString( this->p_input, "sout", ssout.str().c_str() );
+        var_SetString( this->p_input, "demux-filter", "cc_demux" );
 
         if ( receiverState == RECEIVER_IDLE )
         {
             // we cannot start a new load when the last one is still processing
+            playback_start_local = 0;
             msgPlayerLoad();
             setPlayerStatus(CMD_LOAD_SENT);
         }
@@ -785,6 +791,7 @@ void vlc_renderer_sys::processMessage(const castchannel::CastMessage &msg)
                 switch( receiverState )
                 {
                 case RECEIVER_BUFFERING:
+                    date_play_start = -1;
                     if (!mediaSessionId.empty())
                     {
                         msgPlayerSetMute( var_InheritBool( p_module, "mute" ) );
@@ -795,6 +802,10 @@ void vlc_renderer_sys::processMessage(const castchannel::CastMessage &msg)
                 case RECEIVER_PLAYING:
                     /* TODO reset demux PCR ? */
                     setPlayerStatus(CMD_PLAYBACK_SENT);
+                    date_play_start = mdate();
+#ifndef NDEBUG
+                    msg_Dbg( p_module, "Playback started with now:%" PRId64 " playback_start_local:%" PRId64, date_play_start, playback_start_local);
+#endif
                     break;
 
                 case RECEIVER_PAUSED:
@@ -804,13 +815,24 @@ void vlc_renderer_sys::processMessage(const castchannel::CastMessage &msg)
                         msgPlayerSetVolume( var_InheritFloat( p_module, "volume" ) );
                     }
 #ifndef NDEBUG
-                    msg_Dbg( p_module, "Playback paused");
+                    msg_Dbg( p_module, "Playback paused date_play_start:%" PRId64, date_play_start);
 #endif
+
+                    if (date_play_start != -1 && oldPlayerState == RECEIVER_PLAYING)
+                    {
+                        /* this is a pause generated remotely */
+                        playback_start_local += mdate() - date_play_start;
+#ifndef NDEBUG
+                        msg_Dbg( p_module, "updated playback_start_local:%" PRId64, playback_start_local);
+#endif
+                    }
+                    date_play_start = -1;
                     break;
 
                 case RECEIVER_IDLE:
                     if ( p_input != NULL )
                         setPlayerStatus(NO_CMD_PENDING);
+                    date_play_start = -1;
                     break;
                 }
             }
@@ -818,6 +840,7 @@ void vlc_renderer_sys::processMessage(const castchannel::CastMessage &msg)
             if ( cmd_status != CMD_LOAD_SENT && receiverState == RECEIVER_IDLE && p_input != NULL )
             {
                 msg_Dbg( p_module, "the device missed the LOAD command");
+                playback_start_local = 0;
                 msgPlayerLoad();
                 setPlayerStatus(CMD_LOAD_SENT);
             }

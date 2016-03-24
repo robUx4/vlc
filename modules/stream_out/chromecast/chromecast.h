@@ -81,6 +81,31 @@ struct vlc_renderer_sys
     vlc_renderer_sys(vlc_renderer * const p_this);
     ~vlc_renderer_sys();
 
+    mtime_t getPlaybackTime() const {
+        switch( receiverState )
+        {
+        case RECEIVER_PLAYING:
+            return ( mdate() - date_play_start ) + playback_start_local;
+
+        case RECEIVER_IDLE:
+            msg_Dbg(p_module, "receiver idle using buffering time %" PRId64, playback_start_local);
+            break;
+        case RECEIVER_BUFFERING:
+            msg_Dbg(p_module, "receiver buffering using buffering time %" PRId64, playback_start_local);
+            break;
+        case RECEIVER_PAUSED:
+            msg_Dbg(p_module, "receiver paused using buffering time %" PRId64, playback_start_local);
+            break;
+        }
+        return playback_start_local;
+    }
+
+    double getPlaybackPosition(mtime_t i_length) const {
+        if( i_length > 0 && date_play_start != -1)
+            return (double) getPlaybackTime() / (double)( i_length );
+        return 0.0;
+    }
+
     vlc_object_t  * const p_module;
     input_thread_t *p_input;
     std::string    serverIP;
@@ -94,6 +119,11 @@ struct vlc_renderer_sys
     int i_sock_fd;
     vlc_tls_creds_t *p_creds;
     vlc_tls_t *p_tls;
+
+    /* local date when playback started/resumed */
+    mtime_t           date_play_start;
+    /* local playback time of the input when playback started/resumed */
+    mtime_t           playback_start_local;
 
     vlc_mutex_t  lock;
     vlc_cond_t   loadCommandCond;
