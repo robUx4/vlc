@@ -81,6 +81,33 @@ struct vlc_renderer_sys
     vlc_renderer_sys(vlc_renderer * const p_this);
     ~vlc_renderer_sys();
 
+    mtime_t getPlaybackTimestamp() const
+    {
+        switch( receiverState )
+        {
+        case RECEIVER_PLAYING:
+            return ( mdate() - m_time_playback_started ) + i_ts_local_start;
+
+        case RECEIVER_IDLE:
+            msg_Dbg(p_module, "receiver idle using buffering time %" PRId64, i_ts_local_start);
+            break;
+        case RECEIVER_BUFFERING:
+            msg_Dbg(p_module, "receiver buffering using buffering time %" PRId64, i_ts_local_start);
+            break;
+        case RECEIVER_PAUSED:
+            msg_Dbg(p_module, "receiver paused using buffering time %" PRId64, i_ts_local_start);
+            break;
+        }
+        return i_ts_local_start;
+    }
+
+    double getPlaybackPosition( mtime_t i_length ) const
+    {
+        if( i_length > 0 && m_time_playback_started != -1)
+            return (double) getPlaybackTimestamp() / (double)( i_length );
+        return 0.0;
+    }
+
     vlc_object_t  * const p_module;
     input_thread_t *p_input;
     std::string    serverIP;
@@ -95,8 +122,8 @@ struct vlc_renderer_sys
     vlc_tls_creds_t *p_creds;
     vlc_tls_t *p_tls;
 
+
     vlc_mutex_t  lock;
-    vlc_cond_t   loadCommandCond;
     vlc_thread_t chromecastThread;
 
     void handleMessages();
@@ -119,6 +146,7 @@ struct vlc_renderer_sys
             vlc_cond_broadcast(&loadCommandCond);
         }
     }
+
 
     int connectChromecast();
     void disconnectChromecast();
@@ -182,6 +210,13 @@ private:
 
     bool canDecodeVideo( const es_format_t * ) const;
     bool canDecodeAudio( const es_format_t * ) const;
+
+    vlc_cond_t   loadCommandCond;
+
+    /* local date when playback started/resumed */
+    mtime_t           m_time_playback_started;
+    /* local playback time of the input when playback started/resumed */
+    mtime_t           i_ts_local_start;
 };
 
 #endif /* VLC_CHROMECAST_H */
