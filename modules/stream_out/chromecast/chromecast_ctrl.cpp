@@ -433,6 +433,7 @@ void vlc_renderer_sys::InputUpdated( input_thread_t *p_input )
         ssout << "cc_sout{http-port=" << i_port << ",mux=" << muxer << ",mime=" << mime
               << ",video=" << (canDisplay ? '1' : '0')
               << ",uid=" << i_sout_id++
+              << ",control=" << p_module
               << "}";
 
         msg_Dbg( p_module, "force sout to %s", ssout.str().c_str());
