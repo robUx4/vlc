@@ -40,6 +40,7 @@
 #include "cast_channel.pb.h"
 
 #define PACKET_HEADER_LEN 4
+#define SOUT_INTF_ADDRESS  "sout-chromecast-intf"
 
 // Media player Chromecast app id
 static const std::string DEFAULT_CHOMECAST_RECEIVER = "receiver-0";
@@ -72,6 +73,11 @@ enum receiver_state {
     RECEIVER_PAUSED,
 };
 
+enum restart_state {
+    RESTART_NONE,
+    RESTART_STOPPING,
+    RESTART_STARTING,
+};
 
 /*****************************************************************************
  * vlc_renderer_sys: description and status of interface
@@ -80,6 +86,50 @@ struct vlc_renderer_sys
 {
     vlc_renderer_sys(vlc_renderer * const p_this);
     ~vlc_renderer_sys();
+
+    bool isFinishedPlaying() {
+        vlc_mutex_locker locker(&lock);
+        return conn_status == CHROMECAST_CONNECTION_DEAD || (receiverState == RECEIVER_BUFFERING && cmd_status != CMD_SEEK_SENT);
+    }
+
+    mtime_t getPlaybackTime() const {
+        switch( receiverState )
+        {
+        case RECEIVER_PLAYING:
+            return ( mdate() - date_play_start ) + playback_start_local;
+
+        case RECEIVER_IDLE:
+            msg_Dbg(p_module, "receiver idle using buffering time %" PRId64, playback_start_local);
+            break;
+        case RECEIVER_BUFFERING:
+            msg_Dbg(p_module, "receiver buffering using buffering time %" PRId64, playback_start_local);
+            break;
+        case RECEIVER_PAUSED:
+            msg_Dbg(p_module, "receiver paused using buffering time %" PRId64, playback_start_local);
+            break;
+        }
+        return playback_start_local;
+    }
+
+    double getPlaybackPosition(mtime_t i_length) const {
+        if( i_length > 0 && date_play_start != -1)
+            return (double) getPlaybackTime() / (double)( i_length );
+        return 0.0;
+    }
+
+    bool seekTo(mtime_t pos);
+
+    bool forceSeekPosition() const {
+        return b_forcing_position;
+    }
+
+    void resetForcedSeek(mtime_t i_length) {
+        b_forcing_position = false;
+        playback_start_local = i_length * f_restart_position;
+#ifndef NDEBUG
+        msg_Dbg(p_module, "resetForcedSeek playback_start_local:%" PRId64, playback_start_local);
+#endif
+    }
 
     vlc_object_t  * const p_module;
     input_thread_t *p_input;
@@ -91,18 +141,35 @@ struct vlc_renderer_sys
     std::string mediaSessionId;
     receiver_state receiverState;
 
+    bool              currentStopped;
+
     int i_sock_fd;
     vlc_tls_creds_t *p_creds;
     vlc_tls_t *p_tls;
 
+    /* local date when playback started/resumed */
+    mtime_t           date_play_start;
+    /* playback time reported by the receiver, used to wait for seeking point */
+    mtime_t           playback_start_chromecast;
+    /* local playback time of the input when playback started/resumed */
+    mtime_t           playback_start_local;
+    /* internal seek time */
+    mtime_t           m_seektime;
+    /* seek time with Chromecast relative timestamp */
+    mtime_t           i_seektime;
+    restart_state     restartState;
+
+
     vlc_mutex_t  lock;
     vlc_cond_t   loadCommandCond;
+    vlc_cond_t   seekCommandCond;
     vlc_thread_t chromecastThread;
 
     void msgAuth();
     void msgReceiverClose(std::string destinationId);
 
     void handleMessages();
+    void sendPlayerCmd();
 
     void InputUpdated( input_thread_t * );
 
@@ -125,6 +192,7 @@ struct vlc_renderer_sys
 
     int connectChromecast();
     void disconnectChromecast();
+    void stateChangedForRestart( input_thread_t * );
 
     void msgPing();
     void msgPong();
@@ -172,11 +240,20 @@ private:
     bool       canRemux;
     bool       canDoDirect;
     const bool canDisplay;
+    bool              b_restart_playback;
+    //bool              b_has_restart_callback;
+    bool              b_forcing_position;
+    double            f_restart_position;
 
     std::string GetMedia();
 
     bool canDecodeVideo( const es_format_t * ) const;
     bool canDecodeAudio( const es_format_t * ) const;
+
+    void setCurrentStopped(bool);
+
+    void restartDoStop();
+    bool restartDoPlay();
 };
 
 #endif /* VLC_CHROMECAST_H */

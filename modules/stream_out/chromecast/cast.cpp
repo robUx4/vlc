@@ -43,13 +43,20 @@ struct sout_stream_sys_t
         , p_renderer(renderer)
         , b_has_video(has_video)
     {
+        assert(p_renderer != NULL);
+        vlc_object_hold(p_renderer);
     }
     
     ~sout_stream_sys_t()
     {
         sout_StreamChainDelete(p_out, p_out);
+        vlc_object_release(p_renderer);
     }
 
+    bool isFinishedPlaying() const {
+        /* check if the Chromecast to be done playing */
+        return p_renderer->p_sys->isFinishedPlaying();
+    }
 
     sout_stream_t * const p_out;
     vlc_renderer * const p_renderer;
@@ -82,6 +89,8 @@ static const char *const ppsz_sout_options[] = {
 #define MIME_TEXT N_("MIME content type")
 #define MIME_LONGTEXT N_("This sets the media MIME content type sent to the Chromecast.")
 
+/* sout wrapper that can tell when the Chromecast is finished playing
+ * rather than when data are finished sending */
 vlc_module_begin ()
 
     set_shortname( "cc_sout" )
@@ -143,6 +152,13 @@ static int Control(sout_stream_t *p_stream, int i_query, va_list args)
 {
     sout_stream_sys_t *p_sys = p_stream->p_sys;
 
+    if (i_query == SOUT_STREAM_EMPTY)
+    {
+        bool *b = va_arg( args, bool * );
+        *b = p_sys->isFinishedPlaying();
+        return VLC_SUCCESS;
+    }
+
     if ( !p_sys->p_out->pf_control )
         return VLC_EGENERIC;
 
@@ -162,6 +178,12 @@ static int Open(vlc_object_t *p_this)
     sout_stream_t *p_sout = NULL;
     bool b_has_video = true;
     std::stringstream ss;
+
+    p_renderer = static_cast<vlc_renderer*>(var_InheritAddress(p_stream, SOUT_INTF_ADDRESS));
+    if (p_renderer == NULL) {
+        msg_Err(p_stream, "Missing the control interface to work");
+        goto error;
+    }
 
     config_ChainParse(p_stream, SOUT_CFG_PREFIX, ppsz_sout_options, p_stream->p_cfg);
 

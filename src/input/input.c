@@ -1313,6 +1313,15 @@ error:
     return VLC_EGENERIC;
 }
 
+bool input_HasESOut( input_thread_t * p_input )
+{
+    bool result;
+    vlc_mutex_lock( &p_input->p->lock_control );
+    result = p_input->p->p_es_out != NULL;
+    vlc_mutex_unlock( &p_input->p->lock_control );
+    return result;
+}
+
 /*****************************************************************************
  * End: end the input thread
  *****************************************************************************/
@@ -2219,6 +2228,18 @@ static input_source_t *InputSourceNew( input_thread_t *p_input,
                                       " Check the log for details."), psz_mrl );
         vlc_object_release( in );
         return NULL;
+    }
+
+    /* add the chain of demux filters */
+    char *psz_var_demux_filters = var_InheritString(p_input, "demux-filter");
+    if (psz_var_demux_filters != NULL)
+    {
+        demux_t *p_filtered_demux = demux_FilterChainNew(in->p_demux, psz_var_demux_filters);
+        if (p_filtered_demux == NULL)
+            msg_Dbg(p_input, "Failed to create demux filter %s", psz_var_demux_filters);
+        else
+            in->p_demux = p_filtered_demux,
+        free(psz_var_demux_filters);
     }
 
     /* Get infos from (access_)demux */
