@@ -81,6 +81,11 @@ struct vlc_renderer_sys
     vlc_renderer_sys(vlc_renderer * const p_this);
     ~vlc_renderer_sys();
 
+    bool isFinishedPlaying() {
+        vlc_mutex_locker locker(&lock);
+        return conn_status == CHROMECAST_CONNECTION_DEAD || (receiverState == RECEIVER_BUFFERING && cmd_status != CMD_SEEK_SENT);
+    }
+
     mtime_t getPlaybackTime() const {
         switch( receiverState )
         {

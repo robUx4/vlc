@@ -32,13 +32,15 @@
 
 #include "chromecast.h"
 
+#include <vlc_input.h>
+#include <vlc_playlist.h>
 #include <vlc_sout.h>
 
 #include <cassert>
 
 struct sout_stream_sys_t
 {
-    sout_stream_sys_t(vlc_renderer *renderer, sout_stream_t *sout, bool has_video)
+    sout_stream_sys_t(vlc_renderer * const renderer, sout_stream_t * const sout, bool has_video)
         : p_out(sout)
         , p_renderer(renderer)
         , b_has_video(has_video)
@@ -48,8 +50,13 @@ struct sout_stream_sys_t
     ~sout_stream_sys_t()
     {
         sout_StreamChainDelete(p_out, p_out);
+        vlc_object_release( p_renderer );
     }
 
+    bool isFinishedPlaying() const {
+        /* check if the Chromecast to be done playing */
+        return p_renderer == NULL || p_renderer->p_sys->isFinishedPlaying();
+    }
 
     sout_stream_t * const p_out;
     vlc_renderer * const p_renderer;
@@ -143,6 +150,13 @@ static int Control(sout_stream_t *p_stream, int i_query, va_list args)
 {
     sout_stream_sys_t *p_sys = p_stream->p_sys;
 
+    if (i_query == SOUT_STREAM_EMPTY)
+    {
+        bool *b = va_arg( args, bool * );
+        *b = p_sys->isFinishedPlaying();
+        return VLC_SUCCESS;
+    }
+
     if ( !p_sys->p_out->pf_control )
         return VLC_EGENERIC;
 
@@ -156,7 +170,7 @@ static int Open(vlc_object_t *p_this)
 {
     sout_stream_t *p_stream = reinterpret_cast<sout_stream_t*>(p_this);
     sout_stream_sys_t *p_sys = NULL;
-    vlc_renderer *p_renderer = NULL;
+    vlc_renderer *p_renderer;
     char *psz_mux = NULL;
     char *psz_var_mime = NULL;
     sout_stream_t *p_sout = NULL;
@@ -186,9 +200,30 @@ static int Open(vlc_object_t *p_this)
 
     b_has_video = var_GetBool(p_stream, SOUT_CFG_PREFIX "video");
 
+    if ( !strcmp("input", p_stream->p_sout->p_parent->psz_object_type ) )
+    {
+        p_renderer = input_HoldRenderer( reinterpret_cast<input_thread_t *>( p_stream->p_sout->p_parent ) );
+    }
+    else if ( !strcmp("playlist", p_stream->p_sout->p_parent->psz_object_type ) )
+    {
+        playlist_t *p_playlist = reinterpret_cast<playlist_t *>( p_stream->p_sout->p_parent );
+        input_thread_t *p_input = playlist_CurrentInput( p_playlist );
+        p_renderer = input_HoldRenderer( p_input );
+        vlc_object_release( p_input );
+    }
+
+    if ( p_renderer == NULL )
+    {
+        msg_Err(p_stream, "cannot find our renderer");
+        goto error;
+    }
+
     p_sys = new(std::nothrow) sout_stream_sys_t(p_renderer, p_sout, b_has_video);
     if (unlikely(p_sys == NULL))
+    {
+        vlc_object_release( p_renderer );
         goto error;
+    }
 
     // Set the sout callbacks.
     p_stream->pf_add     = Add;
