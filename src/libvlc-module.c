@@ -992,6 +992,10 @@ static const char *const ppsz_prefres[] = {
 #define STREAM_FILTER_LONGTEXT N_( \
     "Stream filters are used to modify the stream that is being read. " )
 
+#define DEMUX_FILTER_TEXT N_("Demux filter module")
+#define DEMUX_FILTER_LONGTEXT N_( \
+    "Demux filters are used to modify/control the stream that is being read. " )
+
 #define DEMUX_TEXT N_("Demux module")
 #define DEMUX_LONGTEXT N_( \
     "Demultiplexers are used to separate the \"elementary\" streams " \
@@ -1882,6 +1886,10 @@ vlc_module_begin ()
     set_subcategory( SUBCAT_INPUT_STREAM_FILTER )
     add_module_list( "stream-filter", "stream_filter", NULL,
                      STREAM_FILTER_TEXT, STREAM_FILTER_LONGTEXT, false )
+
+    set_subcategory( SUBCAT_INPUT_DEMUX_FILTER )
+    add_module_list( "demux-filter", "demux_filter", NULL,
+                     DEMUX_FILTER_TEXT, DEMUX_FILTER_LONGTEXT, false )
 
 
 /* Stream output options */
