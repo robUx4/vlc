@@ -72,6 +72,10 @@ static void Close(vlc_object_t *);
 
 static int SetInput(vlc_renderer *p_renderer, input_thread_t *p_input);
 
+static int MuteChanged( vlc_object_t *, char const *,
+                          vlc_value_t, vlc_value_t, void * );
+static int VolumeChanged( vlc_object_t *, char const *,
+                          vlc_value_t, vlc_value_t, void * );
 static void *ChromecastThread(void *data);
 
 /*****************************************************************************
@@ -139,6 +143,9 @@ int Open(vlc_object_t *p_module)
         goto error;
     }
 
+    var_AddCallback( p_module->p_parent, "mute",   MuteChanged,   p_renderer );
+    var_AddCallback( p_module->p_parent, "volume", VolumeChanged, p_renderer );
+
     return VLC_SUCCESS;
 
 error:
@@ -154,6 +161,9 @@ void Close(vlc_object_t *p_module)
 {
     vlc_renderer *p_renderer = reinterpret_cast<vlc_renderer*>(p_module);
     vlc_renderer_sys *p_sys = p_renderer->p_sys;
+
+    var_DelCallback( p_module->p_parent, "mute",   MuteChanged,   p_renderer );
+    var_DelCallback( p_module->p_parent, "volume", VolumeChanged, p_renderer );
 
     delete p_sys;
 }
@@ -230,6 +240,36 @@ vlc_renderer_sys::~vlc_renderer_sys()
 
     vlc_cond_destroy(&loadCommandCond);
     vlc_mutex_destroy(&lock);
+}
+
+static int MuteChanged( vlc_object_t *p_this, char const *psz_var,
+                          vlc_value_t oldval, vlc_value_t val, void *p_data )
+{
+    VLC_UNUSED( p_this );
+    VLC_UNUSED( psz_var );
+    VLC_UNUSED( oldval );
+    vlc_renderer *p_renderer = reinterpret_cast<vlc_renderer*>(p_data);
+    vlc_renderer_sys *p_sys = p_renderer->p_sys;
+
+    if (!p_sys->mediaSessionId.empty())
+        p_sys->msgPlayerSetMute( val.b_bool );
+
+    return VLC_SUCCESS;
+}
+
+static int VolumeChanged( vlc_object_t *p_this, char const *psz_var,
+                          vlc_value_t oldval, vlc_value_t val, void *p_data )
+{
+    VLC_UNUSED( p_this );
+    VLC_UNUSED( psz_var );
+    VLC_UNUSED( oldval );
+    vlc_renderer *p_renderer = reinterpret_cast<vlc_renderer*>(p_data);
+    vlc_renderer_sys *p_sys = p_renderer->p_sys;
+
+    if ( !p_sys->mediaSessionId.empty() )
+        p_sys->msgPlayerSetVolume( val.f_float );
+
+    return VLC_SUCCESS;
 }
 
 static int SetInput(vlc_renderer *p_renderer, input_thread_t *p_input)
@@ -641,12 +681,25 @@ void vlc_renderer_sys::processMessage(const castchannel::CastMessage &msg)
 #endif
                 switch( receiverState )
                 {
+                case RECEIVER_BUFFERING:
+                    if (!mediaSessionId.empty())
+                    {
+                        msgPlayerSetMute( var_InheritBool( p_module, "mute" ) );
+                        msgPlayerSetVolume( var_InheritFloat( p_module, "volume" ) );
+                    }
+                    break;
+
                 case RECEIVER_PLAYING:
                     /* TODO reset demux PCR ? */
                     setPlayerStatus(CMD_PLAYBACK_SENT);
                     break;
 
                 case RECEIVER_PAUSED:
+                    if (!mediaSessionId.empty())
+                    {
+                        msgPlayerSetMute( var_InheritBool( p_module, "mute" ) );
+                        msgPlayerSetVolume( var_InheritFloat( p_module, "volume" ) );
+                    }
 #ifndef NDEBUG
                     msg_Dbg( p_module, "Playback paused");
 #endif
