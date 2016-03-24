@@ -78,7 +78,8 @@ static void MRLSections( const char *, int *, int *, int *, int *);
 
 static input_source_t *InputSourceNew( input_thread_t *, const char *,
                                        const char *psz_forced_demux,
-                                       bool b_in_can_fail );
+                                       bool b_in_can_fail, bool b_with_filter );
+static void UpdateDemuxer(input_thread_t *, input_source_t *, const char *psz_demux_chain);
 static void InputSourceDestroy( input_source_t * );
 static void InputSourceMeta( input_thread_t *, input_source_t *, vlc_meta_t * );
 #ifdef ENABLE_SOUT
@@ -1088,7 +1089,7 @@ static void LoadSlaves( input_thread_t *p_input )
             continue;
         msg_Dbg( p_input, "adding slave input '%s'", uri );
 
-        input_source_t *p_slave = InputSourceNew( p_input, uri, NULL, false );
+        input_source_t *p_slave = InputSourceNew( p_input, uri, NULL, false, false );
         if( p_slave )
             TAB_APPEND( p_input->p->i_slave, p_input->p->slave, p_slave );
         free( uri );
@@ -1191,6 +1192,7 @@ static int Init( input_thread_t * p_input )
         msg_Dbg( p_input, "Input is a meta file: disabling unneeded options" );
         var_SetString( p_input, "sout", "" );
         var_SetBool( p_input, "sout-all", false );
+        var_SetString( p_input, "demux-filter", "" );
         var_SetString( p_input, "input-slave", "" );
         var_SetInteger( p_input, "input-repeat", 0 );
         var_SetString( p_input, "sub-file", "" );
@@ -1203,6 +1205,10 @@ static int Init( input_thread_t * p_input )
         goto error;
 #endif
 
+    /* the sout may have modified the "demux-filter" */
+    char *psz_fwd_var = var_GetString( p_input->p_libvlc, "demux-filter" );
+    var_SetString( p_input, "demux-filter", psz_fwd_var );
+
     /* Create es out */
     p_input->p->p_es_out = input_EsOutTimeshiftNew( p_input, p_input->p->p_es_out_display, p_input->p->i_rate );
 
@@ -1212,7 +1218,7 @@ static int Init( input_thread_t * p_input )
 
     /* */
     master = InputSourceNew( p_input, p_input->p->p_item->psz_uri, NULL,
-                             false );
+                             false, true );
     if( master == NULL )
         goto error;
     p_input->p->master = master;
@@ -1924,7 +1930,7 @@ static bool Control( input_thread_t *p_input,
             {
                 const char *uri = val.psz_string;
                 input_source_t *slave = InputSourceNew( p_input, uri, NULL,
-                                                        false );
+                                                        false, false );
                 if( slave == NULL )
                 {
                     msg_Warn( p_input, "failed to add %s as slave", uri );
@@ -2145,7 +2151,8 @@ static void UpdateTitleListfromDemux( input_thread_t *p_input )
 static input_source_t *InputSourceNew( input_thread_t *p_input,
                                        const char *psz_mrl,
                                        const char *psz_forced_demux,
-                                       bool b_in_can_fail )
+                                       bool b_in_can_fail,
+                                       bool b_with_filter)
 {
     input_source_t *in = vlc_custom_create( p_input, sizeof( *in ),
                                             "input source" );
@@ -2244,6 +2251,31 @@ static input_source_t *InputSourceNew( input_thread_t *p_input,
         return NULL;
     }
 
+    char *psz_demux_chain = NULL;
+    if (b_with_filter)
+        psz_demux_chain = var_InheritString(p_input, "demux-filter");
+    UpdateDemuxer( p_input, in, psz_demux_chain );
+    if (psz_demux_chain)
+        free(psz_demux_chain);
+
+    if( var_GetInteger( p_input, "clock-synchro" ) != -1 )
+        in->b_can_pace_control = !var_GetInteger( p_input, "clock-synchro" );
+
+    return in;
+}
+
+static void UpdateDemuxer(input_thread_t *p_input, input_source_t *in, const char *psz_var_demux_filters)
+{
+    /* add the chain of demux filters */
+    if (psz_var_demux_filters != NULL && psz_var_demux_filters[0])
+    {
+        demux_t *p_filtered_demux = demux_FilterChainNew(in->p_demux, psz_var_demux_filters);
+        if (p_filtered_demux == NULL)
+            msg_Dbg(p_input, "Failed to create demux filter %s", psz_var_demux_filters);
+        else
+            in->p_demux = p_filtered_demux;
+    }
+
     /* Get infos from (access_)demux */
     bool b_can_seek;
     if( demux_Control( in->p_demux, DEMUX_CAN_SEEK, &b_can_seek ) )
@@ -2331,11 +2363,6 @@ static input_source_t *InputSourceNew( input_thread_t *p_input,
 
     if( demux_Control( in->p_demux, DEMUX_GET_FPS, &in->f_fps ) )
         in->f_fps = 0.f;
-
-    if( var_GetInteger( p_input, "clock-synchro" ) != -1 )
-        in->b_can_pace_control = !var_GetInteger( p_input, "clock-synchro" );
-
-    return in;
 }
 
 /*****************************************************************************
@@ -2346,7 +2373,17 @@ static void InputSourceDestroy( input_source_t *in )
     int i;
 
     if( in->p_demux )
+    {
+        while (in->p_demux->p_source )
+        {
+            demux_t *p_old = in->p_demux;
+            in->p_demux = p_old->p_source;
+            in->p_demux->s = p_old->s;
+            p_old->s = NULL;
+            demux_Delete( p_old );
+        }
         demux_Delete( in->p_demux );
+    }
 
     if( in->i_title > 0 )
     {
@@ -2831,7 +2868,7 @@ static void input_SubtitleAdd( input_thread_t *p_input,
     var_Change( p_input, "spu-es", VLC_VAR_CHOICESCOUNT, &count, NULL );
 
     input_source_t *sub = InputSourceNew( p_input, url, "subtitle",
-                                          (i_flags & SUB_CANFAIL) );
+                                          (i_flags & SUB_CANFAIL), false );
     if( sub == NULL )
         return;
 

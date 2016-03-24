@@ -411,7 +411,7 @@ dbus_out:
 
     /* dynamic variables that may have already been set in the command-line */
     var_Create( p_libvlc, "sout", VLC_VAR_STRING | VLC_VAR_DOINHERIT );
-
+    var_Create( p_libvlc, "demux-filter", VLC_VAR_STRING | VLC_VAR_DOINHERIT );
 
     /* System specific configuration */
     system_Configure( p_libvlc, i_argc - vlc_optind, ppsz_argv + vlc_optind );
