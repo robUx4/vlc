@@ -82,14 +82,15 @@ SUFFIXES += .proto .pb.cc
 
 libchromecast_plugin_la_SOURCES = \
     stream_out/chromecast/cast_channel.proto stream_out/chromecast/chromecast.h \
-    stream_out/chromecast/chromecast_ctrl.cpp \
+    stream_out/chromecast/chromecast_common.cpp stream_out/chromecast/chromecast_ctrl.cpp \
     misc/webservices/json.h misc/webservices/json.c
 nodist_libchromecast_plugin_la_SOURCES = stream_out/chromecast/cast_channel.pb.cc
 libchromecast_plugin_la_CPPFLAGS = $(AM_CPPFLAGS) -Istream_out/chromecast $(CHROMECAST_CFLAGS)
 libchromecast_plugin_la_LIBADD = $(CHROMECAST_LIBS) $(SOCKET_LIBS)
 CLEANFILES += $(nodist_libchromecast_plugin_la_SOURCES)
 
-libdemux_chromecast_plugin_la_SOURCES = stream_out/chromecast/chromecast_demux.cpp stream_out/chromecast/chromecast.h
+libdemux_chromecast_plugin_la_SOURCES = stream_out/chromecast/chromecast_demux.cpp stream_out/chromecast/chromecast.h \
+                                        stream_out/chromecast/chromecast_common.cpp
 nodist_libdemux_chromecast_plugin_la_SOURCES = stream_out/chromecast/cast_channel.pb.cc
 libdemux_chromecast_plugin_la_CPPFLAGS = $(AM_CPPFLAGS) -Istream_out/chromecast $(CHROMECAST_CFLAGS)
 libdemux_chromecast_plugin_la_LIBADD = $(CHROMECAST_LIBS) $(SOCKET_LIBS)
