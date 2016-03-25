@@ -36,6 +36,63 @@
 
 static const mtime_t SEEK_FORWARD_OFFSET = 1000000;
 
+bool vlc_renderer_sys::seekTo(mtime_t i_pts)
+{
+    vlc_mutex_locker locker(&lock);
+    if (conn_status == CHROMECAST_CONNECTION_DEAD)
+        return false;
+
+    if (m_chromecast_start_time == -1)
+        return false; /* seeking before starting the file, ignore it */
+
+    i_ts_local_start = i_pts; /* stay on this position until playback resumes */
+
+    char current_time[32];
+    m_seek_request_time = mdate() + SEEK_FORWARD_OFFSET /* + playback_start_local */ ;
+    if( snprintf( current_time, sizeof(current_time), "%f", double( m_seek_request_time ) / 1000000.0 ) >= (int)sizeof(current_time) )
+    {
+        msg_Err( p_module, "snprintf() truncated string for mediaSessionId" );
+        current_time[sizeof(current_time) - 1] = '\0';
+    }
+#ifndef NDEBUG
+    msg_Dbg( p_module, "Seeking to %" PRId64 "/%s playback_time:%" PRId64 " i_ts_local_start:%" PRId64, i_pts, current_time, m_chromecast_start_time, i_ts_local_start);
+#endif
+    setPlayerStatus(CMD_SEEK_SENT);
+    /* send a fake time to seek to to make sure the device tries to reconnect */
+    msgPlayerSeek( current_time );
+
+    return true;
+}
+
+void vlc_renderer_sys::waitAppStarted()
+{
+    mutex_cleanup_push(&lock);
+    while (getConnectionStatus() != CHROMECAST_APP_STARTED &&
+           getConnectionStatus() != CHROMECAST_CONNECTION_DEAD)
+        vlc_cond_wait(&loadCommandCond, &lock);
+    vlc_cleanup_pop();
+}
+
+void vlc_renderer_sys::waitSeekDone()
+{
+    if ( m_seek_request_time != -1 )
+    {
+        mutex_cleanup_push(&lock);
+        while (m_chromecast_start_time < m_seek_request_time)
+        {
+#ifndef NDEBUG
+            msg_Dbg( p_module, "waiting for Chromecast seek" );
+#endif
+            vlc_cond_wait(&seekCommandCond, &lock);
+#ifndef NDEBUG
+            msg_Dbg( p_module, "finished waiting for Chromecast seek" );
+#endif
+        }
+        vlc_cleanup_pop();
+        m_seek_request_time = -1;
+    }
+}
+
 /**
  * @brief Send a message to the Chromecast
  * @param msg the CastMessage to send

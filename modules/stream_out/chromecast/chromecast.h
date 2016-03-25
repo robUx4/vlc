@@ -113,6 +113,13 @@ struct vlc_renderer_sys
         return 0.0;
     }
 
+    /**
+     * @brief seekTo
+     * @param pos
+     * @return true if the device was sent a SEEK command and we need to wait until it's processed
+     */
+    bool seekTo(mtime_t pos);
+
     vlc_object_t  * const p_module;
     input_thread_t *p_input;
     std::string    serverIP;
@@ -126,7 +133,6 @@ struct vlc_renderer_sys
     int i_sock_fd;
     vlc_tls_creds_t *p_creds;
     vlc_tls_t *p_tls;
-
 
     vlc_mutex_t  lock;
     vlc_thread_t chromecastThread;
@@ -151,6 +157,9 @@ struct vlc_renderer_sys
             vlc_cond_broadcast(&loadCommandCond);
         }
     }
+
+    void waitAppStarted();
+    void waitSeekDone();
 
     int connectChromecast();
     void disconnectChromecast();
@@ -216,11 +225,17 @@ private:
     bool canDecodeAudio( const es_format_t * ) const;
 
     vlc_cond_t   loadCommandCond;
+    vlc_cond_t   seekCommandCond;
 
     /* local date when playback started/resumed */
     mtime_t           m_time_playback_started;
     /* local playback time of the input when playback started/resumed */
     mtime_t           i_ts_local_start;
+    /* playback time reported by the receiver, used to wait for seeking point */
+    mtime_t           m_chromecast_start_time;
+    /* seek time with Chromecast relative timestamp */
+    mtime_t           m_seek_request_time;
+
 };
 
 #endif /* VLC_CHROMECAST_H */
