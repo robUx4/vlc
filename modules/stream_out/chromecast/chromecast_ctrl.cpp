@@ -189,9 +189,12 @@ vlc_renderer_sys::vlc_renderer_sys(vlc_renderer * const p_this)
  , canDisplay( p_this->target.psz_path == NULL || strcasecmp("/audio", p_this->target.psz_path) )
  , m_time_playback_started( -1 )
  , i_ts_local_start( VLC_TS_INVALID )
+ , m_chromecast_start_time( -1 )
+ , m_seek_request_time( -1 )
 {
     vlc_mutex_init_recursive(&lock);
     vlc_cond_init(&loadCommandCond);
+    vlc_cond_init(&seekCommandCond);
 }
 
 vlc_renderer_sys::~vlc_renderer_sys()
@@ -220,6 +223,11 @@ vlc_renderer_sys::~vlc_renderer_sys()
 
     disconnectChromecast();
 
+    // make sure we unblock the demuxer
+    m_seek_request_time = -1;
+    vlc_cond_signal(&seekCommandCond);
+
+    vlc_cond_destroy(&seekCommandCond);
     vlc_cond_destroy(&loadCommandCond);
     vlc_mutex_destroy(&lock);
 }
@@ -773,6 +781,16 @@ void vlc_renderer_sys::processMessage(const castchannel::CastMessage &msg)
                 switch( receiverState )
                 {
                 case RECEIVER_BUFFERING:
+                    if ( double(status[0]["currentTime"]) == 0.0 )
+                    {
+                        receiverState = oldPlayerState;
+                        msg_Dbg( p_module, "Invalid buffering time, keep previous state %d", oldPlayerState);
+                    }
+                    else
+                    {
+                        m_chromecast_start_time = (1 + mtime_t( double( status[0]["currentTime"] ) ) ) * 1000000L;
+                        msg_Dbg( p_module, "Playback pending with an offset of %" PRId64, m_chromecast_start_time);
+                    }
                     m_time_playback_started = -1;
                     if (!mediaSessionId.empty())
                     {
@@ -783,6 +801,10 @@ void vlc_renderer_sys::processMessage(const castchannel::CastMessage &msg)
 
                 case RECEIVER_PLAYING:
                     /* TODO reset demux PCR ? */
+                    if (unlikely(m_chromecast_start_time == -1)) {
+                        msg_Warn( p_module, "start playing without buffering" );
+                        m_chromecast_start_time = (1 + mtime_t( double( status[0]["currentTime"] ) ) ) * 1000000L;
+                    }
                     setPlayerStatus(CMD_PLAYBACK_SENT);
                     m_time_playback_started = mdate();
 #ifndef NDEBUG
@@ -796,6 +818,8 @@ void vlc_renderer_sys::processMessage(const castchannel::CastMessage &msg)
                         msgPlayerSetMute( var_InheritBool( p_module, "mute" ) );
                         msgPlayerSetVolume( var_InheritFloat( p_module, "volume" ) );
                     }
+
+                    m_chromecast_start_time = (1 + mtime_t( double( status[0]["currentTime"] ) ) ) * 1000000L;
 #ifndef NDEBUG
                     msg_Dbg( p_module, "Playback paused with an offset of %" PRId64 " date_play_start:%" PRId64, m_chromecast_start_time, m_time_playback_started);
 #endif
@@ -817,6 +841,12 @@ void vlc_renderer_sys::processMessage(const castchannel::CastMessage &msg)
                     m_time_playback_started = -1;
                     break;
                 }
+            }
+
+            if (receiverState == RECEIVER_BUFFERING && m_seek_request_time != -1)
+            {
+                msg_Dbg( p_module, "Chromecast seeking possibly done");
+                vlc_cond_signal( &seekCommandCond );
             }
 
             if ( cmd_status != CMD_LOAD_SENT && receiverState == RECEIVER_IDLE && p_input != NULL )
@@ -861,6 +891,9 @@ void vlc_renderer_sys::processMessage(const castchannel::CastMessage &msg)
             InputUpdated( NULL );
             vlc_mutex_locker locker(&lock);
             setConnectionStatus(CHROMECAST_CONNECTION_DEAD);
+            // make sure we unblock the demuxer
+            m_seek_request_time = -1;
+            vlc_cond_signal(&seekCommandCond);
         }
         else
         {
