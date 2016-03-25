@@ -208,6 +208,7 @@ input_item_SetName
 input_item_SetURI
 input_item_WriteMeta
 input_Read
+input_HoldRenderer
 input_resource_New
 input_resource_Release
 input_resource_TerminateVout

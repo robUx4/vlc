@@ -2945,3 +2945,8 @@ char *input_CreateFilename( input_thread_t *input, const char *psz_path, const c
         return psz_file;
     }
 }
+
+vlc_renderer * input_HoldRenderer(input_thread_t *p_input)
+{
+    return input_resource_HoldRenderer( p_input->p->p_resource );
+}
