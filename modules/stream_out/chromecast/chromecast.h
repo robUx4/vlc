@@ -111,6 +111,8 @@ struct vlc_renderer_sys
         return 0.0;
     }
 
+    bool seekTo(mtime_t pos);
+
     vlc_object_t  * const p_module;
     input_thread_t *p_input;
     std::string    serverIP;
@@ -129,9 +131,16 @@ struct vlc_renderer_sys
     mtime_t           date_play_start;
     /* local playback time of the input when playback started/resumed */
     mtime_t           playback_start_local;
+    /* playback time reported by the receiver, used to wait for seeking point */
+    mtime_t           playback_start_chromecast;
+    /* internal seek time */
+    mtime_t           m_seektime;
+    /* seek time with Chromecast relative timestamp */
+    mtime_t           i_seektime;
 
     vlc_mutex_t  lock;
     vlc_cond_t   loadCommandCond;
+    vlc_cond_t   seekCommandCond;
     vlc_thread_t chromecastThread;
 
     void msgAuth();

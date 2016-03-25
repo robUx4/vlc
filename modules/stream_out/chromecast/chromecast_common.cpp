@@ -34,6 +34,35 @@
 
 #include <cassert>
 
+static const mtime_t SEEK_FORWARD_OFFSET = 1000000;
+
+bool vlc_renderer_sys::seekTo(mtime_t pos)
+{
+    vlc_mutex_locker locker(&lock);
+    if (conn_status == CHROMECAST_CONNECTION_DEAD)
+        return false;
+
+    assert(playback_start_chromecast != -1);
+
+    char current_time[32];
+    i_seektime = mdate() + SEEK_FORWARD_OFFSET /* + playback_start_local */ ;
+    if( snprintf( current_time, sizeof(current_time), "%f", double( i_seektime ) / 1000000.0 ) >= (int)sizeof(current_time) )
+    {
+        msg_Err( p_module, "snprintf() truncated string for mediaSessionId" );
+        current_time[sizeof(current_time) - 1] = '\0';
+    }
+    m_seektime = pos; // + playback_start_chromecast - playback_start_local;
+    playback_start_local = pos;
+#ifndef NDEBUG
+    msg_Dbg( p_module, "Seeking to %" PRId64 "/%s playback_time:%" PRId64 " playback_start_local:%" PRId64, pos, current_time, playback_start_chromecast, playback_start_local);
+#endif
+    setPlayerStatus(CMD_SEEK_SENT);
+    /* send a fake time to seek to to make sure the device tries to reconnect */
+    msgPlayerSeek( current_time );
+
+    return true;
+}
+
 /**
  * @brief Send a message to the Chromecast
  * @param msg the CastMessage to send

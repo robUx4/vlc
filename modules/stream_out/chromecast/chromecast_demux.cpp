@@ -78,6 +78,18 @@ struct demux_sys_t
         this->canSeek = canSeek;
     }
 
+    bool seekTo(double pos) {
+        if (i_length == -1)
+            return false;
+        return seekTo( mtime_t( i_length * pos ) );
+    }
+
+    bool seekTo(mtime_t i_pos) {
+        if (!canSeek)
+            return false;
+        return p_renderer->p_sys->seekTo(i_pos);
+    }
+
     void setLength(mtime_t length) {
         this->i_length = length;
     }
@@ -103,6 +115,42 @@ struct demux_sys_t
             return 0;
         }
 
+        /* hold the data while seeking */
+        /* wait until the client is buffering for seeked data */
+        if (p_renderer->p_sys->i_seektime != -1)
+        {
+            const mtime_t i_seek_time = p_renderer->p_sys->m_seektime; // - (p_renderer->p_sys->playback_start_chromecast - p_renderer->p_sys->playback_start_local);
+            msg_Dbg(p_demux, "do the actual seek");
+            int i_ret = source_Control( DEMUX_SET_TIME, i_seek_time );
+            if (i_ret != VLC_SUCCESS)
+            {
+                msg_Warn(p_demux, "failed to seek in the muxer %d", i_ret);
+                vlc_mutex_unlock(&p_renderer->p_sys->lock);
+                return 0;
+            }
+
+            mutex_cleanup_push(&p_renderer->p_sys->lock);
+            while (p_renderer->p_sys->playback_start_chromecast < p_renderer->p_sys->i_seektime)
+            {
+#ifndef NDEBUG
+                msg_Dbg(p_demux, "waiting for Chromecast seek");
+#endif
+                vlc_cond_wait(&p_renderer->p_sys->seekCommandCond, &p_renderer->p_sys->lock);
+#ifndef NDEBUG
+                msg_Dbg(p_demux, "finished waiting for Chromecast seek");
+#endif
+            }
+            vlc_cleanup_pop();
+
+            p_renderer->p_sys->m_seektime = -1;
+            p_renderer->p_sys->i_seektime = -1;
+
+            if (p_renderer->p_sys->getConnectionStatus() != CHROMECAST_APP_STARTED) {
+                msg_Warn(p_demux, "cannot seek as the Chromecast app is not running %d", p_renderer->p_sys->getConnectionStatus());
+                vlc_mutex_unlock(&p_renderer->p_sys->lock);
+                return 0;
+            }
+        }
         vlc_mutex_unlock(&p_renderer->p_sys->lock);
 
         return p_demux->p_source->pf_demux( p_demux->p_source );
@@ -173,6 +221,39 @@ static int DemuxControl( demux_t *p_demux, int i_query, va_list args)
         return ret;
     }
 
+    case DEMUX_SET_POSITION:
+    {
+        int ret = VLC_SUCCESS;
+        va_list ap;
+
+        va_copy( ap, args );
+        double pos = va_arg( ap, double );
+        va_end( ap );
+
+        if (!p_sys->seekTo( pos ))
+        {
+            msg_Err( p_demux, "failed to seek to %f", pos );
+            ret = VLC_EGENERIC;
+        }
+        return ret;
+    }
+
+    case DEMUX_SET_TIME:
+    {
+        int ret = VLC_SUCCESS;
+        va_list ap;
+
+        va_copy( ap, args );
+        mtime_t pos = va_arg( ap, mtime_t );
+        va_end( ap );
+
+        if (!p_sys->seekTo( pos ))
+        {
+            msg_Err( p_demux, "failed to seek to time %" PRId64, pos );
+            return VLC_EGENERIC;
+        }
+        return ret;
+    }
     }
 
     return p_demux->p_source->pf_control( p_demux->p_source, i_query, args );
