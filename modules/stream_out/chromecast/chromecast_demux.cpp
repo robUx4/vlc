@@ -55,6 +55,7 @@ struct demux_sys_t
         ,p_renderer(renderer)
         ,i_length(-1)
         ,demuxReady(false)
+        ,canSeek(false)
     {
     }
 
@@ -71,6 +72,10 @@ struct demux_sys_t
     double getPlaybackPosition() {
         vlc_mutex_locker locker(&p_renderer->p_sys->lock);
         return p_renderer->p_sys->getPlaybackPosition(i_length);
+    }
+
+    void setCanSeek(bool canSeek) {
+        this->canSeek = canSeek;
     }
 
     void setLength(mtime_t length) {
@@ -108,6 +113,7 @@ protected:
     vlc_renderer  * const p_renderer;
     mtime_t       i_length;
     bool          demuxReady;
+    bool          canSeek;
 
 private:
     int source_Control(int cmd, ...)
@@ -140,6 +146,19 @@ static int DemuxControl( demux_t *p_demux, int i_query, va_list args)
     case DEMUX_GET_TIME:
         *va_arg(args, int64_t *) = p_sys->getPlaybackTime();
         return VLC_SUCCESS;
+
+    case DEMUX_CAN_SEEK:
+    {
+        int ret;
+        va_list ap;
+
+        va_copy( ap, args );
+        ret = p_demux->p_source->pf_control( p_demux->p_source, i_query, args );
+        if( ret == VLC_SUCCESS )
+            p_sys->setCanSeek( *va_arg( ap, bool* ) );
+        va_end( ap );
+        return ret;
+    }
 
     case DEMUX_GET_LENGTH:
     {
