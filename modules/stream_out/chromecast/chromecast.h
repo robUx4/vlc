@@ -152,7 +152,6 @@ struct vlc_renderer_sys
         }
     }
 
-
     int connectChromecast();
     void disconnectChromecast();
 
