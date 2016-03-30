@@ -837,7 +837,8 @@ static int InitSout( input_thread_t * p_input )
     }
     else
     {
-        input_resource_RequestSout( p_input->p->p_resource, NULL, NULL );
+        p_input->p->p_sout = input_resource_RequestSout( p_input->p->p_resource,
+                                                         NULL, NULL );
     }
     free( psz );
 
@@ -1244,7 +1245,7 @@ error:
     if( p_input->p->p_resource )
     {
         if( p_input->p->p_sout )
-            input_resource_RequestSout( p_input->p->p_resource,
+            p_input->p->p_sout = input_resource_RequestSout( p_input->p->p_resource,
                                          p_input->p->p_sout, NULL );
         input_resource_SetInput( p_input->p->p_resource, NULL );
         if( p_input->p->p_resource_private )
@@ -1359,8 +1360,8 @@ static void End( input_thread_t * p_input )
     vlc_mutex_unlock( &p_input->p->p_item->lock );
 
     /* */
-    input_resource_RequestSout( p_input->p->p_resource,
-                                 p_input->p->p_sout, NULL );
+    p_input->p->p_sout = input_resource_RequestSout( p_input->p->p_resource,
+                                                     p_input->p->p_sout, NULL );
     input_resource_SetInput( p_input->p->p_resource, NULL );
     if( p_input->p->p_resource_private )
         input_resource_Terminate( p_input->p->p_resource_private );
