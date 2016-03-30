@@ -88,6 +88,8 @@ static int InitSout( input_thread_t * p_input );
 
 static int RendererChanged(vlc_object_t *, char const *,
                            vlc_value_t, vlc_value_t, void *);
+static int DemuxFilterChanged(vlc_object_t *, char const *,
+                              vlc_value_t, vlc_value_t, void *);
 
 /* TODO */
 //static void InputGetAttachments( input_thread_t *, input_source_t * );
@@ -1248,6 +1250,11 @@ static int Init( input_thread_t * p_input )
         goto error;
     p_input->p->master = master;
 
+    demux_t *p_master_demux = master->p_demux;
+    while ( p_master_demux->p_source )
+        p_master_demux = p_master_demux->p_source;
+    var_AddCallback( p_input, "demux-filter", DemuxFilterChanged, p_master_demux );
+
     InitTitle( p_input );
 
     /* Load master infos */
@@ -1383,6 +1390,11 @@ static void End( input_thread_t * p_input )
     for( int i = 0; i < p_input->p->i_slave; i++ )
         InputSourceDestroy( p_input->p->slave[i] );
     free( p_input->p->slave );
+
+    demux_t *p_master_demux = p_input->p->master->p_demux;
+    while ( p_master_demux->p_source )
+        p_master_demux = p_master_demux->p_source;
+    var_DelCallback( p_input, "demux-filter", DemuxFilterChanged, p_master_demux );
 
     /* Clean up master */
     InputSourceDestroy( p_input->p->master );
@@ -3039,6 +3051,29 @@ int RendererChanged(vlc_object_t *p_this, char const *psz_var,
     {
         input_thread_t *p_input = (input_thread_t*) p_data;
         atomic_store( &p_input->p->b_restart_output, true );
+    }
+    return VLC_SUCCESS;
+}
+
+int DemuxFilterChanged(vlc_object_t *p_this, char const *psz_var,
+                       vlc_value_t oldval, vlc_value_t val, void *p_data)
+{
+    VLC_UNUSED(psz_var);
+    input_thread_t *p_input = (input_thread_t *) p_this;
+    demux_t *p_main_demux = (demux_t *) p_data;
+    if ( strcmp( oldval.psz_string, val.psz_string ) )
+    {
+        input_source_t *in = p_input->p->master;
+        while (in->p_demux && in->p_demux != p_main_demux)
+        {
+            demux_t *p_old = in->p_demux;
+            in->p_demux = p_old->p_source;
+            in->p_demux->s = p_old->s;
+            p_old->s = NULL;
+            demux_Delete( p_old );
+        }
+        assert( in->p_demux != NULL ); /* we need to restart on the base master */
+        UpdateDemuxer( p_input, p_input->p->master, val.psz_string );
     }
     return VLC_SUCCESS;
 }
