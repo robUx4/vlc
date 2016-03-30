@@ -92,6 +92,7 @@ struct input_thread_private_t
     bool        is_stopped;
     bool        b_recording;
     int         i_rate;
+    atomic_bool b_restart_output;
 
     /* Playtime configuration and state */
     int64_t     i_start;    /* :start-time,0 by default */
@@ -105,6 +106,7 @@ struct input_thread_private_t
     vlc_renderer    *p_renderer;
     es_out_t        *p_es_out;
     es_out_t        *p_es_out_display;
+    bool             b_has_renderer_callback;
 
     /* Title infos FIXME multi-input (not easy) ? */
     int          i_title;

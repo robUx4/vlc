@@ -82,6 +82,12 @@ static input_source_t *InputSourceNew( input_thread_t *, const char *,
 static void UpdateDemuxer(input_thread_t *, input_source_t *, const char *psz_demux_chain);
 static void InputSourceDestroy( input_source_t * );
 static void InputSourceMeta( input_thread_t *, input_source_t *, vlc_meta_t * );
+#ifdef ENABLE_SOUT
+static int InitSout( input_thread_t * p_input );
+#endif
+
+static int RendererChanged(vlc_object_t *, char const *,
+                           vlc_value_t, vlc_value_t, void *);
 
 /* TODO */
 //static void InputGetAttachments( input_thread_t *, input_source_t * );
@@ -250,6 +256,9 @@ static void input_Destructor( vlc_object_t *obj )
         ControlRelease( p_ctrl->i_type, p_ctrl->val );
     }
 
+    if ( p_input->p->b_has_renderer_callback )
+        var_DelCallback( p_input->p_parent, "renderer", RendererChanged, p_input );
+
     vlc_cond_destroy( &p_input->p->wait_control );
     vlc_mutex_destroy( &p_input->p->lock_control );
     free( p_input->p );
@@ -327,6 +336,7 @@ static input_thread_t *Create( vlc_object_t *p_parent, input_item_t *p_item,
     p_input->p->p_sout   = NULL;
     p_input->p->p_renderer = NULL;
     p_input->p->b_out_pace_control = false;
+    p_input->p->b_has_renderer_callback = false;
 
     vlc_gc_incref( p_item ); /* Released in Destructor() */
     p_input->p->p_item = p_item;
@@ -402,6 +412,7 @@ static input_thread_t *Create( vlc_object_t *p_parent, input_item_t *p_item,
 
     /* Create Objects variables for public Get and Set */
     input_ControlVarInit( p_input );
+    atomic_init( &p_input->p->b_restart_output, false );
 
     /* */
     if( !p_input->b_preparsing )
@@ -683,6 +694,34 @@ static void MainLoop( input_thread_t *p_input, bool b_interactive )
     {
         mtime_t i_wakeup = -1;
         bool b_paused = p_input->p->i_state == PAUSE_S;
+
+        if ( atomic_load( &p_input->p->b_restart_output ) )
+        {
+            atomic_store( &p_input->p->b_restart_output, false );
+
+#ifdef ENABLE_SOUT
+            if( InitSout( p_input ) )
+                break; /* TODO */
+#endif
+
+            es_out_Control( p_input->p->p_es_out, ES_OUT_RESTART_ES, NULL );
+
+            if ( p_input->p->p_renderer == NULL )
+                input_resource_RequestRenderer( p_input->p->p_resource, NULL, NULL );
+            if ( p_input->p->p_sout == NULL )
+                input_resource_TerminateSout( p_input->p->p_resource );
+
+            if( !p_input->b_preparsing && p_input->p->p_sout )
+            {
+                p_input->p->b_out_pace_control = (p_input->p->p_sout->i_out_pace_nocontrol > 0);
+
+                msg_Dbg( p_input, "starting in %s mode",
+                         p_input->p->b_out_pace_control ? "async" : "sync" );
+            }
+
+            /* TODO use GET_POSITION/SET_POSITION to restart the decoder cleanly on a keyframe */
+        }
+
         /* FIXME if p_input->p->i_state == PAUSE_S the access/access_demux
          * is paused -> this may cause problem with some of them
          * The same problem can be seen when seeking while paused */
@@ -818,6 +857,12 @@ static int InitSout( input_thread_t * p_input )
         return VLC_SUCCESS;
     char *psz;
     const bool b_is_cmd = !strncasecmp( p_input->p->p_item->psz_uri, "vlc:", 4 );
+
+    if ( !p_input->p->b_has_renderer_callback )
+    {
+        var_AddCallback( p_input->p_parent, "renderer", RendererChanged, p_input );
+        p_input->p->b_has_renderer_callback = true;
+    }
 
     if( !b_is_cmd && ( psz = var_InheritString( p_input, "renderer" ) ) )
     {
@@ -2975,4 +3020,18 @@ char *input_CreateFilename( input_thread_t *input, const char *psz_path, const c
         path_sanitize( psz_file );
         return psz_file;
     }
+}
+
+int RendererChanged(vlc_object_t *p_this, char const *psz_var,
+                    vlc_value_t oldval, vlc_value_t val, void *p_data)
+{
+    VLC_UNUSED(p_this);
+    VLC_UNUSED(psz_var);
+
+    if ( strcmp( oldval.psz_string, val.psz_string ) )
+    {
+        input_thread_t *p_input = (input_thread_t*) p_data;
+        atomic_store( &p_input->p->b_restart_output, true );
+    }
+    return VLC_SUCCESS;
 }
