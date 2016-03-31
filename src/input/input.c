@@ -838,7 +838,7 @@ static int InitSout( input_thread_t * p_input )
     else
     {
         p_input->p->p_sout = input_resource_RequestSout( p_input->p->p_resource,
-                                                         NULL, NULL );
+                                                         p_input->p->p_sout, NULL );
     }
     free( psz );
 
