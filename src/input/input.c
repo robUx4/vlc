@@ -699,6 +699,9 @@ static void MainLoop( input_thread_t *p_input, bool b_interactive )
         {
             atomic_store( &p_input->p->b_restart_output, false );
 
+            double f_restart_position;
+            input_Control( p_input, INPUT_GET_POSITION, &f_restart_position );
+
 #ifdef ENABLE_SOUT
             if( InitSout( p_input ) )
                 break; /* TODO */
@@ -719,7 +722,8 @@ static void MainLoop( input_thread_t *p_input, bool b_interactive )
                          p_input->p->b_out_pace_control ? "async" : "sync" );
             }
 
-            /* TODO use GET_POSITION/SET_POSITION to restart the decoder cleanly on a keyframe */
+            if ( f_restart_position != -1.0 )
+                input_Control( p_input, INPUT_SET_POSITION, f_restart_position);
         }
 
         /* FIXME if p_input->p->i_state == PAUSE_S the access/access_demux
