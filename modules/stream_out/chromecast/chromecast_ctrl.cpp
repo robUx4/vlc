@@ -256,15 +256,19 @@ intf_sys_t::intf_sys_t(vlc_object_t * const p_this)
 
 intf_sys_t::~intf_sys_t()
 {
+    /* disconnect the current Chromecast */
     switch (getConnectionStatus())
     {
     case CHROMECAST_APP_STARTED:
         // Generate the close messages.
         msgReceiverClose(appTransportId);
         // ft
+    case CHROMECAST_TLS_CONNECTED:
     case CHROMECAST_AUTHENTICATED:
         msgReceiverClose(DEFAULT_CHOMECAST_RECEIVER);
         // ft
+    case CHROMECAST_DISCONNECTED:
+    case CHROMECAST_CONNECTION_DEAD:
     default:
         break;
     }
