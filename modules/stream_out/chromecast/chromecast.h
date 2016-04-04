@@ -94,9 +94,6 @@ struct intf_sys_t
     vlc_cond_t   loadCommandCond;
     vlc_thread_t chromecastThread;
 
-    void msgAuth();
-    void msgReceiverClose(std::string destinationId);
-
     void handleMessages();
 
     connection_status getConnectionStatus() const
@@ -118,6 +115,9 @@ struct intf_sys_t
 
     int connectChromecast(char *psz_ipChromecast);
     void disconnectChromecast();
+
+    void msgAuth();
+    void msgReceiverClose(std::string destinationId);
 
     void msgPing();
     void msgPong();
