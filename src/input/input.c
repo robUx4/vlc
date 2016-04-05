@@ -301,7 +301,7 @@ static input_thread_t *Create( vlc_object_t *p_parent, input_item_t *p_item,
     snprintf( psz_timer_name, sizeof(psz_timer_name),
               "input launching for '%s'", psz_name );
 
-    msg_Dbg( p_input, "Creating an input for '%s'", psz_name);
+    msg_Dbg( p_input, "Creating an input for %s'%s'", psz_name, b_quick ? "preparsing " : "");
 
     free( psz_name );
 
