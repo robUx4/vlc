@@ -348,7 +348,7 @@ int filter_chain_ForEach( filter_chain_t *chain,
     return VLC_SUCCESS;
 }
 
-int filter_chain_GetLength( filter_chain_t *p_chain )
+unsigned filter_chain_GetLength( filter_chain_t *p_chain )
 {
     return p_chain->length;
 }
