@@ -351,7 +351,7 @@ VLC_API void filter_chain_DeleteFilter(filter_chain_t *chain,
  * \param chain pointer to filter chain
  * \return number of filters in this filter chain
  */
-VLC_API int filter_chain_GetLength(filter_chain_t *chain);
+VLC_API unsigned filter_chain_GetLength(filter_chain_t *chain);
 
 /**
  * Get last output format of the last element in the filter chain.

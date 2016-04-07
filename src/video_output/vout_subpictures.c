@@ -1343,7 +1343,7 @@ void spu_PutSubpicture(spu_t *spu, subpicture_t *subpic)
 
             filter_chain_AppendFromString(spu->p->filter_chain, chain_update);
         }
-        else if (filter_chain_GetLength(spu->p->filter_chain) > 0)
+        else if (filter_chain_GetLength(spu->p->filter_chain) != 0)
             filter_chain_Reset(sys->filter_chain, NULL, NULL);
 
         /* "sub-source"  was formerly "sub-filter", so now the "sub-filter"
