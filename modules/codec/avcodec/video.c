@@ -124,7 +124,7 @@ static uint32_t ffmpeg_CodecTag( vlc_fourcc_t fcc )
  */
 static int lavc_GetVideoFormat(decoder_t *dec, video_format_t *restrict fmt,
                                AVCodecContext *ctx, enum AVPixelFormat pix_fmt,
-                               enum AVPixelFormat sw_pix_fmt)
+                               enum AVPixelFormat sw_pix_fmt, vlc_va_t *p_va)
 {
     int width = ctx->coded_width;
     int height = ctx->coded_height;
@@ -141,7 +141,16 @@ static int lavc_GetVideoFormat(decoder_t *dec, video_format_t *restrict fmt,
         avcodec_align_dimensions2(ctx, &width, &height, aligns);
     }
     else /* hardware decoding */
-        fmt->i_chroma = vlc_va_GetChroma(pix_fmt, sw_pix_fmt);
+    {
+        if ( p_va != NULL )
+        {
+            p_va->setup( p_va, &fmt->i_chroma );
+        }
+        else
+        {
+            fmt->i_chroma = vlc_va_GetChroma(pix_fmt, sw_pix_fmt);
+        }
+    }
 
     if( width == 0 || height == 0 || width > 8192 || height > 8192 )
     {
@@ -197,12 +206,13 @@ static int lavc_GetVideoFormat(decoder_t *dec, video_format_t *restrict fmt,
 
 static int lavc_UpdateVideoFormat(decoder_t *dec, AVCodecContext *ctx,
                                   enum AVPixelFormat fmt,
-                                  enum AVPixelFormat swfmt)
+                                  enum AVPixelFormat swfmt,
+                                  vlc_va_t *p_va)
 {
     video_format_t fmt_out;
     int val;
 
-    val = lavc_GetVideoFormat(dec, &fmt_out, ctx, fmt, swfmt);
+    val = lavc_GetVideoFormat(dec, &fmt_out, ctx, fmt, swfmt, p_va);
     if (val)
         return val;
 
@@ -802,7 +812,7 @@ static picture_t *DecodeVideo( decoder_t *p_dec, block_t **pp_block )
              * then picture buffer can be allocated. */
             if (p_sys->p_va == NULL
              && lavc_UpdateVideoFormat(p_dec, p_context, p_context->pix_fmt,
-                                       p_context->pix_fmt) == 0)
+                                       p_context->pix_fmt, p_dec->p_sys->p_va) == 0)
                 p_pic = decoder_GetPicture(p_dec);
 
             if( !p_pic )
@@ -1092,10 +1102,23 @@ static int lavc_GetFrame(struct AVCodecContext *ctx, AVFrame *frame, int flags)
         /* Most unaccelerated decoders do not call get_format(), so we need to
          * update the output video format here. The MT semaphore must be held
          * to protect p_dec->fmt_out. */
-        if (lavc_UpdateVideoFormat(dec, ctx, ctx->pix_fmt, ctx->pix_fmt))
+        if (lavc_UpdateVideoFormat(dec, ctx, ctx->pix_fmt, ctx->pix_fmt, NULL))
         {
             post_mt(sys);
             return -1;
+        }
+    }
+    else
+    {
+        vlc_fourcc_t va_fourcc;
+        sys->p_va->setup( sys->p_va, &va_fourcc);
+        if ( va_fourcc != dec->fmt_out.video.i_chroma )
+        {
+            if (lavc_UpdateVideoFormat(dec, ctx, ctx->pix_fmt, ctx->sw_pix_fmt, sys->p_va))
+            {
+                post_mt(sys);
+                return -1;
+            }
         }
     }
     post_mt(sys);
@@ -1144,7 +1167,7 @@ static enum PixelFormat ffmpeg_GetFormat( AVCodecContext *p_context,
      * This avoids resetting the pipeline downstream. This also avoids
      * needlessly probing for hardware acceleration support. */
     if (p_sys->pix_fmt != AV_PIX_FMT_NONE
-     && lavc_GetVideoFormat(p_dec, &fmt, p_context, p_sys->pix_fmt, swfmt) == 0
+     && lavc_GetVideoFormat(p_dec, &fmt, p_context, p_sys->pix_fmt, swfmt, p_dec->p_sys->p_va) == 0
      && fmt.i_width == p_dec->fmt_out.video.i_width
      && fmt.i_height == p_dec->fmt_out.video.i_height
      && p_context->profile == p_sys->profile
@@ -1194,17 +1217,12 @@ static enum PixelFormat ffmpeg_GetFormat( AVCodecContext *p_context,
             msg_Err(p_dec, "unspecified video dimensions");
             continue;
         }
-        if (lavc_UpdateVideoFormat(p_dec, p_context, hwfmt, swfmt))
+        if (lavc_UpdateVideoFormat(p_dec, p_context, hwfmt, swfmt, NULL))
             continue; /* Unsupported brand of hardware acceleration */
-        post_mt(p_sys);
 
-        picture_t *test_pic = decoder_GetPicture(p_dec);
-        assert(!test_pic || test_pic->format.i_chroma == p_dec->fmt_out.video.i_chroma);
+        post_mt(p_sys);
         vlc_va_t *va = vlc_va_New(VLC_OBJECT(p_dec), p_context, hwfmt,
-                                  &p_dec->fmt_in,
-                                  test_pic ? test_pic->p_sys : NULL);
-        if (test_pic)
-            picture_Release(test_pic);
+                                  &p_dec->fmt_in);
         if (va == NULL)
         {
             wait_mt(p_sys);
