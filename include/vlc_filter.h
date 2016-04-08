@@ -28,6 +28,7 @@
 #include <vlc_es.h>
 #include <vlc_picture.h>
 #include <vlc_subpicture.h>
+#include <vlc_picture_pool.h>
 #include <vlc_mouse.h>
 
 /**
@@ -138,6 +139,9 @@ struct filter_t
     /* Input attachments
      * XXX use filter_GetInputAttachments */
     int (*pf_get_attachments)( filter_t *, input_attachment_t ***, int * );
+
+    pool_picture_factory     pool_factory;
+    vlc_picture_pool_handler *p_pool_handler;
 
     /* Private structure for the owner of the decoder */
     filter_owner_t      owner;
@@ -274,11 +278,13 @@ typedef struct filter_chain_t filter_chain_t;
  * \param p_object pointer to a vlc object
  * \param psz_capability vlc capability of filters in filter chain
  * \param b_allow_format_fmt_change allow changing of fmt
+ * \param p_pool_handler
  * \return pointer to a filter chain
  */
-VLC_API filter_chain_t * filter_chain_New( vlc_object_t *, const char *, bool )
+VLC_API filter_chain_t * filter_chain_New( vlc_object_t *, const char *, bool,
+                                           vlc_picture_pool_handler * )
 VLC_USED;
-#define filter_chain_New( a, b, c ) filter_chain_New( VLC_OBJECT( a ), b, c )
+#define filter_chain_New( a, b, c, d ) filter_chain_New( VLC_OBJECT( a ), b, c, d )
 
 /**
  * Creates a new video filter chain.
@@ -286,13 +292,15 @@ VLC_USED;
  * \param obj pointer to parent VLC object
  * \param change whether to allow changing the output format
  * \param owner owner video buffer callbacks
+ * \param p_pool_handler
  * \return new filter chain, or NULL on error
  */
 VLC_API filter_chain_t * filter_chain_NewVideo( vlc_object_t *obj, bool change,
-                                                const filter_owner_t *owner )
+                                                const filter_owner_t *owner,
+                                                vlc_picture_pool_handler *p_pool_handler)
 VLC_USED;
-#define filter_chain_NewVideo( a, b, c ) \
-        filter_chain_NewVideo( VLC_OBJECT( a ), b, c )
+#define filter_chain_NewVideo( a, b, c, d ) \
+        filter_chain_NewVideo( VLC_OBJECT( a ), b, c, d )
 
 /**
  * Delete filter chain will delete all filters in the chain and free all

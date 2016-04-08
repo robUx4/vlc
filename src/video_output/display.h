@@ -29,7 +29,8 @@ vout_display_t *vout_NewSplitter(vout_thread_t *vout,
                                  const char *module,
                                  const char *splitter_module,
                                  mtime_t double_click_timeout,
-                                 mtime_t hide_timeout);
+                                 mtime_t hide_timeout,
+                                 vlc_picture_pool_handler *p_pool_handler);
 
 /* FIXME should not be there */
 void vout_SendDisplayEventMouse(vout_thread_t *, const vlc_mouse_t *);

@@ -46,23 +46,13 @@ struct vlc_va_t {
 };
 
 /**
- * Determines the VLC video chroma value for a pair of hardware acceleration
- * PixelFormat and software PixelFormat.
- * @param hwfmt the hardware acceleration pixel format
- * @param swfmt the software pixel format
- * @return a VLC chroma value, or 0 on error.
- */
-vlc_fourcc_t vlc_va_GetChroma(enum PixelFormat hwfmt, enum PixelFormat swfmt);
-
-/**
  * Creates an accelerated video decoding back-end for libavcodec.
  * @param obj parent VLC object
  * @param fmt VLC format of the content to decode
  * @return a new VLC object on success, NULL on error.
  */
-vlc_va_t *vlc_va_New(vlc_object_t *obj, AVCodecContext *,
-                     enum PixelFormat, const es_format_t *fmt,
-                     picture_sys_t *p_sys);
+vlc_va_t *vlc_va_New(decoder_t *obj, AVCodecContext *,
+                     enum PixelFormat, const es_format_t *fmt);
 
 /**
  * Allocates a hardware video surface for a libavcodec frame.

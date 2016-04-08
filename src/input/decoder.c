@@ -43,6 +43,7 @@
 #include <vlc_meta.h>
 #include <vlc_dialog.h>
 #include <vlc_modules.h>
+#include <vlc_picture_pool.h>
 
 #include "audio_output/aout_internal.h"
 #include "stream_output/stream_output.h"
@@ -214,6 +215,36 @@ static void DecoderUpdateFormatLocked( decoder_t *p_dec )
 /*****************************************************************************
  * Buffers allocation callbacks for the decoders
  *****************************************************************************/
+static unsigned GetVideoDecoderDPBSize( const decoder_t *p_dec )
+{
+    unsigned dpb_size;
+    switch( p_dec->fmt_in.i_codec )
+    {
+    case VLC_CODEC_HEVC:
+    case VLC_CODEC_H264:
+    case VLC_CODEC_DIRAC: /* FIXME valid ? */
+        dpb_size = 18;
+        break;
+    case VLC_CODEC_VP5:
+    case VLC_CODEC_VP6:
+    case VLC_CODEC_VP6F:
+    case VLC_CODEC_VP8:
+        dpb_size = 3;
+        break;
+    default:
+        dpb_size = 2;
+        break;
+    }
+
+    return dpb_size + p_dec->i_extra_picture_buffers + 1;
+}
+
+static unsigned GetAudioDecoderDPBSize( const decoder_t *p_dec )
+{
+    VLC_UNUSED( p_dec );
+    return 1;
+}
+
 static vout_thread_t *aout_request_vout( void *p_private,
                                          vout_thread_t *p_vout, video_format_t *p_fmt, bool b_recyle )
 {
@@ -221,8 +252,13 @@ static vout_thread_t *aout_request_vout( void *p_private,
     decoder_owner_sys_t *p_owner = p_dec->p_owner;
     input_thread_t *p_input = p_owner->p_input;
 
-    p_vout = input_resource_RequestVout( p_owner->p_resource, p_vout, p_fmt, 1,
-                                         b_recyle );
+    vlc_picture_pool_handler *pool_handler = pool_HandlerCreate( p_dec, GetAudioDecoderDPBSize );
+    if (pool_handler == NULL)
+        return NULL;
+
+    p_vout = input_resource_RequestVout( p_owner->p_resource, p_vout, p_fmt,
+                                         b_recyle, pool_handler );
+    pool_HandlerDestroy(pool_handler);
     if( p_input != NULL )
         input_SendEventVout( p_input );
 
@@ -400,29 +436,15 @@ static int vout_update_format( decoder_t *p_dec )
         p_owner->p_vout = NULL;
         vlc_mutex_unlock( &p_owner->lock );
 
-        unsigned dpb_size;
-        switch( p_dec->fmt_in.i_codec )
-        {
-        case VLC_CODEC_HEVC:
-        case VLC_CODEC_H264:
-        case VLC_CODEC_DIRAC: /* FIXME valid ? */
-            dpb_size = 18;
-            break;
-        case VLC_CODEC_VP5:
-        case VLC_CODEC_VP6:
-        case VLC_CODEC_VP6F:
-        case VLC_CODEC_VP8:
-            dpb_size = 3;
-            break;
-        default:
-            dpb_size = 2;
-            break;
-        }
+        vlc_picture_pool_handler *pool_handler = pool_HandlerCreate( p_dec, GetVideoDecoderDPBSize );
+        if (pool_handler == NULL)
+            return NULL;
+
         p_vout = input_resource_RequestVout( p_owner->p_resource,
                                              p_vout, &fmt,
-                                             dpb_size +
-                                             p_dec->i_extra_picture_buffers + 1,
-                                             true );
+                                             true,
+                                             pool_handler );
+        pool_HandlerDestroy(pool_handler);
         vlc_mutex_lock( &p_owner->lock );
         p_owner->p_vout = p_vout;
 
@@ -1706,7 +1728,7 @@ static void DeleteDecoder( decoder_t * p_dec )
 
         /* */
         input_resource_RequestVout( p_owner->p_resource, p_owner->p_vout, NULL,
-                                    0, true );
+                                    true, NULL );
         if( p_owner->p_input != NULL )
             input_SendEventVout( p_owner->p_input );
     }

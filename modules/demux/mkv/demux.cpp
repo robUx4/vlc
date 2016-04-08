@@ -739,6 +739,7 @@ bool demux_sys_t::PreloadLinked()
         }
         p_vseg->i_sys_title = p_vseg->i_current_edition;
     }
+    /* TODO i_current_title = p_current_vsegment->i_sys_title; */
 
     // TODO decide which segment should be first used (VMG for DVD)
 
@@ -798,6 +799,7 @@ bool demux_sys_t::PreparePlayback( virtual_segment_c & new_vsegment, mtime_t i_m
     p_current_vsegment->CurrentSegment()->Select( i_mk_date );
 
     /* Seek to the beginning */
+    es_out_Control( p_current_vsegment->CurrentSegment()->sys.demuxer.out, ES_OUT_RESET_PCR);
     p_current_vsegment->Seek(p_current_vsegment->CurrentSegment()->sys.demuxer,
                              i_mk_date, p_current_vsegment->p_current_vchapter, -1);
 
@@ -809,6 +811,7 @@ void demux_sys_t::JumpTo( virtual_segment_c & vsegment, virtual_chapter_c & vcha
     if ( !vchapter.p_chapter || !vchapter.p_chapter->Enter( true ) )
     {
         // jump to the location in the found segment
+        es_out_Control( demuxer.out, ES_OUT_RESET_PCR);
         vsegment.Seek( demuxer, vchapter.i_mk_virtual_start_time, &vchapter, -1 );
     }
 }

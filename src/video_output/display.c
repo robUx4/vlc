@@ -65,9 +65,25 @@ static picture_t *VideoBufferNew(filter_t *filter)
     return picture_pool_Get(pool);
 }
 
+static picture_pool_t *DefaultDecoderPool(vout_display_t *vd, unsigned count)
+{
+    return picture_pool_NewFromFormat( &vd->source, count );
+}
+
 /*****************************************************************************
  *
  *****************************************************************************/
+
+static picture_pool_t *DefaultPoolFactory(const video_format_t *p_fmt, unsigned count,
+                                          void *p_opaque)
+{
+    VLC_UNUSED( p_opaque );
+    return picture_pool_NewFromFormat( p_fmt, count );
+}
+
+static pool_picture_factory vout_pool_factory = {
+  .pf_create_pool = DefaultPoolFactory,
+};
 
 /**
  * It creates a new vout_display_t using the given configuration.
@@ -76,7 +92,8 @@ static vout_display_t *vout_display_New(vlc_object_t *obj,
                                         const char *module, bool load_module,
                                         const video_format_t *fmt,
                                         const vout_display_cfg_t *cfg,
-                                        vout_display_owner_t *owner)
+                                        vout_display_owner_t *owner,
+                                        vlc_picture_pool_handler *p_pool_handler)
 {
     /* */
     vout_display_t *vd = vlc_custom_create(obj, sizeof(*vd), "vout display" );
@@ -103,6 +120,8 @@ static vout_display_t *vout_display_New(vlc_object_t *obj,
     vd->control = NULL;
     vd->manage = NULL;
     vd->sys = NULL;
+    vd->decoder_pool = DefaultDecoderPool;
+    vd->p_pool_factory = &vout_pool_factory;
 
     vd->owner = *owner;
 
@@ -115,14 +134,28 @@ static vout_display_t *vout_display_New(vlc_object_t *obj,
     } else {
         vd->module = NULL;
     }
+
+    if ( pool_HandlerAddFactory(p_pool_handler, vd->fmt.i_chroma, vd->p_pool_factory) != VLC_SUCCESS )
+    {
+        if (load_module)
+        {
+            module_unneed(vd, vd->module);
+            vd->module = NULL;
+        }
+        vlc_object_release(vd);
+        return NULL;
+    }
+
     return vd;
 }
 
 /**
  * It deletes a vout_display_t
  */
-static void vout_display_Delete(vout_display_t *vd)
+static void vout_display_Delete(vout_display_t *vd, vlc_picture_pool_handler *p_pool_handler)
 {
+    pool_HandlerRemoveFactory( p_pool_handler, vd->fmt.i_chroma, vd->p_pool_factory );
+
     if (vd->module)
         module_unneed(vd, vd->module);
 
@@ -412,7 +445,7 @@ struct vout_display_owner_sys_t {
     } event;
 };
 
-static int VoutDisplayCreateRender(vout_display_t *vd)
+static int VoutDisplayCreateRender(vout_display_t *vd, vlc_picture_pool_handler *p_pool_handler)
 {
     vout_display_owner_sys_t *osys = vd->owner.sys;
 
@@ -447,7 +480,7 @@ static int VoutDisplayCreateRender(vout_display_t *vd)
         },
     };
 
-    osys->filters = filter_chain_NewVideo(vd, false, &owner);
+    osys->filters = filter_chain_NewVideo(vd, false, &owner, p_pool_handler);
     if (unlikely(osys->filters == NULL))
         abort(); /* TODO critical */
 
@@ -491,7 +524,7 @@ static void VoutDisplayDestroyRender(vout_display_t *vd)
 static int VoutDisplayResetRender(vout_display_t *vd)
 {
     VoutDisplayDestroyRender(vd);
-    return VoutDisplayCreateRender(vd);
+    return VoutDisplayCreateRender(vd, NULL); /* TODO */
 }
 
 static void VoutDisplayEventMouse(vout_display_t *vd, int event, va_list args)
@@ -1080,6 +1113,35 @@ picture_t *vout_FilterDisplay(vout_display_t *vd, picture_t *picture)
     return filter_chain_VideoFilter(osys->filters, picture);
 }
 
+struct filter_pool_query
+{
+    vout_display_t                 *vd;
+    const vlc_picture_pool_handler *p_pool_handler;
+    vlc_picture_pool_query         *p_queries;
+};
+
+static int AddFilterBuffer( filter_t *p_filter, void *opaque )
+{
+    struct filter_pool_query *p_query = (struct filter_pool_query *)opaque;
+    pool_HandlerAddQueryResult( p_query->p_queries, 1, &p_filter->fmt_out.video );
+    return VLC_SUCCESS;
+}
+
+void vout_FilterQueryPools( vout_display_t *vd, const vlc_picture_pool_handler *p_pool_handler, vlc_picture_pool_query *p_queries )
+{
+    vout_display_owner_sys_t *osys = vd->owner.sys;
+    if (osys->filters && filter_chain_GetLength(osys->filters) != 0)
+    {
+        struct filter_pool_query query = {
+            .vd = vd,
+            .p_pool_handler = p_pool_handler,
+            .p_queries = p_queries,
+        };
+
+        filter_chain_ForEach( osys->filters, AddFilterBuffer, &query );
+    }
+}
+
 void vout_UpdateDisplaySourceProperties(vout_display_t *vd, const video_format_t *source)
 {
     vout_display_owner_sys_t *osys = vd->owner.sys;
@@ -1200,7 +1262,8 @@ static vout_display_t *DisplayNew(vout_thread_t *vout,
                                   bool is_wrapper, vout_display_t *wrapper,
                                   mtime_t double_click_timeout,
                                   mtime_t hide_timeout,
-                                  const vout_display_owner_t *owner_ptr)
+                                  const vout_display_owner_t *owner_ptr,
+                                  vlc_picture_pool_handler *p_pool_handler)
 {
     /* */
     vout_display_owner_sys_t *osys = calloc(1, sizeof(*osys));
@@ -1273,12 +1336,12 @@ static vout_display_t *DisplayNew(vout_thread_t *vout,
 
     vout_display_t *p_display = vout_display_New(VLC_OBJECT(vout),
                                                  module, !is_wrapper,
-                                                 source, cfg, &owner);
+                                                 source, cfg, &owner, p_pool_handler);
     if (!p_display)
         goto error;
 
-    if (VoutDisplayCreateRender(p_display)) {
-        vout_display_Delete(p_display);
+    if (VoutDisplayCreateRender(p_display, p_pool_handler)) {
+        vout_display_Delete(p_display, p_pool_handler);
         goto error;
     }
 
@@ -1294,7 +1357,8 @@ error:
     return NULL;
 }
 
-void vout_DeleteDisplay(vout_display_t *vd, vout_display_state_t *state)
+void vout_DeleteDisplay(vout_display_t *vd, vout_display_state_t *state,
+                        vlc_picture_pool_handler *p_pool_handler)
 {
     vout_display_owner_sys_t *osys = vd->owner.sys;
 
@@ -1311,7 +1375,7 @@ void vout_DeleteDisplay(vout_display_t *vd, vout_display_state_t *state)
     VoutDisplayDestroyRender(vd);
     if (osys->is_wrapper)
         SplitterClose(vd);
-    vout_display_Delete(vd);
+    vout_display_Delete(vd, p_pool_handler);
     if (osys->event.fifo) {
         vlc_cancel(osys->event.thread);
         vlc_join(osys->event.thread, NULL);
@@ -1329,10 +1393,11 @@ vout_display_t *vout_NewDisplay(vout_thread_t *vout,
                                 const vout_display_state_t *state,
                                 const char *module,
                                 mtime_t double_click_timeout,
-                                mtime_t hide_timeout)
+                                mtime_t hide_timeout,
+                                vlc_picture_pool_handler *p_pool_handler)
 {
     return DisplayNew(vout, source, state, module, false, NULL,
-                      double_click_timeout, hide_timeout, NULL);
+                      double_click_timeout, hide_timeout, NULL, p_pool_handler);
 }
 
 /*****************************************************************************
@@ -1349,6 +1414,7 @@ struct vout_display_sys_t {
 };
 struct video_splitter_owner_t {
     vout_display_t *wrapper;
+    vlc_picture_pool_handler *p_pool_handler;
 };
 
 static vout_window_t *SplitterNewWindow(vout_display_t *vd, unsigned type)
@@ -1494,6 +1560,7 @@ static void SplitterClose(vout_display_t *vd)
 
     /* */
     video_splitter_t *splitter = sys->splitter;
+    vlc_picture_pool_handler *p_pool_handler = splitter->p_owner->p_pool_handler;
     free(splitter->p_owner);
     video_splitter_Delete(splitter);
 
@@ -1502,7 +1569,7 @@ static void SplitterClose(vout_display_t *vd)
 
     /* */
     for (int i = 0; i < sys->count; i++)
-        vout_DeleteDisplay(sys->display[i], NULL);
+        vout_DeleteDisplay(sys->display[i], NULL, p_pool_handler);
     TAB_CLEAN(sys->count, sys->display);
     free(sys->picture);
 
@@ -1515,7 +1582,8 @@ vout_display_t *vout_NewSplitter(vout_thread_t *vout,
                                  const char *module,
                                  const char *splitter_module,
                                  mtime_t double_click_timeout,
-                                 mtime_t hide_timeout)
+                                 mtime_t hide_timeout,
+                                 vlc_picture_pool_handler *p_pool_handler)
 {
     video_splitter_t *splitter =
         video_splitter_New(VLC_OBJECT(vout), splitter_module, source);
@@ -1525,7 +1593,7 @@ vout_display_t *vout_NewSplitter(vout_thread_t *vout,
     /* */
     vout_display_t *wrapper =
         DisplayNew(vout, source, state, module, true, NULL,
-                    double_click_timeout, hide_timeout, NULL);
+                    double_click_timeout, hide_timeout, NULL, p_pool_handler);
     if (!wrapper) {
         video_splitter_Delete(splitter);
         return NULL;
@@ -1549,6 +1617,7 @@ vout_display_t *vout_NewSplitter(vout_thread_t *vout,
     /* */
     video_splitter_owner_t *vso = xmalloc(sizeof(*vso));
     vso->wrapper = wrapper;
+    vso->p_pool_handler = p_pool_handler;
     splitter->p_owner = vso;
     splitter->pf_picture_new = SplitterPictureNew;
     splitter->pf_picture_del = SplitterPictureDel;
@@ -1576,9 +1645,10 @@ vout_display_t *vout_NewSplitter(vout_thread_t *vout,
         vout_display_t *vd = DisplayNew(vout, &output->fmt, &ostate,
                                         output->psz_module ? output->psz_module : module,
                                         false, wrapper,
-                                        double_click_timeout, hide_timeout, &vdo);
+                                        double_click_timeout, hide_timeout, &vdo,
+                                        p_pool_handler);
         if (!vd) {
-            vout_DeleteDisplay(wrapper, NULL);
+            vout_DeleteDisplay(wrapper, NULL, p_pool_handler);
             return NULL;
         }
         TAB_APPEND(sys->count, sys->display, vd);

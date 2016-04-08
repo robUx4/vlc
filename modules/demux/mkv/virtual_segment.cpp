@@ -320,6 +320,13 @@ virtual_segment_c::virtual_segment_c( matroska_segment_c & main_segment, std::ve
             break;
         }
     }
+    /* Set current chapter */
+    //p_current_vchapter = veditions[i_current_edition]->getChapterbyTimecode(0);
+    //msg_Dbg( &main_segment.sys.demuxer, "NEW START CHAPTER uid=%" PRId64, p_current_vchapter->p_chapter->i_uid );
+#if 0 /* TODO should be done once playback/demuxing starts */
+    if ( p_current_chapter != NULL )
+        p_current_chapter->Enter( true );
+#endif
 }
 
 virtual_segment_c::~virtual_segment_c()
@@ -443,7 +450,6 @@ bool virtual_segment_c::UpdateCurrentToChapter( demux_t & demux )
             msg_Dbg( &demux, "NEW CHAPTER %" PRId64 " uid=%" PRId64, sys.i_pts - VLC_TS_0, p_cur_vchapter->p_chapter->i_uid );
             if ( p_cur_vedition->b_ordered )
             {
-                /* FIXME EnterAndLeave has probably been broken for a long time */
                 // Leave/Enter up to the link point
                 b_has_seeked = p_cur_vchapter->EnterAndLeave( p_current_vchapter );
                 if ( !b_has_seeked )
@@ -477,6 +483,7 @@ bool virtual_segment_c::UpdateCurrentToChapter( demux_t & demux )
             /* out of the scope of the data described by chapters, leave the edition */
             if ( p_cur_vedition->b_ordered && p_current_vchapter != NULL )
             {
+                /* TODO should just Leave, not enter anything */
                 if ( !p_current_vchapter->Leave( ) )
                 {
                     p_current_vchapter = NULL;
@@ -502,6 +509,7 @@ bool virtual_chapter_c::EnterAndLeave( virtual_chapter_c *p_leaving_vchapter, bo
     if( !p_chapter )
         return false;
 
+    /* TODO we also need to enter and leave the sub chapters */
     return p_chapter->EnterAndLeave( p_leaving_vchapter->p_chapter, b_enter );
 }
 
@@ -540,6 +548,7 @@ void virtual_segment_c::Seek( demux_t & demuxer, mtime_t i_mk_date,
         }
         else
         {
+            /* TODO should do EnterLeave on the chapter ? */
             p_current_vchapter = p_vchapter;
             p_current_vchapter->segment.Seek( i_mk_date, i_mk_time_offset, i_global_position );
         }

@@ -35,6 +35,7 @@
 #include <vlc_vout.h>
 #include <vlc_spu.h>
 #include <vlc_aout.h>
+#include <vlc_picture_pool.h>
 #include <vlc_sout.h>
 #include "../libvlc.h"
 #include "../stream_output/stream_output.h"
@@ -193,8 +194,9 @@ static void DisplayVoutTitle( input_resource_t *p_resource,
 }
 static vout_thread_t *RequestVout( input_resource_t *p_resource,
                                    vout_thread_t *p_vout,
-                                   video_format_t *p_fmt, unsigned dpb_size,
-                                   bool b_recycle )
+                                   video_format_t *p_fmt,
+                                   bool b_recycle,
+                                   vlc_picture_pool_handler *p_pool_handler )
 {
     vlc_assert_locked( &p_resource->lock );
 
@@ -234,7 +236,7 @@ static vout_thread_t *RequestVout( input_resource_t *p_resource,
             .input      = VLC_OBJECT(p_resource->p_input),
             .change_fmt = true,
             .fmt        = p_fmt,
-            .dpb_size   = dpb_size,
+            .p_pool_handler = p_pool_handler,
         };
         p_vout = vout_Request( p_resource->p_parent, &cfg );
         if( !p_vout )
@@ -274,7 +276,7 @@ static vout_thread_t *RequestVout( input_resource_t *p_resource,
                 .input      = NULL,
                 .change_fmt = false,
                 .fmt        = NULL,
-                .dpb_size   = 0,
+                .p_pool_handler = NULL,
             };
             p_resource->p_vout_free = vout_Request( p_resource->p_parent, &cfg );
         }
@@ -458,11 +460,12 @@ void input_resource_SetInput( input_resource_t *p_resource, input_thread_t *p_in
 
 vout_thread_t *input_resource_RequestVout( input_resource_t *p_resource,
                                             vout_thread_t *p_vout,
-                                            video_format_t *p_fmt, unsigned dpb_size,
-                                            bool b_recycle )
+                                            video_format_t *p_fmt,
+                                            bool b_recycle,
+                                            vlc_picture_pool_handler *p_pool_handler )
 {
     vlc_mutex_lock( &p_resource->lock );
-    vout_thread_t *p_ret = RequestVout( p_resource, p_vout, p_fmt, dpb_size, b_recycle );
+    vout_thread_t *p_ret = RequestVout( p_resource, p_vout, p_fmt, b_recycle, p_pool_handler );
     vlc_mutex_unlock( &p_resource->lock );
 
     return p_ret;
@@ -480,7 +483,7 @@ void input_resource_HoldVouts( input_resource_t *p_resource, vout_thread_t ***pp
 
 void input_resource_TerminateVout( input_resource_t *p_resource )
 {
-    input_resource_RequestVout( p_resource, NULL, NULL, 0, false );
+    input_resource_RequestVout( p_resource, NULL, NULL, false, NULL );
 }
 bool input_resource_HasVout( input_resource_t *p_resource )
 {

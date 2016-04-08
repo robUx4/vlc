@@ -26,53 +26,10 @@
 #include <vlc_common.h>
 #include <vlc_modules.h>
 #include <vlc_fourcc.h>
+#include <vlc_codec.h>
 #include <libavutil/pixfmt.h>
 #include <libavcodec/avcodec.h>
 #include "va.h"
-
-vlc_fourcc_t vlc_va_GetChroma(enum PixelFormat hwfmt, enum PixelFormat swfmt)
-{
-    /* NOTE: At the time of writing this comment, the return value was only
-     * used to probe support as decoder output. So incorrect values were not
-     * fatal, especially not if a software format. */
-    switch (hwfmt)
-    {
-        case AV_PIX_FMT_VAAPI_VLD:
-            return VLC_CODEC_YV12;
-
-        case AV_PIX_FMT_DXVA2_VLD:
-            return VLC_CODEC_D3D9_OPAQUE;
-
-#if LIBAVUTIL_VERSION_CHECK(54, 13, 1, 24, 100)
-        case AV_PIX_FMT_D3D11VA_VLD:
-            return VLC_CODEC_D3D11_OPAQUE;
-#endif
-#if (LIBAVUTIL_VERSION_INT >= AV_VERSION_INT(53, 14, 0))
-        case AV_PIX_FMT_VDA:
-            return VLC_CODEC_I420;
-#endif
-#if (LIBAVUTIL_VERSION_INT >= AV_VERSION_INT(52, 4, 0))
-        case AV_PIX_FMT_VDPAU:
-            switch (swfmt)
-            {
-                case AV_PIX_FMT_YUVJ444P:
-                case AV_PIX_FMT_YUV444P:
-                    return VLC_CODEC_VDPAU_VIDEO_444;
-                case AV_PIX_FMT_YUVJ422P:
-                case AV_PIX_FMT_YUV422P:
-                    return VLC_CODEC_VDPAU_VIDEO_422;
-                case AV_PIX_FMT_YUVJ420P:
-                case AV_PIX_FMT_YUV420P:
-                    return VLC_CODEC_VDPAU_VIDEO_420;
-                default:
-                    return 0;
-            }
-            break;
-#endif
-        default:
-            return 0;
-    }
-}
 
 static int vlc_va_Start(void *func, va_list ap)
 {
@@ -80,9 +37,9 @@ static int vlc_va_Start(void *func, va_list ap)
     AVCodecContext *ctx = va_arg(ap, AVCodecContext *);
     enum PixelFormat pix_fmt = va_arg(ap, enum PixelFormat);
     const es_format_t *fmt = va_arg(ap, const es_format_t *);
-    picture_sys_t *p_sys = va_arg(ap, picture_sys_t *);
+    decoder_t *p_sys = va_arg(ap, decoder_t *);
     int (*open)(vlc_va_t *, AVCodecContext *, enum PixelFormat,
-                const es_format_t *, picture_sys_t *) = func;
+                const es_format_t *, decoder_t *) = func;
 
     return open(va, ctx, pix_fmt, fmt, p_sys);
 }
@@ -96,31 +53,28 @@ static void vlc_va_Stop(void *func, va_list ap)
     close(va, ctx);
 }
 
-vlc_va_t *vlc_va_New(vlc_object_t *obj, AVCodecContext *avctx,
-                     enum PixelFormat pix_fmt, const es_format_t *fmt,
-                     picture_sys_t *p_sys)
+vlc_va_t *vlc_va_New(decoder_t *p_dec, AVCodecContext *avctx,
+                     enum PixelFormat pix_fmt, const es_format_t *fmt)
 {
-    vlc_va_t *va = vlc_object_create(obj, sizeof (*va));
+    vlc_va_t *va = vlc_object_create(VLC_OBJECT(p_dec), sizeof (*va));
     if (unlikely(va == NULL))
         return NULL;
 
+    /* get a test picture from the vout */
+    //picture_t *test_pic = decoder_GetPicture(p_dec);
+    //assert(!test_pic /* || test_pic->format.i_chroma == p_dec->fmt_out.video.i_chroma */);
+
+    //picture_sys_t *p_sys = test_pic ? test_pic->p_sys : NULL;
+
     va->module = vlc_module_load(va, "hw decoder", "$avcodec-hw", true,
-                                 vlc_va_Start, va, avctx, pix_fmt, fmt, p_sys);
+                                 vlc_va_Start, va, avctx, pix_fmt, fmt, p_dec);
     if (va->module == NULL)
     {
         vlc_object_release(va);
-#ifdef _WIN32
-        return NULL;
-    }
-
-    vlc_fourcc_t chroma;
-    va->setup(va, &chroma);
-    if (chroma != vlc_va_GetChroma(pix_fmt, AV_PIX_FMT_YUV420P))
-    {   /* Mismatch, cannot work, fail */
-        vlc_va_Delete(va, avctx);
-#endif
         va = NULL;
     }
+    //if (test_pic)
+    //    picture_Release(test_pic);
     return va;
 }
 

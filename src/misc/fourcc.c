@@ -632,7 +632,8 @@ static const struct
     { { VLC_CODEC_ANDROID_OPAQUE, VLC_CODEC_MMAL_OPAQUE,
         VLC_CODEC_D3D9_OPAQUE,    VLC_CODEC_D3D11_OPAQUE },
                                                FAKE_FMT() },
-    { { VLC_CODEC_CVPX_OPAQUE },               FAKE_FMT() },
+    { { VLC_CODEC_CVPX_OPAQUE, VLC_CODEC_DXGI_OPAQUE      },
+                                               FAKE_FMT() },
 
     { { 0 },                                   FAKE_FMT() }
 };

@@ -339,6 +339,9 @@
 /* D3D11VA opaque video surface for use with D3D11 */
 #define VLC_CODEC_D3D11_OPAQUE    VLC_FOURCC('D','X','1','1')
 
+/* DXGI 420 OPAQUE video surface */
+#define VLC_CODEC_DXGI_OPAQUE     VLC_FOURCC('D','X','G','I')
+
 /* CVPixelBuffer opaque buffer type */
 #define VLC_CODEC_CVPX_OPAQUE     VLC_FOURCC('C','V','P','X')
 

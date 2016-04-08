@@ -21,8 +21,12 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston MA 02110-1301, USA.
  *****************************************************************************/
 
+#ifndef VLC_CODEC_AVCODEC_H
+#define VLC_CODEC_AVCODEC_H
+
 #include "chroma.h"
 #include "avcommon.h"
+#include "va.h"
 
 /* VLC <-> avcodec tables */
 int GetFfmpegCodec( vlc_fourcc_t i_fourcc, int *pi_cat,
@@ -253,3 +257,4 @@ void ffmpeg_CloseCodec( decoder_t *p_dec );
 #   define HAVE_AVCODEC_MT
 #endif
 
+#endif /* VLC_CODEC_AVCODEC_H */

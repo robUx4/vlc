@@ -131,7 +131,8 @@ static vout_thread_t *VoutCreate(vlc_object_t *object,
     vout->p = (vout_thread_sys_t*)&vout[1];
 
     vout->p->original = original;
-    vout->p->dpb_size = cfg->dpb_size;
+    vout->p->dpb_size = pool_HandlerDBPSize( cfg->p_pool_handler );
+    vout->p->p_pool_handler = cfg->p_pool_handler;
 
     vout_control_Init(&vout->p->control);
     vout_control_PushVoid(&vout->p->control, VOUT_CONTROL_INIT);
@@ -148,7 +149,7 @@ static vout_thread_t *VoutCreate(vlc_object_t *object,
     vout_IntfInit(vout);
 
     /* Initialize subpicture unit */
-    vout->p->spu = spu_Create(vout);
+    vout->p->spu = spu_Create(vout, cfg->p_pool_handler);
 
     vout->p->title.show     = var_InheritBool(vout, "video-title-show");
     vout->p->title.timeout  = var_InheritInteger(vout, "video-title-timeout");
@@ -201,6 +202,8 @@ static vout_thread_t *VoutCreate(vlc_object_t *object,
     }
 
     vout_control_WaitEmpty(&vout->p->control);
+
+    vout->p->p_pool_handler = NULL;
 
     if (vout->p->dead) {
         msg_Err(vout, "video output creation failed");
@@ -1307,11 +1310,11 @@ static int ThreadStart(vout_thread_t *vout, const vout_display_state_t *state)
         },
     };
     vout->p->filter.chain_static =
-        filter_chain_NewVideo( vout, true, &owner );
+        filter_chain_NewVideo( vout, true, &owner, vout->p->p_pool_handler );
 
     owner.video.buffer_new = VoutVideoFilterInteractiveNewPicture;
     vout->p->filter.chain_interactive =
-        filter_chain_NewVideo( vout, true, &owner );
+        filter_chain_NewVideo( vout, true, &owner, vout->p->p_pool_handler );
 
     vout_display_state_t state_default;
     if (!state) {
@@ -1417,7 +1420,7 @@ static int ThreadReinit(vout_thread_t *vout,
     /* We ignore crop/ar changes at this point, they are dynamically supported */
     VideoFormatCopyCropAr(&vout->p->original, &original);
     if (video_format_IsSimilar(&original, &vout->p->original)) {
-        if (cfg->dpb_size <= vout->p->dpb_size) {
+        if (pool_HandlerDBPSize( cfg->p_pool_handler ) <= vout->p->dpb_size) {
             video_format_Clean(&original);
             return VLC_SUCCESS;
         }
@@ -1448,7 +1451,8 @@ static int ThreadReinit(vout_thread_t *vout,
     }
 
     vout->p->original = original;
-    vout->p->dpb_size = cfg->dpb_size;
+    vout->p->dpb_size = pool_HandlerDBPSize( cfg->p_pool_handler );
+    vout->p->p_pool_handler = cfg->p_pool_handler;
     if (ThreadStart(vout, &state)) {
         ThreadClean(vout);
         return VLC_EGENERIC;

@@ -32,6 +32,8 @@
 #include <vlc_common.h>
 #include <vlc_picture_pool.h>
 #include <vlc_atomic.h>
+#include <vlc_codec.h>
+#include <vlc_vout_wrapper.h>
 #include "picture.h"
 
 static const uintptr_t pool_max = CHAR_BIT * sizeof (unsigned long long);
@@ -315,3 +317,199 @@ void picture_pool_Enum(picture_pool_t *pool, void (*cb)(void *, picture_t *),
     for (unsigned i = 0; i < pool->picture_count; i++)
         cb(opaque, pool->picture[i]);
 }
+
+typedef struct vlc_picture_pool_handler
+{
+
+    decoder_t *p_dec;
+    vlc_array_t pools;
+    vlc_array_t factories;
+    unsigned (*pf_get_dpb_size)(const decoder_t *);
+
+} vlc_picture_pool_handler;
+
+typedef struct
+{
+    video_format_t fmt;
+    picture_pool_t *pool;
+} pool_item;
+
+typedef struct
+{
+    video_format_t fmt;
+    unsigned       count;
+} pool_query_item;
+
+typedef struct
+{
+    vlc_fourcc_t          i_chroma;
+    pool_picture_factory  *p_factory;
+} pool_chroma_factory;
+
+vlc_picture_pool_query *pool_HandlerQueryCreate()
+{
+    vlc_array_t *p_queries = malloc( sizeof(vlc_array_t) );
+    if (p_queries)
+    {
+        vlc_array_init( p_queries );
+    }
+    return (vlc_picture_pool_query*) p_queries;
+}
+
+void pool_HandlerQueryDestroy( vlc_picture_pool_query *p_pool_handler )
+{
+    vlc_array_t* p_queries = (vlc_array_t*) p_pool_handler;
+    for (int i = 0; i < vlc_array_count( p_queries ); ++i)
+    {
+        pool_query_item *p_item =  vlc_array_item_at_index( p_queries, i );
+        free( p_item );
+    }
+    vlc_array_clear( p_queries );
+}
+
+static picture_pool_t *DefaultPoolCreate( const video_format_t *fmt, unsigned count, void *p_opaque )
+{
+    VLC_UNUSED( p_opaque );
+    return picture_pool_NewFromFormat( fmt, count );
+}
+
+static pool_picture_factory default_factory = {
+    .p_opaque       = NULL,
+    .pf_create_pool = DefaultPoolCreate,
+};
+
+pool_picture_factory *pool_HandlerGetFactory( vlc_picture_pool_handler *p_pool_handler,
+                                              vlc_fourcc_t i_chroma )
+{
+    for (int i = 0; i < vlc_array_count( &p_pool_handler->factories ); ++i)
+    {
+        pool_chroma_factory *p_item =  vlc_array_item_at_index( &p_pool_handler->factories, i );
+        if ( p_item->i_chroma == i_chroma )
+            return p_item->p_factory;
+    }
+    return &default_factory;
+}
+
+int pool_HandlerAddFactory( vlc_picture_pool_handler *p_pool_handler,
+                             vlc_fourcc_t i_chroma, pool_picture_factory *factory )
+{
+    pool_chroma_factory *p_item = malloc( sizeof(*p_item) );
+    if (unlikely(p_item == NULL))
+        return VLC_ENOMEM;
+    p_item->i_chroma  = i_chroma;
+    p_item->p_factory = factory;
+
+    vlc_array_append( &p_pool_handler->factories, p_item );
+    return VLC_SUCCESS;
+}
+
+void pool_HandlerRemoveFactory( vlc_picture_pool_handler *p_pool_handler,
+                                vlc_fourcc_t i_chroma, pool_picture_factory *factory )
+{
+    for (int i = 0; i < vlc_array_count( &p_pool_handler->factories ); ++i)
+    {
+        pool_chroma_factory *p_item =  vlc_array_item_at_index( &p_pool_handler->factories, i );
+        if ( p_item->i_chroma == i_chroma && p_item->p_factory == factory )
+        {
+            vlc_array_remove( &p_pool_handler->factories, i );
+            break;
+        }
+    }
+}
+
+vlc_picture_pool_handler *pool_HandlerCreate(decoder_t *p_dec, unsigned (*pf_get_dpb_size)(const decoder_t *))
+{
+    vlc_picture_pool_handler *p_pool_handler = malloc( sizeof(*p_pool_handler) );
+    if (p_pool_handler)
+    {
+        vlc_array_init( &p_pool_handler->pools );
+        vlc_array_init( &p_pool_handler->factories );
+        p_pool_handler->p_dec = p_dec;
+        p_pool_handler->pf_get_dpb_size = pf_get_dpb_size;
+    }
+    return p_pool_handler;
+}
+
+void pool_HandlerDestroy( vlc_picture_pool_handler *p_pool_handler )
+{
+    for (int i = 0; i < vlc_array_count( &p_pool_handler->pools ); ++i)
+    {
+        pool_item *p_item =  vlc_array_item_at_index( &p_pool_handler->pools, i );
+        free( p_item );
+    }
+    vlc_array_clear( &p_pool_handler->pools );
+
+    for (int i = 0; i < vlc_array_count( &p_pool_handler->factories ); ++i)
+    {
+        pool_chroma_factory *p_item =  vlc_array_item_at_index( &p_pool_handler->factories, i );
+        free( p_item );
+    }
+    vlc_array_clear( &p_pool_handler->factories );
+}
+
+unsigned pool_HandlerDBPSize(const vlc_picture_pool_handler *p_handled )
+{
+    return p_handled == NULL ? 0 : p_handled->pf_get_dpb_size( p_handled->p_dec );
+}
+
+int pool_HandlerAddQueryResult(vlc_picture_pool_query *queries, unsigned count, video_format_t *p_fmt)
+{
+    vlc_array_t *p_queries = (vlc_array_t *)queries;
+    for (int i = 0; i < vlc_array_count( p_queries ); ++i)
+    {
+        pool_query_item *p_item =  vlc_array_item_at_index( p_queries, i );
+        if ( video_format_IsSimilar( &p_item->fmt, p_fmt ) )
+        {
+            p_item->count += count;
+            return VLC_SUCCESS;
+        }
+    }
+
+    pool_query_item *p_item = malloc( sizeof(*p_item) );
+    if (unlikely(p_item == NULL))
+        return VLC_ENOMEM;
+    p_item->fmt  = *p_fmt;
+    p_item->count = count;
+
+    vlc_array_append( p_queries, p_item );
+    return VLC_SUCCESS;
+}
+
+int pool_HandlerQueryDecoder( vlc_picture_pool_handler *p_pool_handler,
+                              vlc_picture_pool_query *p_queries, unsigned count )
+{
+    return pool_HandlerAddQueryResult( p_queries, count, &p_pool_handler->p_dec->fmt_out.video );
+}
+
+/**
+ * @brief pool_HandlerQueryVout query to know how many picture_t the vout will need
+ * @param p_pool_handler
+ * @param p_queries
+ * @param vd
+ * @param display_pool_size
+ * @return
+ */
+int pool_HandlerQueryVout( vlc_picture_pool_handler *p_pool_handler,
+                           vlc_picture_pool_query *p_queries,
+                           vout_display_t *vd, unsigned display_pool_size )
+{
+    picture_pool_t *display_pool = vout_display_Pool( vd, display_pool_size );
+    if (display_pool == NULL)
+        return VLC_ENOITEM;
+
+#ifndef NDEBUG
+    if ( picture_pool_GetSize( display_pool ) < display_pool_size )
+        msg_Warn(vd, "Not enough display buffers in the pool, requested %d got %d",
+                 display_pool_size, picture_pool_GetSize(display_pool));
+#endif
+
+    return pool_HandlerAddQueryResult( p_queries, display_pool_size, &vd->fmt);
+}
+
+int pool_HandlerCreatePools( vlc_picture_pool_handler *p_pool_handler,
+                             vlc_picture_pool_query *queries, vout_display_t *vd )
+{
+    vlc_array_t *p_queries = (vlc_array_t *)queries;
+    return VLC_SUCCESS;
+}
+

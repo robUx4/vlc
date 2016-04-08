@@ -112,9 +112,13 @@ libd3d11_surface_plugin_la_SOURCES = video_chroma/d3d11_surface.c \
 	video_chroma/dxgi_fmt.c video_chroma/dxgi_fmt.h \
 	video_chroma/copy.c video_chroma/copy.h
 
+libdxgi_opaque_plugin_la_SOURCES = video_chroma/dxgi_opaque.c \
+	video_chroma/dxgi_fmt.c video_chroma/dxgi_fmt.h \
+	video_chroma/copy.c video_chroma/copy.h
+
 if HAVE_AVCODEC_D3D11VA
 chroma_LTLIBRARIES += \
-	libd3d11_surface_plugin.la
+	libd3d11_surface_plugin.la libdxgi_opaque_plugin.la
 endif
 
 libcvpx_i420_plugin_la_SOURCES = video_chroma/cvpx_i420.c video_chroma/copy.c video_chroma/copy.h

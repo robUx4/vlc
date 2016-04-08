@@ -27,6 +27,7 @@
 
 #include <vlc_filter.h>
 #include <vlc_modules.h>
+#include <vlc_picture_pool.h>
 #include <vlc_spu.h>
 #include <libvlc.h>
 #include <assert.h>
@@ -59,7 +60,8 @@ struct filter_chain_t
     es_format_t fmt_out; /**< Chain current output format */
     unsigned length; /**< Number of filters */
     bool b_allow_fmt_out_change; /**< Can the output format be changed? */
-    char psz_capability[1]; /**< Module capability for all chained filters */
+    vlc_picture_pool_handler *p_pool_handler;
+    char psz_capability[1]; /**< Module capability for all chained filters, MUST BE LAST */
 };
 
 /**
@@ -68,7 +70,8 @@ struct filter_chain_t
 static void FilterDeletePictures( picture_t * );
 
 static filter_chain_t *filter_chain_NewInner( const filter_owner_t *callbacks,
-    const char *cap, bool fmt_out_change, const filter_owner_t *owner )
+    const char *cap, bool fmt_out_change, const filter_owner_t *owner,
+                                              vlc_picture_pool_handler *p_pool_handler )
 {
     assert( callbacks != NULL && callbacks->sys != NULL );
     assert( cap != NULL );
@@ -82,6 +85,7 @@ static filter_chain_t *filter_chain_NewInner( const filter_owner_t *callbacks,
         chain->owner = *owner;
     chain->first = NULL;
     chain->last = NULL;
+    chain->p_pool_handler = p_pool_handler;
     es_format_Init( &chain->fmt_in, UNKNOWN_ES, 0 );
     es_format_Init( &chain->fmt_out, UNKNOWN_ES, 0 );
     chain->length = 0;
@@ -96,13 +100,13 @@ static filter_chain_t *filter_chain_NewInner( const filter_owner_t *callbacks,
  * Filter chain initialisation
  */
 filter_chain_t *filter_chain_New( vlc_object_t *obj, const char *cap,
-                                  bool fmt_out_change )
+                                  bool fmt_out_change, vlc_picture_pool_handler *p_pool_handler )
 {
     filter_owner_t callbacks = {
         .sys = obj,
     };
 
-    return filter_chain_NewInner( &callbacks, cap, fmt_out_change, NULL );
+    return filter_chain_NewInner( &callbacks, cap, fmt_out_change, NULL, p_pool_handler );
 }
 
 /** Chained filter picture allocator function */
@@ -129,7 +133,8 @@ static picture_t *filter_chain_VideoBufferNew( filter_t *filter )
 
 #undef filter_chain_NewVideo
 filter_chain_t *filter_chain_NewVideo( vlc_object_t *obj, bool allow_change,
-                                       const filter_owner_t *restrict owner )
+                                       const filter_owner_t *restrict owner,
+                                       vlc_picture_pool_handler *p_pool_handler )
 {
     filter_owner_t callbacks = {
         .sys = obj,
@@ -139,7 +144,7 @@ filter_chain_t *filter_chain_NewVideo( vlc_object_t *obj, bool allow_change,
     };
 
     return filter_chain_NewInner( &callbacks, "video filter2", allow_change,
-                                  owner );
+                                  owner, p_pool_handler );
 }
 
 /**
@@ -176,6 +181,20 @@ void filter_chain_Reset( filter_chain_t *p_chain, const es_format_t *p_fmt_in,
     }
 }
 
+static picture_pool_t *DefaultPoolFactory( const video_format_t *p_fmt, unsigned count,
+                                           void *p_opaque )
+{
+    VLC_UNUSED( p_opaque );
+    return picture_pool_NewFromFormat( p_fmt, count );
+}
+
+#if 0
+static bool DefaultPoolCompare( pool_picture_factory *p_factory, const video_format_t *fmt,
+                                void *p_opaque )
+{
+}
+#endif
+
 filter_t *filter_chain_AppendFilter( filter_chain_t *chain, const char *name,
                                      config_chain_t *cfg,
                                      const es_format_t *fmt_in,
@@ -207,6 +226,10 @@ filter_t *filter_chain_AppendFilter( filter_chain_t *chain, const char *name,
 
     filter->owner = chain->callbacks;
     filter->owner.sys = chain;
+    filter->pool_factory.p_opaque = NULL;
+    filter->pool_factory.pf_create_pool = DefaultPoolFactory;
+    //filter->pool_factory.pf_compatible  = DefaultPoolCompare;
+    filter->p_pool_handler = chain->p_pool_handler;
 
     filter->p_module = module_need( filter, chain->psz_capability, name,
                                     name != NULL );
@@ -218,6 +241,8 @@ filter_t *filter_chain_AppendFilter( filter_chain_t *chain, const char *name,
         es_format_Clean( &chain->fmt_out );
         es_format_Copy( &chain->fmt_out, &filter->fmt_out );
     }
+
+    pool_HandlerAddFactory( chain->p_pool_handler, chain->fmt_in.video.i_chroma, &filter->pool_factory );
 
     if( chain->last == NULL )
     {
@@ -283,6 +308,8 @@ void filter_chain_DeleteFilter( filter_chain_t *chain, filter_t *filter )
 
     msg_Dbg( obj, "Filter %p removed from chain", (void *)filter );
     FilterDeletePictures( chained->pending );
+
+    pool_HandlerRemoveFactory( chain->p_pool_handler, filter->fmt_in.video.i_chroma, &filter->pool_factory );
 
     free( chained->mouse );
     es_format_Clean( &filter->fmt_out );

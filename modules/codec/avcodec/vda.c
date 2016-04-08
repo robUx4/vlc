@@ -94,13 +94,13 @@ static int Open(vlc_va_t *va,
                 AVCodecContext *avctx,
                 enum PixelFormat pix_fmt,
                 const es_format_t *fmt,
-                picture_sys_t *p_sys)
+                decoder_t *p_dec)
 {
     if( pix_fmt != AV_PIX_FMT_VDA )
         return VLC_EGENERIC;
 
     (void) fmt;
-    (void) p_sys;
+    (void) p_dec;
 
     size_t i_profile = 0xFFFF, i_level = 0xFFFF;
 

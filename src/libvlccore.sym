@@ -734,3 +734,4 @@ addons_manager_Remove
 addon_entry_New
 addon_entry_Hold
 addon_entry_Release
+pool_HandlerGetFactory

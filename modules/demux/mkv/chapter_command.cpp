@@ -421,7 +421,7 @@ bool dvd_command_interpretor_c::Interpret( const binary * p_command, size_t i_si
                     {
                         p_vchapter = p_vsegment->BrowseCodecPrivate( 1, MatchPgcType, &p_type, 1 );
                         if ( p_vchapter != NULL )
-                        {
+                        { /* TODO enter via the first PGC ? */
                             sys.JumpTo( *p_vsegment, *p_vchapter );
                             f_result = true;
                         }
@@ -465,7 +465,7 @@ bool dvd_command_interpretor_c::Interpret( const binary * p_command, size_t i_si
                             // find the specified menu in the VTSM
                             p_vchapter = p_vsegment->BrowseCodecPrivate( 1, MatchPgcType, &p_type, 1 );
                             if ( p_vchapter != NULL )
-                            {
+                            { /* TODO enter via the first PGC ? */
                                 sys.JumpTo( *p_vsegment, *p_vchapter );
                                 f_result = true;
                             }
@@ -750,7 +750,10 @@ bool matroska_script_interpretor_c::Interpret( const binary * p_command, size_t 
         else
         {
             if ( !p_vchapter->EnterAndLeave( sys.p_current_vsegment->CurrentChapter() ) )
+            {
+                //es_out_Control( sys.demuxer.out, ES_OUT_RESET_PCR);
                 p_vsegment->Seek( sys.demuxer, p_vchapter->i_mk_virtual_start_time, p_vchapter, -1 );
+            }
             b_result = true;
         }
     }

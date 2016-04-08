@@ -380,7 +380,7 @@ static void Close(vlc_object_t *p_this)
     DeinitOmxCore();
 }
 
-static picture_pool_t *Pool(vout_display_t *vd, unsigned count)
+static picture_pool_t *Pool(vout_display_t *vd, unsigned count, bool decoder)
 {
     VLC_UNUSED(count);
 

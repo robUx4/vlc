@@ -111,6 +111,8 @@ struct vout_display_sys_t
     RECT         rect_dest_clipped;
 
     picture_pool_t *pool;
+    picture_pool_t *p_decoder_pool;
+    pool_picture_factory  pool_factory;
 
 #ifdef MODULE_NAME_IS_directdraw
     /* Multi-monitor support */
@@ -267,8 +269,6 @@ void UpdateRects (vout_display_t *,
                   const video_format_t *,
                   bool is_forced);
 void AlignRect(RECT *, int align_boundary, int align_size);
-
-picture_pool_t *CommonPool(vout_display_t *, unsigned);
 
 /*****************************************************************************
  * Constants

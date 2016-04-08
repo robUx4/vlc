@@ -115,7 +115,7 @@ static int Activate( vlc_object_t *p_this )
         },
     };
 
-    p_sys->p_chain = filter_chain_NewVideo( p_filter, false, &owner );
+    p_sys->p_chain = filter_chain_NewVideo( p_filter, false, &owner, NULL ); /* TODO */
     if( !p_sys->p_chain )
     {
         free( p_sys );

@@ -64,10 +64,9 @@ struct picture_sys_t
 };
 
 struct filter_sys_t {
-    copy_cache_t        cache;
-    ID3D11Texture2D     *staging;
-    vlc_mutex_t         staging_lock;
-    picture_pool_d3d11  pool_factory;
+    copy_cache_t     cache;
+    ID3D11Texture2D  *staging;
+    vlc_mutex_t      staging_lock;
 };
 
 static int assert_staging(filter_t *p_filter, picture_sys_t *p_sys)
@@ -111,6 +110,12 @@ static void D3D11_YUY2(filter_t *p_filter, picture_t *src, picture_t *dst)
     D3D11_MAPPED_SUBRESOURCE lock;
 
     vlc_mutex_lock(&sys->staging_lock);
+    if (assert_staging(p_filter, p_sys) != VLC_SUCCESS)
+    {
+        vlc_mutex_unlock(&sys->staging_lock);
+        return;
+    }
+
     D3D11_VIDEO_DECODER_OUTPUT_VIEW_DESC viewDesc;
     ID3D11VideoDecoderOutputView_GetDesc( p_sys->decoder, &viewDesc );
 
@@ -188,6 +193,12 @@ static void D3D11_NV12(filter_t *p_filter, picture_t *src, picture_t *dst)
     D3D11_MAPPED_SUBRESOURCE lock;
 
     vlc_mutex_lock(&sys->staging_lock);
+    if (assert_staging(p_filter, p_sys) != VLC_SUCCESS)
+    {
+        vlc_mutex_unlock(&sys->staging_lock);
+        return;
+    }
+
     D3D11_VIDEO_DECODER_OUTPUT_VIEW_DESC viewDesc;
     ID3D11VideoDecoderOutputView_GetDesc( p_sys->decoder, &viewDesc );
 
@@ -232,7 +243,7 @@ VIDEO_FILTER_WRAPPER (D3D11_YUY2)
 static int OpenConverter( vlc_object_t *obj )
 {
     filter_t *p_filter = (filter_t *)obj;
-    if ( p_filter->fmt_in.video.i_chroma != VLC_CODEC_D3D11_OPAQUE )
+    if ( p_filter->fmt_in.video.i_chroma != VLC_CODEC_DXGI_OPAQUE )
         return VLC_EGENERIC;
 
     if ( p_filter->fmt_in.video.i_height != p_filter->fmt_out.video.i_height
@@ -254,34 +265,6 @@ static int OpenConverter( vlc_object_t *obj )
     filter_sys_t *p_sys = calloc(1, sizeof(filter_sys_t));
     if (!p_sys)
          return VLC_ENOMEM;
-    p_filter->pool_factory.p_opaque = &p_sys->pool_factory;
-
-    /* TODO do the same in direct3d11.c & d3d11va.c */
-    pool_picture_factory *p_pool_factory = pool_HandlerGetFactory( p_filter->p_pool_handler,
-                                                                   p_filter->fmt_in.video.i_chroma );
-    if ( p_pool_factory != NULL )
-    {
-        D3D11SurfaceContextAddRef( p_filter->pool_factory.p_opaque );
-        p_filter->pool_factory.pf_destructor = D3D11SurfaceContextDelRef;
-    }
-    else
-    {
-        int err = D3D11CreateSurfaceContext( p_filter, &p_sys->pool_factory );
-        if ( err != VLC_SUCCESS )
-        {
-            free( p_sys );
-            return err;
-        }
-        p_filter->pool_factory.pf_destructor = D3D11DestroySurfaceContext;
-    }
-    p_filter->pool_factory.pf_create_pool = D3D11CreateSurfacePool;
-
-    assert_staging( p_filter, p_sys );
-    if ( p_sys->staging == NULL )
-    {
-        free( p_sys );
-        return VLC_ENOMEM;
-    }
     CopyInitCache(&p_sys->cache, p_filter->fmt_in.video.i_width );
     vlc_mutex_init(&p_sys->staging_lock);
     p_filter->p_sys = p_sys;

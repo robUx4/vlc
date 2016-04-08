@@ -52,7 +52,7 @@ typedef struct {
     vlc_object_t         *input;
     bool                 change_fmt;
     const video_format_t *fmt;
-    unsigned             dpb_size;
+    vlc_picture_pool_handler *p_pool_handler;
 } vout_configuration_t;
 
 /**

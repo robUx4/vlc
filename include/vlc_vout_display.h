@@ -293,6 +293,17 @@ struct vout_display_t {
      */
     picture_pool_t *(*pool)(vout_display_t *, unsigned count);
 
+    /* Return a pointer over the decoder picture_pool_t* (optional).
+     *
+     * For performance reasons, it is best to provide at least count
+     * pictures but it is not mandatory.
+     * You can return NULL when you cannot/do not want to allocate
+     * pictures.
+     * The vout display module keeps the ownership of the pool and can
+     * destroy it only when closing or on invalid pictures control.
+     */
+    picture_pool_t *(*decoder_pool)(vout_display_t *, unsigned count);
+
     /* Prepare a picture and an optional subpicture for display (optional).
      *
      * It is called before the next pf_display call to provide as much
@@ -322,6 +333,8 @@ struct vout_display_t {
 
     /* Manage pending event (optional) */
     void       (*manage)(vout_display_t *);
+
+    pool_picture_factory *p_pool_factory;
 
     /* Private place holder for the vout_display_t module (optional)
      *

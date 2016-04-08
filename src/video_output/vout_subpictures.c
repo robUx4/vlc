@@ -1183,7 +1183,7 @@ static int SubSourceClean(filter_t *filter, void *data)
  *
  * \param p_this the parent object which creates the subpicture unit
  */
-spu_t *spu_Create(vlc_object_t *object)
+spu_t *spu_Create(vlc_object_t *object, vlc_picture_pool_handler *p_pool_handler)
 {
     spu_t *spu = vlc_custom_create(object,
                                    sizeof(spu_t) + sizeof(spu_private_t),
@@ -1212,8 +1212,8 @@ spu_t *spu_Create(vlc_object_t *object)
     sys->filter_chain_update = NULL;
     vlc_mutex_init(&sys->source_chain_lock);
     vlc_mutex_init(&sys->filter_chain_lock);
-    sys->source_chain = filter_chain_New(spu, "sub source", false);
-    sys->filter_chain = filter_chain_New(spu, "sub filter", false);
+    sys->source_chain = filter_chain_New(spu, "sub source", false, p_pool_handler);
+    sys->filter_chain = filter_chain_New(spu, "sub filter", false, p_pool_handler);
 
     /* Load text and scale module */
     sys->text = SpuRenderCreateAndLoadText(spu);

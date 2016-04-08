@@ -117,6 +117,7 @@ typedef struct d3d_vertex_t {
 #define RECTHeight(r)  (int)((r).bottom - (r).top)
 
 static picture_pool_t *Pool(vout_display_t *vd, unsigned count);
+static picture_pool_t *DecoderPool(vout_display_t *vd, unsigned count);
 
 static void Prepare(vout_display_t *, picture_t *, subpicture_t *subpicture);
 static void Display(vout_display_t *, picture_t *, subpicture_t *subpicture);
@@ -127,7 +128,7 @@ static void Direct3D11Destroy(vout_display_t *);
 static int  Direct3D11Open (vout_display_t *, video_format_t *);
 static void Direct3D11Close(vout_display_t *);
 
-static int  Direct3D11CreateResources (vout_display_t *, video_format_t *);
+static int  Direct3D11CreateResources (vout_display_t *, video_format_t *, vlc_fourcc_t);
 static void Direct3D11DestroyResources(vout_display_t *);
 
 static int  Direct3D11CreatePool (vout_display_t *, video_format_t *);
@@ -345,6 +346,18 @@ static const char *globPixelShaderBiplanarYUV_BT709_2RGB = "\
   }\
 ";
 
+static picture_pool_t* CreatePoolD3D11(const video_format_t *p_fmt, unsigned count, void *p_opaque)
+{
+    vout_display_sys_t *sys = p_opaque; /* should just have the D3D11 context*/
+    return picture_pool_NewFromFormat( p_fmt, count );
+}
+
+static picture_pool_t* CreatePoolDXGI(const video_format_t *p_fmt, unsigned count, void *p_opaque)
+{
+    vout_display_sys_t *sys = p_opaque; /* should just have the D3D11 context*/
+    return picture_pool_NewFromFormat( p_fmt, count );
+}
+
 static int Open(vlc_object_t *object)
 {
     vout_display_t *vd = (vout_display_t *)object;
@@ -460,11 +473,11 @@ static int Open(vlc_object_t *object)
     }
 
     vout_display_info_t info  = vd->info;
-    info.is_slow              = fmt.i_chroma != VLC_CODEC_D3D11_OPAQUE;
+    info.is_slow              = fmt.i_chroma != VLC_CODEC_D3D11_OPAQUE && fmt.i_chroma != VLC_CODEC_DXGI_OPAQUE;
     info.has_double_click     = true;
     info.has_hide_mouse       = false;
     info.has_event_thread     = true;
-    info.has_pictures_invalid = fmt.i_chroma != VLC_CODEC_D3D11_OPAQUE;
+    info.has_pictures_invalid = fmt.i_chroma != VLC_CODEC_D3D11_OPAQUE && fmt.i_chroma != VLC_CODEC_DXGI_OPAQUE;
 
     if (var_InheritBool(vd, "direct3d11-hw-blending") &&
         sys->d3dregion_format != DXGI_FORMAT_UNKNOWN)
@@ -477,10 +490,23 @@ static int Open(vlc_object_t *object)
     vd->info = info;
 
     vd->pool    = Pool;
+    // TODO vd->decoder_pool = DecoderPool;
     vd->prepare = Prepare;
     vd->display = Display;
     vd->control = CommonControl;
     vd->manage  = Manage;
+    if ( fmt.i_chroma == VLC_CODEC_D3D11_OPAQUE )
+    {
+        sys->pool_factory.pf_create_pool = CreatePoolD3D11;
+        sys->pool_factory.p_opaque       = sys; /* TODO share same structure with D3D11VA */
+        vd->p_pool_factory = &sys->pool_factory;
+    }
+    else if ( fmt.i_chroma == VLC_CODEC_DXGI_OPAQUE )
+    {
+        sys->pool_factory.pf_create_pool = CreatePoolDXGI;
+        sys->pool_factory.p_opaque       = sys; /* TODO share same structure with D3D11VA */
+        vd->p_pool_factory = &sys->pool_factory;
+    }
 
     msg_Dbg(vd, "Direct3D11 Open Succeeded");
 
@@ -594,7 +620,98 @@ error:
     return vd->sys->pool;
 }
 
-#ifdef HAVE_ID3D11VIDEODECODER 
+static picture_pool_t *DecoderPool(vout_display_t *vd, unsigned pool_size)
+{
+    if ( vd->sys->p_decoder_pool != NULL )
+        return vd->sys->p_decoder_pool;
+
+#ifdef HAVE_ID3D11VIDEODECODER
+    picture_t**       pictures = NULL;
+    unsigned          picture_count = 0;
+    HRESULT           hr;
+
+    ID3D10Multithread *pMultithread;
+    hr = ID3D11Device_QueryInterface( vd->sys->d3ddevice, &IID_ID3D10Multithread, (void **)&pMultithread);
+    if (SUCCEEDED(hr)) {
+        ID3D10Multithread_SetMultithreadProtected(pMultithread, TRUE);
+        ID3D10Multithread_Release(pMultithread);
+    }
+
+    pictures = calloc(pool_size, sizeof(*pictures));
+    if (!pictures)
+        goto error;
+
+    D3D11_TEXTURE2D_DESC texDesc;
+    ZeroMemory(&texDesc, sizeof(texDesc));
+    texDesc.Width = vd->fmt.i_width;
+    texDesc.Height = vd->fmt.i_height;
+    texDesc.MipLevels = 1;
+    texDesc.Format = vd->sys->picQuadConfig.textureFormat;
+    texDesc.SampleDesc.Count = 1;
+    texDesc.MiscFlags = 0; //D3D11_RESOURCE_MISC_SHARED;
+    texDesc.ArraySize = 1;
+    texDesc.Usage = D3D11_USAGE_DYNAMIC;
+    texDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+    texDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+
+    for (picture_count = 0; picture_count < pool_size; picture_count++) {
+        picture_sys_t *picsys = calloc(1, sizeof(*picsys));
+        if (unlikely(picsys == NULL))
+            goto error;
+
+        hr = ID3D11Device_CreateTexture2D( vd->sys->d3ddevice, &texDesc, NULL, &picsys->texture );
+        if (FAILED(hr)) {
+            msg_Err(vd, "CreateTexture2D %d failed on picture %d of the pool. (hr=0x%0lx)", pool_size, picture_count, hr);
+            goto error;
+        }
+
+        picsys->context = vd->sys->d3dcontext;
+
+        picture_resource_t resource = {
+            .p_sys = picsys,
+            .pf_destroy = DestroyDisplayPoolPicture,
+        };
+
+        picture_t *picture = picture_NewFromResource(&vd->fmt, &resource);
+        if (unlikely(picture == NULL)) {
+            free(picsys);
+            msg_Err( vd, "Failed to create picture %d in the pool.", picture_count );
+            goto error;
+        }
+
+        pictures[picture_count] = picture;
+        /* each picture_t holds a ref to the context and release it on Destroy */
+        ID3D11DeviceContext_AddRef(picsys->context);
+    }
+    msg_Dbg(vd, "ID3D11VideoDecoderOutputView succeed with %d surfaces (%dx%d)",
+            pool_size, vd->fmt.i_width, vd->fmt.i_height);
+
+    picture_pool_configuration_t pool_cfg;
+    memset(&pool_cfg, 0, sizeof(pool_cfg));
+    pool_cfg.picture_count = pool_size;
+    pool_cfg.picture       = pictures;
+
+    vd->sys->p_decoder_pool = picture_pool_NewExtended( &pool_cfg );
+
+error:
+    if (vd->sys->p_decoder_pool ==NULL && pictures) {
+        msg_Dbg(vd, "Failed to create the picture d3d11 pool");
+        for (unsigned i=0;i<picture_count; ++i)
+            DestroyDisplayPoolPicture(pictures[i]);
+        free(pictures);
+
+        /* create an empty pool to avoid crashing */
+        picture_pool_configuration_t pool_cfg;
+        memset( &pool_cfg, 0, sizeof( pool_cfg ) );
+        pool_cfg.picture_count = 0;
+
+        vd->sys->pool = picture_pool_NewExtended( &pool_cfg );
+    }
+#endif
+    return vd->sys->p_decoder_pool;
+}
+
+#ifdef HAVE_ID3D11VIDEODECODER
 static void DestroyDisplayPoolPicture(picture_t *picture)
 {
     picture_sys_t *p_sys = (picture_sys_t*) picture->p_sys;
@@ -734,6 +851,8 @@ static void Prepare(vout_display_t *vd, picture_t *picture, subpicture_t *subpic
 #ifdef HAVE_ID3D11VIDEODECODER 
     if (picture->format.i_chroma == VLC_CODEC_D3D11_OPAQUE) {
         D3D11_BOX box;
+        D3D11_TEXTURE2D_DESC inDesc, outDesc;
+
         box.left = 0;
         box.right = picture->format.i_visible_width;
         box.top = 0;
@@ -742,6 +861,9 @@ static void Prepare(vout_display_t *vd, picture_t *picture, subpicture_t *subpic
         box.front = 0;
 
         picture_sys_t *p_sys = picture->p_sys;
+        ID3D11Texture2D_GetDesc( p_sys->texture, &inDesc );
+        ID3D11Texture2D_GetDesc( sys->picQuad.pTexture, &outDesc );
+
         ID3D11DeviceContext_CopySubresourceRegion(sys->d3dcontext,
                                                   (ID3D11Resource*) sys->picQuad.pTexture,
                                                   0, 0, 0, 0,
@@ -1087,6 +1209,7 @@ static int Direct3D11Open(vout_display_t *vd, video_format_t *fmt)
         {
         case VLC_CODEC_NV12:
         case VLC_CODEC_D3D11_OPAQUE:
+        case VLC_CODEC_DXGI_OPAQUE:
             if( fmt->i_height > 576 )
                 sys->d3dPxShader = globPixelShaderBiplanarYUV_BT709_2RGB;
             else
@@ -1112,7 +1235,7 @@ static int Direct3D11Open(vout_display_t *vd, video_format_t *fmt)
 
     UpdateRects(vd, NULL, NULL, true);
 
-    if (Direct3D11CreateResources(vd, fmt)) {
+    if (Direct3D11CreateResources(vd, fmt, i_src_chroma)) {
         msg_Err(vd, "Failed to allocate resources");
         Direct3D11DestroyResources(vd);
         return VLC_EGENERIC;
@@ -1178,7 +1301,7 @@ static void UpdatePicQuadPosition(vout_display_t *vd)
 
 /* TODO : handle errors better
    TODO : seperate out into smaller functions like createshaders */
-static int Direct3D11CreateResources(vout_display_t *vd, video_format_t *fmt)
+static int Direct3D11CreateResources(vout_display_t *vd, video_format_t *fmt, vlc_fourcc_t i_decoder_chroma)
 {
     vout_display_sys_t *sys = vd->sys;
     HRESULT hr;
@@ -1407,7 +1530,8 @@ static int Direct3D11CreatePool(vout_display_t *vd, video_format_t *fmt)
 {
     vout_display_sys_t *sys = vd->sys;
 
-    if ( fmt->i_chroma == VLC_CODEC_D3D11_OPAQUE )
+    if ( fmt->i_chroma == VLC_CODEC_D3D11_OPAQUE ||
+         fmt->i_chroma == VLC_CODEC_DXGI_OPAQUE )
         /* a D3D11VA pool will be created when needed */
         return VLC_SUCCESS;
 
@@ -1451,9 +1575,16 @@ static void Direct3D11DestroyPool(vout_display_t *vd)
 {
     vout_display_sys_t *sys = vd->sys;
 
-    if (sys->pool)
-        picture_pool_Release(sys->pool);
-    sys->pool = NULL;
+    if ( sys->pool )
+    {
+        picture_pool_Release( sys->pool );
+        sys->pool = NULL;
+    }
+    if ( sys->p_decoder_pool )
+    {
+        picture_pool_Release( sys->p_decoder_pool );
+        sys->p_decoder_pool = NULL;
+    }
 }
 
 static int AllocQuad(vout_display_t *vd, const video_format_t *fmt, d3d_quad_t *quad,

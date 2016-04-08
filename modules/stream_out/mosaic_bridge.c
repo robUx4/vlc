@@ -392,7 +392,7 @@ static sout_stream_id_sys_t * Add( sout_stream_t *p_stream, const es_format_t *p
             },
         };
 
-        p_sys->p_vf2 = filter_chain_NewVideo( p_stream, false, &owner );
+        p_sys->p_vf2 = filter_chain_NewVideo( p_stream, false, &owner, NULL ); /* TODO */
         es_format_t fmt;
         es_format_Copy( &fmt, &p_sys->p_decoder->fmt_out );
         if( p_sys->i_chroma )

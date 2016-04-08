@@ -29,11 +29,19 @@
 /* XXX DO NOT use it outside the vout module wrapper XXX */
 
 /**
- * It retreives a picture pool from the display
+ * It retreives a picture pool from the display to display
  */
 static inline picture_pool_t *vout_display_Pool(vout_display_t *vd, unsigned count)
 {
     return vd->pool(vd, count);
+}
+
+/**
+ * It retreives a picture pool from the display for the decoder
+ */
+static inline picture_pool_t *vout_display_DecoderPool(vout_display_t *vd, unsigned count)
+{
+    return vd->decoder_pool(vd, count);
 }
 
 /**
@@ -76,13 +84,15 @@ typedef struct {
  */
 vout_display_t *vout_NewDisplay( vout_thread_t *, const video_format_t *,
     const vout_display_state_t *, const char *module,
-    mtime_t double_click_timeout, mtime_t hide_timeout );
+    mtime_t double_click_timeout, mtime_t hide_timeout, vlc_picture_pool_handler * );
 /**
  * It destroy a vout managed display.
  */
-void vout_DeleteDisplay(vout_display_t *, vout_display_state_t *);
+void vout_DeleteDisplay(vout_display_t *, vout_display_state_t *, vlc_picture_pool_handler *);
 bool vout_IsDisplayFiltered(vout_display_t *);
 picture_t * vout_FilterDisplay(vout_display_t *, picture_t *);
+void vout_FilterQueryPools( vout_display_t * vd, const vlc_picture_pool_handler *p_pool_handler,
+                            vlc_picture_pool_query *p_queries );
 bool vout_AreDisplayPicturesInvalid(vout_display_t *);
 
 bool vout_ManageDisplay(vout_display_t *, bool allow_reset_pictures);

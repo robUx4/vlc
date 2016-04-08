@@ -102,7 +102,7 @@ static int Open( vlc_object_t *p_this )
         },
     };
     /* Store the filter chain in p_sys */
-    p_filter->p_sys = (filter_sys_t *)filter_chain_NewVideo( p_filter, true, &owner );
+    p_filter->p_sys = (filter_sys_t *)filter_chain_NewVideo( p_filter, true, &owner, NULL ); /* TODO */
 
     if ( p_filter->p_sys == NULL)
     {

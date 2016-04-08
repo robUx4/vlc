@@ -62,10 +62,12 @@ int vout_OpenWrapper(vout_thread_t *vout,
 
     if (splitter_name) {
         sys->display.vd = vout_NewSplitter(vout, &vout->p->original, state, "$vout", splitter_name,
-                                           double_click_timeout, hide_timeout);
+                                           double_click_timeout, hide_timeout,
+                                           vout->p->p_pool_handler);
     } else {
         sys->display.vd = vout_NewDisplay(vout, &vout->p->original, state, "$vout",
-                                          double_click_timeout, hide_timeout);
+                                          double_click_timeout, hide_timeout,
+                                          vout->p->p_pool_handler);
     }
     if (!sys->display.vd) {
         free(sys->display.title);
@@ -96,7 +98,7 @@ void vout_CloseWrapper(vout_thread_t *vout, vout_display_state_t *state)
 #endif
     sys->decoder_pool = NULL; /* FIXME remove */
 
-    vout_DeleteDisplay(sys->display.vd, state);
+    vout_DeleteDisplay(sys->display.vd, state, sys->p_pool_handler);
     free(sys->display.title);
 }
 
@@ -106,7 +108,7 @@ void vout_CloseWrapper(vout_thread_t *vout, vout_display_state_t *state)
 /* Minimum number of display picture */
 #define DISPLAY_PICTURE_COUNT (1)
 
-static void NoDrInit(vout_thread_t *vout)
+static void NoDrInit(vout_thread_t *vout) /* TODO: remove */
 {
     vout_thread_sys_t *sys = vout->p;
 
@@ -116,13 +118,81 @@ static void NoDrInit(vout_thread_t *vout)
         sys->display_pool = NULL;
 }
 
+static int vout_InitWrapperPools( vout_thread_sys_t *sys )
+{
+    vout_display_t *vd = sys->display.vd;
+    vlc_picture_pool_handler *p_pool_handler = sys->p_pool_handler;
+    int err;
+
+    /* TODO 1/ aggregate the number of pictures needed for each format */
+    vlc_picture_pool_query *p_queries = pool_HandlerQueryCreate();
+    if (unlikely(p_queries == NULL))
+        return VLC_ENOMEM;
+
+    bool allow_dr = false;
+    unsigned decoder_pool_size = 1 + pool_HandlerDBPSize( p_pool_handler );
+    if ( vout_IsDisplayFiltered( vd ) )
+    {
+        sys->display.use_dr = false;
+        vout_FilterQueryPools( vd, p_pool_handler, p_queries );
+    }
+    else
+    {
+        sys->display.use_dr = true;
+        if ( !vd->info.has_pictures_invalid && !vd->info.is_slow )
+        {
+            allow_dr = true;
+            // direct rendering
+            decoder_pool_size = __MAX(VOUT_MAX_PICTURES, pool_HandlerDBPSize( p_pool_handler ));
+        }
+    }
+
+    /* TODO allocate all the pools needed for each layer */
+    // query the decoder for its output picture pool
+    err = pool_HandlerQueryDecoder( p_pool_handler, p_queries, decoder_pool_size );
+    if ( err != VLC_SUCCESS )
+    {
+        pool_HandlerQueryDestroy( p_queries );
+        return err;
+    }
+
+    // query the vout for its input picture pool
+    err = pool_HandlerQueryVout( p_pool_handler, p_queries, vd,
+                                 1 + /* last displayed picture */
+                                 1 + /* SPU */
+                                 DISPLAY_PICTURE_COUNT );
+    if ( err != VLC_SUCCESS )
+    {
+        pool_HandlerQueryDestroy( p_queries );
+        return err;
+    }
+
+    /* TODO 2/ allocate a pool for a each format through the decoder + filters + vout */
+    pool_HandlerCreatePools( p_pool_handler, p_queries, vd );
+
+    /* TODO 3/ fill legacy decoder_pool / display_pool / private_pool */
+#if 0
+    if (allow_dr &&
+        picture_pool_GetSize(display_pool) >= reserved_picture + decoder_picture) {
+        sys->dpb_size     = picture_pool_GetSize(display_pool) - reserved_picture;
+        sys->decoder_pool = display_pool;
+        sys->display_pool = display_pool;
+    }
+#endif
+
+    pool_HandlerQueryDestroy( p_queries );
+    return err;
+}
+
 int vout_InitWrapper(vout_thread_t *vout)
 {
     vout_thread_sys_t *sys = vout->p;
     vout_display_t *vd = sys->display.vd;
-    video_format_t source = vd->source;
 
-    sys->display.use_dr = !vout_IsDisplayFiltered(vd);
+    int err = vout_InitWrapperPools( sys );
+    if ( err != VLC_SUCCESS )
+        return err;
+
     const bool allow_dr = !vd->info.has_pictures_invalid && !vd->info.is_slow && sys->display.use_dr;
     const unsigned private_picture  = 4; /* XXX 3 for filter, 1 for SPU */
     const unsigned decoder_picture  = 1 + sys->dpb_size;
@@ -130,17 +200,8 @@ int vout_InitWrapper(vout_thread_t *vout)
     const unsigned reserved_picture = DISPLAY_PICTURE_COUNT +
                                       private_picture +
                                       kept_picture;
-    const unsigned display_pool_size = allow_dr ? __MAX(VOUT_MAX_PICTURES,
-                                                        reserved_picture + decoder_picture) : 3;
-    picture_pool_t *display_pool = vout_display_Pool(vd, display_pool_size);
-    if (display_pool == NULL)
-        return VLC_EGENERIC;
 
-#ifndef NDEBUG
-    if ( picture_pool_GetSize(display_pool) < display_pool_size )
-        msg_Warn(vout, "Not enough display buffers in the pool, requested %d got %d",
-                 display_pool_size, picture_pool_GetSize(display_pool));
-#endif
+    picture_pool_t *display_pool = NULL;
 
     if (allow_dr &&
         picture_pool_GetSize(display_pool) >= reserved_picture + decoder_picture) {
@@ -148,10 +209,13 @@ int vout_InitWrapper(vout_thread_t *vout)
         sys->decoder_pool = display_pool;
         sys->display_pool = display_pool;
     } else if (!sys->decoder_pool) {
-        sys->decoder_pool =
-            picture_pool_NewFromFormat(&source,
+        sys->decoder_pool = vout_display_DecoderPool( vd, __MAX(VOUT_MAX_PICTURES,
+                                                         reserved_picture + decoder_picture - DISPLAY_PICTURE_COUNT) );
+#if 0
+            picture_pool_NewFromFormat(&vd->source,
                                        __MAX(VOUT_MAX_PICTURES,
                                              reserved_picture + decoder_picture - DISPLAY_PICTURE_COUNT));
+#endif
         if (!sys->decoder_pool)
             return VLC_EGENERIC;
         if (allow_dr) {
