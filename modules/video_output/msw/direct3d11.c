@@ -346,16 +346,18 @@ static const char *globPixelShaderBiplanarYUV_BT709_2RGB = "\
   }\
 ";
 
-static picture_pool_t* CreatePoolD3D11(const video_format_t *p_fmt, unsigned count, void *p_opaque)
+static picture_pool_t* CreatePoolD3D11( vlc_object_t *p_obj, struct pool_picture_factory *p_pool_factory,
+                                        const video_format_t *p_fmt, unsigned pool_size )
 {
-    vout_display_sys_t *sys = p_opaque; /* should just have the D3D11 context*/
-    return picture_pool_NewFromFormat( p_fmt, count );
+    vout_display_sys_t *sys = p_pool_factory->p_opaque; /* should just have the D3D11 context*/
+    return picture_pool_NewFromFormat( p_fmt, pool_size );
 }
 
-static picture_pool_t* CreatePoolDXGI(const video_format_t *p_fmt, unsigned count, void *p_opaque)
+static picture_pool_t* CreatePoolDXGI( vlc_object_t *p_obj, struct pool_picture_factory *p_pool_factory,
+                                       const video_format_t *p_fmt, unsigned pool_size )
 {
-    vout_display_sys_t *sys = p_opaque; /* should just have the D3D11 context*/
-    return picture_pool_NewFromFormat( p_fmt, count );
+    vout_display_sys_t *sys = p_pool_factory->p_opaque; /* should just have the D3D11 context*/
+    return picture_pool_NewFromFormat( p_fmt, pool_size );
 }
 
 static int Open(vlc_object_t *object)

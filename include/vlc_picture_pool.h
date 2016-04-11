@@ -50,7 +50,7 @@ typedef struct {
 
 typedef struct pool_picture_factory {
     void *p_opaque; /* depends on the vlc_fourcc_t chroma */
-    picture_pool_t* (*pf_create_pool)(struct pool_picture_factory *, const video_format_t *fmt, unsigned count);
+    picture_pool_t* (*pf_create_pool)(vlc_object_t *, struct pool_picture_factory *, const video_format_t *fmt, unsigned count);
     //bool (*pf_compatible)(struct pool_picture_factory *, const video_format_t *fmt, void *p_opaque);
     void (*pf_destructor)(void *p_opaque);
 } pool_picture_factory;
@@ -63,7 +63,7 @@ void pool_HandlerQueryDestroy(vlc_picture_pool_query *);
 vlc_picture_pool_handler *pool_HandlerCreate(decoder_t *, unsigned (*pf_get_dpb_size)(const decoder_t *));
 void pool_HandlerDestroy(vlc_picture_pool_handler *);
 
-int pool_HandlerCreatePools(vlc_picture_pool_handler *, vlc_picture_pool_query *, vout_display_t *);
+int pool_HandlerCreatePools(vlc_object_t *, vlc_picture_pool_handler *, vlc_picture_pool_query *, vout_display_t *);
 
 pool_picture_factory *pool_HandlerGetFactory(vlc_picture_pool_handler *, vlc_fourcc_t, bool);
 int pool_HandlerAddFactory(vlc_picture_pool_handler *, vlc_fourcc_t, pool_picture_factory *);

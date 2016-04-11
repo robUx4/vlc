@@ -64,6 +64,7 @@ int D3D11CreateSurfaceContext( vlc_object_t *, picture_pool_d3d11 * );
 void D3D11DestroySurfaceContext( void * );
 void D3D11SurfaceContextAddRef( void * );
 void D3D11SurfaceContextDelRef( void * );
-picture_pool_t* D3D11CreateSurfacePool( pool_picture_factory *, const video_format_t *, unsigned );
+picture_pool_t* D3D11CreateSurfacePool( vlc_object_t *, pool_picture_factory *,
+                                        const video_format_t *, unsigned );
 
 #endif /* include-guard */

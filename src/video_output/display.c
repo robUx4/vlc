@@ -74,11 +74,12 @@ static picture_pool_t *DefaultDecoderPool(vout_display_t *vd, unsigned count)
  *
  *****************************************************************************/
 
-static picture_pool_t *DefaultPoolFactory(const video_format_t *p_fmt, unsigned count,
-                                          void *p_opaque)
+static picture_pool_t *DefaultPoolFactory( vlc_object_t *p_obj, struct pool_picture_factory *p_pool_factory,
+                                           const video_format_t *p_fmt, unsigned pool_size )
 {
-    VLC_UNUSED( p_opaque );
-    return picture_pool_NewFromFormat( p_fmt, count );
+    VLC_UNUSED( p_obj );
+    VLC_UNUSED( p_pool_factory );
+    return picture_pool_NewFromFormat( p_fmt, pool_size );
 }
 
 static pool_picture_factory vout_pool_factory = {

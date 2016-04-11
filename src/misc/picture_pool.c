@@ -367,10 +367,12 @@ void pool_HandlerQueryDestroy( vlc_picture_pool_query *p_pool_handler )
     vlc_array_clear( p_queries );
 }
 
-static picture_pool_t *DefaultPoolCreate( const video_format_t *fmt, unsigned count, void *p_opaque )
+static picture_pool_t *DefaultPoolCreate( vlc_object_t *p_obj, struct pool_picture_factory *p_pool_factory,
+                                          const video_format_t *fmt, unsigned pool_size )
 {
-    VLC_UNUSED( p_opaque );
-    return picture_pool_NewFromFormat( fmt, count );
+    VLC_UNUSED( p_obj );
+    VLC_UNUSED( p_pool_factory );
+    return picture_pool_NewFromFormat( fmt, pool_size );
 }
 
 static pool_picture_factory default_factory = {
@@ -507,7 +509,7 @@ int pool_HandlerQueryVout( vlc_picture_pool_handler *p_pool_handler,
     return pool_HandlerAddQueryResult( p_queries, display_pool_size, &vd->fmt);
 }
 
-int pool_HandlerCreatePools( vlc_picture_pool_handler *p_pool_handler,
+int pool_HandlerCreatePools( vlc_object_t *p_obj, vlc_picture_pool_handler *p_pool_handler,
                              vlc_picture_pool_query *queries, vout_display_t *vd )
 {
     vlc_array_t *p_queries = (vlc_array_t *)queries;

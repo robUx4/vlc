@@ -220,9 +220,10 @@ static void DestroyDisplayPoolPicture(picture_t *picture)
     free(picture);
 }
 
-picture_pool_t* D3D11CreateSurfacePool( pool_picture_factory *p_pool_factory,
+picture_pool_t* D3D11CreateSurfacePool( vlc_object_t *p_obj, struct pool_picture_factory *p_pool_factory,
                                         const video_format_t *fmt, unsigned pool_size )
 {
+    VLC_UNUSED( p_obj );
     if ( fmt->i_chroma != VLC_CODEC_D3D11_OPAQUE )
         return NULL;
 

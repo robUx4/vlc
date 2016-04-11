@@ -168,7 +168,7 @@ static int vout_InitWrapperPools( vout_thread_sys_t *sys )
     }
 
     /* TODO 2/ allocate a pool for a each format through the decoder + filters + vout */
-    pool_HandlerCreatePools( p_pool_handler, p_queries, vd );
+    pool_HandlerCreatePools( VLC_OBJECT(vd), p_pool_handler, p_queries, vd );
 
     /* TODO 3/ fill legacy decoder_pool / display_pool / private_pool */
 #if 0
