@@ -191,7 +191,10 @@ int vout_InitWrapper(vout_thread_t *vout)
 
     int err = vout_InitWrapperPools( sys );
     if ( err != VLC_SUCCESS )
+    {
+        msg_Dbg(vout, "failed to init pools");
         return err;
+    }
 
     const bool allow_dr = !vd->info.has_pictures_invalid && !vd->info.is_slow && sys->display.use_dr;
     const unsigned private_picture  = 4; /* XXX 3 for filter, 1 for SPU */
@@ -217,7 +220,10 @@ int vout_InitWrapper(vout_thread_t *vout)
                                              reserved_picture + decoder_picture - DISPLAY_PICTURE_COUNT));
 #endif
         if (!sys->decoder_pool)
+        {
+            msg_Warn(vout, "no decoder pool available");
             return VLC_EGENERIC;
+        }
         if (allow_dr) {
             msg_Warn(vout, "Not enough direct buffers, using system memory");
             sys->dpb_size = 0;
