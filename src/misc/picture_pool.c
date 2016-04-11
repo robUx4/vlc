@@ -513,6 +513,23 @@ int pool_HandlerCreatePools( vlc_object_t *p_obj, vlc_picture_pool_handler *p_po
                              vlc_picture_pool_query *queries, vout_display_t *vd )
 {
     vlc_array_t *p_queries = (vlc_array_t *)queries;
+    vlc_array_t *p_factories = &p_pool_handler->factories;
+    for (int i = 0; i < vlc_array_count( p_queries ); ++i)
+    {
+        pool_query_item *p_item = vlc_array_item_at_index( p_queries, i );
+        for (int j = 0; j < vlc_array_count( p_factories ); ++j)
+        {
+            pool_chroma_factory *p_factory = vlc_array_item_at_index( p_factories, j );
+            if ( p_factory->i_chroma == p_item->fmt.i_chroma )
+            {
+                picture_pool_t *p_pool = p_factory->p_factory->pf_create_pool(p_obj, p_factory->p_factory, &p_item->fmt, p_item->count );
+                if ( p_pool != NULL )
+                {
+                }
+                break;
+            }
+        }
+    }
     return VLC_SUCCESS;
 }
 
