@@ -133,6 +133,7 @@ static vout_thread_t *VoutCreate(vlc_object_t *object,
     vout->p->original = original;
     vout->p->dpb_size = pool_HandlerDBPSize( cfg->p_pool_handler );
     vout->p->p_pool_handler = cfg->p_pool_handler;
+    msg_Dbg(vout, "VoutCreate set vout=%p vout->p=%p vout->p->p_pool_handler=%p", vout, vout->p, vout->p->p_pool_handler);
 
     vout_control_Init(&vout->p->control);
     vout_control_PushVoid(&vout->p->control, VOUT_CONTROL_INIT);
@@ -204,6 +205,7 @@ static vout_thread_t *VoutCreate(vlc_object_t *object,
     vout_control_WaitEmpty(&vout->p->control);
 
     //vout->p->p_pool_handler = NULL;
+    msg_Dbg(vout, "VoutCreate2 set vout=%p vout->p=%p vout->p->p_pool_handler=%p", vout, vout->p, vout->p->p_pool_handler);
 
     if (vout->p->dead) {
         msg_Err(vout, "video output creation failed");
@@ -223,12 +225,14 @@ vout_thread_t *vout_Request(vlc_object_t *object,
                               const vout_configuration_t *cfg)
 {
     vout_thread_t *vout = cfg->vout;
+    msg_Dbg(object, "vout_Request0 vout=%p vout->p=%p vout->p->p_pool_handler=%p", vout, vout ? vout->p : NULL, vout && vout->p ? vout->p->p_pool_handler : NULL);
     if (cfg->change_fmt && !cfg->fmt) {
         if (vout)
             vout_CloseAndRelease(vout);
         return NULL;
     }
 
+    msg_Dbg(object, "vout_Request1 vout=%p vout->p=%p vout->p->p_pool_handler=%p", vout, vout ? vout->p : NULL, vout && vout->p ? vout->p->p_pool_handler : NULL);
     /* If a vout is provided, try reusing it */
     if (vout) {
         if (vout->p->input != cfg->input) {
@@ -239,11 +243,13 @@ vout_thread_t *vout_Request(vlc_object_t *object,
                 spu_Attach(vout->p->spu, vout->p->input, true);
         }
 
+        msg_Dbg(object, "vout_Request2 vout=%p vout->p=%p vout->p->p_pool_handler=%p", vout, vout ? vout->p : NULL, vout && vout->p ? vout->p->p_pool_handler : NULL);
         if (cfg->change_fmt) {
             vout_control_cmd_t cmd;
             vout_control_cmd_Init(&cmd, VOUT_CONTROL_REINIT);
             cmd.u.cfg = cfg;
 
+            msg_Dbg(vout, "VOUT_CONTROL_REINIT vout=%p vout->p=%p vout->p->p_pool_handler=%p", vout, vout->p, vout->p->p_pool_handler);
             vout_control_Push(&vout->p->control, &cmd);
             vout_control_WaitEmpty(&vout->p->control);
         }
@@ -257,6 +263,7 @@ vout_thread_t *vout_Request(vlc_object_t *object,
 
         msg_Warn(object, "cannot reuse provided vout");
     }
+    msg_Dbg(object, "vout_Request3 vout=%p vout->p=%p vout->p->p_pool_handler=%p", vout, vout ? vout->p : NULL, vout && vout->p ? vout->p->p_pool_handler : NULL);
     return VoutCreate(object, cfg);
 }
 
@@ -1453,7 +1460,7 @@ static int ThreadReinit(vout_thread_t *vout,
     vout->p->original = original;
     vout->p->dpb_size = pool_HandlerDBPSize( cfg->p_pool_handler );
     vout->p->p_pool_handler = cfg->p_pool_handler;
-
+    msg_Dbg(vout, "ThreadReinit set vout=%p vout->p=%p vout->p->p_pool_handler=%p", vout, vout->p, vout->p->p_pool_handler);
     if (ThreadStart(vout, &state)) {
         ThreadClean(vout);
         return VLC_EGENERIC;

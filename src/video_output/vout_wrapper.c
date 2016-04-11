@@ -60,6 +60,7 @@ int vout_OpenWrapper(vout_thread_t *vout,
     const mtime_t double_click_timeout = 300000;
     const mtime_t hide_timeout = var_CreateGetInteger(vout, "mouse-hide-timeout") * 1000;
 
+    msg_Dbg(vout, "vout_OpenWrapper1 vout=%p vout->p=%p vout->p->p_pool_handler=%p", vout, vout->p, vout->p->p_pool_handler);
     if (splitter_name) {
         sys->display.vd = vout_NewSplitter(vout, &vout->p->original, state, "$vout", splitter_name,
                                            double_click_timeout, hide_timeout,
@@ -69,6 +70,7 @@ int vout_OpenWrapper(vout_thread_t *vout,
                                           double_click_timeout, hide_timeout,
                                           vout->p->p_pool_handler);
     }
+    msg_Dbg(vout, "vout_OpenWrapper2 vout=%p vout->p=%p vout->p->p_pool_handler=%p", vout, vout->p, vout->p->p_pool_handler);
     if (!sys->display.vd) {
         free(sys->display.title);
         return VLC_EGENERIC;
@@ -98,6 +100,7 @@ void vout_CloseWrapper(vout_thread_t *vout, vout_display_state_t *state)
 #endif
     sys->decoder_pool = NULL; /* FIXME remove */
 
+    msg_Dbg(vout, "vout_CloseWrapper vout=%p vout->p=%p vout->p->p_pool_handler=%p", vout, vout->p, vout->p->p_pool_handler);
     vout_DeleteDisplay(sys->display.vd, state, sys->p_pool_handler);
     free(sys->display.title);
 }
@@ -189,6 +192,7 @@ int vout_InitWrapper(vout_thread_t *vout)
     vout_thread_sys_t *sys = vout->p;
     vout_display_t *vd = sys->display.vd;
 
+    msg_Dbg(vout, "vout_InitWrapper1 vout=%p vout->p=%p vout->p->p_pool_handler=%p", vout, vout->p, vout->p->p_pool_handler);
     int err = vout_InitWrapperPools( sys );
     if ( err != VLC_SUCCESS )
     {
@@ -196,6 +200,7 @@ int vout_InitWrapper(vout_thread_t *vout)
         return err;
     }
 
+    msg_Dbg(vout, "vout_InitWrapper2 vout=%p vout->p=%p vout->p->p_pool_handler=%p", vout, vout->p, vout->p->p_pool_handler);
     const bool allow_dr = !vd->info.has_pictures_invalid && !vd->info.is_slow && sys->display.use_dr;
     const unsigned private_picture  = 4; /* XXX 3 for filter, 1 for SPU */
     const unsigned decoder_picture  = 1 + sys->dpb_size;
@@ -204,6 +209,7 @@ int vout_InitWrapper(vout_thread_t *vout)
                                       private_picture +
                                       kept_picture;
 
+    //unsigned decoder_pool_size = 1 + pool_HandlerDBPSize( p_pool_handler );
     picture_pool_t *display_pool = vout_display_Pool( vd, 0);
 
     if (allow_dr &&
@@ -233,6 +239,7 @@ int vout_InitWrapper(vout_thread_t *vout)
         NoDrInit(vout);
     }
     sys->private_pool = picture_pool_Reserve(sys->decoder_pool, private_picture);
+    msg_Dbg(vout, "vout_InitWrapper3 vout=%p vout->p=%p vout->p->p_pool_handler=%p", vout, vout->p, vout->p->p_pool_handler);
     return VLC_SUCCESS;
 }
 

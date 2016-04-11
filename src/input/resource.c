@@ -200,6 +200,7 @@ static vout_thread_t *RequestVout( input_resource_t *p_resource,
 {
     vlc_assert_locked( &p_resource->lock );
 
+    msg_Dbg(p_resource->p_parent, "RequestVout0 vout=%p, vout->p=%p, new p_pool_handler=%p", p_vout, p_vout ? p_vout->p : NULL, p_pool_handler);
     if( !p_vout && !p_fmt )
     {
         if( p_resource->p_vout_free )
@@ -238,6 +239,7 @@ static vout_thread_t *RequestVout( input_resource_t *p_resource,
             .fmt        = p_fmt,
             .p_pool_handler = p_pool_handler,
         };
+        msg_Dbg(p_resource->p_parent, "RequestVout1 vout=%p, vout->p=%p, new p_pool_handler=%p", p_vout, p_vout ? p_vout->p : NULL, p_pool_handler);
         p_vout = vout_Request( p_resource->p_parent, &cfg );
         if( !p_vout )
             return NULL;
@@ -278,6 +280,7 @@ static vout_thread_t *RequestVout( input_resource_t *p_resource,
                 .fmt        = NULL,
                 .p_pool_handler = NULL,
             };
+            msg_Dbg(p_resource->p_parent, "RequestVout2 p_pool_handler=%p", NULL);
             p_resource->p_vout_free = vout_Request( p_resource->p_parent, &cfg );
         }
         return NULL;
