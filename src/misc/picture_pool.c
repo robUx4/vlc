@@ -379,7 +379,8 @@ static pool_picture_factory default_factory = {
 };
 
 pool_picture_factory *pool_HandlerGetFactory( vlc_picture_pool_handler *p_pool_handler,
-                                              vlc_fourcc_t i_chroma )
+                                              vlc_fourcc_t i_chroma,
+                                              bool b_with_default )
 {
     for (int i = 0; i < vlc_array_count( &p_pool_handler->factories ); ++i)
     {
@@ -387,7 +388,7 @@ pool_picture_factory *pool_HandlerGetFactory( vlc_picture_pool_handler *p_pool_h
         if ( p_item->i_chroma == i_chroma )
             return p_item->p_factory;
     }
-    return &default_factory;
+    return b_with_default ? &default_factory : NULL;
 }
 
 int pool_HandlerAddFactory( vlc_picture_pool_handler *p_pool_handler,

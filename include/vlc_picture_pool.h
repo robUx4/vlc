@@ -65,7 +65,7 @@ void pool_HandlerDestroy(vlc_picture_pool_handler *);
 
 int pool_HandlerCreatePools(vlc_picture_pool_handler *, vlc_picture_pool_query *, vout_display_t *);
 
-pool_picture_factory *pool_HandlerGetFactory(vlc_picture_pool_handler *, vlc_fourcc_t);
+pool_picture_factory *pool_HandlerGetFactory(vlc_picture_pool_handler *, vlc_fourcc_t, bool);
 int pool_HandlerAddFactory(vlc_picture_pool_handler *, vlc_fourcc_t, pool_picture_factory *);
 void pool_HandlerRemoveFactory(vlc_picture_pool_handler *, vlc_fourcc_t, pool_picture_factory *);
 

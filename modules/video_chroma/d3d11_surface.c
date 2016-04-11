@@ -258,7 +258,8 @@ static int OpenConverter( vlc_object_t *obj )
 
     /* TODO do the same in direct3d11.c & d3d11va.c */
     pool_picture_factory *p_pool_factory = pool_HandlerGetFactory( p_filter->p_pool_handler,
-                                                                   p_filter->fmt_in.video.i_chroma );
+                                                                   p_filter->fmt_in.video.i_chroma,
+                                                                   false );
     if ( p_pool_factory != NULL )
     {
         D3D11SurfaceContextAddRef( p_filter->pool_factory.p_opaque );
@@ -292,7 +293,7 @@ static int OpenConverter( vlc_object_t *obj )
 static void CloseConverter( vlc_object_t *obj )
 {
     filter_t *p_filter = (filter_t *)obj;
-    filter_sys_t *p_sys = (filter_sys_t*) p_filter->p_sys;
+    filter_sys_t *p_sys = p_filter->p_sys;
     CopyCleanCache(&p_sys->cache);
     vlc_mutex_destroy(&p_sys->staging_lock);
     if (p_sys->staging)
