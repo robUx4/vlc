@@ -258,7 +258,7 @@ static vout_thread_t *aout_request_vout( void *p_private,
 
     p_vout = input_resource_RequestVout( p_owner->p_resource, p_vout, p_fmt,
                                          b_recyle, pool_handler );
-    pool_HandlerDestroy(pool_handler);
+    // TODO push back in the resources for reuse ? pool_HandlerDestroy(pool_handler);
     if( p_input != NULL )
         input_SendEventVout( p_input );
 
@@ -444,7 +444,7 @@ static int vout_update_format( decoder_t *p_dec )
                                              p_vout, &fmt,
                                              true,
                                              pool_handler );
-        pool_HandlerDestroy(pool_handler);
+        // TODO push back in the resources for reuse ? pool_HandlerDestroy(pool_handler);
         vlc_mutex_lock( &p_owner->lock );
         p_owner->p_vout = p_vout;
 

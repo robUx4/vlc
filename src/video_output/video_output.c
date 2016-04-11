@@ -203,7 +203,7 @@ static vout_thread_t *VoutCreate(vlc_object_t *object,
 
     vout_control_WaitEmpty(&vout->p->control);
 
-    vout->p->p_pool_handler = NULL;
+    //vout->p->p_pool_handler = NULL;
 
     if (vout->p->dead) {
         msg_Err(vout, "video output creation failed");
@@ -1453,6 +1453,7 @@ static int ThreadReinit(vout_thread_t *vout,
     vout->p->original = original;
     vout->p->dpb_size = pool_HandlerDBPSize( cfg->p_pool_handler );
     vout->p->p_pool_handler = cfg->p_pool_handler;
+
     if (ThreadStart(vout, &state)) {
         ThreadClean(vout);
         return VLC_EGENERIC;

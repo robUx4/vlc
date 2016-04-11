@@ -201,7 +201,7 @@ int vout_InitWrapper(vout_thread_t *vout)
                                       private_picture +
                                       kept_picture;
 
-    picture_pool_t *display_pool = NULL;
+    picture_pool_t *display_pool = vout_display_Pool( vd, 0);
 
     if (allow_dr &&
         picture_pool_GetSize(display_pool) >= reserved_picture + decoder_picture) {
