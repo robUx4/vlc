@@ -409,7 +409,6 @@ static int OpenConverter( vlc_object_t *obj )
          return VLC_ENOMEM;
     p_filter->pool_factory.p_opaque = &p_sys->pool_factory;
 
-    /* TODO do the same in direct3d9.c & dxva2.c */
     pool_picture_factory *p_pool_factory = pool_HandlerGetFactory( p_filter->p_pool_handler,
                                                                    p_filter->fmt_in.video.i_chroma,
                                                                    false );
