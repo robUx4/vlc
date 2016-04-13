@@ -343,13 +343,6 @@ static picture_pool_t* CreatePoolD3D11( vlc_object_t *p_obj, struct pool_picture
     return picture_pool_NewFromFormat( p_fmt, pool_size );
 }
 
-static picture_pool_t* CreatePoolDXGI( vlc_object_t *p_obj, struct pool_picture_factory *p_pool_factory,
-                                       const video_format_t *p_fmt, unsigned pool_size )
-{
-    vout_display_sys_t *sys = p_pool_factory->p_opaque; /* should just have the D3D11 context*/
-    return picture_pool_NewFromFormat( p_fmt, pool_size );
-}
-
 static int Open(vlc_object_t *object)
 {
     vout_display_t *vd = (vout_display_t *)object;
@@ -490,13 +483,7 @@ static int Open(vlc_object_t *object)
     if ( fmt.i_chroma == VLC_CODEC_D3D11_OPAQUE )
     {
         sys->pool_factory.pf_create_pool = CreatePoolD3D11;
-        sys->pool_factory.p_opaque       = sys; /* TODO share same structure with D3D11VA */
-        vd->p_pool_factory = &sys->pool_factory;
-    }
-    else if ( fmt.i_chroma == VLC_CODEC_DXGI_OPAQUE )
-    {
-        sys->pool_factory.pf_create_pool = CreatePoolDXGI;
-        sys->pool_factory.p_opaque       = sys; /* TODO share same structure with D3D11VA */
+        sys->pool_factory.p_opaque       = &sys->factory_d3d11;
         vd->p_pool_factory = &sys->pool_factory;
     }
 
