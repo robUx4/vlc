@@ -181,6 +181,7 @@ struct vout_display_sys_t
     pD3DCompile                            OurD3DCompile;
 #endif
     IDXGISwapChain1          *dxgiswapChain;   /* DXGI 1.1 swap chain */
+    pool_factory_d3d11       factory_d3d11;
     ID3D11Device             *d3ddevice;       /* D3D device */
     ID3D11DeviceContext      *d3dcontext;      /* D3D context */
     d3d_quad_t               picQuad;

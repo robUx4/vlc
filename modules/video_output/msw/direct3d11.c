@@ -482,6 +482,8 @@ static int Open(vlc_object_t *object)
     vd->manage  = Manage;
     if ( fmt.i_chroma == VLC_CODEC_D3D11_OPAQUE )
     {
+        sys->factory_d3d11.d3ddevice = sys->d3ddevice;
+        sys->factory_d3d11.d3dcontext = sys->d3dcontext;
         sys->pool_factory.pf_create_pool = CreatePoolD3D11;
         sys->pool_factory.p_opaque       = &sys->factory_d3d11;
         vd->p_pool_factory = &sys->pool_factory;
