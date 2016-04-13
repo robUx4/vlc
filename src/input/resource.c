@@ -282,7 +282,6 @@ static vout_thread_t *RequestVout( input_resource_t *p_resource,
                 .input      = NULL,
                 .change_fmt = false,
                 .fmt        = NULL,
-                .p_pool_handler = NULL,
             };
             msg_Dbg(p_resource->p_parent, "RequestVout2 p_pool_handler=%p", NULL);
             p_resource->p_vout_free = vout_Request( p_resource->p_parent, &cfg );
