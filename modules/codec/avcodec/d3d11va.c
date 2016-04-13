@@ -150,15 +150,25 @@ static void SetupAVCodecContext(vlc_va_t *);
 static picture_t *DxAllocPicture(vlc_va_t *, const video_format_t *, unsigned index);
 
 /* */
-static void Setup(vlc_va_t *va, vlc_fourcc_t *chroma)
+static void Setup(vlc_va_t *va, video_format_t *p_fmt_out)
 {
     vlc_va_sys_t *sys = va->sys;
 
+    sub_chroma schroma = {
+     .textureFormat = sys->render,
+    };
+    if ( sys->render == DXGI_FORMAT_420_OPAQUE )
+        video_format_SetChroma( p_fmt_out, VLC_CODEC_DXGI_OPAQUE, &schroma, sizeof(schroma) );
+    else
+        video_format_SetChroma( p_fmt_out, VLC_CODEC_D3D11_OPAQUE, &schroma, sizeof(schroma) );
+
+#if 0
     *chroma = sys->render == DXGI_FORMAT_420_OPAQUE ? VLC_CODEC_DXGI_OPAQUE : (
 #if 1 //OPAQ_FILTER
             sys->filter != NULL ? VLC_CODEC_YV12 :
 #endif
             VLC_CODEC_D3D11_OPAQUE );
+#endif
 }
 
 void SetupAVCodecContext(vlc_va_t *va)

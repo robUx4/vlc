@@ -110,7 +110,7 @@ int lavc_GetVideoFormat(decoder_t *dec, video_format_t *restrict fmt,
     {
         if ( p_va != NULL )
         {
-            p_va->setup( p_va, &fmt->i_chroma );
+            p_va->setup( p_va, fmt );
         }
         else
         {

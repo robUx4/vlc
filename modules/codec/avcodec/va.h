@@ -38,7 +38,7 @@ struct vlc_va_t {
 
 #ifdef _WIN32
     VLC_DEPRECATED
-    void (*setup)(vlc_va_t *, vlc_fourcc_t *output);
+    void (*setup)(vlc_va_t *, video_format_t *p_fmt_out);
 #endif
     int  (*get)(vlc_va_t *, picture_t *pic, uint8_t **data);
     void (*release)(void *pic, uint8_t *surface);

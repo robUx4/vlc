@@ -1007,16 +1007,19 @@ static int lavc_GetFrame(struct AVCodecContext *ctx, AVFrame *frame, int flags)
     }
     else
     {
-        vlc_fourcc_t va_fourcc;
-        sys->p_va->setup( sys->p_va, &va_fourcc);
-        if ( va_fourcc != dec->fmt_out.video.i_chroma )
+        video_format_t real_fmt_out;
+        video_format_Copy( &real_fmt_out, &dec->fmt_out.video );
+        sys->p_va->setup( sys->p_va, &real_fmt_out );
+        if ( !video_format_IsSimilarChroma( &dec->fmt_out.video, &real_fmt_out ) )
         {
             if (lavc_UpdateVideoFormat(dec, ctx, ctx->pix_fmt, ctx->sw_pix_fmt, sys->p_va))
             {
+                video_format_Clean( &real_fmt_out );
                 post_mt(sys);
                 return -1;
             }
         }
+        video_format_Clean( &real_fmt_out );
     }
     post_mt(sys);
 
