@@ -1043,6 +1043,19 @@ static int Direct3D11Open(vout_display_t *vd, video_format_t *fmt)
             }
         }
     }
+
+    if ( i_chroma == VLC_CODEC_D3D11_OPAQUE )
+    {
+        sub_chroma schroma = {
+          .textureFormat = sys->picQuadConfig.textureFormat,
+        };
+        if ( video_format_SetChroma( fmt, i_chroma, &schroma, sizeof(sub_chroma) ) != VLC_SUCCESS )
+        {
+            msg_Err(vd, "Failed to set the extended chroma!");
+            return VLC_EGENERIC;
+        }
+    }
+    else
         video_format_SetChroma( fmt, i_chroma, NULL, 0 );
 
     if ( !i_chroma )
