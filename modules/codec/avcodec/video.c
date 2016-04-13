@@ -78,6 +78,7 @@ struct decoder_sys_t
     /* VA API */
     vlc_va_t *p_va;
     enum PixelFormat pix_fmt;
+    enum PixelFormat pix_hwfmt;
     int profile;
     int level;
 
@@ -1118,6 +1119,23 @@ static int lavc_GetFrame(struct AVCodecContext *ctx, AVFrame *frame, int flags)
     return ret;
 }
 
+static void SetupVA(void *p_setup_opaque, video_format_t *p_fmt_out)
+{
+    decoder_t *p_dec = p_setup_opaque;
+    decoder_sys_t *p_sys = p_dec->p_sys;
+    vlc_va_t *va = p_sys->p_va;
+    if ( va == NULL )
+    {
+        va = vlc_va_New( p_dec, p_sys->p_context, p_sys->pix_hwfmt,
+                                   &p_dec->fmt_in );
+        p_dec->p_sys->p_va = va;
+        if ( va != NULL )
+            va->get_output( va, &p_dec->fmt_out.video );
+    }
+    if ( va != NULL )
+        va->setup( va, p_fmt_out );
+}
+
 static enum PixelFormat ffmpeg_GetFormat( AVCodecContext *p_context,
                                           const enum PixelFormat *pi_fmt )
 {
@@ -1197,31 +1215,35 @@ static enum PixelFormat ffmpeg_GetFormat( AVCodecContext *p_context,
             msg_Err(p_dec, "unspecified video dimensions");
             continue;
         }
-        if (lavc_UpdateVideoFormat(p_dec, p_context, hwfmt, swfmt))
+
+        p_dec->pf_pre_filter_cfg     = SetupVA;
+        p_dec->pre_filter_cfg_opaque = p_dec;
+        p_sys->pix_hwfmt = hwfmt;
+        if (lavc_UpdateVideoFormat(p_dec, p_context, hwfmt, swfmt, NULL))
+        {
+            if ( p_sys->p_va != NULL )
+            {
+                vlc_va_Delete( p_sys->p_va, p_context );
+                p_sys->p_va = NULL;
+            }
+        }
+        if ( p_sys->p_va == NULL )
             continue; /* Unsupported brand of hardware acceleration */
         post_mt(p_sys);
 
         picture_t *test_pic = decoder_GetPicture(p_dec);
         assert(!test_pic || test_pic->format.i_chroma == p_dec->fmt_out.video.i_chroma);
-        vlc_va_t *va = vlc_va_New(VLC_OBJECT(p_dec), p_context, hwfmt,
-                                  &p_dec->fmt_in,
-                                  test_pic ? test_pic->p_sys : NULL);
-        if (test_pic)
-            picture_Release(test_pic);
-        if (va == NULL)
-        {
-            wait_mt(p_sys);
-            continue; /* Unsupported codec profile or such */
-        }
 
-        if (va->description != NULL)
-            msg_Info(p_dec, "Using %s for hardware decoding", va->description);
+        if (p_sys->p_va->description != NULL)
+            msg_Info(p_dec, "Using %s for hardware decoding", p_sys->p_va->description);
 
-        p_sys->p_va = va;
         p_sys->pix_fmt = hwfmt;
         p_context->draw_horiz_band = NULL;
         return pi_fmt[i];
     }
+    p_dec->pf_pre_filter_cfg     = NULL;
+    p_dec->pre_filter_cfg_opaque = NULL;
+    p_sys->pix_hwfmt             = AV_PIX_FMT_NONE;
 
     post_mt(p_sys);
     /* Fallback to default behaviour */
