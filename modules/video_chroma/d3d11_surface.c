@@ -37,6 +37,7 @@
 #define COBJMACROS
 #define INITGUID
 #include "dxgi_fmt.h"
+#include "d3d11_opaque.h"
 
 static int  OpenConverter( vlc_object_t * );
 static void CloseConverter( vlc_object_t * );
@@ -53,15 +54,6 @@ vlc_module_end ()
 #include <windows.h>
 #define COBJMACROS
 #include <d3d11.h>
-
-/* VLC_CODEC_D3D11_OPAQUE */
-struct picture_sys_t
-{
-    ID3D11VideoDecoderOutputView  *decoder; /* may be NULL for pictures from the pool */
-    ID3D11Texture2D               *texture;
-    ID3D11DeviceContext           *context;
-    HINSTANCE                     hd3d11_dll; /* TODO */
-};
 
 struct filter_sys_t {
     copy_cache_t        cache;

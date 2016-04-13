@@ -44,27 +44,4 @@ typedef struct
 extern const char *DxgiFormatToStr(DXGI_FORMAT format);
 extern const d3d_format_t *GetRenderFormatList(void);
 
-typedef struct
-{
-    /* shared between all pool (factory) handling VLC_CODEC_D3D11_OPAQUE */
-    vlc_object_t         *p_obj;
-    ID3D11Device         *d3ddevice;
-    ID3D11DeviceContext  *d3dcontext;
-
-    /* each pool may have a different texture format */
-    DXGI_FORMAT          textureFormat;
-
-    HINSTANCE            hdecoder_dll;
-#if !defined(NDEBUG) && defined(HAVE_DXGIDEBUG_H)
-    HINSTANCE            dxgidebug_dll;
-#endif
-} picture_pool_d3d11;
-
-int D3D11CreateSurfaceContext( vlc_object_t *, picture_pool_d3d11 * );
-void D3D11DestroySurfaceContext( void * );
-void D3D11SurfaceContextAddRef( void * );
-void D3D11SurfaceContextDelRef( void * );
-picture_pool_t* D3D11CreateSurfacePool( vlc_object_t *, pool_picture_factory *,
-                                        const video_format_t *, unsigned );
-
 #endif /* include-guard */

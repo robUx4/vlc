@@ -104,12 +104,6 @@ static const vlc_fourcc_t d3d_subpicture_chromas[] = {
     0
 };
 
-struct picture_sys_t
-{
-    LPDIRECT3DSURFACE9 surface;
-    picture_t          *fallback;
-};
-
 static int  Open(vlc_object_t *);
 
 static picture_pool_t *Pool  (vout_display_t *, unsigned);

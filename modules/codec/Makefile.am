@@ -369,7 +369,8 @@ libdxva2_plugin_la_SOURCES = \
 	codec/avcodec/dxva2.c codec/avcodec/directx_va.c codec/avcodec/directx_va.h \
 	codec/avcodec/chroma.c codec/avcodec/chroma.h \
 	codec/avcodec/va_video.c codec/avcodec/va_video.h \
-	packetizer/h264_nal.c packetizer/h264_nal.h
+	packetizer/h264_nal.c packetizer/h264_nal.h \
+	video_chroma/d3d9_opaque.c video_chroma/d3d9_opaque.h
 libdxva2_plugin_la_LIBADD = $(AVCODEC_LIBS) -lole32 -lshlwapi -luuid
 if HAVE_AVCODEC_DXVA2
 codec_LTLIBRARIES += libdxva2_plugin.la
@@ -379,6 +380,7 @@ libd3d11va_plugin_la_SOURCES = \
 	codec/avcodec/d3d11va.c codec/avcodec/directx_va.c codec/avcodec/directx_va.h \
 	codec/avcodec/chroma.c codec/avcodec/chroma.h \
 	codec/avcodec/va_video.c codec/avcodec/va_video.h \
+	video_chroma/d3d11_opaque.c video_chroma/d3d11_opaque.h \
 	video_chroma/dxgi_fmt.c video_chroma/dxgi_fmt.h \
 	packetizer/h264_nal.c packetizer/h264_nal.h
 libd3d11va_plugin_la_LIBADD = $(AVCODEC_LIBS) -lole32 -luuid

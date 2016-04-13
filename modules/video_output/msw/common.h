@@ -30,10 +30,12 @@
 # include <d3d11.h>
 # include <dxgi1_2.h>
 # include <d3dcompiler.h>
+#include "../../video_chroma/d3d11_opaque.h"
 #endif
 #ifdef MODULE_NAME_IS_direct3d9
 # include <d3d9.h>
 # include <d3dx9effect.h>
+#include "../../video_chroma/d3d9_opaque.h"
 #endif
 #ifdef MODULE_NAME_IS_glwin32
 # include "../opengl.h"
