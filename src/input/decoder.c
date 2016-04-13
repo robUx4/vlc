@@ -128,90 +128,6 @@ struct decoder_owner_sys_t
     mtime_t i_ts_delay;
 };
 
-/* Pictures which are DECODER_BOGUS_VIDEO_DELAY or more in advance probably have
- * a bogus PTS and won't be displayed */
-#define DECODER_BOGUS_VIDEO_DELAY                ((mtime_t)(DEFAULT_PTS_DELAY * 30))
-
-/* */
-#define DECODER_SPU_VOUT_WAIT_DURATION ((int)(0.200*CLOCK_FREQ))
-
-/**
- * Load a decoder module
- */
-static int LoadDecoder( decoder_t *p_dec, bool b_packetizer,
-                        const es_format_t *restrict p_fmt )
-{
-    p_dec->b_frame_drop_allowed = true;
-    p_dec->i_extra_picture_buffers = 0;
-
-    p_dec->pf_decode_audio = NULL;
-    p_dec->pf_decode_video = NULL;
-    p_dec->pf_decode_sub = NULL;
-    p_dec->pf_get_cc = NULL;
-    p_dec->pf_packetize = NULL;
-    p_dec->pf_flush = NULL;
-
-    es_format_Copy( &p_dec->fmt_in, p_fmt );
-    es_format_Init( &p_dec->fmt_out, UNKNOWN_ES, 0 );
-
-    /* Find a suitable decoder/packetizer module */
-    if( !b_packetizer )
-        p_dec->p_module = module_need( p_dec, "decoder", "$codec", false );
-    else
-        p_dec->p_module = module_need( p_dec, "packetizer", "$packetizer", false );
-
-    if( !p_dec->p_module )
-    {
-        es_format_Clean( &p_dec->fmt_in );
-        return -1;
-    }
-    else
-        return 0;
-}
-
-/**
- * Unload a decoder module
- */
-static void UnloadDecoder( decoder_t *p_dec )
-{
-    if( p_dec->p_module )
-    {
-        module_unneed( p_dec, p_dec->p_module );
-        p_dec->p_module = NULL;
-    }
-
-    if( p_dec->p_description )
-    {
-        vlc_meta_Delete( p_dec->p_description );
-        p_dec->p_description = NULL;
-    }
-
-    es_format_Clean( &p_dec->fmt_in );
-    es_format_Clean( &p_dec->fmt_out );
-    p_dec->b_error = false;
-}
-
-static void DecoderUpdateFormatLocked( decoder_t *p_dec )
-{
-    decoder_owner_sys_t *p_owner = p_dec->p_owner;
-
-    vlc_assert_locked( &p_owner->lock );
-
-    es_format_Clean( &p_owner->fmt );
-    es_format_Copy( &p_owner->fmt, &p_dec->fmt_out );
-
-    /* Move p_description */
-    if( p_dec->p_description != NULL )
-    {
-        if( p_owner->p_description != NULL )
-            vlc_meta_Delete( p_owner->p_description );
-        p_owner->p_description = p_dec->p_description;
-        p_dec->p_description = NULL;
-    }
-
-    p_owner->b_fmt_description = true;
-}
-
 /*****************************************************************************
  * Buffers allocation callbacks for the decoders
  *****************************************************************************/
@@ -245,16 +161,110 @@ static unsigned GetAudioDecoderDPBSize( const decoder_t *p_dec )
     return 1;
 }
 
+/* Pictures which are DECODER_BOGUS_VIDEO_DELAY or more in advance probably have
+ * a bogus PTS and won't be displayed */
+#define DECODER_BOGUS_VIDEO_DELAY                ((mtime_t)(DEFAULT_PTS_DELAY * 30))
+
+/* */
+#define DECODER_SPU_VOUT_WAIT_DURATION ((int)(0.200*CLOCK_FREQ))
+
+/**
+ * Load a decoder module
+ */
+static int LoadDecoder( decoder_t *p_dec, bool b_packetizer,
+                        const es_format_t *restrict p_fmt )
+{
+    p_dec->b_frame_drop_allowed = true;
+    p_dec->i_extra_picture_buffers = 0;
+
+    p_dec->pf_decode_audio = NULL;
+    p_dec->pf_decode_video = NULL;
+    p_dec->pf_decode_sub = NULL;
+    p_dec->pf_get_cc = NULL;
+    p_dec->pf_packetize = NULL;
+    p_dec->pf_flush = NULL;
+
+    es_format_Copy( &p_dec->fmt_in, p_fmt );
+    es_format_Init( &p_dec->fmt_out, UNKNOWN_ES, 0 );
+
+    /* TODO don't pass the dpb callback here */
+    vlc_picture_pool_handler *pool_handler = pool_HandlerCreate( p_dec, GetVideoDecoderDPBSize );
+    if ( pool_handler == NULL )
+        return -1;
+    p_dec->p_pool_handler = pool_handler;
+    p_dec->pf_pre_filter_cfg = NULL;
+    p_dec->pre_filter_cfg_opaque = NULL;
+
+    /* Find a suitable decoder/packetizer module */
+    if( !b_packetizer )
+        p_dec->p_module = module_need( p_dec, "decoder", "$codec", false );
+    else
+        p_dec->p_module = module_need( p_dec, "packetizer", "$packetizer", false );
+
+    if( !p_dec->p_module )
+    {
+        es_format_Clean( &p_dec->fmt_in );
+        pool_HandlerDestroy( pool_handler );
+        return -1;
+    }
+    else
+        return 0;
+}
+
+/**
+ * Unload a decoder module
+ */
+static void UnloadDecoder( decoder_t *p_dec )
+{
+    if( p_dec->p_module )
+    {
+        module_unneed( p_dec, p_dec->p_module );
+        p_dec->p_module = NULL;
+    }
+
+    if( p_dec->p_description )
+    {
+        vlc_meta_Delete( p_dec->p_description );
+        p_dec->p_description = NULL;
+    }
+
+    es_format_Clean( &p_dec->fmt_in );
+    es_format_Clean( &p_dec->fmt_out );
+    p_dec->b_error = false;
+    if ( p_dec->p_pool_handler )
+    {
+        pool_HandlerDestroy( p_dec->p_pool_handler ); /* TODO push back in the input resources */
+        p_dec->p_pool_handler = NULL;
+    }
+}
+
+static void DecoderUpdateFormatLocked( decoder_t *p_dec )
+{
+    decoder_owner_sys_t *p_owner = p_dec->p_owner;
+
+    vlc_assert_locked( &p_owner->lock );
+
+    es_format_Clean( &p_owner->fmt );
+    es_format_Copy( &p_owner->fmt, &p_dec->fmt_out );
+
+    /* Move p_description */
+    if( p_dec->p_description != NULL )
+    {
+        if( p_owner->p_description != NULL )
+            vlc_meta_Delete( p_owner->p_description );
+        p_owner->p_description = p_dec->p_description;
+        p_dec->p_description = NULL;
+    }
+
+    p_owner->b_fmt_description = true;
+}
+
 static vout_thread_t *aout_request_vout( void *p_private,
                                          vout_thread_t *p_vout, video_format_t *p_fmt, bool b_recyle )
 {
     decoder_t *p_dec = p_private;
     decoder_owner_sys_t *p_owner = p_dec->p_owner;
     input_thread_t *p_input = p_owner->p_input;
-
-    vlc_picture_pool_handler *pool_handler = pool_HandlerCreate( p_dec, GetAudioDecoderDPBSize );
-    if (pool_handler == NULL)
-        return NULL;
 
     p_vout = input_resource_RequestVout( p_owner->p_resource, p_vout, p_fmt,
                                          b_recyle, p_dec->p_pool_handler,
@@ -436,10 +446,6 @@ static int vout_update_format( decoder_t *p_dec )
         p_vout = p_owner->p_vout;
         p_owner->p_vout = NULL;
         vlc_mutex_unlock( &p_owner->lock );
-
-        vlc_picture_pool_handler *pool_handler = pool_HandlerCreate( p_dec, GetVideoDecoderDPBSize );
-        if (pool_handler == NULL)
-            return NULL;
 
         p_vout = input_resource_RequestVout( p_owner->p_resource,
                                              p_vout, &fmt,
