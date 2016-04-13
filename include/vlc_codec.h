@@ -223,7 +223,7 @@ struct encoder_t
  */
 static inline int decoder_UpdateVideoFormat( decoder_t *dec )
 {
-    if( dec->pf_vout_format_update != NULL )
+    if( likely( dec->pf_vout_format_update != NULL ) )
         return dec->pf_vout_format_update( dec );
     else
         return -1;
