@@ -138,7 +138,9 @@ static vout_display_t *vout_display_New(vlc_object_t *obj,
         vd->module = NULL;
     }
 
-    if ( pool_HandlerAddFactory(p_pool_handler, vd->fmt.i_chroma, vd->p_pool_factory) != VLC_SUCCESS )
+    if ( pool_HandlerAddFactory( p_pool_handler,
+                                 vd->fmt.i_chroma, vd->fmt.p_sub_chroma, vd->fmt.i_sub_chroma_size,
+                                 vd->p_pool_factory) != VLC_SUCCESS )
     {
         if (load_module)
         {
@@ -171,7 +173,7 @@ static vout_display_t *vout_display_New(vlc_object_t *obj,
  */
 static void vout_display_Delete(vout_display_t *vd, vlc_picture_pool_handler *p_pool_handler)
 {
-    pool_HandlerRemoveFactory( p_pool_handler, vd->fmt.i_chroma, vd->p_pool_factory );
+    pool_HandlerRemoveFactory( p_pool_handler, vd->fmt.i_chroma, vd->fmt.p_sub_chroma, vd->p_pool_factory );
 
     if (vd->module)
         module_unneed(vd, vd->module);

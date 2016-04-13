@@ -243,7 +243,9 @@ filter_t *filter_chain_AppendFilter( filter_chain_t *chain, const char *name,
         es_format_Copy( &chain->fmt_out, &filter->fmt_out );
     }
 
-    pool_HandlerAddFactory( chain->p_pool_handler, chain->fmt_in.video.i_chroma, &filter->pool_factory );
+    pool_HandlerAddFactory( chain->p_pool_handler,
+                            chain->fmt_in.video.i_chroma, chain->fmt_in.video.p_sub_chroma,
+                            chain->fmt_in.video.i_sub_chroma_size, &filter->pool_factory );
 
     if( chain->last == NULL )
     {
@@ -310,7 +312,9 @@ void filter_chain_DeleteFilter( filter_chain_t *chain, filter_t *filter )
     msg_Dbg( obj, "Filter %p removed from chain", (void *)filter );
     FilterDeletePictures( chained->pending );
 
-    pool_HandlerRemoveFactory( chain->p_pool_handler, filter->fmt_in.video.i_chroma, &filter->pool_factory );
+    pool_HandlerRemoveFactory( chain->p_pool_handler,
+                               filter->fmt_in.video.i_chroma, filter->fmt_in.video.p_sub_chroma,
+                               &filter->pool_factory );
 
     free( chained->mouse );
     es_format_Clean( &filter->fmt_out );

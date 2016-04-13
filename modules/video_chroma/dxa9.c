@@ -193,7 +193,9 @@ static int OpenConverter( vlc_object_t *obj )
 
     pool_picture_factory *p_pool_factory = pool_HandlerGetFactory( p_filter->p_pool_handler,
                                                                    p_filter->fmt_in.video.i_chroma,
-                                                                   false );
+                                                                   p_filter->fmt_in.video.p_sub_chroma,
+                                                                   false,
+                                                                   true );
     if ( p_pool_factory != NULL )
     {
         D3D9SurfaceContextAddRef( p_filter->pool_factory.p_opaque );

@@ -343,6 +343,8 @@ typedef struct
 typedef struct
 {
     vlc_fourcc_t          i_chroma;
+    sub_chroma            *p_sub_chroma;
+    size_t                i_sub_chroma_size;
     pool_picture_factory  *p_factory;
 } pool_chroma_factory;
 
@@ -382,37 +384,48 @@ static pool_picture_factory default_factory = {
 
 pool_picture_factory *pool_HandlerGetFactory( vlc_picture_pool_handler *p_pool_handler,
                                               vlc_fourcc_t i_chroma,
-                                              bool b_with_default )
+                                              sub_chroma *p_sub_chroma,
+                                              bool b_with_default,
+                                              bool b_test_sub_chroma )
 {
     for (int i = 0; i < vlc_array_count( &p_pool_handler->factories ); ++i)
     {
         pool_chroma_factory *p_item =  vlc_array_item_at_index( &p_pool_handler->factories, i );
-        if ( p_item->i_chroma == i_chroma )
+        if ( p_item->i_chroma == i_chroma && ( !b_test_sub_chroma ||
+             ( !p_item->i_sub_chroma_size ||
+              !memcmp(p_item->p_sub_chroma, p_sub_chroma, p_item->i_sub_chroma_size)) ))
             return p_item->p_factory;
     }
     return b_with_default ? &default_factory : NULL;
 }
 
 int pool_HandlerAddFactory( vlc_picture_pool_handler *p_pool_handler,
-                             vlc_fourcc_t i_chroma, pool_picture_factory *factory )
+                            vlc_fourcc_t i_chroma, sub_chroma *p_sub_chroma, size_t i_sub_chroma_size,
+                            pool_picture_factory *factory )
 {
-    pool_chroma_factory *p_item = malloc( sizeof(*p_item) );
+    pool_chroma_factory *p_item = malloc( sizeof(*p_item) + i_sub_chroma_size );
     if (unlikely(p_item == NULL))
         return VLC_ENOMEM;
     p_item->i_chroma  = i_chroma;
     p_item->p_factory = factory;
+    p_item->p_sub_chroma = (sub_chroma *) (p_item + 1);
+    memcpy( p_item->p_sub_chroma, p_sub_chroma, i_sub_chroma_size );
+    p_item->i_sub_chroma_size = i_sub_chroma_size;
 
     vlc_array_append( &p_pool_handler->factories, p_item );
     return VLC_SUCCESS;
 }
 
 void pool_HandlerRemoveFactory( vlc_picture_pool_handler *p_pool_handler,
-                                vlc_fourcc_t i_chroma, pool_picture_factory *factory )
+                                vlc_fourcc_t i_chroma, sub_chroma *p_sub_chroma,
+                                pool_picture_factory *factory )
 {
     for (int i = 0; i < vlc_array_count( &p_pool_handler->factories ); ++i)
     {
         pool_chroma_factory *p_item =  vlc_array_item_at_index( &p_pool_handler->factories, i );
-        if ( p_item->i_chroma == i_chroma && p_item->p_factory == factory )
+        if ( p_item->p_factory == factory && p_item->i_chroma == i_chroma &&
+             ( !p_item->i_sub_chroma_size ||
+               !memcmp( p_item->p_sub_chroma, p_sub_chroma, p_item->i_sub_chroma_size )) )
         {
             vlc_array_remove( &p_pool_handler->factories, i );
             break;
@@ -520,7 +533,10 @@ int pool_HandlerCreatePools( vlc_object_t *p_obj, vlc_picture_pool_handler *p_po
         for (int j = 0; j < vlc_array_count( p_factories ); ++j)
         {
             pool_chroma_factory *p_factory = vlc_array_item_at_index( p_factories, j );
-            if ( p_factory->i_chroma == p_item->fmt.i_chroma )
+            if ( p_factory->i_chroma == p_item->fmt.i_chroma &&
+                 p_factory->i_sub_chroma_size == p_item->fmt.i_sub_chroma_size &&
+                 ( !p_factory->i_sub_chroma_size ||
+                   !memcmp( p_factory->p_sub_chroma, p_item->fmt.p_sub_chroma, p_factory->i_sub_chroma_size )) )
             {
                 picture_pool_t *p_pool = p_factory->p_factory->pf_create_pool(p_obj, p_factory->p_factory, &p_item->fmt, p_item->count );
                 if ( p_pool != NULL )
