@@ -357,24 +357,36 @@ static int Open(vlc_va_t *va, AVCodecContext *ctx, enum PixelFormat pix_fmt,
     dx_sys->d3ddev = NULL;
 
     /* get a test picture from the vout */
-    picture_t *test_pic = decoder_GetPicture(p_dec);
+    //picture_t *test_pic = decoder_GetPicture(p_dec);
     //assert(!test_pic /* || test_pic->format.i_chroma == p_dec->fmt_out.video.i_chroma */);
 
-    picture_sys_t *p_sys = test_pic ? test_pic->p_sys : NULL;
+    //picture_sys_t *p_sys = test_pic ? test_pic->p_sys : NULL;
+    sub_chroma schroma = {
+      .format = sys->render,
+    };
+    pool_picture_factory *p_factory = pool_HandlerGetFactory( p_dec->p_pool_handler,
+                                                              VLC_CODEC_D3D9_OPAQUE, &schroma,
+                                                              false,
+                                                              true );
 
-    if (p_sys!=NULL)
-        IDirect3DSurface9_GetDevice(p_sys->surface, (IDirect3DDevice9**) &dx_sys->d3ddev );
+    if ( p_factory != NULL ) {
+        pool_factory_d3d9 *p_factory_d3d9 = p_factory->p_opaque;
+        dx_sys->d3ddev = p_factory_d3d9->d3ddevice;
+    }
 
     err = directx_va_Open(va, &sys->dx_sys, ctx, fmt, true);
     if (err!=VLC_SUCCESS)
         goto error;
 
+#if 0
     if (p_sys == NULL)
     {
+        /* TODO remove this */
         sys->filter = CreateFilter( VLC_OBJECT(va), fmt, VLC_CODEC_YV12);
         if (sys->filter == NULL)
             goto error;
     }
+#endif
 
     err = directx_va_Setup(va, &sys->dx_sys, ctx);
     if (err != VLC_SUCCESS)
@@ -391,8 +403,8 @@ static int Open(vlc_va_t *va, AVCodecContext *ctx, enum PixelFormat pix_fmt,
     return VLC_SUCCESS;
 
 error:
-    if (test_pic)
-        picture_Release(test_pic);
+    //if (test_pic)
+    //    picture_Release(test_pic);
     Close(va, ctx);
     return VLC_EGENERIC;
 }

@@ -111,8 +111,6 @@ struct vlc_va_sys_t
     ID3D11VideoContext           *d3dvidctx;
     DXGI_FORMAT                  render;
 
-    ID3D11DeviceContext          *d3dctx;
-
     /* Video decoder */
     D3D11_VIDEO_DECODER_CONFIG   cfg;
 
@@ -128,6 +126,9 @@ struct vlc_va_sys_t
 
     /* avcodec internals */
     struct AVD3D11VAContext      hw;
+
+    pool_factory_d3d11           pool_cfg;
+    picture_pool_d3d11           picture_pool_opaque;
 };
 
 /* */
@@ -290,7 +291,7 @@ static int Extract(vlc_va_t *va, picture_t *output, uint8_t *data)
             ID3D11Texture2D_GetDesc( (ID3D11Texture2D*) p_sys_out->texture, &outDesc);
 
             /* copy decoder slice to surface */
-            ID3D11DeviceContext_CopySubresourceRegion(sys->d3dctx, (ID3D11Resource*) p_sys_out->texture,
+            ID3D11DeviceContext_CopySubresourceRegion(sys->pool_cfg.d3dcontext, (ID3D11Resource*) p_sys_out->texture,
                                                       0, 0, 0, 0,
                                                       (ID3D11Resource*) p_sys_in->texture,
                                                       viewDesc.Texture2D.ArraySlice,
@@ -400,34 +401,41 @@ static int Open(vlc_va_t *va, AVCodecContext *ctx, enum PixelFormat pix_fmt,
 
     /* get a test picture from the vout/decoder to get a potential
      * D3D11 picture_sys_t */
-    picture_t *test_pic = decoder_GetPicture( p_dec );
-    picture_sys_t *p_sys = test_pic ? test_pic->p_sys : NULL;
-    if ( p_dec->fmt_out.video.i_chroma != VLC_CODEC_D3D11_OPAQUE &&
-         p_dec->fmt_out.video.i_chroma != VLC_CODEC_DXGI_OPAQUE )
-        goto error;
+    //picture_t *test_pic = decoder_GetPicture( p_dec );
+    //picture_sys_t *p_sys = test_pic ? test_pic->p_sys : NULL;
+    //if ( p_dec->fmt_out.video.i_chroma != VLC_CODEC_D3D11_OPAQUE &&
+    //     p_dec->fmt_out.video.i_chroma != VLC_CODEC_DXGI_OPAQUE )
+    //    goto error;
+
+    /* get the device from an existing pool factory */
+    pool_picture_factory *p_factory = pool_HandlerGetFactory( p_dec->p_pool_handler,
+                                                              VLC_CODEC_D3D11_OPAQUE, NULL, false, false );
 
     dx_sys->d3ddev = NULL;
-    va->sys->render = DXGI_FORMAT_UNKNOWN;
-    if ( p_sys != NULL && p_sys->context != NULL ) {
+    sys->render = DXGI_FORMAT_UNKNOWN;
+    if ( p_factory != NULL ) {
+        pool_factory_d3d11 *p_factory_d3d11 = p_factory->p_opaque;
         ID3D11VideoContext *d3dvidctx = NULL;
-        HRESULT hr = ID3D11DeviceContext_QueryInterface(p_sys->context, &IID_ID3D11VideoContext, (void **)&d3dvidctx);
+        HRESULT hr = ID3D11DeviceContext_QueryInterface(p_factory_d3d11->d3dcontext, &IID_ID3D11VideoContext, (void **)&d3dvidctx);
         if (FAILED(hr)) {
            msg_Err(va, "Could not Query ID3D11VideoDevice Interface from the picture. (hr=0x%lX)", hr);
         } else {
-            ID3D11DeviceContext_GetDevice( p_sys->context, (ID3D11Device**) &dx_sys->d3ddev );
-            sys->d3dctx = p_sys->context;
+            dx_sys->d3ddev = (IUnknown *) p_factory_d3d11->d3ddevice;
+            sys->pool_cfg = *p_factory_d3d11;
             sys->d3dvidctx = d3dvidctx;
 
-            assert(p_sys->texture != NULL);
+#if TODO /* use the matching texture format if possible ? */
+            assert(p_factory_d3d11->texture != NULL);
             D3D11_TEXTURE2D_DESC dstDesc;
-            ID3D11Texture2D_GetDesc( (ID3D11Texture2D*) p_sys->texture, &dstDesc);
+            ID3D11Texture2D_GetDesc( (ID3D11Texture2D*) p_factory_d3d11->texture, &dstDesc);
             sys->render = dstDesc.Format;
+#endif
         }
     }
-    if ( test_pic != NULL )
-        picture_Release( test_pic );
+    //if ( test_pic != NULL )
+    //    picture_Release( test_pic );
 
-    err = directx_va_Open(va, &sys->dx_sys, ctx, fmt, dx_sys->d3ddev==NULL || va->sys->d3dctx==NULL);
+    err = directx_va_Open(va, &sys->dx_sys, ctx, fmt, dx_sys->d3ddev==NULL || sys->pool_cfg.d3dcontext==NULL);
     if (err!=VLC_SUCCESS)
         goto error;
 
@@ -459,6 +467,14 @@ static int Open(vlc_va_t *va, AVCodecContext *ctx, enum PixelFormat pix_fmt,
     /* TODO print the hardware name/vendor for debugging purposes */
     va->description = DxDescribe(dx_sys);
 
+    sys->dx_sys.pool_factory.pf_create_pool = D3D11CreateSurfacePool;
+    sys->dx_sys.pool_factory.p_opaque       = &sys->pool_cfg;
+    sys->dx_sys.pool_factory.pf_destructor  = NULL; /* TODO */
+
+    pool_HandlerAddFactory( p_dec->p_pool_handler,
+                            dx_sys->fmt_out.i_chroma, dx_sys->fmt_out.p_sub_chroma, dx_sys->fmt_out.i_sub_chroma_size,
+                            &sys->dx_sys.pool_factory );
+
     return VLC_SUCCESS;
 
 error:
@@ -474,60 +490,28 @@ static int D3dCreateDevice(vlc_va_t *va)
     directx_sys_t *dx_sys = &va->sys->dx_sys;
     HRESULT hr;
 
-    if (dx_sys->d3ddev && va->sys->d3dctx) {
+    if (dx_sys->d3ddev && va->sys->pool_cfg.d3dcontext) {
         msg_Dbg(va, "Reusing Direct3D11 device");
-        ID3D11DeviceContext_AddRef(va->sys->d3dctx);
+        ID3D11DeviceContext_AddRef(va->sys->pool_cfg.d3dcontext);
         ID3D11Device_AddRef(dx_sys->d3ddev);
         return VLC_SUCCESS;
     }
 
-    /* */
-    PFN_D3D11_CREATE_DEVICE pf_CreateDevice;
-    pf_CreateDevice = (void *)GetProcAddress(dx_sys->hdecoder_dll, "D3D11CreateDevice");
-    if (!pf_CreateDevice) {
-        msg_Err(va, "Cannot locate reference to D3D11CreateDevice ABI in DLL");
-        return VLC_EGENERIC;
-    }
+    int err = D3D11CreateSurfaceContext( VLC_OBJECT(va), &va->sys->picture_pool_opaque );
+    if ( err != VLC_SUCCESS )
+        return err;
 
-    UINT creationFlags = D3D11_CREATE_DEVICE_VIDEO_SUPPORT;
-#if !defined(NDEBUG) //&& defined(_MSC_VER)
-    creationFlags |= D3D11_CREATE_DEVICE_DEBUG;
-#endif
-
-    /* */
-    ID3D11Device *d3ddev;
-    ID3D11DeviceContext *d3dctx;
-    hr = pf_CreateDevice(NULL, D3D_DRIVER_TYPE_HARDWARE, NULL,
-                                 creationFlags, NULL, 0,
-                                 D3D11_SDK_VERSION, &d3ddev, NULL, &d3dctx);
-    if (FAILED(hr)) {
-        msg_Err(va, "D3D11CreateDevice failed. (hr=0x%lX)", hr);
-        return VLC_EGENERIC;
-    }
-    dx_sys->d3ddev = (IUnknown*) d3ddev;
-    va->sys->d3dctx = d3dctx;
+    dx_sys->d3ddev = (IUnknown*) va->sys->picture_pool_opaque.d3ddevice;
+    va->sys->pool_cfg.d3dcontext = va->sys->picture_pool_opaque.d3dcontext;
+    va->sys->pool_cfg.d3ddevice  = va->sys->picture_pool_opaque.d3ddevice;
 
     ID3D11VideoContext *d3dvidctx = NULL;
-    hr = ID3D11DeviceContext_QueryInterface(d3dctx, &IID_ID3D11VideoContext, (void **)&d3dvidctx);
+    hr = ID3D11DeviceContext_QueryInterface(va->sys->picture_pool_opaque.d3dcontext, &IID_ID3D11VideoContext, (void **)&d3dvidctx);
     if (FAILED(hr)) {
        msg_Err(va, "Could not Query ID3D11VideoDevice Interface. (hr=0x%lX)", hr);
        return VLC_EGENERIC;
     }
     va->sys->d3dvidctx = d3dvidctx;
-
-#if !defined(NDEBUG) && defined(HAVE_DXGIDEBUG_H)
-    HRESULT (WINAPI  * pf_DXGIGetDebugInterface)(const GUID *riid, void **ppDebug);
-    if (va->sys->dxgidebug_dll) {
-        pf_DXGIGetDebugInterface = (void *)GetProcAddress(va->sys->dxgidebug_dll, "DXGIGetDebugInterface");
-        if (pf_DXGIGetDebugInterface) {
-            IDXGIDebug *pDXGIDebug = NULL;
-            hr = pf_DXGIGetDebugInterface(&IID_IDXGIDebug, (void**)&pDXGIDebug);
-            if (SUCCEEDED(hr) && pDXGIDebug) {
-                hr = IDXGIDebug_ReportLiveObjects(pDXGIDebug, DXGI_DEBUG_ALL, DXGI_DEBUG_RLO_ALL);
-            }
-        }
-    }
-#endif
 
     return VLC_SUCCESS;
 }
@@ -539,8 +523,8 @@ static void D3dDestroyDevice(vlc_va_t *va)
 {
     if (va->sys->d3dvidctx)
         ID3D11VideoContext_Release(va->sys->d3dvidctx);
-    if (va->sys->d3dctx)
-        ID3D11DeviceContext_Release(va->sys->d3dctx);
+    if (va->sys->pool_cfg.d3dcontext)
+        ID3D11DeviceContext_Release(va->sys->pool_cfg.d3dcontext);
     if (va->sys->d3dprocessor)
         ID3D11VideoProcessor_Release(va->sys->d3dprocessor);
     if (va->sys->d3dprocenum)
@@ -1060,7 +1044,7 @@ static picture_t *DxAllocPicture(vlc_va_t *va, const video_format_t *fmt, unsign
 
     pic_sys->decoder  = (ID3D11VideoDecoderOutputView*) sys->dx_sys.hw_surface[index];
     ID3D11VideoDecoderOutputView_GetResource(pic_sys->decoder, (ID3D11Resource**) &pic_sys->texture);
-    pic_sys->context  = va->sys->d3dctx;
+    pic_sys->context  = va->sys->pool_cfg.d3dcontext;
 
     if (sys->d3dprocenum)
     {

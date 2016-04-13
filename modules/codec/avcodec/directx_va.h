@@ -35,6 +35,7 @@
 # endif
 
 #include <vlc_common.h>
+#include <vlc_picture_pool.h>
 
 #include <libavcodec/avcodec.h>
 #include "va.h"
@@ -86,6 +87,8 @@ typedef struct
     vlc_mutex_t      surface_lock;
     vlc_va_surface_t surface[MAX_SURFACE_COUNT];
     IUnknown         *hw_surface[MAX_SURFACE_COUNT];
+
+    pool_picture_factory  pool_factory;
 
     /**
      * Check that the decoder device is still available
