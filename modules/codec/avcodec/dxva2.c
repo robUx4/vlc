@@ -41,6 +41,8 @@
 #define COBJMACROS
 #include <libavcodec/dxva2.h>
 
+#include "../../video_chroma/d3d9_opaque.h"
+
 static int Open(vlc_va_t *, AVCodecContext *, enum PixelFormat,
                 const es_format_t *, picture_sys_t *p_sys);
 static void Close(vlc_va_t *, AVCodecContext *);
@@ -130,11 +132,6 @@ struct vlc_va_sys_t
 
     /* avcodec internals */
     struct dxva_context hw;
-};
-
-struct picture_sys_t
-{
-    LPDIRECT3DSURFACE9 surface;
 };
 
 static picture_t *DxAllocPicture(vlc_va_t *, const video_format_t *, unsigned index);

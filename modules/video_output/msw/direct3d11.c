@@ -82,16 +82,6 @@ vlc_module_begin ()
     set_callbacks(Open, Close)
 vlc_module_end ()
 
-#ifdef HAVE_ID3D11VIDEODECODER 
-/* VLC_CODEC_D3D11_OPAQUE */
-struct picture_sys_t
-{
-    ID3D11VideoDecoderOutputView  *decoder; /* may be NULL for pictures from the pool */
-    ID3D11Texture2D               *texture;
-    ID3D11DeviceContext           *context;
-};
-#endif
-
 /* internal picture_t pool  */
 typedef struct
 {

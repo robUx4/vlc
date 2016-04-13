@@ -48,6 +48,7 @@
 #include <d3d11.h>
 #include <libavcodec/d3d11va.h>
 
+#include "../../video_chroma/d3d11_opaque.h"
 #include "../../video_chroma/dxgi_fmt.h"
 
 static int Open(vlc_va_t *, AVCodecContext *, enum PixelFormat,
@@ -116,14 +117,6 @@ struct vlc_va_sys_t
 
     /* avcodec internals */
     struct AVD3D11VAContext      hw;
-};
-
-/* VLC_CODEC_D3D11_OPAQUE */
-struct picture_sys_t
-{
-    ID3D11VideoDecoderOutputView  *decoder; /* may be NULL for pictures from the pool */
-    ID3D11Texture2D               *texture;
-    ID3D11DeviceContext           *context;
 };
 
 /* */

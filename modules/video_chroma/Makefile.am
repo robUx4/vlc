@@ -100,7 +100,8 @@ endif
 
 # DXVA2
 libdxa9_plugin_la_SOURCES = video_chroma/dxa9.c \
-	video_chroma/copy.c video_chroma/copy.h
+	video_chroma/copy.c video_chroma/copy.h \
+	video_chroma/d3d9_opaque.c video_chroma/d3d9_opaque.h
 
 if HAVE_AVCODEC_DXVA2
 chroma_LTLIBRARIES += \
@@ -110,6 +111,7 @@ endif
 # D3D11VA
 libd3d11_surface_plugin_la_SOURCES = video_chroma/d3d11_surface.c \
 	video_chroma/dxgi_fmt.c video_chroma/dxgi_fmt.h \
+	video_chroma/d3d11_opaque.c video_chroma/d3d11_opaque.h \
 	video_chroma/copy.c video_chroma/copy.h
 
 if HAVE_AVCODEC_D3D11VA

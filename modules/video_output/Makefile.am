@@ -172,7 +172,8 @@ libdirect3d9_plugin_la_SOURCES = video_output/msw/direct3d9.c \
 	video_output/msw/common.c video_output/msw/common.h \
 	video_output/msw/events.c video_output/msw/events.h \
 	video_output/msw/builtin_shaders.h \
-	video_output/msw/win32touch.c video_output/msw/win32touch.h
+	video_output/msw/win32touch.c video_output/msw/win32touch.h \
+	video_chroma/d3d9_opaque.c video_chroma/d3d9_opaque.h
 libdirect3d9_plugin_la_CPPFLAGS = $(AM_CPPFLAGS) \
 	-DMODULE_NAME_IS_direct3d9
 libdirect3d9_plugin_la_LIBADD = -lgdi32 -lole32 -luuid

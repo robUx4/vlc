@@ -34,6 +34,7 @@
 #include <vlc_filter.h>
 
 #include "copy.h"
+#include "d3d9_opaque.h"
 
 static int  OpenConverter( vlc_object_t * );
 static void CloseConverter( vlc_object_t * );
@@ -47,12 +48,9 @@ vlc_module_begin ()
     set_callbacks( OpenConverter, CloseConverter )
 vlc_module_end ()
 
-#include <windows.h>
-#include <d3d9.h>
-
-struct picture_sys_t
-{
-    LPDIRECT3DSURFACE9 surface;
+struct filter_sys_t {
+    copy_cache_t       cache;
+    picture_pool_d3d9  pool_factory;
 };
 
 static bool GetLock(filter_t *p_filter, LPDIRECT3DSURFACE9 d3d,
