@@ -1130,8 +1130,7 @@ static int Direct3D11Open(vout_display_t *vd, video_format_t *fmt)
 # endif
 #endif
 
-    vlc_fourcc_t i_src_chroma = fmt->i_chroma;
-    fmt->i_chroma = 0;
+    vlc_fourcc_t i_chroma = 0, i_src_chroma = fmt->i_chroma;
 
     // look for the request pixel format first
     UINT i_quadSupportFlags = D3D11_FORMAT_SUPPORT_TEXTURE2D | D3D11_FORMAT_SUPPORT_SHADER_LOAD;
@@ -1148,7 +1147,7 @@ static int Direct3D11Open(vout_display_t *vd, video_format_t *fmt)
             {
                 msg_Dbg( vd, "Using pixel format %s from chroma %4.4s", output_format->name,
                              (char *)&i_src_chroma );
-                fmt->i_chroma = output_format->fourcc;
+                i_chroma = output_format->fourcc;
                 sys->picQuadConfig.textureFormat      = output_format->formatTexture;
                 sys->picQuadConfig.resourceFormatYRGB = output_format->formatY;
                 sys->picQuadConfig.resourceFormatUV   = output_format->formatUV;
@@ -1158,7 +1157,7 @@ static int Direct3D11Open(vout_display_t *vd, video_format_t *fmt)
     }
 
     // look for any pixel format that we can handle
-    if ( !fmt->i_chroma )
+    if ( !i_chroma )
     {
         for (const d3d_format_t *output_format = GetRenderFormatList();
              output_format->name != NULL; ++output_format)
@@ -1170,7 +1169,7 @@ static int Direct3D11Open(vout_display_t *vd, video_format_t *fmt)
             {
                 msg_Dbg( vd, "Using pixel format %s for chroma %4.4s", output_format->name,
                              (char *)&i_src_chroma );
-                fmt->i_chroma = output_format->fourcc;
+                i_chroma = output_format->fourcc;
                 sys->picQuadConfig.textureFormat      = output_format->formatTexture;
                 sys->picQuadConfig.resourceFormatYRGB = output_format->formatY;
                 sys->picQuadConfig.resourceFormatUV   = output_format->formatUV;
@@ -1178,7 +1177,9 @@ static int Direct3D11Open(vout_display_t *vd, video_format_t *fmt)
             }
         }
     }
-    if ( !fmt->i_chroma )
+        video_format_SetChroma( fmt, i_chroma, NULL, 0 );
+
+    if ( !i_chroma )
     {
        msg_Err(vd, "Could not get a suitable texture pixel format");
        return VLC_EGENERIC;
