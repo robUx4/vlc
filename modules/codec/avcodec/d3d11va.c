@@ -827,8 +827,6 @@ static void DestroyPicture(picture_t *picture)
 
 static picture_t *DxAllocPicture(vlc_va_t *va, const video_format_t *fmt, unsigned index)
 {
-    video_format_t src_fmt = *fmt;
-    src_fmt.i_chroma = VLC_CODEC_D3D11_OPAQUE;
     picture_sys_t *pic_sys = calloc(1, sizeof(*pic_sys));
     if (unlikely(pic_sys == NULL))
         return NULL;
@@ -841,7 +839,7 @@ static picture_t *DxAllocPicture(vlc_va_t *va, const video_format_t *fmt, unsign
         .p_sys      = pic_sys,
         .pf_destroy = DestroyPicture,
     };
-    picture_t *pic = picture_NewFromResource(&src_fmt, &res);
+    picture_t *pic = picture_NewFromResource(&sys->dx_sys.fmt_out, &res);
     if (unlikely(pic == NULL))
     {
         free(pic_sys);

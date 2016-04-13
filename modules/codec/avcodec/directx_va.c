@@ -270,7 +270,7 @@ int directx_va_Setup(vlc_va_t *va, directx_sys_t *dx_sys, AVCodecContext *avctx)
     int surface_alignment = 16;
     int surface_count = 4;
 
-    if (dx_sys->width == avctx->coded_width && dx_sys->height == avctx->coded_height
+    if (dx_sys->fmt_out.i_width == avctx->coded_width && dx_sys->fmt_out.i_height == avctx->coded_height
      && dx_sys->decoder != NULL)
         goto ok;
 
@@ -314,20 +314,16 @@ int directx_va_Setup(vlc_va_t *va, directx_sys_t *dx_sys, AVCodecContext *avctx)
     dx_sys->surface_count = surface_count;
 
 #define ALIGN(x, y) (((x) + ((y) - 1)) & ~((y) - 1))
-    dx_sys->width  = avctx->coded_width;
-    dx_sys->height = avctx->coded_height;
-    dx_sys->surface_width  = ALIGN(dx_sys->width, surface_alignment);
-    dx_sys->surface_height = ALIGN(dx_sys->height, surface_alignment);
+    dx_sys->fmt_out.i_width  = avctx->coded_width;
+    dx_sys->fmt_out.i_height = avctx->coded_height;
+    dx_sys->surface_width  = ALIGN(dx_sys->fmt_out.i_width, surface_alignment);
+    dx_sys->surface_height = ALIGN(dx_sys->fmt_out.i_height, surface_alignment);
 
-    /* FIXME transmit a video_format_t by VaSetup directly */
-    video_format_t fmt;
-    memset(&fmt, 0, sizeof(fmt));
-    fmt.i_width = dx_sys->width;
-    fmt.i_height = dx_sys->height;
-    fmt.i_frame_rate = avctx->framerate.num;
-    fmt.i_frame_rate_base = avctx->framerate.den;
+    dx_sys->fmt_out.i_frame_rate = avctx->framerate.num;
+    dx_sys->fmt_out.i_frame_rate_base = avctx->framerate.den;
+    va->setup( va, &dx_sys->fmt_out );
 
-    if (dx_sys->pf_create_decoder_surfaces(va, dx_sys->codec_id, &fmt, avctx->active_thread_type & FF_THREAD_FRAME))
+    if (dx_sys->pf_create_decoder_surfaces(va, dx_sys->av_codec_id, &dx_sys->fmt_out, avctx->active_thread_type & FF_THREAD_FRAME))
         return VLC_EGENERIC;
 
     if (avctx->coded_width != dx_sys->surface_width ||
@@ -343,7 +339,7 @@ int directx_va_Setup(vlc_va_t *va, directx_sys_t *dx_sys, AVCodecContext *avctx)
         surface->refcount = 0;
         surface->order = 0;
         surface->p_lock = &dx_sys->surface_lock;
-        surface->p_pic = dx_sys->pf_alloc_surface_pic(va, &fmt, i);
+        surface->p_pic = dx_sys->pf_alloc_surface_pic(va, &dx_sys->fmt_out, i);
         if (unlikely(surface->p_pic == NULL))
             return VLC_EGENERIC;
     }
@@ -426,6 +422,7 @@ void directx_va_Close(vlc_va_t *va, directx_sys_t *dx_sys)
     DestroyVideoService(va, dx_sys);
     DestroyDeviceManager(va, dx_sys);
     DestroyDevice(va, dx_sys);
+    video_format_Clean( &dx_sys->fmt_out );
 
     if (dx_sys->hdecoder_dll)
         FreeLibrary(dx_sys->hdecoder_dll);
@@ -438,6 +435,7 @@ int directx_va_Open(vlc_va_t *va, directx_sys_t *dx_sys,
 {
     // TODO va->sys = sys;
     dx_sys->codec_id = ctx->codec_id;
+    video_format_Init( &dx_sys->fmt_out, 0 );
 
     vlc_mutex_init( &dx_sys->surface_lock );
 

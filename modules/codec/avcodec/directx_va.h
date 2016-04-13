@@ -59,8 +59,7 @@ typedef struct input_list_t {
 typedef struct
 {
     int          codec_id;
-    int          width;
-    int          height;
+    video_format_t  fmt_out;
 
     /* DLL */
     HINSTANCE             hdecoder_dll;
