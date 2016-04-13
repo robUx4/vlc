@@ -247,7 +247,11 @@ typedef audio_format_t audio_sample_format_t;
 
 /* Video */
 typedef struct vout_thread_t vout_thread_t;
+
+/* Picture pool */
 typedef struct vlc_picture_pool_handler vlc_picture_pool_handler;
+typedef struct pool_picture_factory pool_picture_factory;
+typedef struct picture_pool_t picture_pool_t;
 
 typedef video_format_t video_frame_format_t;
 typedef struct picture_t picture_t;
