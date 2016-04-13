@@ -43,6 +43,15 @@ filter_t *filter_NewBlend( vlc_object_t *p_this,
 
     p_blend->fmt_out.i_codec        = 
     p_blend->fmt_out.video.i_chroma = p_dst_chroma->i_chroma;
+    if ( p_dst_chroma->i_sub_chroma_size != 0 )
+    {
+        p_blend->fmt_out.video.p_sub_chroma = malloc( p_dst_chroma->i_sub_chroma_size );
+        if ( p_blend->fmt_out.video.p_sub_chroma == NULL )
+            vlc_object_release( p_blend );
+        memcpy( p_blend->fmt_out.video.p_sub_chroma, p_dst_chroma->p_sub_chroma,
+                p_dst_chroma->i_sub_chroma_size );
+    }
+
     p_blend->fmt_out.video.i_rmask  = p_dst_chroma->i_rmask;
     p_blend->fmt_out.video.i_gmask  = p_dst_chroma->i_gmask;
     p_blend->fmt_out.video.i_bmask  = p_dst_chroma->i_bmask;
@@ -66,7 +75,7 @@ int filter_ConfigureBlend( filter_t *p_blend,
 {
     /* */
     if( p_blend->p_module &&
-        p_blend->fmt_in.video.i_chroma != p_src->i_chroma )
+        !video_format_IsSimilarChroma( &p_blend->fmt_in.video, p_src ) )
     {
         /* The chroma is not the same, we need to reload the blend module */
         module_unneed( p_blend, p_blend->p_module );

@@ -55,7 +55,7 @@ static picture_t *VideoBufferNew(filter_t *filter)
     vout_display_t *vd = filter->owner.sys;
     const video_format_t *fmt = &filter->fmt_out.video;
 
-    assert(vd->fmt.i_chroma == fmt->i_chroma &&
+    assert(video_format_IsSimilarChroma( &vd->fmt, fmt) &&
            vd->fmt.i_width  == fmt->i_width  &&
            vd->fmt.i_height == fmt->i_height);
 

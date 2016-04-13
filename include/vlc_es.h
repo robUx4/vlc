@@ -192,12 +192,16 @@ typedef enum video_transform_t
     TRANSFORM_ANTI_TRANSPOSE = ORIENT_ANTI_TRANSPOSED
 } video_transform_t;
 
+typedef struct sub_chroma  sub_chroma;
+
 /**
  * video format description
  */
 struct video_format_t
 {
     vlc_fourcc_t i_chroma;                               /**< picture chroma */
+    sub_chroma   *p_sub_chroma;            /**< data depending on the chroma */
+    size_t        i_sub_chroma_size;      /**< size of the sub chroma buffer */
 
     unsigned int i_width;                                 /**< picture width */
     unsigned int i_height;                               /**< picture height */
@@ -233,6 +237,8 @@ static inline void video_format_Init( video_format_t *p_src, vlc_fourcc_t i_chro
     p_src->i_chroma = i_chroma;
     p_src->i_sar_num = p_src->i_sar_den = 1;
     p_src->p_palette = NULL;
+    p_src->p_sub_chroma = NULL;
+    p_src->i_sub_chroma_size = 0;
 }
 
 /**
@@ -250,6 +256,17 @@ static inline int video_format_Copy( video_format_t *p_dst, const video_format_t
             return VLC_ENOMEM;
         memcpy( p_dst->p_palette, p_src->p_palette, sizeof( *p_dst->p_palette ) );
     }
+    if ( p_src->i_sub_chroma_size && p_src->p_sub_chroma != NULL )
+    {
+        p_dst->p_sub_chroma = (sub_chroma *) malloc( p_src->i_sub_chroma_size );
+        if( !p_dst->p_sub_chroma )
+        {
+            free( p_dst->p_palette );
+            return VLC_ENOMEM;
+        }
+        memcpy( p_dst->p_sub_chroma, p_src->p_sub_chroma, p_src->i_sub_chroma_size );
+        p_dst->i_sub_chroma_size = p_src->i_sub_chroma_size;
+    }
     return VLC_SUCCESS;
 }
 
@@ -259,8 +276,37 @@ static inline int video_format_Copy( video_format_t *p_dst, const video_format_t
  */
 static inline void video_format_Clean( video_format_t *p_src )
 {
+    free( p_src->p_sub_chroma );
     free( p_src->p_palette );
     memset( p_src, 0, sizeof( video_format_t ) );
+}
+
+static inline bool video_format_IsSimilarChroma( const video_format_t *f1, const video_format_t *f2 )
+{
+    return f1->i_chroma == f2->i_chroma && f1->i_sub_chroma_size == f2->i_sub_chroma_size &&
+         ( !f1->i_sub_chroma_size || !memcmp(f1->p_sub_chroma, f2->p_sub_chroma, f1->i_sub_chroma_size));
+}
+
+static inline int video_format_SetChroma( video_format_t *p_fmt, vlc_fourcc_t i_chroma,
+                                          const sub_chroma *p_sub_chroma, size_t i_sub_chroma_size )
+{
+    if ( p_fmt->i_chroma == i_chroma &&
+         p_fmt->i_sub_chroma_size == i_sub_chroma_size &&
+         ( !i_sub_chroma_size || !memcmp(p_fmt->p_sub_chroma, p_sub_chroma, i_sub_chroma_size)) )
+        return VLC_SUCCESS;
+    sub_chroma *p_schroma = NULL;
+    if ( i_sub_chroma_size != 0 )
+    {
+        p_schroma = (sub_chroma *)malloc( i_sub_chroma_size );
+        if ( unlikely( p_schroma == NULL ) )
+            return VLC_ENOMEM;
+        memcpy( p_schroma, p_sub_chroma, i_sub_chroma_size );
+    }
+    free( p_fmt->p_sub_chroma );
+    p_fmt->p_sub_chroma = p_schroma;
+    p_fmt->i_sub_chroma_size = i_sub_chroma_size;
+    p_fmt->i_chroma = i_chroma;
+    return VLC_SUCCESS;
 }
 
 /**

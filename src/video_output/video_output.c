@@ -903,7 +903,7 @@ static int ThreadDisplayRenderPicture(vout_thread_t *vout, bool is_forced)
         subpicture_chromas = NULL;
 
         if (vout->p->spu_blend &&
-            vout->p->spu_blend->fmt_out.video.i_chroma != fmt_spu.i_chroma) {
+            !video_format_IsSimilarChroma( &vout->p->spu_blend->fmt_out.video.i_chroma, &fmt_spu )) {
             filter_DeleteBlend(vout->p->spu_blend);
             vout->p->spu_blend = NULL;
             vout->p->spu_blend_chroma = 0;
