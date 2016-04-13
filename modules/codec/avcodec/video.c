@@ -1085,6 +1085,22 @@ static int lavc_GetFrame(struct AVCodecContext *ctx, AVFrame *frame, int flags)
             return -1;
         }
     }
+    else
+    {
+        video_format_t real_fmt_out;
+        video_format_Copy( &real_fmt_out, &dec->fmt_out.video );
+        sys->p_va->setup( sys->p_va, &real_fmt_out );
+        if ( !video_format_IsSimilarChroma( &dec->fmt_out.video, &real_fmt_out ) )
+        {
+            if (lavc_UpdateVideoFormat(dec, ctx, ctx->pix_fmt, ctx->sw_pix_fmt, sys->p_va))
+            {
+                video_format_Clean( &real_fmt_out );
+                post_mt(sys);
+                return -1;
+            }
+        }
+        video_format_Clean( &real_fmt_out );
+    }
     post_mt(sys);
 
     pic = decoder_GetPicture(dec);

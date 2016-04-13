@@ -200,11 +200,20 @@ static filter_t *CreateFilter( vlc_object_t *p_this, const es_format_t *p_fmt_in
 }
 
 /* */
-static void Setup(vlc_va_t *va, vlc_fourcc_t *chroma)
+static void Setup(vlc_va_t *va, video_format_t *p_fmt_out)
 {
     vlc_va_sys_t *sys = va->sys;
 
-    *chroma = sys->filter == NULL ? VLC_CODEC_D3D9_OPAQUE : VLC_CODEC_YV12;
+    if ( sys->filter != NULL )
+        video_format_SetChroma( p_fmt_out, VLC_CODEC_YV12, NULL, 0 );
+    else
+    {
+        sub_chroma schroma = {
+         .format = sys->render,
+        };
+        video_format_SetChroma( p_fmt_out, VLC_CODEC_D3D9_OPAQUE, &schroma, sizeof(sub_chroma) );
+
+    }
 }
 
 void SetupAVCodecContext(vlc_va_t *va)
