@@ -58,7 +58,7 @@ typedef struct input_list_t {
 #define MAX_SURFACE_COUNT (64)
 typedef struct
 {
-    int          codec_id;
+    int          av_codec_id;
     int          width;
     int          height;
 
@@ -115,7 +115,7 @@ typedef struct
     /**
      * Create the DirectX surfaces in hw_surface and the decoder in decoder
      */
-    int (*pf_create_decoder_surfaces)(vlc_va_t *, int codec_id,
+    int (*pf_create_decoder_surfaces)(vlc_va_t *, int av_codec_id,
                                       const video_format_t *fmt, bool b_threading);
     /**
      * Destroy resources allocated with the surfaces except from hw_surface objects

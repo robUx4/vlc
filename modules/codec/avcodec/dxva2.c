@@ -678,7 +678,7 @@ static int DxSetupOutput(vlc_va_t *va, const GUID *input, const video_format_t *
 /**
  * It creates a DXVA2 decoder using the given video format
  */
-static int DxCreateVideoDecoder(vlc_va_t *va, int codec_id, const video_format_t *fmt, bool b_threading)
+static int DxCreateVideoDecoder(vlc_va_t *va, int av_codec_id, const video_format_t *fmt, bool b_threading)
 {
     VLC_UNUSED(b_threading);
 
@@ -756,7 +756,7 @@ static int DxCreateVideoDecoder(vlc_va_t *va, int codec_id, const video_format_t
         int score;
         if (cfg->ConfigBitstreamRaw == 1)
             score = 1;
-        else if (codec_id == AV_CODEC_ID_H264 && cfg->ConfigBitstreamRaw == 2)
+        else if (av_codec_id == AV_CODEC_ID_H264 && cfg->ConfigBitstreamRaw == 2)
             score = 2;
         else
             continue;

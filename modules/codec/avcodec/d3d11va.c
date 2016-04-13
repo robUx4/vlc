@@ -903,7 +903,7 @@ static int DxSetupOutput(vlc_va_t *va, const GUID *input, const video_format_t *
 /**
  * It creates a Direct3D11 decoder using the given video format
  */
-static int DxCreateDecoderSurfaces(vlc_va_t *va, int codec_id, const video_format_t *fmt, bool b_threading)
+static int DxCreateDecoderSurfaces(vlc_va_t *va, int av_codec_id, const video_format_t *fmt, bool b_threading)
 {
     vlc_va_sys_t *sys = va->sys;
     directx_sys_t *dx_sys = &va->sys->dx_sys;
@@ -998,7 +998,7 @@ static int DxCreateDecoderSurfaces(vlc_va_t *va, int codec_id, const video_forma
         int score;
         if (cfg->ConfigBitstreamRaw == 1)
             score = 1;
-        else if (codec_id == AV_CODEC_ID_H264 && cfg->ConfigBitstreamRaw == 2)
+        else if (av_codec_id == AV_CODEC_ID_H264 && cfg->ConfigBitstreamRaw == 2)
             score = 2;
         else
             continue;

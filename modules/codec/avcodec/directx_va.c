@@ -282,9 +282,9 @@ int directx_va_Setup(vlc_va_t *va, directx_sys_t *dx_sys, AVCodecContext *avctx)
         return VLC_EGENERIC;
 
     /* */
-    msg_Dbg(va, "directx_va_Setup id %d %dx%d", dx_sys->codec_id, avctx->coded_width, avctx->coded_height);
+    msg_Dbg(va, "directx_va_Setup id %d %dx%d", dx_sys->av_codec_id, avctx->coded_width, avctx->coded_height);
 
-    switch ( dx_sys->codec_id )
+    switch ( dx_sys->av_codec_id )
     {
     case AV_CODEC_ID_MPEG2VIDEO:
         /* decoding MPEG-2 requires additional alignment on some Intel GPUs,
@@ -327,7 +327,7 @@ int directx_va_Setup(vlc_va_t *va, directx_sys_t *dx_sys, AVCodecContext *avctx)
     fmt.i_frame_rate = avctx->framerate.num;
     fmt.i_frame_rate_base = avctx->framerate.den;
 
-    if (dx_sys->pf_create_decoder_surfaces(va, dx_sys->codec_id, &fmt, avctx->active_thread_type & FF_THREAD_FRAME))
+    if (dx_sys->pf_create_decoder_surfaces(va, dx_sys->av_codec_id, &fmt, avctx->active_thread_type & FF_THREAD_FRAME))
         return VLC_EGENERIC;
 
     if (avctx->coded_width != dx_sys->surface_width ||
@@ -437,7 +437,7 @@ int directx_va_Open(vlc_va_t *va, directx_sys_t *dx_sys,
                     AVCodecContext *ctx, const es_format_t *fmt, bool b_dll)
 {
     // TODO va->sys = sys;
-    dx_sys->codec_id = ctx->codec_id;
+    dx_sys->av_codec_id = ctx->codec_id;
 
     vlc_mutex_init( &dx_sys->surface_lock );
 
@@ -542,7 +542,7 @@ static int FindVideoServiceConversion(vlc_va_t *va, directx_sys_t *dx_sys, const
     /* Try all supported mode by our priority */
     const directx_va_mode_t *mode = DXVA_MODES;
     for (; mode->name; ++mode) {
-        if (!mode->codec || mode->codec != dx_sys->codec_id)
+        if (!mode->codec || mode->codec != dx_sys->av_codec_id)
             continue;
 
         /* */
