@@ -62,10 +62,14 @@ int vout_OpenWrapper(vout_thread_t *vout,
 
     if (splitter_name) {
         sys->display.vd = vout_NewSplitter(vout, &vout->p->original, state, "$vout", splitter_name,
-                                           double_click_timeout, hide_timeout);
+
+                                           double_click_timeout, hide_timeout,
+                                           vout->p->pf_pre_filter_cfg, vout->p->pre_filter_cfg_opaque);
     } else {
         sys->display.vd = vout_NewDisplay(vout, &vout->p->original, state, "$vout",
-                                          double_click_timeout, hide_timeout);
+
+                                          double_click_timeout, hide_timeout,
+                                          vout->p->pf_pre_filter_cfg, vout->p->pre_filter_cfg_opaque);
     }
     if (!sys->display.vd) {
         free(sys->display.title);

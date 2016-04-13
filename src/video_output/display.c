@@ -76,7 +76,9 @@ static vout_display_t *vout_display_New(vlc_object_t *obj,
                                         const char *module, bool load_module,
                                         const video_format_t *fmt,
                                         const vout_display_cfg_t *cfg,
-                                        vout_display_owner_t *owner)
+                                        vout_display_owner_t *owner,
+                                        void (*pf_pre_filter_cfg)(void *, video_format_t *),
+                                        void *pre_filter_cfg_opaque)
 {
     /* */
     vout_display_t *vd = vlc_custom_create(obj, sizeof(*vd), "vout display" );
@@ -1207,7 +1209,9 @@ static vout_display_t *DisplayNew(vout_thread_t *vout,
                                   bool is_wrapper, vout_display_t *wrapper,
                                   mtime_t double_click_timeout,
                                   mtime_t hide_timeout,
-                                  const vout_display_owner_t *owner_ptr)
+                                  const vout_display_owner_t *owner_ptr,
+                                  void (*pf_pre_filter_cfg)(void *, video_format_t *),
+                                  void *pre_filter_cfg_opaque)
 {
     /* */
     vout_display_owner_sys_t *osys = calloc(1, sizeof(*osys));
@@ -1280,7 +1284,8 @@ static vout_display_t *DisplayNew(vout_thread_t *vout,
 
     vout_display_t *p_display = vout_display_New(VLC_OBJECT(vout),
                                                  module, !is_wrapper,
-                                                 source, cfg, &owner);
+                                                 source, cfg, &owner,
+                                                 pf_pre_filter_cfg, pre_filter_cfg_opaque);
     if (!p_display)
         goto error;
 
@@ -1336,10 +1341,13 @@ vout_display_t *vout_NewDisplay(vout_thread_t *vout,
                                 const vout_display_state_t *state,
                                 const char *module,
                                 mtime_t double_click_timeout,
-                                mtime_t hide_timeout)
+                                mtime_t hide_timeout,
+                                void (*pf_pre_filter_cfg)(void *, video_format_t *),
+                                void *pre_filter_cfg_opaque)
 {
     return DisplayNew(vout, source, state, module, false, NULL,
-                      double_click_timeout, hide_timeout, NULL);
+                      double_click_timeout, hide_timeout, NULL,
+                      pf_pre_filter_cfg, pre_filter_cfg_opaque);
 }
 
 /*****************************************************************************
@@ -1522,7 +1530,9 @@ vout_display_t *vout_NewSplitter(vout_thread_t *vout,
                                  const char *module,
                                  const char *splitter_module,
                                  mtime_t double_click_timeout,
-                                 mtime_t hide_timeout)
+                                 mtime_t hide_timeout,
+                                 void (*pf_pre_filter_cfg)(void *, video_format_t *),
+                                 void *pre_filter_cfg_opaque)
 {
     video_splitter_t *splitter =
         video_splitter_New(VLC_OBJECT(vout), splitter_module, source);
@@ -1532,7 +1542,8 @@ vout_display_t *vout_NewSplitter(vout_thread_t *vout,
     /* */
     vout_display_t *wrapper =
         DisplayNew(vout, source, state, module, true, NULL,
-                    double_click_timeout, hide_timeout, NULL);
+                   double_click_timeout, hide_timeout, NULL,
+                   pf_pre_filter_cfg, pre_filter_cfg_opaque);
     if (!wrapper) {
         video_splitter_Delete(splitter);
         return NULL;
@@ -1583,7 +1594,8 @@ vout_display_t *vout_NewSplitter(vout_thread_t *vout,
         vout_display_t *vd = DisplayNew(vout, &output->fmt, &ostate,
                                         output->psz_module ? output->psz_module : module,
                                         false, wrapper,
-                                        double_click_timeout, hide_timeout, &vdo);
+                                        double_click_timeout, hide_timeout, &vdo,
+                                        pf_pre_filter_cfg, pre_filter_cfg_opaque);
         if (!vd) {
             vout_DeleteDisplay(wrapper, NULL);
             return NULL;

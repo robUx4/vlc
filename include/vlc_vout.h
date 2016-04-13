@@ -53,6 +53,9 @@ typedef struct {
     bool                 change_fmt;
     const video_format_t *fmt;
     unsigned             dpb_size;
+    /* Extra code to execute on the decoder before looking for filters */
+    void (*pf_pre_filter_cfg)(void *, video_format_t *fmt_out);
+    void *pre_filter_cfg_opaque;
 } vout_configuration_t;
 
 /**

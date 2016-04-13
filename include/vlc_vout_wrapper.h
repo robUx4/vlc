@@ -76,7 +76,9 @@ typedef struct {
  */
 vout_display_t *vout_NewDisplay( vout_thread_t *, const video_format_t *,
     const vout_display_state_t *, const char *module,
-    mtime_t double_click_timeout, mtime_t hide_timeout );
+    mtime_t double_click_timeout, mtime_t hide_timeout,
+                                 void (*pf_pre_filter_cfg)(void *, video_format_t *),
+                                 void *pre_filter_cfg_opaque );
 /**
  * It destroy a vout managed display.
  */

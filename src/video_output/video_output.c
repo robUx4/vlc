@@ -132,6 +132,8 @@ static vout_thread_t *VoutCreate(vlc_object_t *object,
 
     vout->p->original = original;
     vout->p->dpb_size = cfg->dpb_size;
+    vout->p->pf_pre_filter_cfg = cfg->pf_pre_filter_cfg;
+    vout->p->pre_filter_cfg_opaque = cfg->pre_filter_cfg_opaque;
 
     vout_control_Init(&vout->p->control);
     vout_control_PushVoid(&vout->p->control, VOUT_CONTROL_INIT);
@@ -1452,6 +1454,8 @@ static int ThreadReinit(vout_thread_t *vout,
 
     vout->p->original = original;
     vout->p->dpb_size = cfg->dpb_size;
+    vout->p->pf_pre_filter_cfg = cfg->pf_pre_filter_cfg;
+    vout->p->pre_filter_cfg_opaque = cfg->pre_filter_cfg_opaque;
     if (ThreadStart(vout, &state)) {
         ThreadClean(vout);
         return VLC_EGENERIC;
