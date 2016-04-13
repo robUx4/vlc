@@ -55,7 +55,7 @@ static picture_t *VideoBufferNew(filter_t *filter)
     vout_display_t *vd = filter->owner.sys;
     const video_format_t *fmt = &filter->fmt_out.video;
 
-    assert(vd->fmt.i_chroma == fmt->i_chroma &&
+    assert(video_format_IsSimilarChroma( &vd->fmt, fmt) &&
            vd->fmt.i_width  == fmt->i_width  &&
            vd->fmt.i_height == fmt->i_height);
 
@@ -432,10 +432,17 @@ static int VoutDisplayCreateRender(vout_display_t *vd)
         (v_src.i_chroma == VLC_CODEC_J440 && v_dst.i_chroma == VLC_CODEC_I440) ||
         (v_src.i_chroma == VLC_CODEC_J444 && v_dst.i_chroma == VLC_CODEC_I444))
         v_dst_cmp.i_chroma = v_src.i_chroma;
+    v_dst_cmp.p_sub_chroma = NULL; // for memcmp
+    v_src.p_sub_chroma = NULL;     // for memcmp
 
-    const bool convert = memcmp(&v_src, &v_dst_cmp, sizeof(v_src)) != 0;
+    const bool convert = memcmp(&v_src, &v_dst_cmp, sizeof(v_src)) != 0 ||
+            (vd->source.i_sub_chroma_size && memcmp( vd->source.p_sub_chroma,
+                                                     vd->fmt.p_sub_chroma,
+                                                     vd->source.i_sub_chroma_size ) != 0 );
     if (!convert)
         return 0;
+    v_src.p_sub_chroma = vd->source.p_sub_chroma;
+    v_dst_cmp.p_sub_chroma = vd->fmt.p_sub_chroma;
 
     msg_Dbg(vd, "A filter to adapt decoder %4.4s to display %4.4s is needed",
             (const char *)&v_src.i_chroma, (const char *)&v_dst.i_chroma);

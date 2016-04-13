@@ -381,7 +381,7 @@ void video_format_ApplyRotation( video_format_t *restrict out,
 bool video_format_IsSimilar( const video_format_t *f1,
                              const video_format_t *f2 )
 {
-    if( f1->i_chroma != f2->i_chroma )
+    if( !video_format_IsSimilarChroma( f1, f2 ) )
         return false;
 
     if( f1->i_width != f2->i_width || f1->i_height != f2->i_height ||
