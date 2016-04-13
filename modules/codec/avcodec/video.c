@@ -1192,7 +1192,7 @@ static enum PixelFormat ffmpeg_GetFormat( AVCodecContext *p_context,
         p_dec->fmt_out.video.i_chroma = vlc_va_GetChroma(hwfmt, swfmt);
         if (p_dec->fmt_out.video.i_chroma == 0)
             continue; /* Unknown brand of hardware acceleration */
-        if (p_context->width == 0 || p_context->height == 0)
+        if (unlikely(p_context->width == 0 || p_context->height == 0))
         {   /* should never happen */
             msg_Err(p_dec, "unspecified video dimensions");
             continue;
