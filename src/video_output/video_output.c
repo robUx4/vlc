@@ -133,6 +133,8 @@ static vout_thread_t *VoutCreate(vlc_object_t *object,
     vout->p->original = original;
     vout->p->dpb_size = pool_HandlerDBPSize( cfg->p_pool_handler );
     vout->p->p_pool_handler = cfg->p_pool_handler;
+    vout->p->pf_pre_filter_cfg = cfg->pf_pre_filter_cfg;
+    vout->p->pre_filter_cfg_opaque = cfg->pre_filter_cfg_opaque;
     msg_Dbg(vout, "VoutCreate set vout=%p vout->p=%p vout->p->p_pool_handler=%p", vout, vout->p, vout->p->p_pool_handler);
 
     vout_control_Init(&vout->p->control);
@@ -1460,6 +1462,8 @@ static int ThreadReinit(vout_thread_t *vout,
     vout->p->original = original;
     vout->p->dpb_size = pool_HandlerDBPSize( cfg->p_pool_handler );
     vout->p->p_pool_handler = cfg->p_pool_handler;
+    vout->p->pf_pre_filter_cfg = cfg->pf_pre_filter_cfg;
+    vout->p->pre_filter_cfg_opaque = cfg->pre_filter_cfg_opaque;
     msg_Dbg(vout, "ThreadReinit set vout=%p vout->p=%p vout->p->p_pool_handler=%p", vout, vout->p, vout->p->p_pool_handler);
     if (ThreadStart(vout, &state)) {
         ThreadClean(vout);

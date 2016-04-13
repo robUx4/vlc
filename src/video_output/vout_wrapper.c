@@ -60,15 +60,18 @@ int vout_OpenWrapper(vout_thread_t *vout,
     const mtime_t double_click_timeout = 300000;
     const mtime_t hide_timeout = var_CreateGetInteger(vout, "mouse-hide-timeout") * 1000;
 
-    msg_Dbg(vout, "vout_OpenWrapper1 vout=%p vout->p=%p vout->p->p_pool_handler=%p", vout, vout->p, vout->p->p_pool_handler);
+    msg_Dbg(vout, "vout_OpenWrapper1 vout=%p vout->p=%p vout->p->p_pool_handler=%p pre_filter_cfg_opaque=%p",
+            vout, vout->p, vout->p->p_pool_handler, vout->p->pre_filter_cfg_opaque);
     if (splitter_name) {
         sys->display.vd = vout_NewSplitter(vout, &vout->p->original, state, "$vout", splitter_name,
                                            double_click_timeout, hide_timeout,
-                                           vout->p->p_pool_handler);
+                                           vout->p->p_pool_handler,
+                                           vout->p->pf_pre_filter_cfg, vout->p->pre_filter_cfg_opaque);
     } else {
         sys->display.vd = vout_NewDisplay(vout, &vout->p->original, state, "$vout",
                                           double_click_timeout, hide_timeout,
-                                          vout->p->p_pool_handler);
+                                          vout->p->p_pool_handler,
+                                          vout->p->pf_pre_filter_cfg, vout->p->pre_filter_cfg_opaque);
     }
     msg_Dbg(vout, "vout_OpenWrapper2 vout=%p vout->p=%p vout->p->p_pool_handler=%p", vout, vout->p, vout->p->p_pool_handler);
     if (!sys->display.vd) {

@@ -40,7 +40,9 @@ sout_instance_t *input_resource_RequestSout( input_resource_t *, sout_instance_t
  * This function handles vout request.
  */
 vout_thread_t *input_resource_RequestVout( input_resource_t *, vout_thread_t *, video_format_t *,
-                                           bool b_recycle, vlc_picture_pool_handler * );
+                                           bool b_recycle, vlc_picture_pool_handler *,
+                                           void (*pf_pre_filter_cfg)(void *, video_format_t *),
+                                           void *pre_filter_cfg_opaque );
 
 /**
  * This function returns one of the current vout if any.

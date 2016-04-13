@@ -94,7 +94,9 @@ static vout_display_t *vout_display_New(vlc_object_t *obj,
                                         const video_format_t *fmt,
                                         const vout_display_cfg_t *cfg,
                                         vout_display_owner_t *owner,
-                                        vlc_picture_pool_handler *p_pool_handler)
+                                        vlc_picture_pool_handler *p_pool_handler,
+                                        void (*pf_pre_filter_cfg)(void *, video_format_t *),
+                                        void *pre_filter_cfg_opaque)
 {
     /* */
     vout_display_t *vd = vlc_custom_create(obj, sizeof(*vd), "vout display" );
@@ -1264,7 +1266,9 @@ static vout_display_t *DisplayNew(vout_thread_t *vout,
                                   mtime_t double_click_timeout,
                                   mtime_t hide_timeout,
                                   const vout_display_owner_t *owner_ptr,
-                                  vlc_picture_pool_handler *p_pool_handler)
+                                  vlc_picture_pool_handler *p_pool_handler,
+                                  void (*pf_pre_filter_cfg)(void *, video_format_t *),
+                                  void *pre_filter_cfg_opaque)
 {
     /* */
     vout_display_owner_sys_t *osys = calloc(1, sizeof(*osys));
@@ -1337,7 +1341,8 @@ static vout_display_t *DisplayNew(vout_thread_t *vout,
 
     vout_display_t *p_display = vout_display_New(VLC_OBJECT(vout),
                                                  module, !is_wrapper,
-                                                 source, cfg, &owner, p_pool_handler);
+                                                 source, cfg, &owner, p_pool_handler,
+                                                 pf_pre_filter_cfg, pre_filter_cfg_opaque);
     if (!p_display)
         goto error;
 
@@ -1395,10 +1400,13 @@ vout_display_t *vout_NewDisplay(vout_thread_t *vout,
                                 const char *module,
                                 mtime_t double_click_timeout,
                                 mtime_t hide_timeout,
-                                vlc_picture_pool_handler *p_pool_handler)
+                                vlc_picture_pool_handler *p_pool_handler,
+                                void (*pf_pre_filter_cfg)(void *, video_format_t *),
+                                void *pre_filter_cfg_opaque)
 {
     return DisplayNew(vout, source, state, module, false, NULL,
-                      double_click_timeout, hide_timeout, NULL, p_pool_handler);
+                      double_click_timeout, hide_timeout, NULL, p_pool_handler,
+                      pf_pre_filter_cfg, pre_filter_cfg_opaque);
 }
 
 /*****************************************************************************
@@ -1584,7 +1592,9 @@ vout_display_t *vout_NewSplitter(vout_thread_t *vout,
                                  const char *splitter_module,
                                  mtime_t double_click_timeout,
                                  mtime_t hide_timeout,
-                                 vlc_picture_pool_handler *p_pool_handler)
+                                 vlc_picture_pool_handler *p_pool_handler,
+                                 void (*pf_pre_filter_cfg)(void *, video_format_t *),
+                                 void *pre_filter_cfg_opaque)
 {
     video_splitter_t *splitter =
         video_splitter_New(VLC_OBJECT(vout), splitter_module, source);
@@ -1594,7 +1604,8 @@ vout_display_t *vout_NewSplitter(vout_thread_t *vout,
     /* */
     vout_display_t *wrapper =
         DisplayNew(vout, source, state, module, true, NULL,
-                    double_click_timeout, hide_timeout, NULL, p_pool_handler);
+                   double_click_timeout, hide_timeout, NULL, p_pool_handler,
+                   pf_pre_filter_cfg, pre_filter_cfg_opaque);
     if (!wrapper) {
         video_splitter_Delete(splitter);
         return NULL;
@@ -1647,7 +1658,8 @@ vout_display_t *vout_NewSplitter(vout_thread_t *vout,
                                         output->psz_module ? output->psz_module : module,
                                         false, wrapper,
                                         double_click_timeout, hide_timeout, &vdo,
-                                        p_pool_handler);
+                                        p_pool_handler,
+                                        pf_pre_filter_cfg, pre_filter_cfg_opaque);
         if (!vd) {
             vout_DeleteDisplay(wrapper, NULL, p_pool_handler);
             return NULL;
