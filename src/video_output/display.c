@@ -149,6 +149,20 @@ static vout_display_t *vout_display_New(vlc_object_t *obj,
         return NULL;
     }
 
+    if ( pf_pre_filter_cfg != NULL )
+    {
+        video_format_t fmt_out;
+        video_format_Init( &fmt_out, vd->source.i_chroma );
+        video_format_Copy( &fmt_out, &vd->source );
+
+        pf_pre_filter_cfg( pre_filter_cfg_opaque, &vd->source );
+        if ( !video_format_IsSimilar( &vd->source, &fmt_out ))
+        {
+            /* TODO reinit the display with this new config */
+        }
+        video_format_Clean( &fmt_out );
+    }
+
     return vd;
 }
 
