@@ -50,7 +50,7 @@ vlc_module_end ()
 
 struct filter_sys_t {
     copy_cache_t       cache;
-    picture_pool_d3d9  pool_factory;
+    vlc_chroma_context  pool_factory;
 };
 
 static bool GetLock(filter_t *p_filter, LPDIRECT3DSURFACE9 d3d,

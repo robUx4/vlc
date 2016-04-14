@@ -127,7 +127,7 @@ error:
 
 void D3D9DestroySurfaceContext( void *p_opaque )
 {
-    picture_pool_d3d9 *sys = p_opaque;
+    vlc_chroma_context *sys = p_opaque;
 
     if ( sys->d3ddevice )
         IDirect3DDevice9_Release( sys->d3ddevice );
@@ -150,7 +150,7 @@ static void DestroyPoolPictureD3D9(picture_t *picture)
 
 void D3D9SurfaceContextAddRef( void *p_opaque )
 {
-    picture_pool_d3d9 *sys = p_opaque;
+    vlc_chroma_context *sys = p_opaque;
 
     IDirect3DDevice9_AddRef( sys->d3ddevice );
     IDirect3D9_AddRef( sys->d3dobj );
@@ -158,7 +158,7 @@ void D3D9SurfaceContextAddRef( void *p_opaque )
 
 void D3D9SurfaceContextDelRef( void *p_opaque )
 {
-    picture_pool_d3d9 *sys = p_opaque;
+    vlc_chroma_context *sys = p_opaque;
 
     IDirect3DDevice9_Release( sys->d3ddevice );
     IDirect3D9_Release( sys->d3dobj );

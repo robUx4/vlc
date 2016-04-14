@@ -77,7 +77,7 @@ static vout_display_t *vout_display_New(vlc_object_t *obj,
                                         const video_format_t *fmt,
                                         const vout_display_cfg_t *cfg,
                                         vout_display_owner_t *owner,
-                                        void (*pf_pre_filter_cfg)(void *, video_format_t *),
+                                        void (*pf_pre_filter_cfg)(void *, vout_display_t *, video_format_t *),
                                         void *pre_filter_cfg_opaque)
 {
     /* */
@@ -124,7 +124,7 @@ static vout_display_t *vout_display_New(vlc_object_t *obj,
         video_format_Init( &fmt_out, vd->source.i_chroma );
         video_format_Copy( &fmt_out, &vd->source );
 
-        pf_pre_filter_cfg( pre_filter_cfg_opaque, &vd->source );
+        pf_pre_filter_cfg( pre_filter_cfg_opaque, vd, &vd->source );
         if ( !video_format_IsSimilar( &vd->source, &fmt_out ))
         {
             /* TODO reinit the display with this new config */
@@ -1225,7 +1225,7 @@ static vout_display_t *DisplayNew(vout_thread_t *vout,
                                   mtime_t double_click_timeout,
                                   mtime_t hide_timeout,
                                   const vout_display_owner_t *owner_ptr,
-                                  void (*pf_pre_filter_cfg)(void *, video_format_t *),
+                                  void (*pf_pre_filter_cfg)(void *, vout_display_t *, video_format_t *),
                                   void *pre_filter_cfg_opaque)
 {
     /* */
@@ -1357,7 +1357,7 @@ vout_display_t *vout_NewDisplay(vout_thread_t *vout,
                                 const char *module,
                                 mtime_t double_click_timeout,
                                 mtime_t hide_timeout,
-                                void (*pf_pre_filter_cfg)(void *, video_format_t *),
+                                void (*pf_pre_filter_cfg)(void *, vout_display_t *, video_format_t *),
                                 void *pre_filter_cfg_opaque)
 {
     return DisplayNew(vout, source, state, module, false, NULL,
@@ -1546,7 +1546,7 @@ vout_display_t *vout_NewSplitter(vout_thread_t *vout,
                                  const char *splitter_module,
                                  mtime_t double_click_timeout,
                                  mtime_t hide_timeout,
-                                 void (*pf_pre_filter_cfg)(void *, video_format_t *),
+                                 void (*pf_pre_filter_cfg)(void *, vout_display_t *, video_format_t *),
                                  void *pre_filter_cfg_opaque)
 {
     video_splitter_t *splitter =

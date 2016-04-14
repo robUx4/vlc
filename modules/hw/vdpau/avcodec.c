@@ -141,13 +141,14 @@ static int Copy(vlc_va_t *va, picture_t *pic, uint8_t *data)
 }
 
 static int Open(vlc_va_t *va, AVCodecContext *avctx, enum PixelFormat pix_fmt,
-                const es_format_t *fmt, decoder_t *p_dec)
+                const es_format_t *fmt, decoder_t *p_dec, vout_display_t *vout)
 {
     if (pix_fmt != AV_PIX_FMT_VDPAU)
         return VLC_EGENERIC;
 
     (void) fmt;
     (void) p_dec;
+    (void) vout;
     void *func;
     VdpStatus err;
 #if (LIBAVCODEC_VERSION_INT < AV_VERSION_INT(56, 2, 0))

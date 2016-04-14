@@ -1127,7 +1127,7 @@ static int lavc_GetFrame(struct AVCodecContext *ctx, AVFrame *frame, int flags)
     return ret;
 }
 
-static void CreateVA(void *p_setup_opaque, video_format_t *p_fmt_out)
+static void CreateVA(void *p_setup_opaque, vout_display_t *vout, video_format_t *p_fmt_out)
 {
     decoder_t *p_dec = p_setup_opaque;
     decoder_sys_t *p_sys = p_dec->p_sys;
@@ -1135,13 +1135,13 @@ static void CreateVA(void *p_setup_opaque, video_format_t *p_fmt_out)
     if ( va == NULL )
     {
         va = vlc_va_New( p_dec, p_sys->va_p_context, p_sys->va_pix_fmt,
-                                   &p_dec->fmt_in );
+                         &p_dec->fmt_in, vout );
         p_dec->p_sys->p_va = va;
         if ( va != NULL )
             va->get_output( va, &p_dec->fmt_out.video );
     }
     if ( va != NULL )
-        va->get_output( va, &p_dec->fmt_out.video );
+        va->get_output( va, p_fmt_out );
 }
 
 static enum PixelFormat ffmpeg_GetFormat( AVCodecContext *p_context,

@@ -34,7 +34,7 @@ typedef struct
     IDirect3DDevice9      *d3ddevice;
 } pool_factory_d3d9;
 
-typedef struct
+typedef struct vlc_chroma_context
 {
     /* shared between all pool (factory) handling VLC_CODEC_D3D9_OPAQUE */
     LPDIRECT3D9           d3dobj;
@@ -46,7 +46,7 @@ typedef struct
     /* DLL */
     HINSTANCE             hd3d9_dll;
 
-} picture_pool_d3d9;
+} vlc_chroma_context;
 
 struct picture_sys_t
 {

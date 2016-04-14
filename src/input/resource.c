@@ -195,7 +195,7 @@ static vout_thread_t *RequestVout( input_resource_t *p_resource,
                                    vout_thread_t *p_vout,
                                    video_format_t *p_fmt, unsigned dpb_size,
                                    bool b_recycle,
-                                   void (*pf_pre_filter_cfg)(void *, video_format_t *),
+                                   void (*pf_pre_filter_cfg)(void *, vout_display_t *, video_format_t *),
                                    void *pre_filter_cfg_opaque )
 {
     vlc_assert_locked( &p_resource->lock );
@@ -464,7 +464,7 @@ vout_thread_t *input_resource_RequestVout( input_resource_t *p_resource,
                                            vout_thread_t *p_vout,
                                            video_format_t *p_fmt, unsigned dpb_size,
                                            bool b_recycle,
-                                           void (*pf_pre_filter_cfg)(void *, video_format_t *),
+                                           void (*pf_pre_filter_cfg)(void *, vout_display_t *, video_format_t *),
                                            void *pre_filter_cfg_opaque )
 {
     vlc_mutex_lock( &p_resource->lock );

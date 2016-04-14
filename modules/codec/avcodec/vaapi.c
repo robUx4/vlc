@@ -280,13 +280,14 @@ static int FindFormat(vlc_va_sys_t *sys)
 }
 
 static int Create( vlc_va_t *va, AVCodecContext *ctx, enum PixelFormat pix_fmt,
-                   const es_format_t *fmt, decoder_t *p_dec )
+                   const es_format_t *fmt, decoder_t *p_dec, vout_display_t *vout )
 {
     if( pix_fmt != AV_PIX_FMT_VAAPI_VLD )
         return VLC_EGENERIC;
 
     (void) fmt;
     (void) p_dec;
+    (void) vout;
 #ifdef VLC_VA_BACKEND_XLIB
     if( !vlc_xlib_init( VLC_OBJECT(va) ) )
     {

@@ -83,10 +83,11 @@ static int vlc_va_Start(void *func, va_list ap)
     enum PixelFormat pix_fmt = va_arg(ap, enum PixelFormat);
     const es_format_t *fmt = va_arg(ap, const es_format_t *);
     decoder_t *p_dec = va_arg(ap, decoder_t *);
+    vout_display_t *vout = va_arg(ap, vout_display_t *);
     int (*open)(vlc_va_t *, AVCodecContext *, enum PixelFormat,
-                const es_format_t *, decoder_t *) = func;
+                const es_format_t *, decoder_t *, vout_display_t *) = func;
 
-    return open(va, ctx, pix_fmt, fmt, p_dec);
+    return open(va, ctx, pix_fmt, fmt, p_dec, vout);
 }
 
 static void vlc_va_Stop(void *func, va_list ap)
@@ -104,7 +105,7 @@ static void GetOutputFormat(vlc_va_t *va, video_format_t *p_fmt_out)
 }
 
 vlc_va_t *vlc_va_New(decoder_t *p_dec, AVCodecContext *avctx,
-                     enum PixelFormat pix_fmt, const es_format_t *fmt)
+                     enum PixelFormat pix_fmt, const es_format_t *fmt, vout_display_t *vout)
 {
     vlc_va_t *va = vlc_object_create(VLC_OBJECT(p_dec), sizeof (*va));
     if (unlikely(va == NULL))
@@ -113,7 +114,7 @@ vlc_va_t *vlc_va_New(decoder_t *p_dec, AVCodecContext *avctx,
     va->get_output = GetOutputFormat;
 
     va->module = vlc_module_load(va, "hw decoder", "$avcodec-hw", true,
-                                 vlc_va_Start, va, avctx, pix_fmt, fmt, p_dec);
+                                 vlc_va_Start, va, avctx, pix_fmt, fmt, p_dec, vout);
     if (va->module == NULL)
     {
         vlc_object_release(va);

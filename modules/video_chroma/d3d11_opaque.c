@@ -106,7 +106,7 @@ error:
 
 void D3D11DestroySurfaceContext( void *p_opaque )
 {
-    picture_pool_d3d11 *sys = p_opaque;
+    vlc_chroma_context *sys = p_opaque;
 
     if ( sys->d3dcontext )
         ID3D11DeviceContext_Release( sys->d3dcontext );
@@ -122,7 +122,7 @@ void D3D11DestroySurfaceContext( void *p_opaque )
 
 void D3D11SurfaceContextAddRef( void *p_opaque )
 {
-    picture_pool_d3d11 *sys = p_opaque;
+    vlc_chroma_context *sys = p_opaque;
 
     IUnknown_AddRef( sys->d3ddevice );
     IUnknown_AddRef( sys->d3dcontext );
@@ -130,7 +130,7 @@ void D3D11SurfaceContextAddRef( void *p_opaque )
 
 void D3D11SurfaceContextDelRef( void *p_opaque )
 {
-    picture_pool_d3d11 *sys = p_opaque;
+    vlc_chroma_context *sys = p_opaque;
 
     IUnknown_Release( sys->d3ddevice );
     IUnknown_Release( sys->d3dcontext );

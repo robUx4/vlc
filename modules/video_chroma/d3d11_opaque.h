@@ -38,7 +38,7 @@ typedef struct
     ID3D11DeviceContext  *d3dcontext;
 } pool_factory_d3d11;
 
-typedef struct
+typedef struct vlc_chroma_context
 {
     /* shared between all pool (factory) handling VLC_CODEC_D3D11_OPAQUE */
     ID3D11Device         *d3ddevice;
@@ -51,7 +51,7 @@ typedef struct
 #if !defined(NDEBUG) && defined(HAVE_DXGIDEBUG_H)
     HINSTANCE            dxgidebug_dll;
 #endif
-} picture_pool_d3d11;
+} vlc_chroma_context;
 
 struct sub_chroma
 {

@@ -30,7 +30,7 @@ vout_display_t *vout_NewSplitter(vout_thread_t *vout,
                                  const char *splitter_module,
                                  mtime_t double_click_timeout,
                                  mtime_t hide_timeout,
-                                 void (*pf_pre_filter_cfg)(void *, video_format_t *),
+                                 void (*pf_pre_filter_cfg)(void *, vout_display_t *, video_format_t *),
                                  void *pre_filter_cfg_opaque);
 
 /* FIXME should not be there */

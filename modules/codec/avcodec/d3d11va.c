@@ -40,7 +40,7 @@
 #include <vlc_charset.h>
 #include <vlc_filter.h>
 #include <vlc_modules.h>
-#include <vlc_codec.h>
+#include <vlc_vout_display.h>
 
 #include "directx_va.h"
 
@@ -53,7 +53,7 @@
 #include "../../video_chroma/dxgi_fmt.h"
 
 static int Open(vlc_va_t *, AVCodecContext *, enum PixelFormat,
-                const es_format_t *, decoder_t *);
+                const es_format_t *, decoder_t *, vout_display_t *);
 static void Close(vlc_va_t *, AVCodecContext *);
 
 vlc_module_begin()
@@ -289,7 +289,7 @@ static void Close(vlc_va_t *va, AVCodecContext *ctx)
 }
 
 static int Open(vlc_va_t *va, AVCodecContext *ctx, enum PixelFormat pix_fmt,
-                const es_format_t *fmt, decoder_t *p_dec)
+                const es_format_t *fmt, decoder_t *p_dec, vout_display_t *vout)
 {
     int err = VLC_EGENERIC;
     directx_sys_t *dx_sys;
@@ -301,9 +301,11 @@ static int Open(vlc_va_t *va, AVCodecContext *ctx, enum PixelFormat pix_fmt,
     if (unlikely(sys == NULL))
         return VLC_ENOMEM;
 
-    picture_t *test_pic = decoder_GetPicture(p_dec);
-    assert(!test_pic || test_pic->format.i_chroma == p_dec->fmt_out.video.i_chroma);
-    picture_sys_t *p_sys = test_pic != NULL ? test_pic->p_sys : NULL;
+    vlc_chroma_context *p_sys = vout != NULL ? vout_display_ChromaContext( vout, VLC_CODEC_D3D11_OPAQUE, NULL ) : NULL;
+    //assert(!test_pic || test_pic->format.i_chroma == p_dec->fmt_out.video.i_chroma);
+    //vlc_chroma_context *p_sys = test_pic;
+    //picture_sys_t *p_sys = test_pic != NULL && test_pic->format.i_chroma == VLC_CODEC_D3D11_OPAQUE
+    //        ? test_pic->p_sys : NULL;
 
 #if !defined(NDEBUG) && defined(HAVE_DXGIDEBUG_H)
     sys->dxgidebug_dll = LoadLibrary(TEXT("DXGIDEBUG.DLL"));
@@ -330,24 +332,21 @@ static int Open(vlc_va_t *va, AVCodecContext *ctx, enum PixelFormat pix_fmt,
 
     dx_sys->d3ddev = NULL;
     va->sys->render = DXGI_FORMAT_UNKNOWN;
-    if ( p_sys != NULL && p_sys->context != NULL ) {
+    if ( p_sys != NULL && p_sys->d3dcontext != NULL) {
         ID3D11VideoContext *d3dvidctx = NULL;
-        HRESULT hr = ID3D11DeviceContext_QueryInterface(p_sys->context, &IID_ID3D11VideoContext, (void **)&d3dvidctx);
+        HRESULT hr = ID3D11DeviceContext_QueryInterface(p_sys->d3dcontext, &IID_ID3D11VideoContext, (void **)&d3dvidctx);
         if (FAILED(hr)) {
            msg_Err(va, "Could not Query ID3D11VideoDevice Interface from the picture. (hr=0x%lX)", hr);
         } else {
-            ID3D11DeviceContext_GetDevice( p_sys->context, (ID3D11Device**) &dx_sys->d3ddev );
-            sys->d3dctx = p_sys->context;
+            ID3D11Device_AddRef( p_sys->d3ddevice );
+            dx_sys->d3ddev = p_sys->d3ddevice;
+            sys->d3dctx = p_sys->d3dcontext;
+            sys->render = p_sys->textureFormat;
             sys->d3dvidctx = d3dvidctx;
-
-            assert(p_sys->texture != NULL);
-            D3D11_TEXTURE2D_DESC dstDesc;
-            ID3D11Texture2D_GetDesc( (ID3D11Texture2D*) p_sys->texture, &dstDesc);
-            sys->render = dstDesc.Format;
         }
     }
 
-    err = directx_va_Open(va, &sys->dx_sys, ctx, fmt, dx_sys->d3ddev==NULL || va->sys->d3dctx==NULL);
+    err = directx_va_Open(va, &sys->dx_sys, ctx, fmt, dx_sys->d3ddev==NULL || sys->d3dctx==NULL);
     if (err!=VLC_SUCCESS)
         goto error;
 
@@ -386,8 +385,6 @@ static int Open(vlc_va_t *va, AVCodecContext *ctx, enum PixelFormat pix_fmt,
     return VLC_SUCCESS;
 
 error:
-    if ( test_pic != NULL )
-        picture_Release( test_pic );
     Close(va, ctx);
     return err;
 }

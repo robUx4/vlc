@@ -56,7 +56,7 @@ struct vout_thread_sys_t
     video_format_t  original;   /* Original format ie coming from the decoder */
     unsigned        dpb_size;
     /* Extra code to execute on the decoder before looking for filters */
-    void (*pf_pre_filter_cfg)(void *, video_format_t *fmt_out);
+    void (*pf_pre_filter_cfg)(void *, vout_display_t *, video_format_t *fmt_out);
     void *pre_filter_cfg_opaque;
 
     /* Snapshot interface */
