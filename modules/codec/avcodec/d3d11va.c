@@ -159,9 +159,11 @@ static void GetOutputFormat(vlc_va_t *va, video_format_t *p_fmt_out)
     sub_chroma schroma = {
      .textureFormat = sys->render,
     };
+#if 0
     if ( sys->render == DXGI_FORMAT_420_OPAQUE )
         video_format_SetChroma( p_fmt_out, VLC_CODEC_DXGI_OPAQUE, &schroma, sizeof(schroma) );
     else
+#endif
         video_format_SetChroma( p_fmt_out, VLC_CODEC_D3D11_OPAQUE, &schroma, sizeof(schroma) );
 
 #if 0
@@ -300,6 +302,7 @@ static int Extract(vlc_va_t *va, picture_t *output, uint8_t *data)
                                                       viewDesc.Texture2D.ArraySlice,
                                                       NULL);
         }
+#if 0
     }
     else if ( output->format.i_chroma == VLC_CODEC_DXGI_OPAQUE )
     {
@@ -309,6 +312,7 @@ static int Extract(vlc_va_t *va, picture_t *output, uint8_t *data)
         va->sys->filter->owner.sys = output;
         picture_Hold( surface->p_pic );
         va->sys->filter->pf_video_filter( va->sys->filter, surface->p_pic );
+#endif
 #endif
     } else {
         msg_Err(va, "Unsupported output picture format %08X", output->format.i_chroma );
