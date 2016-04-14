@@ -164,10 +164,11 @@ picture_pool_t* D3D11CreateSurfacePool( vlc_object_t *p_obj, struct pool_picture
                                         const video_format_t *fmt, unsigned pool_size )
 {
     VLC_UNUSED( p_obj );
-    if ( fmt->i_chroma != VLC_CODEC_D3D11_OPAQUE )
+    if ( fmt->i_chroma != VLC_CODEC_D3D11_OPAQUE && fmt->i_chroma != VLC_CODEC_DXGI_OPAQUE )
         return NULL;
 
     picture_pool_d3d11 *sys = p_pool_factory->p_opaque;
+    sub_chroma *p_sub_chroma = fmt->p_sub_chroma;
 
     unsigned          picture_count = 0;
     picture_t**       pictures = NULL;
@@ -192,10 +193,20 @@ picture_pool_t* D3D11CreateSurfacePool( vlc_object_t *p_obj, struct pool_picture
     texDesc.Format = sys->textureFormat;
     texDesc.SampleDesc.Count = 1;
     texDesc.MiscFlags = 0; //D3D11_RESOURCE_MISC_SHARED;
-    texDesc.ArraySize = 1;
-    texDesc.Usage = D3D11_USAGE_DYNAMIC;
-    texDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
-    texDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+    if ( fmt->i_chroma == VLC_CODEC_DXGI_OPAQUE )
+    {
+        texDesc.ArraySize = pool_size;
+        texDesc.Usage = D3D11_USAGE_DEFAULT;
+        texDesc.BindFlags = fmt->p_sub_chroma->bindFlags; //D3D11_BIND_DECODER;
+        texDesc.CPUAccessFlags = fmt->p_sub_chroma->cpuAccess;
+    }
+    else
+    {
+        texDesc.ArraySize = 1;
+        texDesc.Usage = D3D11_USAGE_DYNAMIC;
+        texDesc.BindFlags = fmt->p_sub_chroma->bindFlags; // D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE;
+        texDesc.CPUAccessFlags = fmt->p_sub_chroma->cpuAccess; // D3D11_CPU_ACCESS_WRITE
+    }
 
     for (picture_count = 0; picture_count < pool_size; picture_count++) {
         picture_sys_t *picsys = calloc(1, sizeof(*picsys));
@@ -204,7 +215,7 @@ picture_pool_t* D3D11CreateSurfacePool( vlc_object_t *p_obj, struct pool_picture
 
         hr = ID3D11Device_CreateTexture2D( sys->d3ddevice, &texDesc, NULL, &picsys->texture );
         if (FAILED(hr)) {
-            msg_Err( sys->p_obj, "CreateTexture2D %d failed on picture %d of the pool. (hr=0x%0lx)", pool_size, picture_count, hr);
+            msg_Err( sys->p_obj, "CreateTexture2D %d failed on picture %d of the %4.4s pool. (hr=0x%0lx)", pool_size, picture_count, (const char*)&fmt->i_chroma, hr );
             goto error;
         }
 
