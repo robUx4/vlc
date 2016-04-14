@@ -1101,7 +1101,7 @@ static int lavc_GetFrame(struct AVCodecContext *ctx, AVFrame *frame, int flags)
         sys->p_va->get_output( sys->p_va, &real_fmt_out );
         if ( !video_format_IsSimilarChroma( &dec->fmt_out.video, &real_fmt_out ) )
         {
-            if (lavc_UpdateVideoFormat(dec, ctx, ctx->pix_fmt, ctx->sw_pix_fmt, sys->p_va))
+            if (lavc_UpdateVideoFormat(dec, ctx, ctx->pix_fmt, ctx->sw_pix_fmt))
             {
                 video_format_Clean( &real_fmt_out );
                 post_mt(sys);
@@ -1231,8 +1231,17 @@ static enum PixelFormat ffmpeg_GetFormat( AVCodecContext *p_context,
         p_dec->pre_filter_cfg_opaque = p_dec;
         p_sys->va_pix_fmt = hwfmt;
         p_sys->va_p_context = p_context;
-        if (lavc_UpdateVideoFormat(p_dec, p_context, hwfmt, swfmt, NULL))
+        if (lavc_UpdateVideoFormat(p_dec, p_context, hwfmt, swfmt))
         {
+            if ( p_sys->p_va != NULL )
+            {
+                vlc_va_Delete( p_sys->p_va, p_context );
+                p_sys->p_va = NULL;
+            }
+        }
+        if ( i_chroma_hint != p_dec->fmt_out.video.i_chroma )
+        {
+            // the va uses a diffent vout format
             if ( p_sys->p_va != NULL )
             {
                 vlc_va_Delete( p_sys->p_va, p_context );
@@ -1241,15 +1250,8 @@ static enum PixelFormat ffmpeg_GetFormat( AVCodecContext *p_context,
         }
         if ( p_sys->p_va == NULL )
             continue; /* Unsupported brand of hardware acceleration */
-        if ( i_chroma_hint != p_dec->fmt_out.video.i_chroma )
-        {
-            // the va uses a diffent vout format
-        }
 
         post_mt(p_sys);
-
-        picture_t *test_pic = decoder_GetPicture(p_dec);
-        assert(!test_pic || test_pic->format.i_chroma == p_dec->fmt_out.video.i_chroma);
 
         if (p_sys->p_va->description != NULL)
             msg_Info(p_dec, "Using %s for hardware decoding", p_sys->p_va->description);

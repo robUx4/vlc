@@ -55,13 +55,12 @@ vlc_fourcc_t vlc_va_GetChroma(enum PixelFormat hwfmt, enum PixelFormat swfmt);
 
 /**
  * Creates an accelerated video decoding back-end for libavcodec.
- * @param obj parent VLC object
+ * @param dec parent VLC object
  * @param fmt VLC format of the content to decode
  * @return a new VLC object on success, NULL on error.
  */
-vlc_va_t *vlc_va_New(vlc_object_t *obj, AVCodecContext *,
-                     enum PixelFormat, const es_format_t *fmt,
-                     picture_sys_t *p_sys);
+vlc_va_t *vlc_va_New(decoder_t *dec, AVCodecContext *,
+                     enum PixelFormat, const es_format_t *fmt);
 
 /**
  * Allocates a hardware video surface for a libavcodec frame.

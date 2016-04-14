@@ -40,6 +40,7 @@
 #include <vlc_charset.h>
 #include <vlc_filter.h>
 #include <vlc_modules.h>
+#include <vlc_codec.h>
 
 #include "directx_va.h"
 
@@ -52,7 +53,7 @@
 #include "../../video_chroma/dxgi_fmt.h"
 
 static int Open(vlc_va_t *, AVCodecContext *, enum PixelFormat,
-                const es_format_t *, picture_sys_t *p_sys);
+                const es_format_t *, decoder_t *);
 static void Close(vlc_va_t *, AVCodecContext *);
 
 vlc_module_begin()
@@ -288,7 +289,7 @@ static void Close(vlc_va_t *va, AVCodecContext *ctx)
 }
 
 static int Open(vlc_va_t *va, AVCodecContext *ctx, enum PixelFormat pix_fmt,
-                const es_format_t *fmt, picture_sys_t *p_sys)
+                const es_format_t *fmt, decoder_t *p_dec)
 {
     int err = VLC_EGENERIC;
     directx_sys_t *dx_sys;
@@ -299,6 +300,10 @@ static int Open(vlc_va_t *va, AVCodecContext *ctx, enum PixelFormat pix_fmt,
     vlc_va_sys_t *sys = calloc(1, sizeof (*sys));
     if (unlikely(sys == NULL))
         return VLC_ENOMEM;
+
+    picture_t *test_pic = decoder_GetPicture(p_dec);
+    assert(!test_pic || test_pic->format.i_chroma == p_dec->fmt_out.video.i_chroma);
+    picture_sys_t *p_sys = test_pic != NULL ? test_pic->p_sys : NULL;
 
 #if !defined(NDEBUG) && defined(HAVE_DXGIDEBUG_H)
     sys->dxgidebug_dll = LoadLibrary(TEXT("DXGIDEBUG.DLL"));
@@ -351,7 +356,7 @@ static int Open(vlc_va_t *va, AVCodecContext *ctx, enum PixelFormat pix_fmt,
     va->release      = directx_va_Release;
     va->extract      = Extract;
 
-#if 0 /* Do we gett the proper DXGI afterwards ? */
+#if 0 /* Do we get the proper DXGI afterwards ? */
     if ( lavc_UpdateVideoFormat(p_dec, ctx, pix_fmt, 0, va) == 0 )
         goto error;
 #endif
@@ -363,6 +368,7 @@ static int Open(vlc_va_t *va, AVCodecContext *ctx, enum PixelFormat pix_fmt,
         if (sys->filter == NULL)
             goto error;
     }
+#endif
 
     err = directx_va_Setup(va, &sys->dx_sys, ctx);
     if (err != VLC_SUCCESS)
@@ -372,7 +378,7 @@ static int Open(vlc_va_t *va, AVCodecContext *ctx, enum PixelFormat pix_fmt,
 
     /* TODO print the hardware name/vendor for debugging purposes */
     va->description = DxDescribe(dx_sys);
-    va->setup   = Setup;
+    va->get_output  = GetOutputFormat;
     va->get     = Get;
     va->release = directx_va_Release;
     va->extract = Extract;
@@ -380,6 +386,8 @@ static int Open(vlc_va_t *va, AVCodecContext *ctx, enum PixelFormat pix_fmt,
     return VLC_SUCCESS;
 
 error:
+    if ( test_pic != NULL )
+        picture_Release( test_pic );
     Close(va, ctx);
     return err;
 }
@@ -849,7 +857,7 @@ static picture_t *DxAllocPicture(vlc_va_t *va, const video_format_t *fmt, unsign
         .p_sys      = pic_sys,
         .pf_destroy = DestroyPicture,
     };
-    picture_t *pic = picture_NewFromResource(&sys->dx_sys.fmt_out, &res);
+    picture_t *pic = picture_NewFromResource(fmt, &res);
     if (unlikely(pic == NULL))
     {
         free(pic_sys);
