@@ -321,7 +321,7 @@ int directx_va_Setup(vlc_va_t *va, directx_sys_t *dx_sys, AVCodecContext *avctx)
 
     dx_sys->fmt_out.i_frame_rate = avctx->framerate.num;
     dx_sys->fmt_out.i_frame_rate_base = avctx->framerate.den;
-    va->setup( va, &dx_sys->fmt_out );
+    va->get_output( va, &dx_sys->fmt_out );
 
     if (dx_sys->pf_create_decoder_surfaces(va, dx_sys->av_codec_id, &dx_sys->fmt_out, avctx->active_thread_type & FF_THREAD_FRAME))
         return VLC_EGENERIC;
