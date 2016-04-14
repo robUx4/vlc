@@ -409,6 +409,15 @@ picture_t *vout_GetPicture(vout_thread_t *vout)
     return picture;
 }
 
+const vlc_chroma_context *vout_display_ChromaContext( vout_display_t *vd,
+                                                      vlc_fourcc_t i_chroma,
+                                                      const sub_chroma *p_sub_chroma )
+{
+    if ( vd->get_chroma_context != NULL )
+        return vd->get_chroma_context( vd, i_chroma );
+    return NULL;
+}
+
 /**
  * It gives to the vout a picture to be displayed.
  *

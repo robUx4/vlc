@@ -708,6 +708,7 @@ vout_window_Delete
 vout_display_GetDefaultDisplaySize
 vout_display_PlacePicture
 vout_display_SendMouseMovedDisplayCoordinates
+vout_display_ChromaContext
 xml_Create
 text_style_Copy
 text_style_Create

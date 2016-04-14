@@ -104,6 +104,7 @@ static vout_display_t *vout_display_New(vlc_object_t *obj,
     vd->display = NULL;
     vd->control = NULL;
     vd->manage = NULL;
+    vd->get_chroma_context = NULL;
     vd->sys = NULL;
 
     vd->owner = *owner;

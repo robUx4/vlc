@@ -51,6 +51,7 @@ typedef struct vout_display_t vout_display_t;
 typedef struct vout_display_sys_t vout_display_sys_t;
 typedef struct vout_display_owner_t vout_display_owner_t;
 typedef struct vout_display_owner_sys_t vout_display_owner_sys_t;
+typedef struct vlc_chroma_context vlc_chroma_context;
 
 /**
  * Possible alignments for vout_display.
@@ -323,6 +324,8 @@ struct vout_display_t {
     /* Manage pending event (optional) */
     void       (*manage)(vout_display_t *);
 
+    const vlc_chroma_context* (*get_chroma_context)(vout_display_t *, vlc_fourcc_t);
+
     /* Private place holder for the vout_display_t module (optional)
      *
      * A module is free to use it as it wishes.
@@ -461,6 +464,8 @@ VLC_API void vout_display_PlacePicture(vout_display_place_t *place, const video_
  */
 VLC_API void vout_display_SendMouseMovedDisplayCoordinates(vout_display_t *vd, video_orientation_t orient_display, int m_x, int m_y,
                                                            vout_display_place_t *place);
+
+VLC_API const vlc_chroma_context *vout_display_ChromaContext( vout_display_t *, vlc_fourcc_t, const sub_chroma * );
 
 /** @} */
 #endif /* VLC_VOUT_DISPLAY_H */
