@@ -79,7 +79,10 @@ struct decoder_sys_t
     /* VA API */
     vlc_va_t *p_va;
     enum PixelFormat pix_fmt;
-    enum PixelFormat pix_hwfmt;
+
+    enum PixelFormat va_pix_fmt;
+    AVCodecContext *va_p_context;
+
     int profile;
     int level;
 
@@ -789,7 +792,12 @@ void EndVideoDec( decoder_t *p_dec )
     ffmpeg_CloseCodec( p_dec );
 
     if( p_sys->p_va )
-        vlc_va_Delete( p_sys->p_va, p_sys->p_context );
+    {
+        vlc_va_Delete( p_sys->p_va, p_sys->va_p_context );
+        p_sys->va_p_context = NULL;
+        p_sys->p_va = NULL;
+        p_sys->va_pix_fmt = AV_PIX_FMT_NONE;
+    }
 
     vlc_sem_destroy( &p_sys->sem_mt );
 }
@@ -1046,7 +1054,7 @@ static void CreateVA(void *p_setup_opaque, video_format_t *p_fmt_out)
     vlc_va_t *va = p_sys->p_va;
     if ( va == NULL )
     {
-        va = vlc_va_New( p_dec, p_sys->p_context, p_sys->pix_hwfmt,
+        va = vlc_va_New( p_dec, p_sys->va_p_context, p_sys->va_pix_fmt,
                                    &p_dec->fmt_in );
         p_dec->p_sys->p_va = va;
         if ( va != NULL )
@@ -1138,7 +1146,8 @@ static enum PixelFormat ffmpeg_GetFormat( AVCodecContext *p_context,
 
         p_dec->pf_pre_filter_cfg     = CreateVA;
         p_dec->pre_filter_cfg_opaque = p_dec;
-        p_sys->pix_hwfmt = hwfmt;
+        p_sys->va_pix_fmt = hwfmt;
+        p_sys->va_p_context = p_context;
         if (lavc_UpdateVideoFormat(p_dec, p_context, hwfmt, swfmt, NULL))
         {
             if ( p_sys->p_va != NULL )
@@ -1161,7 +1170,8 @@ static enum PixelFormat ffmpeg_GetFormat( AVCodecContext *p_context,
     }
     p_dec->pf_pre_filter_cfg     = NULL;
     p_dec->pre_filter_cfg_opaque = NULL;
-    p_sys->pix_hwfmt             = AV_PIX_FMT_NONE;
+    p_sys->va_pix_fmt            = AV_PIX_FMT_NONE;
+    p_sys->va_p_context          = NULL;
 
     post_mt(p_sys);
     /* Fallback to default behaviour */
