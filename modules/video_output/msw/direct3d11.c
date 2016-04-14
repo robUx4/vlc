@@ -339,6 +339,7 @@ static const char *globPixelShaderBiplanarYUV_BT709_2RGB = "\
 static picture_pool_t* CreatePoolD3D11( vlc_object_t *p_obj, struct pool_picture_factory *p_pool_factory,
                                         const video_format_t *p_fmt, unsigned pool_size )
 {
+    /* TODO */
     vout_display_sys_t *sys = p_pool_factory->p_opaque; /* should just have the D3D11 context*/
     return picture_pool_NewFromFormat( p_fmt, pool_size );
 }
@@ -541,7 +542,7 @@ static picture_pool_t *Pool(vout_display_t *vd, unsigned pool_size)
     texDesc.MiscFlags = 0; //D3D11_RESOURCE_MISC_SHARED;
     texDesc.ArraySize = 1;
     texDesc.Usage = D3D11_USAGE_DYNAMIC;
-    texDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+    texDesc.BindFlags = /* D3D11_BIND_RENDER_TARGET | */D3D11_BIND_SHADER_RESOURCE;
     texDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
 
     for (picture_count = 0; picture_count < pool_size; picture_count++) {
@@ -551,7 +552,7 @@ static picture_pool_t *Pool(vout_display_t *vd, unsigned pool_size)
 
         hr = ID3D11Device_CreateTexture2D( vd->sys->d3ddevice, &texDesc, NULL, &picsys->texture );
         if (FAILED(hr)) {
-            msg_Err(vd, "CreateTexture2D %d failed on picture %d of the pool. (hr=0x%0lx)", pool_size, picture_count, hr);
+            msg_Err( vd, "CreateTexture2D DisplayPool %d failed on picture %d of the %s pool. (hr=0x%0lx)", pool_size, picture_count, DxgiFormatToStr(texDesc.Format), hr );
             goto error;
         }
 
@@ -642,7 +643,7 @@ static picture_pool_t *DecoderPool(vout_display_t *vd, unsigned pool_size)
 
         hr = ID3D11Device_CreateTexture2D( vd->sys->d3ddevice, &texDesc, NULL, &picsys->texture );
         if (FAILED(hr)) {
-            msg_Err(vd, "CreateTexture2D %d failed on picture %d of the pool. (hr=0x%0lx)", pool_size, picture_count, hr);
+            msg_Err( vd, "CreateTexture2D DecoderPool %d failed on picture %d of the %s pool. (hr=0x%0lx)", pool_size, picture_count, DxgiFormatToStr(texDesc.Format), hr );
             goto error;
         }
 
