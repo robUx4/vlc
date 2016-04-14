@@ -1215,6 +1215,7 @@ static enum PixelFormat ffmpeg_GetFormat( AVCodecContext *p_context,
     {
         enum PixelFormat hwfmt = pi_fmt[i];
 
+        /* hint of what decoder should be used */
         p_dec->fmt_out.video.i_chroma = vlc_va_GetChroma(hwfmt, swfmt);
         if (p_dec->fmt_out.video.i_chroma == 0)
             continue; /* Unknown brand of hardware acceleration */
@@ -1224,6 +1225,8 @@ static enum PixelFormat ffmpeg_GetFormat( AVCodecContext *p_context,
             continue;
         }
 
+        /* we need to wait before the vout is created */
+        int i_chroma_hint = p_dec->fmt_out.video.i_chroma;
         p_dec->pf_pre_filter_cfg     = CreateVA;
         p_dec->pre_filter_cfg_opaque = p_dec;
         p_sys->va_pix_fmt = hwfmt;
@@ -1238,6 +1241,11 @@ static enum PixelFormat ffmpeg_GetFormat( AVCodecContext *p_context,
         }
         if ( p_sys->p_va == NULL )
             continue; /* Unsupported brand of hardware acceleration */
+        if ( i_chroma_hint != p_dec->fmt_out.video.i_chroma )
+        {
+            // the va uses a diffent vout format
+        }
+
         post_mt(p_sys);
 
         picture_t *test_pic = decoder_GetPicture(p_dec);
