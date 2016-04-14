@@ -335,6 +335,13 @@ static const char *globPixelShaderBiplanarYUV_BT709_2RGB = "\
   }\
 ";
 
+static void *PeekChromaContext(vout_display_t *vd, vlc_fourcc_t i_chroma)
+{
+    if ( i_chroma == VLC_CODEC_D3D11_OPAQUE )
+        return &vd->sys->factory_d3d11;
+    return NULL;
+}
+
 static int Open(vlc_object_t *object)
 {
     vout_display_t *vd = (vout_display_t *)object;
@@ -471,6 +478,7 @@ static int Open(vlc_object_t *object)
     vd->display = Display;
     vd->control = CommonControl;
     vd->manage  = Manage;
+    vd->get_chroma_context = PeekChromaContext;
 
     msg_Dbg(vd, "Direct3D11 Open Succeeded");
 

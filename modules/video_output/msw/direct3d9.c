@@ -147,6 +147,13 @@ static void Direct3D9RenderScene(vout_display_t *vd, d3d_region_t *, int, d3d_re
 /* */
 static int DesktopCallback(vlc_object_t *, char const *, vlc_value_t, vlc_value_t, void *);
 
+static void *PeekChromaContext(vout_display_t *vd, vlc_fourcc_t i_chroma)
+{
+    if ( i_chroma == VLC_CODEC_D3D11_OPAQUE )
+        return &vd->sys->factory_d3d9;
+    return NULL;
+}
+
 /**
  * It creates a Direct3D vout display.
  */
@@ -232,6 +239,7 @@ static int Open(vlc_object_t *object)
     vd->display = Display;
     vd->control = Control;
     vd->manage  = Manage;
+    vd->get_chroma_context = PeekChromaContext;
 
     /* Fix state in case of desktop mode */
     if (sys->use_desktop && vd->cfg->is_fullscreen)
