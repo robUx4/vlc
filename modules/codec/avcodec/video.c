@@ -1119,7 +1119,7 @@ static int lavc_GetFrame(struct AVCodecContext *ctx, AVFrame *frame, int flags)
     return ret;
 }
 
-static void SetupVA(void *p_setup_opaque, video_format_t *p_fmt_out)
+static void CreateVA(void *p_setup_opaque, video_format_t *p_fmt_out)
 {
     decoder_t *p_dec = p_setup_opaque;
     decoder_sys_t *p_sys = p_dec->p_sys;
@@ -1216,7 +1216,7 @@ static enum PixelFormat ffmpeg_GetFormat( AVCodecContext *p_context,
             continue;
         }
 
-        p_dec->pf_pre_filter_cfg     = SetupVA;
+        p_dec->pf_pre_filter_cfg     = CreateVA;
         p_dec->pre_filter_cfg_opaque = p_dec;
         p_sys->pix_hwfmt = hwfmt;
         if (lavc_UpdateVideoFormat(p_dec, p_context, hwfmt, swfmt, NULL))
