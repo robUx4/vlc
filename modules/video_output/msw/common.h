@@ -179,6 +179,7 @@ struct vout_display_sys_t
     pD3DCompile                            OurD3DCompile;
 #endif
     IDXGISwapChain1          *dxgiswapChain;   /* DXGI 1.1 swap chain */
+    pool_factory_d3d11       factory_d3d11;
     ID3D11Device             *d3ddevice;       /* D3D device */
     ID3D11DeviceContext      *d3dcontext;      /* D3D context */
     d3d_quad_t               picQuad;
@@ -211,6 +212,7 @@ struct vout_display_sys_t
     HINSTANCE               hd3d9_dll;       /* handle of the opened d3d9 dll */
     HINSTANCE               hd3d9x_dll;      /* handle of the opened d3d9x dll */
     IDirect3DPixelShader9*  d3dx_shader;
+    pool_factory_d3d9       factory_d3d9;
     LPDIRECT3D9             d3dobj;
     D3DCAPS9                d3dcaps;
     LPDIRECT3DDEVICE9       d3ddev;
