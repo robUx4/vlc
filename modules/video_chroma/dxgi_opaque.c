@@ -81,11 +81,12 @@ static void DXGI_D3D11(filter_t *p_filter, picture_t *src, picture_t *dst)
             .ViewDimension = D3D11_VPOV_DIMENSION_TEXTURE2D,
         };
 
-        HRESULT hr = ID3D11VideoDevice_CreateVideoProcessorOutputView( sys->d3ddec,
-                                                                       (ID3D11Resource*) p_sys_out->texture,
-                                                                       sys->d3dprocenum,
-                                                                       &outDesc,
-                                                                       (ID3D11VideoProcessorOutputView**) &p_sys_out->decoder );
+        /* TODO this should be done on each picture when the ouptut/filter pool is created */
+        hr = ID3D11VideoDevice_CreateVideoProcessorOutputView( sys->d3ddec,
+                                                               (ID3D11Resource*) p_sys_out->texture,
+                                                               sys->d3dprocenum,
+                                                               &outDesc,
+                                                               &p_sys_out->decoder );
         if (FAILED(hr))
         {
             msg_Err( p_filter, "Failed to create the processor output. (hr=0x%lX)", hr);
@@ -102,184 +103,9 @@ static void DXGI_D3D11(filter_t *p_filter, picture_t *src, picture_t *dst)
                                               (ID3D11VideoProcessorOutputView*) p_sys_out->decoder,
                                               0, 1, &stream);
     if (FAILED(hr))
-    {
         msg_Err( p_filter, "Failed to process the video. (hr=0x%lX)", hr);
-        return;
-    }
 }
 
-#if 0
-static int assert_staging(filter_t *p_filter, picture_sys_t *p_sys)
-{
-    filter_sys_t *sys = (filter_sys_t*) p_filter->p_sys;
-    HRESULT hr;
-
-    if (sys->staging)
-        goto ok;
-
-    D3D11_TEXTURE2D_DESC texDesc;
-    ID3D11Texture2D_GetDesc( p_sys->texture, &texDesc);
-
-    texDesc.MipLevels = 1;
-    //texDesc.SampleDesc.Count = 1;
-    texDesc.MiscFlags = 0;
-    texDesc.ArraySize = 1;
-    texDesc.Usage = D3D11_USAGE_STAGING;
-    texDesc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
-    texDesc.BindFlags = 0;
-
-    ID3D11Device *p_device;
-    ID3D11DeviceContext_GetDevice(p_sys->context, &p_device);
-    sys->staging = NULL;
-    hr = ID3D11Device_CreateTexture2D( p_device, &texDesc, NULL, &sys->staging);
-    ID3D11Device_Release(p_device);
-    if (FAILED(hr)) {
-        msg_Err(p_filter, "Failed to create a %s staging texture to extract surface pixels (hr=0x%0lx)", DxgiFormatToStr(texDesc.Format), hr );
-        return VLC_EGENERIC;
-    }
-ok:
-    return VLC_SUCCESS;
-}
-
-static void D3D11_YUY2(filter_t *p_filter, picture_t *src, picture_t *dst)
-{
-    filter_sys_t *sys = (filter_sys_t*) p_filter->p_sys;
-    picture_sys_t *p_sys = src->p_sys;
-
-    D3D11_TEXTURE2D_DESC desc;
-    D3D11_MAPPED_SUBRESOURCE lock;
-
-    vlc_mutex_lock(&sys->staging_lock);
-    if (assert_staging(p_filter, p_sys) != VLC_SUCCESS)
-    {
-        vlc_mutex_unlock(&sys->staging_lock);
-        return;
-    }
-
-    D3D11_VIDEO_DECODER_OUTPUT_VIEW_DESC viewDesc;
-    ID3D11VideoDecoderOutputView_GetDesc( p_sys->decoder, &viewDesc );
-
-    ID3D11DeviceContext_CopySubresourceRegion(p_sys->context, (ID3D11Resource*) sys->staging,
-                                              0, 0, 0, 0,
-                                              (ID3D11Resource*) p_sys->texture, viewDesc.Texture2D.ArraySlice,
-                                              NULL);
-
-    HRESULT hr = ID3D11DeviceContext_Map(p_sys->context, (ID3D11Resource*) sys->staging,
-                                         0, D3D11_MAP_READ, 0, &lock);
-    if (FAILED(hr)) {
-        msg_Err(p_filter, "Failed to map source surface. (hr=0x%0lx)", hr);
-        vlc_mutex_unlock(&sys->staging_lock);
-        return;
-    }
-
-    if (dst->format.i_chroma == VLC_CODEC_I420) {
-        uint8_t *tmp = dst->p[1].p_pixels;
-        dst->p[1].p_pixels = dst->p[2].p_pixels;
-        dst->p[2].p_pixels = tmp;
-    }
-
-    ID3D11Texture2D_GetDesc(sys->staging, &desc);
-
-    if (desc.Format == DXGI_FORMAT_YUY2) {
-        size_t chroma_pitch = (lock.RowPitch / 2);
-
-        size_t pitch[3] = {
-            lock.RowPitch,
-            chroma_pitch,
-            chroma_pitch,
-        };
-
-        uint8_t *plane[3] = {
-            (uint8_t*)lock.pData,
-            (uint8_t*)lock.pData + pitch[0] * src->format.i_height,
-            (uint8_t*)lock.pData + pitch[0] * src->format.i_height
-                                 + pitch[1] * src->format.i_height / 2,
-        };
-
-        CopyFromYv12(dst, plane, pitch, src->format.i_width,
-                     src->format.i_height, &sys->cache);
-    } else if (desc.Format == DXGI_FORMAT_NV12) {
-        uint8_t *plane[2] = {
-            lock.pData,
-            (uint8_t*)lock.pData + lock.RowPitch * src->format.i_height
-        };
-        size_t  pitch[2] = {
-            lock.RowPitch,
-            lock.RowPitch,
-        };
-        CopyFromNv12(dst, plane, pitch, src->format.i_width,
-                     src->format.i_height, &sys->cache);
-    } else {
-        msg_Err(p_filter, "Unsupported D3D11VA conversion from 0x%08X to YV12", desc.Format);
-    }
-
-    if (dst->format.i_chroma == VLC_CODEC_I420) {
-        uint8_t *tmp = dst->p[1].p_pixels;
-        dst->p[1].p_pixels = dst->p[2].p_pixels;
-        dst->p[2].p_pixels = tmp;
-    }
-
-    /* */
-    ID3D11DeviceContext_Unmap(p_sys->context, (ID3D11Resource*)sys->staging, 0);
-    vlc_mutex_unlock(&sys->staging_lock);
-}
-
-static void D3D11_NV12(filter_t *p_filter, picture_t *src, picture_t *dst)
-{
-    filter_sys_t *sys = (filter_sys_t*) p_filter->p_sys;
-    picture_sys_t *p_sys = src->p_sys;
-
-    D3D11_TEXTURE2D_DESC desc;
-    D3D11_MAPPED_SUBRESOURCE lock;
-
-    vlc_mutex_lock(&sys->staging_lock);
-    if (assert_staging(p_filter, p_sys) != VLC_SUCCESS)
-    {
-        vlc_mutex_unlock(&sys->staging_lock);
-        return;
-    }
-
-    D3D11_VIDEO_DECODER_OUTPUT_VIEW_DESC viewDesc;
-    ID3D11VideoDecoderOutputView_GetDesc( p_sys->decoder, &viewDesc );
-
-    ID3D11DeviceContext_CopySubresourceRegion(p_sys->context, (ID3D11Resource*) sys->staging,
-                                              0, 0, 0, 0,
-                                              (ID3D11Resource*) p_sys->texture, viewDesc.Texture2D.ArraySlice,
-                                              NULL);
-
-    HRESULT hr = ID3D11DeviceContext_Map(p_sys->context, (ID3D11Resource*) sys->staging,
-                                         0, D3D11_MAP_READ, 0, &lock);
-    if (FAILED(hr)) {
-        msg_Err(p_filter, "Failed to map source surface. (hr=0x%0lx)", hr);
-        vlc_mutex_unlock(&sys->staging_lock);
-        return;
-    }
-
-    ID3D11Texture2D_GetDesc(sys->staging, &desc);
-
-    if (desc.Format == DXGI_FORMAT_NV12) {
-        uint8_t *plane[2] = {
-            lock.pData,
-            (uint8_t*)lock.pData + lock.RowPitch * src->format.i_height
-        };
-        size_t  pitch[2] = {
-            lock.RowPitch,
-            lock.RowPitch,
-        };
-        CopyFromNv12ToNv12(dst, plane, pitch, src->format.i_width,
-                           src->format.i_height, &sys->cache);
-    } else {
-        msg_Err(p_filter, "Unsupported D3D11VA conversion from 0x%08X to NV12", desc.Format);
-    }
-
-    /* */
-    ID3D11DeviceContext_Unmap(p_sys->context, (ID3D11Resource*)sys->staging, 0);
-    vlc_mutex_unlock(&sys->staging_lock);
-}
-
-VIDEO_FILTER_WRAPPER (D3D11_NV12)
-VIDEO_FILTER_WRAPPER (D3D11_YUY2)
-#endif
 VIDEO_FILTER_WRAPPER (DXGI_D3D11)
 
 static int OpenConverter( vlc_object_t *obj )
@@ -434,12 +260,14 @@ static int OpenConverter( vlc_object_t *obj )
            p_sys->processor_output = processorOutput;
            //p_sys->render           = DXGI_FORMAT_420_OPAQUE;
            p_sys->d3dprocenum      = processorEnumerator;
+           processorEnumerator = NULL;
            //free(psz_decoder_name);
            //return VLC_SUCCESS;
        }
     }
 #endif
-    ID3D11VideoProcessorEnumerator_Release(processorEnumerator);
+    if (processorEnumerator != NULL)
+        ID3D11VideoProcessorEnumerator_Release( processorEnumerator );
 
     p_filter->pf_video_filter = DXGI_D3D11_Filter;
 #if 0
@@ -468,7 +296,7 @@ static void CloseConverter( vlc_object_t *obj )
     filter_t *p_filter = (filter_t *)obj;
     filter_sys_t *p_sys = (filter_sys_t*) p_filter->p_sys;
     if ( p_sys->d3dprocenum )
-         ID3D11VideoProcessorEnumerator_Release( p_sys->d3dprocenum );
+        ID3D11VideoProcessorEnumerator_Release( p_sys->d3dprocenum );
     if ( p_sys->d3dvidctx )
         ID3D11DeviceContext_Release( p_sys->d3dvidctx );
     if ( p_sys->d3dprocessor )
