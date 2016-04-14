@@ -55,7 +55,9 @@ typedef struct
 
 struct sub_chroma
 {
-    DXGI_FORMAT          textureFormat;
+    DXGI_FORMAT            textureFormat;
+    D3D11_BIND_FLAG        bindFlags;
+    D3D11_CPU_ACCESS_FLAG  cpuAccess;
 };
 
 struct picture_sys_t
