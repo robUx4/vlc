@@ -111,10 +111,15 @@ VIDEO_FILTER_WRAPPER (DXGI_D3D11)
 static int OpenConverter( vlc_object_t *obj )
 {
     filter_t *p_filter = (filter_t *)obj;
-    if ( p_filter->fmt_in.video.i_chroma != VLC_CODEC_DXGI_OPAQUE )
+    sub_chroma *p_schroma_in, *p_schroma_out;
+    if ( p_filter->fmt_in.video.i_chroma != VLC_CODEC_D3D11_OPAQUE )
+        return VLC_EGENERIC;
+    p_schroma_in = p_filter->fmt_in.video.p_sub_chroma;
+    if ( p_schroma_in->textureFormat != DXGI_FORMAT_420_OPAQUE )
         return VLC_EGENERIC;
     if ( p_filter->fmt_out.video.i_chroma != VLC_CODEC_D3D11_OPAQUE )
         return VLC_EGENERIC;
+    p_schroma_out = p_filter->fmt_out.video.p_sub_chroma;
 
     if ( p_filter->fmt_in.video.i_height != p_filter->fmt_out.video.i_height
          || p_filter->fmt_in.video.i_width != p_filter->fmt_out.video.i_width )
