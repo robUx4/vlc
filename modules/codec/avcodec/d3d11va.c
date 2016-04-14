@@ -25,7 +25,7 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston MA 02110-1301, USA.
  *****************************************************************************/
 
-#define OPAQ_FILTER 1
+#define OPAQ_FILTER 0
 
 /**
   * See https://msdn.microsoft.com/en-us/library/windows/desktop/hh162912%28v=vs.85%29.aspx
@@ -119,10 +119,12 @@ struct vlc_va_sys_t
     filter_t                     *filter;
 #endif
 
+#ifdef OPAQ
     /* video decoder for 420_OPAQUE */
     ID3D11VideoProcessor         *d3dprocessor;
     DXGI_FORMAT                  processor_output;
     ID3D11VideoProcessorEnumerator *d3dprocenum;
+#endif
 
     /* avcodec internals */
     struct AVD3D11VAContext      hw;
@@ -245,6 +247,7 @@ static int Extract(vlc_va_t *va, picture_t *output, uint8_t *data)
         assert(p_sys_out->texture != NULL);
         assert(p_sys_in->decoder == src);
 
+#ifdef OPAQ
         if (sys->d3dprocessor)
         {
             // extract the decoded video to a the output Texture
@@ -281,6 +284,7 @@ static int Extract(vlc_va_t *va, picture_t *output, uint8_t *data)
             }
         }
         else
+#endif
         {
             D3D11_VIDEO_DECODER_OUTPUT_VIEW_DESC viewDesc;
             ID3D11VideoDecoderOutputView_GetDesc( src, &viewDesc );
@@ -524,10 +528,12 @@ static void D3dDestroyDevice(vlc_va_t *va)
         ID3D11VideoContext_Release(va->sys->d3dvidctx);
     if (va->sys->pool_cfg.d3dcontext)
         ID3D11DeviceContext_Release(va->sys->pool_cfg.d3dcontext);
+#ifdef OPAQ
     if (va->sys->d3dprocessor)
         ID3D11VideoProcessor_Release(va->sys->d3dprocessor);
     if (va->sys->d3dprocenum)
         ID3D11VideoProcessorEnumerator_Release(va->sys->d3dprocenum);
+#endif
 }
 /**
  * It describes our Direct3D object
@@ -1045,6 +1051,7 @@ static picture_t *DxAllocPicture(vlc_va_t *va, const video_format_t *fmt, unsign
     ID3D11VideoDecoderOutputView_GetResource(pic_sys->decoder, (ID3D11Resource**) &pic_sys->texture);
     pic_sys->context  = va->sys->pool_cfg.d3dcontext;
 
+#ifdef OPAQ
     if (sys->d3dprocenum)
     {
         D3D11_VIDEO_PROCESSOR_INPUT_VIEW_DESC inDesc = {
@@ -1064,6 +1071,7 @@ static picture_t *DxAllocPicture(vlc_va_t *va, const video_format_t *fmt, unsign
             return NULL;
         }
     }
+#endif
 
     picture_resource_t res = {
         .p_sys      = pic_sys,
