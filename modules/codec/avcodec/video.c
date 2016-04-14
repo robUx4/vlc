@@ -1010,7 +1010,7 @@ static int lavc_GetFrame(struct AVCodecContext *ctx, AVFrame *frame, int flags)
     {
         video_format_t real_fmt_out;
         video_format_Copy( &real_fmt_out, &dec->fmt_out.video );
-        sys->p_va->setup( sys->p_va, &real_fmt_out );
+        sys->p_va->get_output( sys->p_va, &real_fmt_out );
         if ( !video_format_IsSimilarChroma( &dec->fmt_out.video, &real_fmt_out ) )
         {
             if (lavc_UpdateVideoFormat(dec, ctx, ctx->pix_fmt, ctx->sw_pix_fmt, sys->p_va))
@@ -1053,7 +1053,7 @@ static void SetupVA(void *p_setup_opaque, video_format_t *p_fmt_out)
             va->get_output( va, &p_dec->fmt_out.video );
     }
     if ( va != NULL )
-        va->setup( va, p_fmt_out );
+        va->get_output( va, &p_dec->fmt_out.video );
 }
 
 static enum PixelFormat ffmpeg_GetFormat( AVCodecContext *p_context,

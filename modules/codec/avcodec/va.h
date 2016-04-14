@@ -35,11 +35,10 @@ struct vlc_va_t {
     vlc_va_sys_t *sys;
     module_t *module;
     const char *description;
+    enum PixelFormat hwfmt;
 
-#ifdef _WIN32
-    VLC_DEPRECATED
-    void (*setup)(vlc_va_t *, video_format_t *p_fmt_out);
-#endif
+    /* get the output video format with posisble sub_chroma */
+    void (*get_output)(vlc_va_t *, video_format_t *p_fmt_out);
     int  (*get)(vlc_va_t *, picture_t *pic, uint8_t **data);
     void (*release)(void *pic, uint8_t *surface);
     int  (*extract)(vlc_va_t *, picture_t *pic, uint8_t *data);

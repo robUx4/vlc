@@ -30,6 +30,7 @@
 #include <libavutil/pixfmt.h>
 #include <libavcodec/avcodec.h>
 #include "va.h"
+#include "va_video.h"
 
 static int vlc_va_Start(void *func, va_list ap)
 {
@@ -53,12 +54,19 @@ static void vlc_va_Stop(void *func, va_list ap)
     close(va, ctx);
 }
 
+static void GetOutputFormat(vlc_va_t *va, video_format_t *p_fmt_out)
+{
+    video_format_SetChroma( p_fmt_out, vlc_va_GetChroma( va->hwfmt ,0 ), NULL, 0 );
+}
+
 vlc_va_t *vlc_va_New(decoder_t *p_dec, AVCodecContext *avctx,
                      enum PixelFormat pix_fmt, const es_format_t *fmt)
 {
     vlc_va_t *va = vlc_object_create(VLC_OBJECT(p_dec), sizeof (*va));
     if (unlikely(va == NULL))
         return NULL;
+    va->hwfmt = pix_fmt;
+    va->get_output = GetOutputFormat;
 
     /* get a test picture from the vout */
     //picture_t *test_pic = decoder_GetPicture(p_dec);

@@ -201,7 +201,7 @@ static filter_t *CreateFilter( vlc_object_t *p_this, const es_format_t *p_fmt_in
 }
 
 /* */
-static void Setup(vlc_va_t *va, video_format_t *p_fmt_out)
+static void GetOuputFormat(vlc_va_t *va, video_format_t *p_fmt_out)
 {
     vlc_va_sys_t *sys = va->sys;
 
@@ -213,7 +213,6 @@ static void Setup(vlc_va_t *va, video_format_t *p_fmt_out)
          .format = sys->render,
         };
         video_format_SetChroma( p_fmt_out, VLC_CODEC_D3D9_OPAQUE, &schroma, sizeof(sub_chroma) );
-
     }
 }
 
@@ -396,7 +395,7 @@ static int Open(vlc_va_t *va, AVCodecContext *ctx, enum PixelFormat pix_fmt,
 
     /* TODO print the hardware name/vendor for debugging purposes */
     va->description = DxDescribe(sys);
-    va->setup   = Setup;
+    va->get_output = GetOuputFormat;
     va->get     = Get;
     va->release = directx_va_Release;
     va->extract = Extract;

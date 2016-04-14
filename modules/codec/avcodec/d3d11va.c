@@ -150,8 +150,7 @@ static void SetupAVCodecContext(vlc_va_t *);
 
 static picture_t *DxAllocPicture(vlc_va_t *, const video_format_t *, unsigned index);
 
-/* */
-static void Setup(vlc_va_t *va, video_format_t *p_fmt_out)
+static void GetOutputFormat(vlc_va_t *va, video_format_t *p_fmt_out)
 {
     vlc_va_sys_t *sys = va->sys;
 
@@ -439,10 +438,10 @@ static int Open(vlc_va_t *va, AVCodecContext *ctx, enum PixelFormat pix_fmt,
     if (err!=VLC_SUCCESS)
         goto error;
 
-    va->setup   = Setup;
-    va->get     = Get;
-    va->release = directx_va_Release;
-    va->extract = Extract;
+    va->get_output   = GetOutputFormat;
+    va->get          = Get;
+    va->release      = directx_va_Release;
+    va->extract      = Extract;
 
 #if 0 /* Do we gett the proper DXGI afterwards ? */
     if ( lavc_UpdateVideoFormat(p_dec, ctx, pix_fmt, 0, va) == 0 )
