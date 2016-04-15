@@ -183,6 +183,7 @@ static int OpenConverter( vlc_object_t *obj )
         p_filter->pf_video_filter = DXA9_NV12_Filter;
         break;
     default:
+        msg_Info( obj, "conversion to %4.4s not supported", (const char*)&p_filter->fmt_out.video.i_chroma );
         return VLC_EGENERIC;
     }
 
