@@ -73,7 +73,7 @@ static int Open(vlc_object_t *);
 static void Close(vlc_object_t *);
 
 static const char *const ppsz_sout_options[] = {
-    "control", "http-port", "mux", "mime", "video", NULL
+    "ip", "http-port", "mux", "mime", "video", NULL
 };
 
 /*****************************************************************************
@@ -89,6 +89,8 @@ static const char *const ppsz_sout_options[] = {
 #define MUX_LONGTEXT N_("This sets the muxer used to stream to the Chromecast.")
 #define MIME_TEXT N_("MIME content type")
 #define MIME_LONGTEXT N_("This sets the media MIME content type sent to the Chromecast.")
+#define IP_ADDR_TEXT N_("IP Address")
+#define IP_ADDR_LONGTEXT N_("IP Address of the Chromecast.")
 
 vlc_module_begin ()
 
@@ -100,7 +102,7 @@ vlc_module_begin ()
     set_subcategory(SUBCAT_SOUT_STREAM)
     set_callbacks(Open, Close)
 
-    add_integer(SOUT_CFG_PREFIX "control", NULL, "", "", false)
+    add_string(SOUT_CFG_PREFIX "ip", NULL, IP_ADDR_TEXT, IP_ADDR_LONGTEXT, false)
     add_integer(SOUT_CFG_PREFIX "http-port", HTTP_PORT, HTTP_PORT_TEXT, HTTP_PORT_LONGTEXT, false)
     add_bool(SOUT_CFG_PREFIX "video", true, HAS_VIDEO_TEXT, HAS_VIDEO_LONGTEXT, false)
     add_string(SOUT_CFG_PREFIX "mux", "mp4stream", MUX_TEXT, MUX_LONGTEXT, false)
@@ -173,6 +175,7 @@ static int Open(vlc_object_t *p_this)
     sout_stream_t *p_stream = reinterpret_cast<sout_stream_t*>(p_this);
     sout_stream_sys_t *p_sys = NULL;
     vlc_renderer *p_renderer;
+    char *psz_ip = NULL;
     char *psz_mux = NULL;
     char *psz_var_mime = NULL;
     sout_stream_t *p_sout = NULL;
@@ -180,6 +183,13 @@ static int Open(vlc_object_t *p_this)
     std::stringstream ss;
 
     config_ChainParse(p_stream, SOUT_CFG_PREFIX, ppsz_sout_options, p_stream->p_cfg);
+
+    psz_ip = var_GetNonEmptyString( p_stream, SOUT_CFG_PREFIX "ip");
+    if ( psz_ip == NULL )
+    {
+        msg_Err( p_this, "missing Chromecast IP address" );
+        goto error;
+    }
 
     intptr_t i_chromecast_control = var_InheritInteger( p_stream, SOUT_CFG_PREFIX "control" );
     if ( i_chromecast_control == 0 )
@@ -222,12 +232,14 @@ static int Open(vlc_object_t *p_this)
     p_stream->pf_control = Control;
 
     p_stream->p_sys = p_sys;
+    free(psz_ip);
     free(psz_mux);
     free(psz_var_mime);
     return VLC_SUCCESS;
 
 error:
     sout_StreamChainDelete(p_sout, p_sout);
+    free(psz_ip);
     free(psz_mux);
     free(psz_var_mime);
     delete p_sys;
