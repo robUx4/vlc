@@ -38,6 +38,7 @@
 #include <vlc_renderer.h>
 
 #include <cassert>
+#include <vector>
 
 struct sout_stream_sys_t
 {
@@ -45,6 +46,7 @@ struct sout_stream_sys_t
         : p_out(sout)
         , p_renderer(renderer)
         , b_has_video(has_video)
+        , last_added_ts( VLC_TS_INVALID )
     {
     }
     
@@ -62,9 +64,14 @@ struct sout_stream_sys_t
     sout_stream_t * const p_out;
     vlc_renderer * const p_renderer;
     const bool b_has_video;
+
+    mtime_t                            last_added_ts;
+    std::vector<es_format_t *>         outputs;
+    std::vector<sout_stream_id_sys_t*> streams;
 };
 
 #define SOUT_CFG_PREFIX "sout-chromecast-"
+const static mtime_t MAX_WAIT_BETWEEN_ADD = (CLOCK_FREQ / 3);
 
 /*****************************************************************************
  * Local prototypes
@@ -123,13 +130,38 @@ static sout_stream_id_sys_t *Add(sout_stream_t *p_stream, const es_format_t *p_f
         if (p_fmt->i_cat != AUDIO_ES)
             return NULL;
     }
-    return sout_StreamIdAdd(p_sys->p_out, p_fmt);
+    sout_stream_id_sys_t *result = sout_StreamIdAdd(p_sys->p_out, p_fmt);
+    if ( result != NULL )
+    {
+        es_format_t *p_es = (es_format_t *)malloc( sizeof(es_format_t) );
+        if (p_es != NULL)
+        {
+            es_format_Copy( p_es, p_fmt );
+            p_sys->outputs.push_back( p_es );
+            p_sys->streams.push_back( result );
+            p_sys->last_added_ts = mdate();
+        }
+    }
+    return result;
 }
 
 
 static void Del(sout_stream_t *p_stream, sout_stream_id_sys_t *id)
 {
     sout_stream_sys_t *p_sys = p_stream->p_sys;
+
+    for (size_t i=0; i<p_sys->streams.size(); i++)
+    {
+        if ( p_sys->streams[i] == id )
+        {
+            p_sys->streams.erase( p_sys->streams.begin() +  i );
+            es_format_Clean( p_sys->outputs[i] );
+            free( p_sys->outputs[i] );
+            p_sys->outputs.erase( p_sys->outputs.begin() +  i );
+            p_sys->last_added_ts = mdate();
+            break;
+        }
+    }
 
     sout_StreamIdDel(p_sys->p_out, id);
 }
@@ -139,6 +171,17 @@ static int Send(sout_stream_t *p_stream, sout_stream_id_sys_t *id,
                 block_t *p_buffer)
 {
     sout_stream_sys_t *p_sys = p_stream->p_sys;
+
+    if ( p_sys->last_added_ts != VLC_TS_INVALID )
+    {
+        if ( p_sys->last_added_ts + MAX_WAIT_BETWEEN_ADD < mdate() )
+        {
+            // wait for new ES expired
+            msleep( MAX_WAIT_BETWEEN_ADD );
+        }
+        p_sys->last_added_ts = VLC_TS_INVALID;
+        /* FIXME tell the chromecast to load the content */
+    }
 
     return sout_StreamIdSend(p_sys->p_out, id, p_buffer);
 }
