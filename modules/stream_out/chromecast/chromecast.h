@@ -213,16 +213,12 @@ private:
 
     unsigned i_receiver_requestId;
     unsigned i_requestId;
-    unsigned i_sout_id;
 
     bool       canRemux;
     bool       canDoDirect;
     const bool canDisplay;
 
     std::string GetMedia();
-
-    bool canDecodeVideo( const es_format_t * ) const;
-    bool canDecodeAudio( const es_format_t * ) const;
 
     vlc_cond_t   loadCommandCond;
     vlc_cond_t   seekCommandCond;

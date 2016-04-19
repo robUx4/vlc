@@ -43,9 +43,6 @@
 
 #include "../../misc/webservices/json.h"
 
-static const vlc_fourcc_t DEFAULT_TRANSCODE_AUDIO = VLC_CODEC_MP3;
-static const vlc_fourcc_t DEFAULT_TRANSCODE_VIDEO = VLC_CODEC_H264;
-
 #define PACKET_MAX_LEN 10 * 1024
 
 // Media player Chromecast app id
@@ -108,7 +105,7 @@ vlc_module_begin ()
 vlc_module_end ()
 
 /*****************************************************************************
- * Open: connect to the Chromecast and initialize the sout
+ * Open: connect to the Chromecast and initialize the demux-filter
  *****************************************************************************/
 int Open(vlc_object_t *p_module)
 {
@@ -185,7 +182,6 @@ vlc_renderer_sys::vlc_renderer_sys(vlc_renderer * const p_this)
  , cmd_status(NO_CMD_PENDING)
  , i_receiver_requestId(0)
  , i_requestId(0)
- , i_sout_id(0)
  , canDisplay( p_this->target.psz_path == NULL || strcasecmp("/audio", p_this->target.psz_path) )
  , m_time_playback_started( -1 )
  , i_ts_local_start( VLC_TS_INVALID )
@@ -269,28 +265,6 @@ static int SetInput(vlc_renderer *p_renderer, input_thread_t *p_input)
     return VLC_SUCCESS;
 }
 
-bool vlc_renderer_sys::canDecodeVideo( const es_format_t *p_es ) const
-{
-    if (p_es->i_codec == VLC_CODEC_H264 || p_es->i_codec == VLC_CODEC_VP8)
-        return true;
-    return false;
-}
-
-bool vlc_renderer_sys::canDecodeAudio( const es_format_t *p_es ) const
-{
-    if (p_es->i_codec == VLC_CODEC_VORBIS ||
-        p_es->i_codec == VLC_CODEC_MP4A ||
-        p_es->i_codec == VLC_FOURCC('h', 'a', 'a', 'c') ||
-        p_es->i_codec == VLC_FOURCC('l', 'a', 'a', 'c') ||
-        p_es->i_codec == VLC_FOURCC('s', 'a', 'a', 'c') ||
-        p_es->i_codec == VLC_CODEC_MPGA ||
-        p_es->i_codec == VLC_CODEC_MP3 ||
-        p_es->i_codec == VLC_CODEC_A52 ||
-        p_es->i_codec == VLC_CODEC_EAC3)
-        return true;
-    return false;
-}
-
 void vlc_renderer_sys::InputUpdated( input_thread_t *p_input )
 {
     vlc_renderer *p_renderer = reinterpret_cast<vlc_renderer*>( p_module );
@@ -303,7 +277,6 @@ void vlc_renderer_sys::InputUpdated( input_thread_t *p_input )
 
     if( this->p_input != NULL )
     {
-        var_SetString( this->p_input, "sout", NULL );
         var_SetString( this->p_input, "demux-filter", NULL );
 
 #if 0 /* the Chromecast doesn't work well with consecutives calls if stopped between them */
@@ -331,93 +304,6 @@ void vlc_renderer_sys::InputUpdated( input_thread_t *p_input )
         }
 
         assert(!p_input->b_preparsing);
-
-        canRemux = false;
-        canDoDirect = false;
-        vlc_fourcc_t i_codec_video = 0, i_codec_audio = 0;
-
-        input_item_t * p_item = input_GetItem(p_input);
-        if ( p_item )
-        {
-            canRemux = true;
-            for (int i=0; i<p_item->i_es; ++i)
-            {
-                es_format_t *p_es = p_item->es[i];
-                if (p_es->i_cat == AUDIO_ES)
-                {
-                    if (!canDecodeAudio( p_es ))
-                    {
-                        msg_Dbg( p_module, "can't remux audio track %d codec %4.4s", p_es->i_id, (const char*)&p_es->i_codec );
-                        canRemux = false;
-                    }
-                    else if (i_codec_audio == 0)
-                        i_codec_audio = p_es->i_codec;
-                }
-                else if (canDisplay && p_es->i_cat == VIDEO_ES)
-                {
-                    if (!canDecodeVideo( p_es ))
-                    {
-                        msg_Dbg( p_module, "can't remux video track %d codec %4.4s", p_es->i_id, (const char*)&p_es->i_codec );
-                        canRemux = false;
-                    }
-                    else if (i_codec_video == 0)
-                        i_codec_video = p_es->i_codec;
-                }
-                else
-                {
-                    p_es->i_priority = ES_PRIORITY_NOT_SELECTABLE;
-                    msg_Dbg( p_module, "disable non audio/video track %d i_cat:%d codec %4.4s canDisplay:%d", p_es->i_id, p_es->i_cat, (const char*)&p_es->i_codec, canDisplay );
-                }
-            }
-        }
-
-        int i_port = var_InheritInteger( p_module, CONTROL_CFG_PREFIX "http-port");
-
-        std::stringstream ssout;
-        ssout << '#';
-        if ( !canRemux )
-        {
-            if ( i_codec_audio == 0 )
-                i_codec_audio = DEFAULT_TRANSCODE_AUDIO;
-            /* avcodec AAC encoder is experimental */
-            if ( i_codec_audio == VLC_CODEC_MP4A ||
-                 i_codec_audio == VLC_FOURCC('h', 'a', 'a', 'c') ||
-                 i_codec_audio == VLC_FOURCC('l', 'a', 'a', 'c') ||
-                 i_codec_audio == VLC_FOURCC('s', 'a', 'a', 'c'))
-                i_codec_audio = DEFAULT_TRANSCODE_AUDIO;
-
-            if ( i_codec_video == 0 )
-                i_codec_video = DEFAULT_TRANSCODE_VIDEO;
-
-            /* TODO: provide audio samplerate and channels */
-            ssout << "transcode{acodec=";
-            char s_fourcc[5];
-            vlc_fourcc_to_char( i_codec_audio, s_fourcc );
-            s_fourcc[4] = '\0';
-            ssout << s_fourcc;
-            if ( canDisplay )
-            {
-                /* TODO: provide maxwidth,maxheight */
-                ssout << ",vcodec=";
-                vlc_fourcc_to_char( i_codec_video, s_fourcc );
-                s_fourcc[4] = '\0';
-                ssout << s_fourcc;
-            }
-            ssout << "}:";
-        }
-        if (mime == "video/x-matroska" && canDisplay && i_codec_audio == VLC_CODEC_VORBIS && i_codec_video == VLC_CODEC_VP8 )
-            mime == "video/webm";
-        if (mime == "video/x-matroska" && !canDisplay )
-            mime == "audio/x-matroska";
-        ssout << "cc_sout{http-port=" << i_port << ",mux=" << muxer << ",mime=" << mime
-              << ",video=" << (canDisplay ? '1' : '0')
-              << ",uid=" << i_sout_id++
-              << ",control=" << p_module
-              << "}";
-
-        msg_Dbg( p_module, "force sout to %s", ssout.str().c_str());
-        var_SetString( this->p_input, "sout", ssout.str().c_str() );
-
         std::stringstream sdemux;
         sdemux << "cc_demux{control="
                << p_module
