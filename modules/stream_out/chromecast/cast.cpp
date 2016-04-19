@@ -35,6 +35,7 @@
 #include <vlc_input.h>
 #include <vlc_playlist.h>
 #include <vlc_sout.h>
+#include <vlc_renderer.h>
 
 #include <cassert>
 
@@ -45,7 +46,6 @@ struct sout_stream_sys_t
         , p_renderer(renderer)
         , b_has_video(has_video)
     {
-        vlc_object_hold( p_renderer );
     }
     
     ~sout_stream_sys_t()
@@ -174,13 +174,13 @@ static int Open(vlc_object_t *p_this)
 {
     sout_stream_t *p_stream = reinterpret_cast<sout_stream_t*>(p_this);
     sout_stream_sys_t *p_sys = NULL;
-    vlc_renderer *p_renderer;
+    vlc_renderer *p_renderer = NULL;
     char *psz_ip = NULL;
     char *psz_mux = NULL;
     char *psz_var_mime = NULL;
     sout_stream_t *p_sout = NULL;
     bool b_has_video = true;
-    std::stringstream ss;
+    std::stringstream srender, ss;
 
     config_ChainParse(p_stream, SOUT_CFG_PREFIX, ppsz_sout_options, p_stream->p_cfg);
 
@@ -191,13 +191,13 @@ static int Open(vlc_object_t *p_this)
         goto error;
     }
 
-    intptr_t i_chromecast_control = var_InheritInteger( p_stream, SOUT_CFG_PREFIX "control" );
-    if ( i_chromecast_control == 0 )
+    srender << "chromecast://" << psz_ip;
+    p_renderer = vlc_renderer_new( p_this,  srender.str().c_str() ); /* FIXME load the class directly */
+    if ( p_renderer == NULL)
     {
-        msg_Err(p_stream, "cannot find our renderer");
+        msg_Err( p_this, "cannot load the Chromecast controler" );
         goto error;
     }
-    p_renderer = (vlc_renderer *) i_chromecast_control;
 
     psz_mux = var_GetNonEmptyString(p_stream, SOUT_CFG_PREFIX "mux");
     if (psz_mux == NULL || !psz_mux[0])
@@ -238,6 +238,8 @@ static int Open(vlc_object_t *p_this)
     return VLC_SUCCESS;
 
 error:
+    if ( p_renderer != NULL )
+        vlc_object_release( p_renderer );
     sout_StreamChainDelete(p_sout, p_sout);
     free(psz_ip);
     free(psz_mux);
