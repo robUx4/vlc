@@ -742,3 +742,4 @@ vlc_renderer_equals
 vlc_renderer_item_name
 vlc_renderer_item_uri
 vlc_renderer_item_flags
+vlc_renderer_new

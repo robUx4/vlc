@@ -120,7 +120,7 @@ struct vlc_renderer
 /* Internal API */
 
 /* Release with vlc_object_release */
-vlc_renderer *
+VLC_API vlc_renderer *
 vlc_renderer_new(vlc_object_t *p_obj, const char *psz_renderer);
 #define vlc_renderer_new(a, b) vlc_renderer_new(VLC_OBJECT(a), b)
 

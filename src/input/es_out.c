@@ -1385,6 +1385,7 @@ static void EsOutMeta( es_out_t *p_out, const vlc_meta_t *p_meta )
     if( psz_arturl != NULL && !strncmp( psz_arturl, "attachment://", 13 ) )
     {   /* Clear art cover if streaming out.
          * FIXME: Why? Remove this when sout gets meta data support. */
+        /* TODO Chromecast output should be able to show the art when loading */
         if( p_input->p->p_sout && !p_input->b_preparsing )
             input_item_SetArtURL( p_item, NULL );
         else
