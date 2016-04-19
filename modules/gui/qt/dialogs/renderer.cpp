@@ -32,8 +32,7 @@
 
 #include <vlc_common.h>
 #include <vlc_access.h>
-#include <vlc_renderer.h>
-#include <vlc_services_discovery.h>
+#include <vlc_renderer_discovery.h>
 #include <vlc_url.h>
 
 #include "dialogs/renderer.hpp"
@@ -43,7 +42,7 @@ class RendererItem : public QListWidgetItem
 public:
     RendererItem(vlc_renderer_item *obj)
         : QListWidgetItem( vlc_renderer_item_flags(obj) & VLC_RENDERER_CAN_VIDEO ? QIcon( ":/sidebar/movie" ) : QIcon( ":/sidebar/music" ),
-                           qfu( vlc_renderer_item_name(obj) ).append(" (").append(RendererItemIP(obj)).append(')'))
+                           qfu( vlc_renderer_item_name(obj) ))
     {
         m_obj = vlc_renderer_item_hold(obj);
     }
@@ -56,19 +55,9 @@ protected:
     vlc_renderer_item* m_obj;
 
     friend class RendererDialog;
-
-private:
-    static QString RendererItemIP( const vlc_renderer_item *obj )
-    {
-        vlc_url_t url;
-        vlc_UrlParse(&url, vlc_renderer_item_uri(obj));
-        QString result = QString(url.psz_host);
-        vlc_UrlClean(&url);
-        return result;
-    }
 };
 
-extern "C" void discovery_event_received( const vlc_event_t * p_event, void * user_data )
+extern "C" void renderer_event_received( const vlc_event_t * p_event, void * user_data )
 {
     RendererDialog *p_this = reinterpret_cast<RendererDialog*>(user_data);
     p_this->discoveryEventReceived( p_event );
@@ -76,8 +65,8 @@ extern "C" void discovery_event_received( const vlc_event_t * p_event, void * us
 
 RendererDialog::RendererDialog( intf_thread_t *_p_intf )
                : QVLCDialog( (QWidget*)_p_intf->p_sys->p_mi, _p_intf )
-               , p_sd( NULL )
-               , b_sd_started( false )
+               , p_rd( NULL )
+               , b_rd_started( false )
 {
     setWindowTitle( qtr( "Renderer Output" ) );
     setWindowRole( "vlc-renderer" );
@@ -94,13 +83,13 @@ RendererDialog::RendererDialog( intf_thread_t *_p_intf )
 
 RendererDialog::~RendererDialog()
 {
-    if ( p_sd != NULL )
-        vlc_sd_Destroy( p_sd );
+    if ( p_rd != NULL )
+        vlc_rd_release( p_rd );
 }
 
 void RendererDialog::onReject()
 {
-    setRenderer( NULL );
+    setSout( NULL );
 
     QVLCDialog::reject();
 }
@@ -120,42 +109,36 @@ void RendererDialog::setVisible(bool visible)
     {
         /* SD subnodes */
         char **ppsz_longnames;
-        int *p_categories;
-        char **ppsz_names = vlc_sd_GetNames( THEPL, &ppsz_longnames, &p_categories );
-        if( !ppsz_names )
+        char **ppsz_names;
+        if( vlc_rd_get_names( THEPL, &ppsz_names, &ppsz_longnames ) != VLC_SUCCESS )
             return;
 
         char **ppsz_name = ppsz_names, **ppsz_longname = ppsz_longnames;
-        int *p_category = p_categories;
-        for( ; *ppsz_name; ppsz_name++, ppsz_longname++, p_category++ )
+        for( ; *ppsz_name; ppsz_name++, ppsz_longname++ )
         {
-            if( *p_category == SD_CAT_RENDERER )
+            /* TODO launch all discovery services for renderers */
+            msg_Dbg( p_intf, "starting renderer discovery service %s", *ppsz_longname );
+            if ( p_rd == NULL )
             {
-                /* TODO launch all discovery services for renderers */
-                msg_Dbg( p_intf, "starting renderer discovery service %s", *ppsz_longname );
-                if ( p_sd == NULL )
-                {
-                    p_sd = vlc_sd_Create( VLC_OBJECT(p_intf), *ppsz_name );
-                    if( !p_sd )
-                        msg_Err( p_intf, "Could not start renderer discovery services" );
-                }
-                break;
+                p_rd = vlc_rd_new( VLC_OBJECT(p_intf), *ppsz_name );
+                if( !p_rd )
+                    msg_Err( p_intf, "Could not start renderer discovery services" );
             }
+            break;
         }
         free( ppsz_names );
         free( ppsz_longnames );
-        free( p_categories );
 
-        if ( p_sd != NULL )
+        if ( p_rd != NULL )
         {
             int row = -1;
-            char *psz_renderer = var_InheritString( THEPL, "renderer" );
+            char *psz_renderer = var_InheritString( THEPL, "sout" );
             if ( psz_renderer != NULL )
             {
                 for ( row = 0 ; row < ui.receiversListWidget->count(); row++ )
                 {
                     RendererItem *rowItem = reinterpret_cast<RendererItem*>( ui.receiversListWidget->item( row ) );
-                    if ( isItemUri( psz_renderer, rowItem->m_obj ) )
+                    if ( isItemSout( psz_renderer, rowItem->m_obj ) )
                         break;
                 }
                 if ( row == ui.receiversListWidget->count() )
@@ -164,33 +147,33 @@ void RendererDialog::setVisible(bool visible)
             }
             ui.receiversListWidget->setCurrentRow( row );
 
-            if ( !b_sd_started )
+            if ( !b_rd_started )
             {
-                vlc_event_manager_t *em = services_discovery_EventManager( p_sd );
-                vlc_event_attach( em, vlc_ServicesDiscoveryRendererAdded, discovery_event_received, this );
-                vlc_event_attach( em, vlc_ServicesDiscoveryRendererRemoved, discovery_event_received, this );
+                vlc_event_manager_t *em = vlc_rd_event_manager( p_rd );
+                vlc_event_attach( em, vlc_RendererDiscoveryItemAdded, renderer_event_received, this );
+                vlc_event_attach( em, vlc_RendererDiscoveryItemRemoved, renderer_event_received, this );
 
-                b_sd_started = vlc_sd_Start( p_sd );
-                if ( !b_sd_started )
+                b_rd_started = vlc_rd_start( p_rd ) == VLC_SUCCESS;
+                if ( !b_rd_started )
                 {
-                    vlc_event_detach( em, vlc_ServicesDiscoveryRendererAdded, discovery_event_received, this);
-                    vlc_event_detach( em, vlc_ServicesDiscoveryRendererRemoved, discovery_event_received, this);
+                    vlc_event_detach( em, vlc_RendererDiscoveryItemAdded, renderer_event_received, this);
+                    vlc_event_detach( em, vlc_RendererDiscoveryItemRemoved, renderer_event_received, this);
                 }
             }
         }
     }
     else
     {
-        if ( p_sd != NULL )
+        if ( p_rd != NULL )
         {
-            if ( b_sd_started )
+            if ( b_rd_started )
             {
-                vlc_event_manager_t *em = services_discovery_EventManager( p_sd );
-                vlc_event_detach( em, vlc_ServicesDiscoveryRendererAdded, discovery_event_received, this);
-                vlc_event_detach( em, vlc_ServicesDiscoveryRendererRemoved, discovery_event_received, this);
+                vlc_event_manager_t *em = vlc_rd_event_manager( p_rd );
+                vlc_event_detach( em, vlc_RendererDiscoveryItemAdded, renderer_event_received, this);
+                vlc_event_detach( em, vlc_RendererDiscoveryItemRemoved, renderer_event_received, this);
 
-                vlc_sd_Stop( p_sd );
-                b_sd_started = false;
+                vlc_rd_stop( p_rd );
+                b_rd_started = false;
             }
         }
     }
@@ -203,10 +186,9 @@ void RendererDialog::accept()
     if (current != NULL)
     {
         RendererItem *rowItem = reinterpret_cast<RendererItem*>(current);
-        msg_Dbg( p_intf, "selecting Renderer %s %s", vlc_renderer_item_name(rowItem->m_obj),
-                 vlc_renderer_item_uri(rowItem->m_obj) );
+        msg_Dbg( p_intf, "selecting Renderer %s", vlc_renderer_item_name(rowItem->m_obj) );
 
-        setRenderer( vlc_renderer_item_uri( rowItem->m_obj ) );
+        setSout( rowItem->m_obj );
     }
 
     QVLCDialog::accept();
@@ -214,52 +196,46 @@ void RendererDialog::accept()
 
 void RendererDialog::discoveryEventReceived( const vlc_event_t * p_event )
 {
-    if ( p_event->type == vlc_ServicesDiscoveryRendererAdded )
+    if ( p_event->type == vlc_RendererDiscoveryItemAdded )
     {
-        vlc_renderer_item *p_item =  p_event->u.services_discovery_renderer_added.p_new_item;
+        vlc_renderer_item *p_item =  p_event->u.renderer_discovery_item_added.p_new_item;
 
         int row = 0;
         for ( ; row < ui.receiversListWidget->count(); row++ )
         {
             RendererItem *rowItem = reinterpret_cast<RendererItem*>( ui.receiversListWidget->item( row ) );
-            if ( !strcmp( vlc_renderer_item_uri( p_item ), vlc_renderer_item_uri( rowItem->m_obj ) ) )
+            if ( !strcmp( vlc_renderer_item_sout( p_item ), vlc_renderer_item_sout( rowItem->m_obj ) ) )
                 return;
         }
 
         RendererItem *newItem = new RendererItem(p_item);
         ui.receiversListWidget->addItem( newItem );
 
-        char *psz_renderer = var_InheritString( THEPL, "renderer" );
+        char *psz_renderer = var_InheritString( THEPL, "sout" );
         if ( psz_renderer != NULL )
         {
-            if ( isItemUri( psz_renderer, p_item ) )
+            if ( isItemSout( psz_renderer, p_item ) )
                 ui.receiversListWidget->setCurrentItem( newItem );
             free( psz_renderer );
         }
     }
 }
 
-void RendererDialog::setRenderer( const char *psz_renderer )
+void RendererDialog::setSout( const vlc_renderer_item *p_item )
 {
-    const char *psz_old_renderer = var_GetString( THEPL, "renderer" );
-    if ( psz_renderer == NULL )
-        psz_renderer = "";
-    if ( !strcmp( psz_old_renderer, psz_renderer ) )
+    const char *psz_old_sout = var_GetString( THEPL, "sout" );
+    if( !psz_old_sout )
+        psz_old_sout = "";
+    const char *psz_sout = p_item ? vlc_renderer_item_sout( p_item ) : "";
+
+    if ( !strcmp( psz_old_sout, psz_sout ) )
         return;
 
-    var_SetString( THEPL, "renderer", psz_renderer );
+    msg_Err( p_intf, "starting sout: '%s'", psz_sout );
+    var_SetString( THEPL, "sout", psz_sout );
 }
 
-bool RendererDialog::isItemUri( const char *psz_renderer_uri, const vlc_renderer_item *p_item )
+bool RendererDialog::isItemSout( const char *psz_sout, const vlc_renderer_item *p_item )
 {
-    vlc_url_t uri, item_uri;
-    vlc_UrlParse( &uri, psz_renderer_uri );
-    vlc_UrlParse( &item_uri, vlc_renderer_item_uri( p_item ) );
-    bool b_match = ( uri.i_port == item_uri.i_port || uri.i_port == 0 || item_uri.i_port == 0 ) &&
-            ( uri.psz_protocol && item_uri.psz_protocol && !strcmp( uri.psz_protocol, item_uri.psz_protocol ) ) &&
-            ( uri.psz_host && item_uri.psz_host && !strcmp( uri.psz_host, item_uri.psz_host ) );
-
-    vlc_UrlClean( &uri );
-    vlc_UrlClean( &item_uri );
-    return b_match;
+    return strcmp( psz_sout, vlc_renderer_item_sout( p_item ) ) == 0;
 }
