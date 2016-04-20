@@ -189,8 +189,10 @@ items_add_renderer( struct discovery_sys *p_sys, vlc_renderer_discovery *p_rd,
     if( p_item == NULL )
         return VLC_ENOMEM;
 
+    const char *psz_extra_uri = i_flags & VLC_RENDERER_CAN_VIDEO ? "" : "video=0";
+
     vlc_renderer_item *p_renderer_item =
-        vlc_renderer_item_new( psz_name, psz_uri, NULL, psz_icon_uri, i_flags );
+        vlc_renderer_item_new( psz_name, psz_uri, psz_extra_uri, psz_icon_uri, i_flags );
     if( p_renderer_item == NULL )
     {
         free( psz_uri );
