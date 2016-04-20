@@ -85,6 +85,8 @@ static void InputSourceMeta( input_thread_t *, input_source_t *, vlc_meta_t * );
 #ifdef ENABLE_SOUT
 static int InitSout( input_thread_t * p_input );
 #endif
+static int SoutChanged(vlc_object_t *, char const *,
+                              vlc_value_t, vlc_value_t, void *);
 
 static int DemuxFilterChanged(vlc_object_t *, char const *,
                               vlc_value_t, vlc_value_t, void *);
@@ -858,7 +860,10 @@ static int InitSout( input_thread_t * p_input )
     /* Find a usable sout and attach it to p_input */
     if( !b_is_cmd && ( psz = var_GetNonEmptyString( p_input, "sout" ) ) )
     {
-        p_input->p->p_sout  = input_resource_RequestSout( p_input->p->p_resource, NULL, psz );
+        /* push the old sout for possible reuse */
+        if ( p_input->p->p_sout )
+            input_resource_RequestSout( p_input->p->p_resource, p_input->p->p_sout, NULL );
+        p_input->p->p_sout = input_resource_RequestSout( p_input->p->p_resource, NULL, psz );
         free( psz );
         if( !p_input->p->p_sout )
         {
@@ -1217,6 +1222,7 @@ static int Init( input_thread_t * p_input )
     while ( p_master_demux->p_source )
         p_master_demux = p_master_demux->p_source;
     var_AddCallback( p_input, "demux-filter", DemuxFilterChanged, p_master_demux );
+    var_AddCallback( p_input->p_libvlc, "sout", SoutChanged, p_input );
 
     InitTitle( p_input );
 
@@ -1354,6 +1360,7 @@ static void End( input_thread_t * p_input )
     while ( p_master_demux->p_source )
         p_master_demux = p_master_demux->p_source;
     var_DelCallback( p_input, "demux-filter", DemuxFilterChanged, p_master_demux );
+    var_DelCallback( p_input->p_libvlc, "sout", SoutChanged, p_input );
 
     /* Clean up master */
     InputSourceDestroy( p_input->p->master );
@@ -2996,6 +3003,22 @@ char *input_CreateFilename( input_thread_t *input, const char *psz_path, const c
         path_sanitize( psz_file );
         return psz_file;
     }
+}
+
+int SoutChanged( vlc_object_t *p_this, char const *psz_var,
+                 vlc_value_t oldval, vlc_value_t val, void *p_data )
+{
+    VLC_UNUSED(p_this);
+#ifdef ENABLE_SOUT
+    VLC_UNUSED(psz_var);
+    input_thread_t *p_input = (input_thread_t *) p_data;
+    if ( strcmp( oldval.psz_string, val.psz_string ) )
+    {
+        var_SetString( p_input, "sout", val.psz_string );
+        atomic_store( &p_input->p->b_restart_output, true );
+    }
+#endif
+    return VLC_SUCCESS;
 }
 
 int DemuxFilterChanged(vlc_object_t *p_this, char const *psz_var,
