@@ -68,8 +68,8 @@ vlc_renderer_item_new(const char *psz_name, const char *psz_uri,
     if (p_item->psz_name == NULL)
         goto error;
 
-    if (asprintf(&p_item->psz_sout, "%s{ip=%s%s%s}",
-                 url.psz_protocol, url.psz_host,
+    if (asprintf(&p_item->psz_sout, "%s{ip=%s,port=%d%s%s}",
+                 url.psz_protocol, url.psz_host, url.i_port,
                  psz_extra_sout != NULL ? "," : "",
                  psz_extra_sout != NULL ? psz_extra_sout : "") == -1)
         goto error;
