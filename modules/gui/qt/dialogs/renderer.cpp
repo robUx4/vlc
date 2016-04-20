@@ -132,7 +132,7 @@ void RendererDialog::setVisible(bool visible)
         if ( p_rd != NULL )
         {
             int row = -1;
-            char *psz_renderer = var_InheritString( THEPL, "sout" );
+            char *psz_renderer = var_InheritString( THEPL->p_libvlc, "sout" );
             if ( psz_renderer != NULL )
             {
                 for ( row = 0 ; row < ui.receiversListWidget->count(); row++ )
@@ -211,7 +211,7 @@ void RendererDialog::discoveryEventReceived( const vlc_event_t * p_event )
         RendererItem *newItem = new RendererItem(p_item);
         ui.receiversListWidget->addItem( newItem );
 
-        char *psz_renderer = var_InheritString( THEPL, "sout" );
+        char *psz_renderer = var_InheritString( THEPL->p_libvlc, "sout" );
         if ( psz_renderer != NULL )
         {
             if ( isItemSout( psz_renderer, p_item ) )
@@ -223,7 +223,7 @@ void RendererDialog::discoveryEventReceived( const vlc_event_t * p_event )
 
 void RendererDialog::setSout( const vlc_renderer_item *p_item )
 {
-    const char *psz_old_sout = var_GetString( THEPL, "sout" );
+    const char *psz_old_sout = var_GetString( THEPL->p_libvlc, "sout" );
     if( !psz_old_sout )
         psz_old_sout = "";
     const char *psz_sout = p_item ? vlc_renderer_item_sout( p_item ) : "";
@@ -231,8 +231,8 @@ void RendererDialog::setSout( const vlc_renderer_item *p_item )
     if ( !strcmp( psz_old_sout, psz_sout ) )
         return;
 
-    msg_Err( p_intf, "starting sout: '%s'", psz_sout );
-    var_SetString( THEPL, "sout", psz_sout );
+    msg_Dbg( p_intf, "starting sout: '%s'", psz_sout );
+    var_SetString( THEPL->p_libvlc, "sout", psz_sout );
 }
 
 bool RendererDialog::isItemSout( const char *psz_sout, const vlc_renderer_item *p_item )
