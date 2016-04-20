@@ -35,14 +35,13 @@
 #include <vlc_input.h>
 #include <vlc_playlist.h>
 #include <vlc_sout.h>
-#include <vlc_renderer.h>
 
 #include <cassert>
 #include <vector>
 
 struct sout_stream_sys_t
 {
-    sout_stream_sys_t(vlc_renderer * const renderer, sout_stream_t *sout, bool has_video, int port,
+    sout_stream_sys_t(vlc_renderer_sys * const renderer, sout_stream_t *sout, bool has_video, int port,
                       const char *psz_default_muxer, const char *psz_default_mime)
         : p_out(sout)
         , default_muxer(psz_default_muxer)
@@ -57,12 +56,12 @@ struct sout_stream_sys_t
     ~sout_stream_sys_t()
     {
         sout_StreamChainDelete(p_out, p_out);
-        vlc_object_release( p_renderer );
+        delete p_renderer;
     }
 
     bool isFinishedPlaying() const {
         /* check if the Chromecast to be done playing */
-        return p_renderer == NULL || p_renderer->p_sys->isFinishedPlaying();
+        return p_renderer == NULL || p_renderer->isFinishedPlaying();
     }
 
     bool canDecodeVideo( const es_format_t *p_es ) const;
@@ -73,7 +72,7 @@ struct sout_stream_sys_t
     const std::string  default_muxer;
     const std::string  default_mime;
 
-    vlc_renderer * const p_renderer;
+    vlc_renderer_sys * const p_renderer;
     const bool b_has_video;
     const int i_port;
 
@@ -305,6 +304,7 @@ static int Send(sout_stream_t *p_stream, sout_stream_id_sys_t *id,
         }
 
         /* FIXME tell the chromecast to load the content */
+        p_sys->p_renderer->InputUpdated( true );
     }
 
     return sout_StreamIdSend(p_sys->p_out, id, p_buffer);
@@ -341,7 +341,7 @@ static int Open(vlc_object_t *p_this)
 {
     sout_stream_t *p_stream = reinterpret_cast<sout_stream_t*>(p_this);
     sout_stream_sys_t *p_sys = NULL;
-    vlc_renderer *p_renderer = NULL;
+    vlc_renderer_sys *p_renderer = NULL;
     char *psz_ip = NULL;
     char *psz_mux = NULL;
     char *psz_var_mime = NULL;
@@ -359,8 +359,10 @@ static int Open(vlc_object_t *p_this)
         goto error;
     }
 
+    i_port = var_InheritInteger(p_stream, SOUT_CFG_PREFIX "http-port");
+
     srender << "chromecast://" << psz_ip;
-    p_renderer = vlc_renderer_new( p_this,  srender.str().c_str() ); /* FIXME load the class directly */
+    p_renderer = new(std::nothrow) vlc_renderer_sys( p_this, i_port, psz_ip );
     if ( p_renderer == NULL)
     {
         msg_Err( p_this, "cannot load the Chromecast controler" );
@@ -376,7 +378,6 @@ static int Open(vlc_object_t *p_this)
     if (psz_var_mime == NULL)
         goto error;
 
-    i_port = var_InheritInteger(p_stream, SOUT_CFG_PREFIX "http-port");
     ss << "http{dst=:" << i_port << "/stream"
        << ",mux=" << psz_mux
        << ",access=http{mime=" << psz_var_mime << "}}";
@@ -411,8 +412,7 @@ static int Open(vlc_object_t *p_this)
     return VLC_SUCCESS;
 
 error:
-    if ( p_renderer != NULL )
-        vlc_object_release( p_renderer );
+    delete p_renderer;
     sout_StreamChainDelete(p_sout, p_sout);
     free(psz_ip);
     free(psz_mux);

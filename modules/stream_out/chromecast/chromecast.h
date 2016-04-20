@@ -32,7 +32,9 @@
 #include <vlc_common.h>
 #include <vlc_interface.h>
 #include <vlc_plugin.h>
+#ifdef MODULE_NAME_IS_chromecast
 #include <vlc_renderer.h>
+#endif
 #include <vlc_tls.h>
 
 #include <sstream>
@@ -78,7 +80,7 @@ enum receiver_state {
  *****************************************************************************/
 struct vlc_renderer_sys
 {
-    vlc_renderer_sys(vlc_renderer * const p_this);
+    vlc_renderer_sys(vlc_object_t * const p_this, int local_port, std::string device_addr, int device_port = 0);
     ~vlc_renderer_sys();
 
     bool isFinishedPlaying() {
@@ -121,8 +123,11 @@ struct vlc_renderer_sys
     bool seekTo(mtime_t pos);
 
     vlc_object_t  * const p_module;
-    input_thread_t *p_input;
+    bool           has_input;
+    const int      i_port;
     std::string    serverIP;
+    const int      i_target_port;
+    std::string    targetIP;
     std::string    mime;
     std::string    muxer;
 
@@ -139,7 +144,7 @@ struct vlc_renderer_sys
 
     void handleMessages();
 
-    void InputUpdated( input_thread_t * );
+    void InputUpdated( bool has_input );
 
     connection_status getConnectionStatus() const
     {
@@ -216,7 +221,6 @@ private:
 
     bool       canRemux;
     bool       canDoDirect;
-    const bool canDisplay;
 
     std::string GetMedia();
 

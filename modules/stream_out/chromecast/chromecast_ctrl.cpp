@@ -67,6 +67,9 @@ static const std::string NAMESPACE_RECEIVER         = "urn:x-cast:com.google.cas
 /*****************************************************************************
  * Local prototypes
  *****************************************************************************/
+static void *ChromecastThread(void *data);
+
+#ifdef MODULE_NAME_IS_chromecast
 static int Open(vlc_object_t *);
 static void Close(vlc_object_t *);
 
@@ -76,7 +79,6 @@ static int MuteChanged( vlc_object_t *, char const *,
                           vlc_value_t, vlc_value_t, void * );
 static int VolumeChanged( vlc_object_t *, char const *,
                           vlc_value_t, vlc_value_t, void * );
-static void *ChromecastThread(void *data);
 
 /*****************************************************************************
  * Module descriptor
@@ -110,38 +112,13 @@ vlc_module_end ()
 int Open(vlc_object_t *p_module)
 {
     vlc_renderer *p_renderer = reinterpret_cast<vlc_renderer*>(p_module);
-    vlc_renderer_sys *p_sys = new(std::nothrow) vlc_renderer_sys( p_renderer );
+    vlc_renderer_sys *p_sys = new(std::nothrow) vlc_renderer_sys( p_module,
+                                                                  var_InheritInteger( p_module, CONTROL_CFG_PREFIX "http-port") );
     if (unlikely(p_sys == NULL))
         return VLC_ENOMEM;
     p_renderer->p_sys = p_sys;
 
-    char *psz_mux = var_InheritString( p_module, CONTROL_CFG_PREFIX "mux");
-    if (psz_mux == NULL)
-    {
-        msg_Err( p_module, "Bad muxer provided");
-        goto error;
-    }
-    p_sys->muxer = psz_mux;
-    free(psz_mux);
-
-    psz_mux = var_InheritString( p_module, CONTROL_CFG_PREFIX "mime");
-    if (psz_mux == NULL)
-    {
-        msg_Err( p_module, "Bad MIME type provided");
-        goto error;
-    }
-    p_sys->mime = psz_mux; /* TODO get the MIME type from the playlist/input ? */
-    free(psz_mux);
-
     p_renderer->pf_set_input = SetInput;
-
-    // Start the Chromecast event thread.
-    if (vlc_clone(&p_sys->chromecastThread, ChromecastThread, p_module,
-                  VLC_THREAD_PRIORITY_LOW))
-    {
-        msg_Err( p_module, "Could not start the Chromecast talking thread");
-        goto error;
-    }
 
     var_AddCallback( p_module->p_parent, "mute",   MuteChanged,   p_renderer );
     var_AddCallback( p_module->p_parent, "volume", VolumeChanged, p_renderer );
@@ -167,13 +144,17 @@ void Close(vlc_object_t *p_module)
 
     delete p_sys;
 }
+#endif
 
 /*****************************************************************************
  * vlc_renderer_sys: class definition
  *****************************************************************************/
-vlc_renderer_sys::vlc_renderer_sys(vlc_renderer * const p_this)
- : p_module( VLC_OBJECT(p_this) )
- , p_input(NULL)
+vlc_renderer_sys::vlc_renderer_sys(vlc_object_t * const p_this, int port, std::string device_addr, int device_port)
+ : p_module( p_this )
+ , has_input(false)
+ , i_port(port)
+ , i_target_port(device_port)
+ , targetIP(device_addr)
  , receiverState(RECEIVER_IDLE)
  , i_sock_fd(-1)
  , p_creds(NULL)
@@ -182,7 +163,6 @@ vlc_renderer_sys::vlc_renderer_sys(vlc_renderer * const p_this)
  , cmd_status(NO_CMD_PENDING)
  , i_receiver_requestId(0)
  , i_requestId(0)
- , canDisplay( p_this->target.psz_path == NULL || strcasecmp("/audio", p_this->target.psz_path) )
  , m_time_playback_started( -1 )
  , i_ts_local_start( VLC_TS_INVALID )
  , m_chromecast_start_time( -1 )
@@ -191,11 +171,18 @@ vlc_renderer_sys::vlc_renderer_sys(vlc_renderer * const p_this)
     vlc_mutex_init_recursive(&lock);
     vlc_cond_init(&loadCommandCond);
     vlc_cond_init(&seekCommandCond);
+
+    // Start the Chromecast event thread.
+    if (vlc_clone(&chromecastThread, ChromecastThread, this,
+                  VLC_THREAD_PRIORITY_LOW))
+    {
+        msg_Err( p_module, "Could not start the Chromecast talking thread");
+    }
 }
 
 vlc_renderer_sys::~vlc_renderer_sys()
 {
-    InputUpdated( NULL );
+    InputUpdated( false );
 
     /* disconnect the current Chromecast */
     switch (getConnectionStatus())
@@ -228,6 +215,7 @@ vlc_renderer_sys::~vlc_renderer_sys()
     vlc_mutex_destroy(&lock);
 }
 
+#ifdef MODULE_NAME_IS_chromecast
 static int MuteChanged( vlc_object_t *p_this, char const *psz_var,
                           vlc_value_t oldval, vlc_value_t val, void *p_data )
 {
@@ -261,23 +249,20 @@ static int VolumeChanged( vlc_object_t *p_this, char const *psz_var,
 static int SetInput(vlc_renderer *p_renderer, input_thread_t *p_input)
 {
     vlc_renderer_sys *p_sys = p_renderer->p_sys;
-    p_sys->InputUpdated( p_input );
+    p_sys->InputUpdated( p_input != NULL );
     return VLC_SUCCESS;
 }
+#endif
 
-void vlc_renderer_sys::InputUpdated( input_thread_t *p_input )
+void vlc_renderer_sys::InputUpdated( bool b_has_input )
 {
-    vlc_renderer *p_renderer = reinterpret_cast<vlc_renderer*>( p_module );
     vlc_mutex_locker locker(&lock);
-    msg_Dbg( p_module, "InputUpdated p_input:%p was:%p device:%s session:%s", (void*)p_input, (void*)this->p_input,
-             p_renderer->target.psz_host, mediaSessionId.c_str() );
+    msg_Dbg( p_module, "InputUpdated device:%s session:%s",
+             targetIP.c_str(), mediaSessionId.c_str() );
 
-    if ( this->p_input == p_input )
-        return;
-
-    if( this->p_input != NULL )
+    if( this->has_input )
     {
-        var_SetString( this->p_input, "demux-filter", NULL );
+        var_SetString( p_module->p_parent, "demux-filter", NULL );
 
 #if 0 /* the Chromecast doesn't work well with consecutives calls if stopped between them */
         if ( receiverState != RECEIVER_IDLE )
@@ -285,9 +270,9 @@ void vlc_renderer_sys::InputUpdated( input_thread_t *p_input )
 #endif
     }
 
-    this->p_input = p_input;
+    this->has_input = b_has_input;
 
-    if( this->p_input != NULL )
+    if( this->has_input )
     {
         mutex_cleanup_push(&lock);
         while (conn_status != CHROMECAST_APP_STARTED && conn_status != CHROMECAST_CONNECTION_DEAD)
@@ -303,13 +288,12 @@ void vlc_renderer_sys::InputUpdated( input_thread_t *p_input )
             return;
         }
 
-        assert(!p_input->b_preparsing);
         std::stringstream sdemux;
         sdemux << "cc_demux{control="
                << p_module
                << '}';
         msg_Dbg( p_module, "force demux to %s", sdemux.str().c_str());
-        var_SetString( this->p_input, "demux-filter", sdemux.str().c_str() );
+        var_SetString( p_module->p_parent, "demux-filter", sdemux.str().c_str() );
 
         if ( receiverState == RECEIVER_IDLE )
         {
@@ -327,11 +311,10 @@ void vlc_renderer_sys::InputUpdated( input_thread_t *p_input )
  */
 int vlc_renderer_sys::connectChromecast()
 {
-    vlc_renderer *p_renderer = reinterpret_cast<vlc_renderer*>(p_module);
-    unsigned devicePort = p_renderer->target.i_port;
+    unsigned devicePort = i_target_port;
     if (devicePort == 0)
         devicePort = CHROMECAST_CONTROL_PORT;
-    int fd = net_ConnectTCP( p_module, p_renderer->target.psz_host, devicePort);
+    int fd = net_ConnectTCP( p_module, targetIP.c_str(), devicePort);
     if (fd < 0)
         return -1;
 
@@ -342,7 +325,7 @@ int vlc_renderer_sys::connectChromecast()
         return -1;
     }
 
-    p_tls = vlc_tls_ClientSessionCreateFD(p_creds, fd, p_renderer->target.psz_host,
+    p_tls = vlc_tls_ClientSessionCreateFD(p_creds, fd, targetIP.c_str(),
                                                "tcps", NULL, NULL);
 
     if (p_tls == NULL)
@@ -722,7 +705,7 @@ void vlc_renderer_sys::processMessage(const castchannel::CastMessage &msg)
                     break;
 
                 case RECEIVER_IDLE:
-                    if ( p_input != NULL )
+                    if ( has_input )
                         setPlayerStatus(NO_CMD_PENDING);
                     m_time_playback_started = -1;
                     break;
@@ -735,7 +718,7 @@ void vlc_renderer_sys::processMessage(const castchannel::CastMessage &msg)
                 vlc_cond_signal( &seekCommandCond );
             }
 
-            if ( cmd_status != CMD_LOAD_SENT && receiverState == RECEIVER_IDLE && p_input != NULL )
+            if ( cmd_status != CMD_LOAD_SENT && receiverState == RECEIVER_IDLE && has_input )
             {
                 msg_Dbg( p_module, "the device missed the LOAD command");
                 i_ts_local_start = VLC_TS_0;
@@ -774,7 +757,7 @@ void vlc_renderer_sys::processMessage(const castchannel::CastMessage &msg)
         if (type == "CLOSE")
         {
             msg_Warn( p_module, "received close message");
-            InputUpdated( NULL );
+            InputUpdated( false );
             vlc_mutex_locker locker(&lock);
             setConnectionStatus(CHROMECAST_CONNECTION_DEAD);
             // make sure we unblock the demuxer
@@ -873,7 +856,7 @@ std::string vlc_renderer_sys::GetMedia()
     std::stringstream ss;
     std::string       s_chromecast_url;
 
-    input_item_t * p_item = input_GetItem(p_input);
+    input_item_t * p_item = NULL; // TODO get the name/artwork another way input_GetItem(p_input);
     if ( p_item )
     {
         char *psz_name = input_item_GetTitleFbName( p_item );
@@ -888,24 +871,24 @@ std::string vlc_renderer_sys::GetMedia()
 
         ss << "},";
         free( psz_name );
-
-        std::stringstream chromecast_url;
-        if ( canDoDirect && canRemux )
-        {
-            char *psz_uri = input_item_GetURI(p_item);
-            chromecast_url << psz_uri;
-            msg_Dbg( p_module, "using direct URL: %s", psz_uri );
-            free( psz_uri );
-        }
-        else
-        {
-            int i_port = var_InheritInteger( p_module, CONTROL_CFG_PREFIX "http-port");
-            chromecast_url << "http://" << serverIP << ":" << i_port << "/stream";
-        }
-        s_chromecast_url = chromecast_url.str();
-
-        msg_Dbg( p_module, "s_chromecast_url: %s", s_chromecast_url.c_str());
     }
+
+    std::stringstream chromecast_url;
+    if ( canDoDirect && canRemux )
+    {
+        char *psz_uri = input_item_GetURI(p_item);
+        chromecast_url << psz_uri;
+        msg_Dbg( p_module, "using direct URL: %s", psz_uri );
+        free( psz_uri );
+    }
+    else
+    {
+        int i_port = var_InheritInteger( p_module, CONTROL_CFG_PREFIX "http-port");
+        chromecast_url << "http://" << serverIP << ":" << i_port << "/stream";
+    }
+    s_chromecast_url = chromecast_url.str();
+
+    msg_Dbg( p_module, "s_chromecast_url: %s", s_chromecast_url.c_str());
 
     ss << "\"contentId\":\"" << s_chromecast_url << "\""
        << ",\"streamType\":\"LIVE\""
@@ -1002,15 +985,14 @@ void vlc_renderer_sys::msgPlayerSetMute(bool b_mute)
 static void* ChromecastThread(void* p_data)
 {
     int canc;
-    vlc_renderer *p_intf = reinterpret_cast<vlc_renderer*>(p_data);
-    vlc_renderer_sys *p_sys = p_intf->p_sys;
+    vlc_renderer_sys *p_sys = reinterpret_cast<vlc_renderer_sys*>(p_data);
     p_sys->setConnectionStatus( CHROMECAST_DISCONNECTED );
 
     p_sys->i_sock_fd = p_sys->connectChromecast();
     if (p_sys->i_sock_fd < 0)
     {
         canc = vlc_savecancel();
-        msg_Err(p_intf, "Could not connect the Chromecast");
+        msg_Err( p_sys->p_module, "Could not connect the Chromecast" );
         vlc_mutex_lock(&p_sys->lock);
         p_sys->setConnectionStatus(CHROMECAST_CONNECTION_DEAD);
         vlc_mutex_unlock(&p_sys->lock);
@@ -1022,7 +1004,7 @@ static void* ChromecastThread(void* p_data)
     if (net_GetSockAddress(p_sys->i_sock_fd, psz_localIP, NULL))
     {
         canc = vlc_savecancel();
-        msg_Err(p_intf, "Cannot get local IP address");
+        msg_Err( p_sys->p_module, "Cannot get local IP address" );
         vlc_mutex_lock(&p_sys->lock);
         p_sys->setConnectionStatus(CHROMECAST_CONNECTION_DEAD);
         vlc_mutex_unlock(&p_sys->lock);
