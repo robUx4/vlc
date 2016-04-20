@@ -116,10 +116,10 @@ static const char *const ppsz_sout_options[] = {
 
 vlc_module_begin ()
 
-    set_shortname( "cc_sout" )
+    set_shortname( "Chromecast" )
     set_description(N_("Chromecast stream output"))
     set_capability("sout stream", 0)
-    add_shortcut("cc_sout")
+    add_shortcut("chromecast")
     set_category(CAT_SOUT)
     set_subcategory(SUBCAT_SOUT_STREAM)
     set_callbacks(Open, Close)
