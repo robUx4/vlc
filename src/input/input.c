@@ -86,8 +86,6 @@ static void InputSourceMeta( input_thread_t *, input_source_t *, vlc_meta_t * );
 static int InitSout( input_thread_t * p_input );
 #endif
 
-static int RendererChanged(vlc_object_t *, char const *,
-                           vlc_value_t, vlc_value_t, void *);
 static int DemuxFilterChanged(vlc_object_t *, char const *,
                               vlc_value_t, vlc_value_t, void *);
 
@@ -258,9 +256,6 @@ static void input_Destructor( vlc_object_t *obj )
         ControlRelease( p_ctrl->i_type, p_ctrl->val );
     }
 
-    if ( p_input->p->b_has_renderer_callback )
-        var_DelCallback( p_input->p_parent, "renderer", RendererChanged, p_input );
-
     vlc_cond_destroy( &p_input->p->wait_control );
     vlc_mutex_destroy( &p_input->p->lock_control );
     free( p_input->p );
@@ -301,7 +296,7 @@ static input_thread_t *Create( vlc_object_t *p_parent, input_item_t *p_item,
     snprintf( psz_timer_name, sizeof(psz_timer_name),
               "input launching for '%s'", psz_name );
 
-    msg_Dbg( p_input, "Creating an input for %s'%s'", psz_name, b_quick ? "preparsing " : "");
+    msg_Dbg( p_input, "Creating an input for %s'%s'", b_quick ? "preparsing " : "", psz_name);
 
     free( psz_name );
 
@@ -336,9 +331,7 @@ static input_thread_t *Create( vlc_object_t *p_parent, input_item_t *p_item,
     TAB_INIT( p_input->p->i_attachment, p_input->p->attachment );
     p_input->p->attachment_demux = NULL;
     p_input->p->p_sout   = NULL;
-    p_input->p->p_renderer = NULL;
     p_input->p->b_out_pace_control = false;
-    p_input->p->b_has_renderer_callback = false;
 
     vlc_gc_incref( p_item ); /* Released in Destructor() */
     p_input->p->p_item = p_item;
@@ -711,8 +704,6 @@ static void MainLoop( input_thread_t *p_input, bool b_interactive )
 
             es_out_Control( p_input->p->p_es_out, ES_OUT_RESTART_ES, NULL );
 
-            if ( p_input->p->p_renderer == NULL )
-                input_resource_RequestRenderer( p_input->p->p_resource, NULL, NULL );
             if ( p_input->p->p_sout == NULL )
                 input_resource_TerminateSout( p_input->p->p_resource );
 
@@ -863,31 +854,6 @@ static int InitSout( input_thread_t * p_input )
         return VLC_SUCCESS;
     char *psz;
     const bool b_is_cmd = !strncasecmp( p_input->p->p_item->psz_uri, "vlc:", 4 );
-
-    if ( !p_input->p->b_has_renderer_callback )
-    {
-        var_AddCallback( p_input->p_parent, "renderer", RendererChanged, p_input );
-        p_input->p->b_has_renderer_callback = true;
-    }
-
-    if( !b_is_cmd && ( psz = var_InheritString( p_input, "renderer" ) ) )
-    {
-        p_input->p->p_renderer =
-            input_resource_RequestRenderer( p_input->p->p_resource, NULL, psz );
-        free( psz );
-        if( !p_input->p->p_renderer )
-        {
-            input_ChangeState( p_input, ERROR_S );
-            msg_Err( p_input, "cannot start renderer instance, " \
-                              "aborting" );
-            return VLC_EGENERIC;
-        }
-    }
-    else
-    {
-        p_input->p->p_renderer = input_resource_RequestRenderer( p_input->p->p_resource,
-                                                                 p_input->p->p_renderer, NULL );
-    }
 
     /* Find a usable sout and attach it to p_input */
     if( !b_is_cmd && ( psz = var_GetNonEmptyString( p_input, "sout" ) ) )
@@ -1324,9 +1290,6 @@ error:
         if( p_input->p->p_sout )
             p_input->p->p_sout = input_resource_RequestSout( p_input->p->p_resource,
                                          p_input->p->p_sout, NULL );
-        if( p_input->p->p_renderer )
-            p_input->p->p_renderer = input_resource_RequestRenderer( p_input->p->p_resource,
-                                                                     p_input->p->p_renderer, NULL );
         input_resource_SetInput( p_input->p->p_resource, NULL );
         if( p_input->p->p_resource_private )
             input_resource_Terminate( p_input->p->p_resource_private );
@@ -1364,7 +1327,6 @@ error:
     /* Mark them deleted */
     p_input->p->p_es_out = NULL;
     p_input->p->p_sout = NULL;
-    p_input->p->p_renderer = NULL;
 
     return VLC_EGENERIC;
 }
@@ -1448,8 +1410,6 @@ static void End( input_thread_t * p_input )
     /* */
     p_input->p->p_sout = input_resource_RequestSout( p_input->p->p_resource,
                                                      p_input->p->p_sout, NULL );
-    p_input->p->p_renderer = input_resource_RequestRenderer( p_input->p->p_resource,
-                                                             p_input->p->p_renderer, NULL );
     input_resource_SetInput( p_input->p->p_resource, NULL );
     if( p_input->p->p_resource_private )
         input_resource_Terminate( p_input->p->p_resource_private );
@@ -3036,20 +2996,6 @@ char *input_CreateFilename( input_thread_t *input, const char *psz_path, const c
         path_sanitize( psz_file );
         return psz_file;
     }
-}
-
-int RendererChanged(vlc_object_t *p_this, char const *psz_var,
-                    vlc_value_t oldval, vlc_value_t val, void *p_data)
-{
-    VLC_UNUSED(p_this);
-    VLC_UNUSED(psz_var);
-
-    if ( strcmp( oldval.psz_string, val.psz_string ) )
-    {
-        input_thread_t *p_input = (input_thread_t*) p_data;
-        atomic_store( &p_input->p->b_restart_output, true );
-    }
-    return VLC_SUCCESS;
 }
 
 int DemuxFilterChanged(vlc_object_t *p_this, char const *psz_var,

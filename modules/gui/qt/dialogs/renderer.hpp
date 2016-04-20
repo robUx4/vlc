@@ -59,11 +59,11 @@ private slots:
 private:
 
     friend class          Singleton<RendererDialog>;
-    services_discovery_t *p_sd;
-    bool                  b_sd_started;
-    void                  setRenderer( const char *psz_renderer );
+    vlc_renderer_discovery *p_rd;
+    bool                  b_rd_started;
+    void                  setSout( const vlc_renderer_item *p_item );
 
-    static bool           isItemUri( const char *psz_renderer_uri, const vlc_renderer_item *p_item );
+    static bool           isItemSout( const char *psz_sout, const vlc_renderer_item *p_item );
 };
 
 

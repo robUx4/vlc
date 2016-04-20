@@ -323,9 +323,6 @@ void PLSelector::createItems()
             else
                 icon = QIcon( ":/sidebar/movie" );
             break;
-        case SD_CAT_RENDERER:
-            /* do not show renderers in the sources dialog */
-            continue;
         default:
             selItem = addItem( SD_TYPE, *ppsz_longname );
         }
