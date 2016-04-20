@@ -442,13 +442,13 @@ new_entries_rd_cb( void *p_this, int i_status, const struct rr_entry *p_entries 
     const char *psz_model = NULL;
     const char *psz_icon = NULL;
     for( const struct rr_entry *p_entry = p_entries;
-         p_entry != NULL && (psz_model == NULL || psz_icon == NULL);
+         p_entry != NULL && ( psz_model == NULL || psz_icon == NULL );
          p_entry = p_entry->next )
     {
         if( p_entry->type == RR_TXT )
         {
             const struct rr_data_txt *p_txt = p_entry->data.TXT;
-            while( p_txt )
+            while( p_txt && ( psz_model == NULL || psz_icon == NULL ) )
             {
                 if( p_txt->txt )
                 {
