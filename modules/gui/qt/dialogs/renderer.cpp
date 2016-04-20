@@ -223,19 +223,28 @@ void RendererDialog::discoveryEventReceived( const vlc_event_t * p_event )
 
 void RendererDialog::setSout( const vlc_renderer_item *p_item )
 {
-    const char *psz_old_sout = var_GetString( THEPL->p_libvlc, "sout" );
-    if( !psz_old_sout )
-        psz_old_sout = "";
-    const char *psz_sout = p_item ? vlc_renderer_item_sout( p_item ) : "";
+    std::stringstream s_sout;
+    const char *psz_out = NULL;
+    if ( p_item )
+    {
+        psz_out = vlc_renderer_item_sout( p_item );
+        if ( psz_out )
+            s_sout << '#' << psz_out;
+    }
 
-    if ( !strcmp( psz_old_sout, psz_sout ) )
-        return;
-
-    msg_Dbg( p_intf, "starting sout: '%s'", psz_sout );
-    var_SetString( THEPL->p_libvlc, "sout", psz_sout );
+    msg_Dbg( p_intf, "starting sout: '%s'", s_sout.str().c_str() );
+    var_SetString( THEPL->p_libvlc, "sout", s_sout.str().c_str() );
 }
 
 bool RendererDialog::isItemSout( const char *psz_sout, const vlc_renderer_item *p_item )
 {
-    return strcmp( psz_sout, vlc_renderer_item_sout( p_item ) ) == 0;
+    std::stringstream s_sout;
+    const char *psz_out = NULL;
+    if ( p_item )
+    {
+        psz_out = vlc_renderer_item_sout( p_item );
+        if ( psz_out )
+            s_sout << '#' << psz_out;
+    }
+    return s_sout.str() == psz_sout;
 }
