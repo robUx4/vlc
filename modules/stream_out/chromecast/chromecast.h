@@ -144,7 +144,7 @@ struct vlc_renderer_sys
 
     void handleMessages();
 
-    void InputUpdated( bool has_input );
+    void InputUpdated( bool has_input, const std::string mime_type );
 
     connection_status getConnectionStatus() const
     {
