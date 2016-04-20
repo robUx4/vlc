@@ -46,6 +46,14 @@
 {
     NSMenuItem *_vlcStatusBarMenuItem;
 
+    IBOutlet NSMenuItem *showMainWindowItem;
+    IBOutlet NSMenuItem *playPauseItem;
+    IBOutlet NSMenuItem *stopItem;
+    IBOutlet NSMenuItem *nextItem;
+    IBOutlet NSMenuItem *prevItem;
+    IBOutlet NSMenuItem *randItem;
+    IBOutlet NSMenuItem *quitItem;
+
     NSString *_nameToDisplay;
     NSString *_timeToDisplay;
     NSString *_durationToDisplay;
@@ -77,10 +85,19 @@
 
     [self enableMenuIcon];
 
-    // add the top menu item for dynamic data
-    _vlcStatusBarMenuItem = [[NSMenuItem alloc] initWithTitle:@"URL/Path Options" action:@selector(updateMenuItemContent:) keyEquivalent:@""];
+    // Populate menu items with localized strings
+    [showMainWindowItem setTitle:_NS("Show Main Window")];
+    [playPauseItem setTitle:_NS("Play")];
+    [stopItem setTitle:_NS("Stop")];
+    [nextItem setTitle:_NS("Next")];
+    [prevItem setTitle:_NS("Previous")];
+    [randItem setTitle:_NS("Random")];
+    [quitItem setTitle:_NS("Quit")];
 
-    [_vlcStatusBarMenuItem setToolTip:@"Misc functions with media URL or Path"];
+    // add the top menu item for dynamic data
+    _vlcStatusBarMenuItem = [[NSMenuItem alloc] initWithTitle:_NS("URL/Path Options") action:@selector(updateMenuItemContent:) keyEquivalent:@""];
+
+    [_vlcStatusBarMenuItem setToolTip:_NS("Misc functions with media URL or Path")];
     [_vlcStatusBarMenuItem setTarget:self];
 
     [_vlcStatusBarIconMenu insertItem:_vlcStatusBarMenuItem atIndex:0];
@@ -179,6 +196,7 @@
     // Make sure the b/w statusItem icon is inverted on dark/light mode
     menuIcon.template = YES;
     [_statusItem setImage:menuIcon];
+    [_statusItem setLength:24];
 
     // Attach pull-down menu
     [_statusItem setMenu:_vlcStatusBarIconMenu];
@@ -233,12 +251,13 @@
 
     if ([self vlcPlayingStatus] == PLAYLIST_STOPPED) {
         // nothing playing
-        toolTipText = @"VLC media player\nNothing playing";
+        toolTipText = _NS("VLC media player\nNothing playing");
     } else {
 #ifdef showURLInToolTip
-        toolTipText = [NSString stringWithFormat:@"VLC media player\nName: %@\nDuration: %@\nTime: %@\nURL/Path: %@", _nameToDisplay, _durationToDisplay, _timeToDisplay, _urlToDisplay];
+        toolTipText = [NSString stringWithFormat:_NS("VLC media player\nName: %@\nDuration: %@\nTime: %@\nURL/Path: %@"), _nameToDisplay, _durationToDisplay, _timeToDisplay, _urlToDisplay];
 #else
-        toolTipText = [NSString stringWithFormat:@"VLC media player\nName: %@\nDuration: %@\nTime: %@", _nameToDisplay, _durationToDisplay, _timeToDisplay];
+        toolTipText = [NSString stringWithFormat:_NS("VLC media player\nName: %@\nDuration: %@\nTime: %@"), _nameToDisplay, _durationToDisplay, _timeToDisplay];
+        // Causes warning, we need NS_FORMAT_ARGUMENT(1) for the localize function
 #endif
     }
 
@@ -257,14 +276,14 @@
     // create string for dynamic menu bit (sync?)
     if ([self vlcPlayingStatus] == PLAYLIST_STOPPED) {
         // put back our disabled menu item text.
-        menuString =  @"URL/Path Options";
+        menuString =  _NS("URL/Path Options");
     } else {
         if ([_urlToDisplay hasPrefix:@"file://"]) {
             // offer to show 'file://' in finder
-            menuString = [NSString stringWithFormat:@"Select File In Finder"];
+            menuString = _NS("Select File In Finder");
         } else {
             // offer to copy URL to clipboard
-            menuString = [NSString stringWithFormat:@"Copy URL to clipboard"];
+            menuString = _NS("Copy URL to clipboard");
         }
     }
 
@@ -310,14 +329,12 @@
 //
 - (void)updateMenuItemPlayPause
 {
-    NSMenuItem* menuItemToChange = [_vlcStatusBarIconMenu itemWithTag:playPauseMenuItemTag];
-
     if ([self vlcPlayingStatus] == PLAYLIST_RUNNING) {
-        [menuItemToChange setTitle:@"Pause"];
-        [menuItemToChange setImage:_menuImagePause];
+        [playPauseItem setTitle:_NS("Pause")];
+        [playPauseItem setImage:_menuImagePause];
     } else {
-        [menuItemToChange setTitle:@"Play"];
-        [menuItemToChange setImage:_menuImagePlay];
+        [playPauseItem setTitle:_NS("Play")];
+        [playPauseItem setImage:_menuImagePlay];
     }
 }
 

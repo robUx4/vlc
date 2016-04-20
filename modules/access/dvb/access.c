@@ -167,7 +167,7 @@ static int Open( vlc_object_t *p_this )
 
         scan_parameter_Init( &parameter );
 
-        parameter.b_use_nit = var_GetBool( p_access, "dvb-scan-nit" );
+        parameter.b_use_nit = var_InheritBool( p_access, "dvb-scan-nit" );
 
         msg_Dbg( p_access, "setting filter on PAT/NIT/SDT (DVB only)" );
         FilterSet( p_access, 0x00, OTHER_TYPE );    // PAT
@@ -255,7 +255,7 @@ static block_t *BlockScan( access_t *p_access )
     if( FrontendSet( p_access ) < 0 )
     {
         msg_Err( p_access, "Failed to tune the frontend" );
-        p_access->info.b_eof = true;
+        //p_access->info.b_eof = true;
         scan_session_Destroy( p_scan, session );
         return NULL;
     }
@@ -338,7 +338,10 @@ static block_t *BlockScan( access_t *p_access )
             if( !FrontendGetStatistic( p_access, &stat ) )
             {
                 if( stat.i_snr > i_best_snr )
+                {
                     i_best_snr = stat.i_snr;
+                    scan_session_SetSNR( session, i_best_snr );
+                }
             }
         }
 
@@ -373,10 +376,6 @@ static block_t *BlockScan( access_t *p_access )
             }
         }
     }
-
-    /* */
-    if( i_best_snr > 0 )
-        scan_session_SetSNR( session, i_best_snr );
 
     scan_session_Destroy( p_scan, session );
     return NULL;
