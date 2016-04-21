@@ -57,7 +57,7 @@ protected:
     friend class RendererDialog;
 };
 
-extern "C" void renderer_event_received( const vlc_event_t * p_event, void * user_data )
+void RendererDialog::renderer_event_received( const vlc_event_t * p_event, void * user_data )
 {
     RendererDialog *p_this = reinterpret_cast<RendererDialog*>(user_data);
     p_this->discoveryEventReceived( p_event );
@@ -204,7 +204,7 @@ void RendererDialog::discoveryEventReceived( const vlc_event_t * p_event )
         for ( ; row < ui.receiversListWidget->count(); row++ )
         {
             RendererItem *rowItem = reinterpret_cast<RendererItem*>( ui.receiversListWidget->item( row ) );
-            if ( !strcmp( vlc_renderer_item_sout( p_item ), vlc_renderer_item_sout( rowItem->m_obj ) ) )
+            if ( isItemSout( vlc_renderer_item_sout( p_item ), rowItem->m_obj ) )
                 return;
         }
 

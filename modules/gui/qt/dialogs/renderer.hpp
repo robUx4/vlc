@@ -28,12 +28,6 @@
 #include "util/singleton.hpp"
 #include "ui/renderer.h"
 
-#include <QMutex>
-#include <QAtomicInt>
-
-class QPushButton;
-class QTreeWidget;
-class QTreeWidgetItem;
 class MsgEvent;
 
 class RendererDialog : public QVLCDialog, public Singleton<RendererDialog>
@@ -64,6 +58,7 @@ private:
     void                  setSout( const vlc_renderer_item *p_item );
 
     static bool           isItemSout( const char *psz_sout, const vlc_renderer_item *p_item );
+    static void           renderer_event_received( const vlc_event_t * p_event, void * user_data );
 };
 
 
