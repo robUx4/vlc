@@ -41,9 +41,9 @@
 
 struct sout_stream_sys_t
 {
-    sout_stream_sys_t(vlc_renderer_sys * const renderer, sout_stream_t *sout, bool has_video, int port,
+    sout_stream_sys_t(vlc_renderer_sys * const renderer, bool has_video, int port,
                       const char *psz_default_muxer, const char *psz_default_mime)
-        : p_out(sout)
+        : p_out(NULL)
         , default_muxer(psz_default_muxer)
         , default_mime(psz_default_mime)
         , p_renderer(renderer)
@@ -77,7 +77,6 @@ struct sout_stream_sys_t
     const int i_port;
 
     mtime_t                            last_added_ts;
-    std::vector<es_format_t *>         outputs;
     std::vector<sout_stream_id_sys_t*> streams;
 };
 
@@ -137,6 +136,12 @@ vlc_module_begin ()
 vlc_module_end ()
 
 
+struct sout_stream_id_sys_t
+{
+    es_format_t           fmt;
+    sout_stream_id_sys_t  *p_out;
+};
+
 /*****************************************************************************
  * Sout callbacks
  *****************************************************************************/
@@ -149,19 +154,16 @@ static sout_stream_id_sys_t *Add(sout_stream_t *p_stream, const es_format_t *p_f
         if (p_fmt->i_cat != AUDIO_ES)
             return NULL;
     }
-    sout_stream_id_sys_t *result = sout_StreamIdAdd(p_sys->p_out, p_fmt);
-    if ( result != NULL )
+
+    sout_stream_id_sys_t *p_sys_id = (sout_stream_id_sys_t *)malloc( sizeof(sout_stream_id_sys_t) );
+    if (p_sys_id != NULL)
     {
-        es_format_t *p_es = (es_format_t *)malloc( sizeof(es_format_t) );
-        if (p_es != NULL)
-        {
-            es_format_Copy( p_es, p_fmt );
-            p_sys->outputs.push_back( p_es );
-            p_sys->streams.push_back( result );
-            p_sys->last_added_ts = mdate();
-        }
+        es_format_Copy( &p_sys_id->fmt, p_fmt );
+        p_sys_id->p_out = NULL;
+        p_sys->streams.push_back( p_sys_id );
+        p_sys->last_added_ts = mdate();
     }
-    return result;
+    return p_sys_id;
 }
 
 
@@ -173,16 +175,25 @@ static void Del(sout_stream_t *p_stream, sout_stream_id_sys_t *id)
     {
         if ( p_sys->streams[i] == id )
         {
+            if ( p_sys->streams[i]->p_out != NULL )
+                sout_StreamIdDel( p_sys->p_out, p_sys->streams[i]->p_out );
+
+            es_format_Clean( &p_sys->streams[i]->fmt );
+            free( p_sys->streams[i] );
             p_sys->streams.erase( p_sys->streams.begin() +  i );
-            es_format_Clean( p_sys->outputs[i] );
-            free( p_sys->outputs[i] );
-            p_sys->outputs.erase( p_sys->outputs.begin() +  i );
             p_sys->last_added_ts = mdate();
             break;
         }
     }
+    /* TODO if there's no new stream after a while we should tell the Chromecast to stop waiting */
+    /* p_sys->p_renderer->InputUpdated( false ); */
 
-    sout_StreamIdDel(p_sys->p_out, id);
+    if ( p_sys->streams.empty() )
+    {
+        sout_StreamChainDelete( p_sys->p_out, p_sys->p_out );
+        p_sys->p_out = NULL;
+        p_sys->sout = "";
+    }
 }
 
 
@@ -215,19 +226,20 @@ static int Send(sout_stream_t *p_stream, sout_stream_id_sys_t *id,
 
     if ( p_sys->last_added_ts != VLC_TS_INVALID )
     {
-        if ( p_sys->last_added_ts + MAX_WAIT_BETWEEN_ADD < mdate() )
+        while ( p_sys->last_added_ts + MAX_WAIT_BETWEEN_ADD < mdate() )
         {
             // wait for new ES expired
             msleep( MAX_WAIT_BETWEEN_ADD );
         }
         p_sys->last_added_ts = VLC_TS_INVALID;
+        msg_Dbg( p_stream, "prepare new sub-sout for %s", p_sys->p_renderer->title.c_str() );
 
         bool canRemux = true;
         vlc_fourcc_t i_codec_video = 0, i_codec_audio = 0;
 
-        for (std::vector<es_format_t*>::iterator it = p_sys->outputs.begin(); it != p_sys->outputs.begin(); ++it)
+        for (std::vector<sout_stream_id_sys_t*>::iterator it = p_sys->streams.begin(); it != p_sys->streams.end(); ++it)
         {
-            const es_format_t *p_es = *it;
+            const es_format_t *p_es = &(*it)->fmt;
             if (p_es->i_cat == AUDIO_ES)
             {
                 if (!p_sys->canDecodeAudio( p_es ))
@@ -296,8 +308,11 @@ static int Send(sout_stream_t *p_stream, sout_stream_id_sys_t *id,
 
         if ( p_sys->sout != ssout.str() )
         {
-            sout_StreamChainDelete( p_sys->p_out, p_sys->p_out );
-            p_sys->sout = "";
+            if ( unlikely( p_sys->p_out != NULL ) )
+            {
+                sout_StreamChainDelete( p_sys->p_out, p_sys->p_out );
+                p_sys->sout = "";
+            }
 
             p_sys->p_out = sout_StreamChainNew( p_stream->p_sout, ssout.str().c_str(), NULL, NULL);
             if (p_sys->p_out == NULL) {
@@ -307,8 +322,35 @@ static int Send(sout_stream_t *p_stream, sout_stream_id_sys_t *id,
             p_sys->sout = ssout.str();
         }
 
+        /* check the streams we can actually add */
+        for (std::vector<sout_stream_id_sys_t*>::iterator it = p_sys->streams.begin(); it != p_sys->streams.end(); ++it)
+        {
+            sout_stream_id_sys_t *p_sys_id = *it;
+            p_sys_id->p_out = sout_StreamIdAdd( p_sys->p_out, &p_sys_id->fmt );
+            if ( p_sys_id->p_out == NULL )
+            {
+                msg_Err( p_stream, "can't handle a stream" );
+                p_sys->streams.erase( it, it );
+            }
+        }
+
         /* tell the chromecast to load the content */
         p_sys->p_renderer->InputUpdated( true, mime );
+    }
+
+    size_t i;
+    for (i = 0; i < p_sys->streams.size(); ++i)
+    {
+        if ( id == (sout_stream_id_sys_t*) p_sys->streams[i] )
+        {
+            id = p_sys->streams[i]->p_out;
+            break;
+        }
+    }
+    if ( unlikely(i == p_sys->streams.size()) )
+    {
+        msg_Err( p_stream, "unknown stream ID");
+        return VLC_EBADVAR;
     }
 
     return sout_StreamIdSend(p_sys->p_out, id, p_buffer);
@@ -383,6 +425,7 @@ static int Open(vlc_object_t *p_this)
     if (psz_var_mime == NULL)
         goto error;
 
+    /* check if we can open the proper sout */
     ss << "http{dst=:" << i_local_server_port << "/stream"
        << ",mux=" << psz_mux
        << ",access=http{mime=" << psz_var_mime << "}}";
@@ -395,13 +438,13 @@ static int Open(vlc_object_t *p_this)
 
     b_has_video = var_GetBool(p_stream, SOUT_CFG_PREFIX "video");
 
-    p_sys = new(std::nothrow) sout_stream_sys_t( p_renderer, p_sout, b_has_video, i_local_server_port,
+    p_sys = new(std::nothrow) sout_stream_sys_t( p_renderer, b_has_video, i_local_server_port,
                                                  psz_mux, psz_var_mime );
     if (unlikely(p_sys == NULL))
     {
         goto error;
     }
-    p_sys->sout = ss.str();
+    sout_StreamChainDelete( p_sout, p_sout );
 
     // Set the sout callbacks.
     p_stream->pf_add     = Add;
@@ -418,7 +461,6 @@ static int Open(vlc_object_t *p_this)
 
 error:
     delete p_renderer;
-    sout_StreamChainDelete(p_sout, p_sout);
     free(psz_ip);
     free(psz_mux);
     free(psz_var_mime);

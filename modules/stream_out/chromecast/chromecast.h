@@ -201,6 +201,7 @@ struct vlc_renderer_sys
         else
             title = "";
     }
+    std::string title;
 
     void setArtwork( const char *psz_artwork )
     {
@@ -237,7 +238,6 @@ private:
     bool        has_input;
 
     std::string GetMedia();
-    std::string title;
     std::string artwork;
     std::string mime;
 
