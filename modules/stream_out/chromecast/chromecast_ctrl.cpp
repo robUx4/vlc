@@ -289,7 +289,7 @@ void vlc_renderer_sys::InputUpdated( bool b_has_input, const std::string mime_ty
 
         std::stringstream sdemux;
         sdemux << "cc_demux{control="
-               << p_module
+               << this
                << '}';
         msg_Dbg( p_module, "force demux to %s", sdemux.str().c_str());
         var_SetString( p_module->p_libvlc, "demux-filter", sdemux.str().c_str() );
