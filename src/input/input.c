@@ -1207,6 +1207,10 @@ static int Init( input_thread_t * p_input )
         goto error;
 #endif
 
+    /* the sout may have modified the "demux-filter" */
+    char *psz_fwd_var = var_GetString( p_input->p_libvlc, "demux-filter" );
+    var_SetString( p_input, "demux-filter", psz_fwd_var );
+
     /* Create es out */
     p_input->p->p_es_out = input_EsOutTimeshiftNew( p_input, p_input->p->p_es_out_display, p_input->p->i_rate );
 

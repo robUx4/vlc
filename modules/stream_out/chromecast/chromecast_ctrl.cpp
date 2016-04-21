@@ -170,6 +170,11 @@ vlc_renderer_sys::vlc_renderer_sys(vlc_object_t * const p_this, int port, std::s
     vlc_cond_init(&loadCommandCond);
     vlc_cond_init(&seekCommandCond);
 
+    std::stringstream sdemux;
+    sdemux << "cc_demux{control=" << this << '}';
+    msg_Dbg( p_module, "force demux to %s", sdemux.str().c_str());
+    var_SetString( p_module->p_libvlc, "demux-filter", sdemux.str().c_str() );
+
     // Start the Chromecast event thread.
     if (vlc_clone(&chromecastThread, ChromecastThread, this,
                   VLC_THREAD_PRIORITY_LOW))
@@ -180,6 +185,7 @@ vlc_renderer_sys::vlc_renderer_sys(vlc_object_t * const p_this, int port, std::s
 
 vlc_renderer_sys::~vlc_renderer_sys()
 {
+    var_SetString( p_module->p_libvlc, "demux-filter", NULL );
     InputUpdated( false, "" );
 
     /* disconnect the current Chromecast */
@@ -260,8 +266,6 @@ void vlc_renderer_sys::InputUpdated( bool b_has_input, const std::string mime_ty
 
     if( this->has_input )
     {
-        var_SetString( p_module->p_libvlc, "demux-filter", NULL );
-
 #if 0 /* the Chromecast doesn't work well with consecutives calls if stopped between them */
         if ( receiverState != RECEIVER_IDLE )
             msgPlayerStop();
@@ -286,13 +290,6 @@ void vlc_renderer_sys::InputUpdated( bool b_has_input, const std::string mime_ty
             msg_Warn( p_module, "no Chromecast hook possible");
             return;
         }
-
-        std::stringstream sdemux;
-        sdemux << "cc_demux{control="
-               << this
-               << '}';
-        msg_Dbg( p_module, "force demux to %s", sdemux.str().c_str());
-        var_SetString( p_module->p_libvlc, "demux-filter", sdemux.str().c_str() );
 
         if ( receiverState == RECEIVER_IDLE )
         {
