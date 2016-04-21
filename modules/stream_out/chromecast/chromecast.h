@@ -124,12 +124,10 @@ struct vlc_renderer_sys
     bool seekTo(mtime_t pos);
 
     vlc_object_t  * const p_module;
-    bool           has_input;
     const int      i_port;
     std::string    serverIP;
     const int      i_target_port;
     std::string    targetIP;
-    std::string    mime;
     std::string    muxer;
 
     std::string appTransportId;
@@ -236,11 +234,12 @@ private:
     unsigned i_receiver_requestId;
     unsigned i_requestId;
 
-    bool       canRemux;
+    bool        has_input;
 
     std::string GetMedia();
     std::string title;
     std::string artwork;
+    std::string mime;
 
     vlc_cond_t   loadCommandCond;
     vlc_cond_t   seekCommandCond;
