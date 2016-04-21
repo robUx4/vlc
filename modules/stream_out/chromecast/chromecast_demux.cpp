@@ -143,7 +143,8 @@ struct demux_sys_t
             msg_Dbg(p_demux, "ready to demux");
         }
 
-        if (p_renderer->getConnectionStatus() != CHROMECAST_APP_STARTED) {
+        if (p_renderer->getConnectionStatus() != CHROMECAST_APP_STARTED)
+        {
             msg_Dbg(p_demux, "app not started:%d, don't demux", p_renderer->getConnectionStatus());
             vlc_mutex_unlock(&p_renderer->lock);
             return VLC_DEMUXER_EOF;

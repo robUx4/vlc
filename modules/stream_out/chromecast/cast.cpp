@@ -307,7 +307,7 @@ static int Send(sout_stream_t *p_stream, sout_stream_id_sys_t *id,
             p_sys->sout = ssout.str();
         }
 
-        /* FIXME tell the chromecast to load the content */
+        /* tell the chromecast to load the content */
         p_sys->p_renderer->InputUpdated( true, mime );
     }
 
