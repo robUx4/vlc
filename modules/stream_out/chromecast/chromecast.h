@@ -196,6 +196,22 @@ struct vlc_renderer_sys
         return cmd_status;
     }
 
+    void setTitle( const char *psz_title )
+    {
+        if ( psz_title )
+            title = psz_title;
+        else
+            title = "";
+    }
+
+    void setArtwork( const char *psz_artwork )
+    {
+        if ( psz_artwork )
+            artwork = psz_artwork;
+        else
+            artwork = "";
+    }
+
 private:
     int sendMessage(const castchannel::CastMessage &msg);
 
@@ -221,9 +237,10 @@ private:
     unsigned i_requestId;
 
     bool       canRemux;
-    bool       canDoDirect;
 
     std::string GetMedia();
+    std::string title;
+    std::string artwork;
 
     vlc_cond_t   loadCommandCond;
     vlc_cond_t   seekCommandCond;

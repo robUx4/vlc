@@ -853,45 +853,26 @@ void vlc_renderer_sys::msgPlayerGetStatus()
 std::string vlc_renderer_sys::GetMedia()
 {
     std::stringstream ss;
-    std::string       s_chromecast_url;
 
-    char *psz_uri = NULL;
-    input_item_t * p_item = NULL; // TODO get the name/artwork another way input_GetItem(p_input);
-    if ( p_item )
+    if ( title.size() )
     {
-        char *psz_name = input_item_GetTitleFbName( p_item );
         ss << "\"metadata\":{"
            << " \"metadataType\":0"
-           << ",\"title\":\"" << psz_name << "\"";
+           << ",\"title\":\"" << title << "\"";
 
-        char *psz_arturl = input_item_GetArtworkURL( p_item );
-        if ( psz_arturl && !strncmp(psz_arturl, "http", 4))
-            ss << ",\"images\":[\"" << psz_arturl << "\"]";
-        free( psz_arturl );
+        if ( artwork.size() && !strncmp(artwork.c_str(), "http", 4))
+            ss << ",\"images\":[\"" << artwork << "\"]";
 
         ss << "},";
-        free( psz_name );
-        psz_uri = input_item_GetURI(p_item);
     }
 
     std::stringstream chromecast_url;
-    if ( canDoDirect && canRemux && psz_uri != NULL)
-    {
-        chromecast_url << psz_uri;
-        msg_Dbg( p_module, "using direct URL: %s", psz_uri );
-    }
-    else
-    {
-        int i_port = var_InheritInteger( p_module, CONTROL_CFG_PREFIX "http-port");
-        chromecast_url << "http://" << serverIP << ":" << i_port << "/stream";
-    }
-    free( psz_uri );
+    int i_port = var_InheritInteger( p_module, CONTROL_CFG_PREFIX "http-port");
+    chromecast_url << "http://" << serverIP << ":" << i_port << "/stream";
 
-    s_chromecast_url = chromecast_url.str();
+    msg_Dbg( p_module, "s_chromecast_url: %s", chromecast_url.str().c_str());
 
-    msg_Dbg( p_module, "s_chromecast_url: %s", s_chromecast_url.c_str());
-
-    ss << "\"contentId\":\"" << s_chromecast_url << "\""
+    ss << "\"contentId\":\"" << chromecast_url.str() << "\""
        << ",\"streamType\":\"LIVE\""
        << ",\"contentType\":\"" << mime << "\"";
 
