@@ -260,7 +260,7 @@ void vlc_renderer_sys::InputUpdated( bool b_has_input, const std::string mime_ty
 
     if( this->has_input )
     {
-        var_SetString( p_module->p_parent, "demux-filter", NULL );
+        var_SetString( p_module->p_libvlc, "demux-filter", NULL );
 
 #if 0 /* the Chromecast doesn't work well with consecutives calls if stopped between them */
         if ( receiverState != RECEIVER_IDLE )
@@ -292,7 +292,7 @@ void vlc_renderer_sys::InputUpdated( bool b_has_input, const std::string mime_ty
                << p_module
                << '}';
         msg_Dbg( p_module, "force demux to %s", sdemux.str().c_str());
-        var_SetString( p_module->p_parent, "demux-filter", sdemux.str().c_str() );
+        var_SetString( p_module->p_libvlc, "demux-filter", sdemux.str().c_str() );
 
         if ( receiverState == RECEIVER_IDLE )
         {

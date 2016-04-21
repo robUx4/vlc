@@ -90,6 +90,8 @@ static int SoutChanged(vlc_object_t *, char const *,
 
 static int DemuxFilterChanged(vlc_object_t *, char const *,
                               vlc_value_t, vlc_value_t, void *);
+static int ForwardStringValueChanged(vlc_object_t *, char const *,
+                                 vlc_value_t, vlc_value_t, void *);
 
 /* TODO */
 //static void InputGetAttachments( input_thread_t *, input_source_t * );
@@ -1192,6 +1194,7 @@ static int Init( input_thread_t * p_input )
         msg_Dbg( p_input, "Input is a meta file: disabling unneeded options" );
         var_SetString( p_input, "sout", "" );
         var_SetBool( p_input, "sout-all", false );
+        var_SetString( p_input, "demux-filter", "" );
         var_SetString( p_input, "input-slave", "" );
         var_SetInteger( p_input, "input-repeat", 0 );
         var_SetString( p_input, "sub-file", "" );
@@ -1222,7 +1225,11 @@ static int Init( input_thread_t * p_input )
     while ( p_master_demux->p_source )
         p_master_demux = p_master_demux->p_source;
     var_AddCallback( p_input, "demux-filter", DemuxFilterChanged, p_master_demux );
-    var_AddCallback( p_input->p_libvlc, "sout", SoutChanged, p_input );
+    var_AddCallback( p_input, "sout", SoutChanged, p_input );
+
+    var_AddCallback( p_input->p_libvlc, "sout", ForwardStringValueChanged, p_input );
+    var_AddCallback( p_input->p_libvlc, "demux-filter", ForwardStringValueChanged, p_input );
+
 
     InitTitle( p_input );
 
@@ -1360,7 +1367,11 @@ static void End( input_thread_t * p_input )
     while ( p_master_demux->p_source )
         p_master_demux = p_master_demux->p_source;
     var_DelCallback( p_input, "demux-filter", DemuxFilterChanged, p_master_demux );
-    var_DelCallback( p_input->p_libvlc, "sout", SoutChanged, p_input );
+    var_DelCallback( p_input, "sout", SoutChanged, p_input );
+
+    var_DelCallback( p_input->p_libvlc, "demux-filter", ForwardStringValueChanged, p_input );
+    var_DelCallback( p_input->p_libvlc, "sout", ForwardStringValueChanged, p_input );
+
 
     /* Clean up master */
     InputSourceDestroy( p_input->p->master );
@@ -3021,13 +3032,30 @@ int SoutChanged( vlc_object_t *p_this, char const *psz_var,
     return VLC_SUCCESS;
 }
 
-int DemuxFilterChanged(vlc_object_t *p_this, char const *psz_var,
-                       vlc_value_t oldval, vlc_value_t val, void *p_data)
+
+int ForwardStringValueChanged( vlc_object_t *p_this, char const *psz_var,
+                               vlc_value_t oldval, vlc_value_t val, void *p_data )
+{
+    VLC_UNUSED(p_this);
+    vlc_object_t *p_target = (vlc_object_t *) p_data;
+    if ( oldval.psz_string != val.psz_string &&
+         ( oldval.psz_string == NULL || val.psz_string == NULL ||
+           strcmp( oldval.psz_string, val.psz_string ) ) )
+    {
+        var_SetString( p_target, psz_var, val.psz_string  );
+    }
+    return VLC_SUCCESS;
+}
+
+int DemuxFilterChanged( vlc_object_t *p_this, char const *psz_var,
+                        vlc_value_t oldval, vlc_value_t val, void *p_data )
 {
     VLC_UNUSED(psz_var);
     input_thread_t *p_input = (input_thread_t *) p_this;
     demux_t *p_main_demux = (demux_t *) p_data;
-    if ( strcmp( oldval.psz_string, val.psz_string ) )
+    if ( oldval.psz_string != val.psz_string &&
+         ( oldval.psz_string == NULL || val.psz_string == NULL ||
+           strcmp( oldval.psz_string, val.psz_string ) ) )
     {
         input_source_t *in = p_input->p->master;
         while (in->p_demux && in->p_demux != p_main_demux)
