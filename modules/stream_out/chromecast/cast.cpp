@@ -51,12 +51,16 @@ struct sout_stream_sys_t
         , i_port(port)
         , last_added_ts( VLC_TS_INVALID )
     {
+        vlc_mutex_init( &es_lock );
+        vlc_cond_init( &es_changed_cond );
     }
     
     ~sout_stream_sys_t()
     {
         sout_StreamChainDelete(p_out, p_out);
         delete p_renderer;
+        vlc_cond_destroy( &es_changed_cond );
+        vlc_mutex_destroy( &es_lock );
     }
 
     bool isFinishedPlaying() const {
@@ -76,6 +80,10 @@ struct sout_stream_sys_t
     const bool b_has_video;
     const int i_port;
 
+    int WaitEsReady( sout_stream_t * );
+
+    vlc_mutex_t                        es_lock;
+    vlc_cond_t                         es_changed_cond;
     mtime_t                            last_added_ts;
     std::vector<sout_stream_id_sys_t*> streams;
 };
@@ -160,8 +168,11 @@ static sout_stream_id_sys_t *Add(sout_stream_t *p_stream, const es_format_t *p_f
     {
         es_format_Copy( &p_sys_id->fmt, p_fmt );
         p_sys_id->p_out = NULL;
+
+        vlc_mutex_locker locker( &p_sys->es_lock );
         p_sys->streams.push_back( p_sys_id );
         p_sys->last_added_ts = mdate();
+        vlc_cond_signal( &p_sys->es_changed_cond );
     }
     return p_sys_id;
 }
@@ -171,6 +182,7 @@ static void Del(sout_stream_t *p_stream, sout_stream_id_sys_t *id)
 {
     sout_stream_sys_t *p_sys = p_stream->p_sys;
 
+    vlc_mutex_locker locker( &p_sys->es_lock );
     for (size_t i=0; i<p_sys->streams.size(); i++)
     {
         if ( p_sys->streams[i] == id )
@@ -182,6 +194,7 @@ static void Del(sout_stream_t *p_stream, sout_stream_id_sys_t *id)
             free( p_sys->streams[i] );
             p_sys->streams.erase( p_sys->streams.begin() +  i );
             p_sys->last_added_ts = mdate();
+            vlc_cond_signal( &p_sys->es_changed_cond );
             break;
         }
     }
@@ -219,30 +232,31 @@ bool sout_stream_sys_t::canDecodeAudio( const es_format_t *p_es ) const
     return false;
 }
 
-static int Send(sout_stream_t *p_stream, sout_stream_id_sys_t *id,
-                block_t *p_buffer)
+int sout_stream_sys_t::WaitEsReady( sout_stream_t *p_stream )
 {
-    sout_stream_sys_t *p_sys = p_stream->p_sys;
+    assert( p_stream->p_sys == this );
 
-    if ( p_sys->last_added_ts != VLC_TS_INVALID )
+    if ( last_added_ts != VLC_TS_INVALID )
     {
-        while ( p_sys->last_added_ts + MAX_WAIT_BETWEEN_ADD < mdate() )
+        while ( last_added_ts + MAX_WAIT_BETWEEN_ADD < mdate() )
         {
-            // wait for new ES expired
-            msleep( MAX_WAIT_BETWEEN_ADD );
+            // wait for adding/removing ES expired
+            mutex_cleanup_push( &es_lock );
+            vlc_cond_timedwait( &es_changed_cond, &es_lock, last_added_ts + MAX_WAIT_BETWEEN_ADD );
+            vlc_cleanup_pop();
         }
-        p_sys->last_added_ts = VLC_TS_INVALID;
-        msg_Dbg( p_stream, "prepare new sub-sout for %s", p_sys->p_renderer->title.c_str() );
+        last_added_ts = VLC_TS_INVALID;
+        msg_Dbg( p_stream, "prepare new sub-sout for %s", p_renderer->title.c_str() );
 
         bool canRemux = true;
         vlc_fourcc_t i_codec_video = 0, i_codec_audio = 0;
 
-        for (std::vector<sout_stream_id_sys_t*>::iterator it = p_sys->streams.begin(); it != p_sys->streams.end(); ++it)
+        for (std::vector<sout_stream_id_sys_t*>::iterator it = streams.begin(); it != streams.end(); ++it)
         {
             const es_format_t *p_es = &(*it)->fmt;
             if (p_es->i_cat == AUDIO_ES)
             {
-                if (!p_sys->canDecodeAudio( p_es ))
+                if (!canDecodeAudio( p_es ))
                 {
                     msg_Dbg( p_stream, "can't remux audio track %d codec %4.4s", p_es->i_id, (const char*)&p_es->i_codec );
                     canRemux = false;
@@ -250,9 +264,9 @@ static int Send(sout_stream_t *p_stream, sout_stream_id_sys_t *id,
                 else if (i_codec_audio == 0)
                     i_codec_audio = p_es->i_codec;
             }
-            else if (p_sys->b_has_video && p_es->i_cat == VIDEO_ES)
+            else if (b_has_video && p_es->i_cat == VIDEO_ES)
             {
-                if (!p_sys->canDecodeVideo( p_es ))
+                if (!canDecodeVideo( p_es ))
                 {
                     msg_Dbg( p_stream, "can't remux video track %d codec %4.4s", p_es->i_id, (const char*)&p_es->i_codec );
                     canRemux = false;
@@ -284,7 +298,7 @@ static int Send(sout_stream_t *p_stream, sout_stream_id_sys_t *id,
             vlc_fourcc_to_char( i_codec_audio, s_fourcc );
             s_fourcc[4] = '\0';
             ssout << s_fourcc;
-            if ( p_sys->b_has_video )
+            if ( b_has_video )
             {
                 /* TODO: provide maxwidth,maxheight */
                 ssout << ",vcodec=";
@@ -295,47 +309,63 @@ static int Send(sout_stream_t *p_stream, sout_stream_id_sys_t *id,
             ssout << "}:";
         }
         std::string mime;
-        if ( !p_sys->b_has_video )
+        if ( !b_has_video )
             mime = "audio/x-matroska";
         else if (i_codec_audio == VLC_CODEC_VORBIS && i_codec_video == VLC_CODEC_VP8 )
             mime = "video/webm";
         else
-            mime = p_sys->default_mime;
+            mime = default_mime;
 
-        ssout << "http{dst=:" << p_sys->i_port << "/stream"
-              << ",mux=" << p_sys->default_muxer
+        ssout << "http{dst=:" << i_port << "/stream"
+              << ",mux=" << default_muxer
               << ",access=http{mime=" << mime << "}}";
 
-        if ( p_sys->sout != ssout.str() )
+        if ( sout != ssout.str() )
         {
-            if ( unlikely( p_sys->p_out != NULL ) )
+            if ( unlikely( p_out != NULL ) )
             {
-                sout_StreamChainDelete( p_sys->p_out, p_sys->p_out );
-                p_sys->sout = "";
+                sout_StreamChainDelete( p_out, p_out );
+                sout = "";
             }
 
-            p_sys->p_out = sout_StreamChainNew( p_stream->p_sout, ssout.str().c_str(), NULL, NULL);
-            if (p_sys->p_out == NULL) {
+            p_out = sout_StreamChainNew( p_stream->p_sout, ssout.str().c_str(), NULL, NULL);
+            if (p_out == NULL) {
                 msg_Dbg(p_stream, "could not create sout chain:%s", ssout.str().c_str());
                 return VLC_EGENERIC;
             }
-            p_sys->sout = ssout.str();
+            sout = ssout.str();
         }
 
         /* check the streams we can actually add */
-        for (std::vector<sout_stream_id_sys_t*>::iterator it = p_sys->streams.begin(); it != p_sys->streams.end(); ++it)
+        for (std::vector<sout_stream_id_sys_t*>::iterator it = streams.begin(); it != streams.end(); ++it)
         {
             sout_stream_id_sys_t *p_sys_id = *it;
-            p_sys_id->p_out = sout_StreamIdAdd( p_sys->p_out, &p_sys_id->fmt );
+            p_sys_id->p_out = sout_StreamIdAdd( p_out, &p_sys_id->fmt );
             if ( p_sys_id->p_out == NULL )
             {
                 msg_Err( p_stream, "can't handle a stream" );
-                p_sys->streams.erase( it, it );
+                streams.erase( it, it );
             }
         }
 
         /* tell the chromecast to load the content */
-        p_sys->p_renderer->InputUpdated( true, mime );
+        p_renderer->InputUpdated( true, mime );
+    }
+
+    return VLC_SUCCESS;
+}
+
+static int Send( sout_stream_t *p_stream, sout_stream_id_sys_t *id,
+                 block_t *p_buffer )
+{
+    sout_stream_sys_t *p_sys = p_stream->p_sys;
+
+    vlc_mutex_lock( &p_sys->es_lock );
+    int err = p_sys->WaitEsReady( p_stream );
+    if ( err != VLC_SUCCESS )
+    {
+        vlc_mutex_unlock( &p_sys->es_lock );
+        return err;
     }
 
     size_t i;
@@ -350,8 +380,10 @@ static int Send(sout_stream_t *p_stream, sout_stream_id_sys_t *id,
     if ( unlikely(i == p_sys->streams.size()) )
     {
         msg_Err( p_stream, "unknown stream ID");
+        vlc_mutex_unlock( &p_sys->es_lock );
         return VLC_EBADVAR;
     }
+    vlc_mutex_unlock( &p_sys->es_lock );
 
     return sout_StreamIdSend(p_sys->p_out, id, p_buffer);
 }
@@ -359,6 +391,31 @@ static int Send(sout_stream_t *p_stream, sout_stream_id_sys_t *id,
 static void Flush( sout_stream_t *p_stream, sout_stream_id_sys_t *id )
 {
     sout_stream_sys_t *p_sys = p_stream->p_sys;
+
+    vlc_mutex_lock( &p_sys->es_lock );
+    int err = p_sys->WaitEsReady( p_stream );
+    if ( err != VLC_SUCCESS )
+    {
+        vlc_mutex_unlock( &p_sys->es_lock );
+        return;
+    }
+
+    size_t i;
+    for (i = 0; i < p_sys->streams.size(); ++i)
+    {
+        if ( id == (sout_stream_id_sys_t*) p_sys->streams[i] )
+        {
+            id = p_sys->streams[i]->p_out;
+            break;
+        }
+    }
+    if ( unlikely(i == p_sys->streams.size()) )
+    {
+        msg_Err( p_stream, "unknown stream ID");
+        vlc_mutex_unlock( &p_sys->es_lock );
+        return;
+    }
+    vlc_mutex_unlock( &p_sys->es_lock );
 
     sout_StreamFlush( p_sys->p_out, id );
 }
