@@ -168,3 +168,54 @@ void vlc_renderer_sys::msgPlayerSeek(const std::string & timestamp)
 
     pushMediaPlayerMessage( ss );
 }
+
+void vlc_renderer_sys::setInputState(input_state_e state)
+{
+    input_state = state;
+    msg_Dbg( p_module, "new %d state for %s", state, title.c_str() );
+    switch( input_state )
+    {
+        case PLAYING_S:
+            if ( !mediaSessionId.empty() && receiverState != RECEIVER_IDLE )
+            {
+                msgPlayerPlay();
+                setPlayerStatus(CMD_PLAYBACK_SENT);
+            }
+            break;
+        case PAUSE_S:
+            if ( !mediaSessionId.empty() && receiverState != RECEIVER_IDLE )
+            {
+                msgPlayerPause();
+                setPlayerStatus(CMD_PLAYBACK_SENT);
+            }
+            break;
+        default:
+            break;
+    }
+}
+
+void vlc_renderer_sys::msgPlayerPlay()
+{
+    assert(!mediaSessionId.empty());
+
+    std::stringstream ss;
+    ss << "{\"type\":\"PLAY\","
+       <<  "\"mediaSessionId\":" << mediaSessionId << ","
+       <<  "\"requestId\":" << i_requestId++
+       << "}";
+
+    pushMediaPlayerMessage( ss );
+}
+
+void vlc_renderer_sys::msgPlayerPause()
+{
+    assert(!mediaSessionId.empty());
+
+    std::stringstream ss;
+    ss << "{\"type\":\"PAUSE\","
+       <<  "\"mediaSessionId\":" << mediaSessionId << ","
+       <<  "\"requestId\":" << i_requestId++
+       << "}";
+
+    pushMediaPlayerMessage( ss );
+}

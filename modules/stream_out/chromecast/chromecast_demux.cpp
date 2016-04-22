@@ -78,10 +78,15 @@ struct demux_sys_t
             p_renderer->setArtwork( psz_title );
             free( psz_title );
         }
+
+        p_renderer->setInputState( (input_state_e) var_GetInteger( p_demux->p_input, "state" ) );
+        var_AddCallback( p_demux->p_input, "intf-event", InputEvent, this );
     }
 
     ~demux_sys_t()
     {
+        var_DelCallback( p_demux->p_input, "intf-event", InputEvent, this );
+
         p_renderer->setTitle( NULL );
         p_renderer->setArtwork( NULL );
     }
@@ -197,6 +202,9 @@ private:
         va_end(ap);
         return ret;
     }
+
+    static int InputEvent( vlc_object_t *p_this, char const *psz_var,
+                           vlc_value_t oldval, vlc_value_t val, void *p_data );
 };
 
 static int DemuxDemux( demux_t *p_demux )
@@ -292,6 +300,21 @@ static int DemuxControl( demux_t *p_demux, int i_query, va_list args)
     }
 
     return p_demux->p_source->pf_control( p_demux->p_source, i_query, args );
+}
+
+int demux_sys_t::InputEvent( vlc_object_t *p_this, char const *psz_var,
+                             vlc_value_t oldval, vlc_value_t val, void *p_data )
+{
+    VLC_UNUSED(psz_var);
+    VLC_UNUSED(oldval);
+    input_thread_t *p_input = reinterpret_cast<input_thread_t*>( p_this );
+    demux_sys_t *p_sys = reinterpret_cast<demux_sys_t*>( p_data );
+
+    assert( p_input == p_input );
+    if( val.i_int == INPUT_EVENT_STATE )
+        p_sys->p_renderer->setInputState( (input_state_e) var_GetInteger( p_input, "state" ) );
+
+    return VLC_SUCCESS;
 }
 
 int DemuxOpen(vlc_object_t *p_this)

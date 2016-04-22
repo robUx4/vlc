@@ -33,6 +33,7 @@
 #include <vlc_interface.h>
 #include <vlc_plugin.h>
 #include <vlc_tls.h>
+#include <vlc_input.h>
 
 #include <sstream>
 
@@ -191,6 +192,8 @@ struct vlc_renderer_sys
         return cmd_status;
     }
 
+    void setInputState(input_state_e state);
+
     void setTitle( const char *psz_title )
     {
         if ( psz_title )
@@ -232,7 +235,8 @@ private:
     unsigned i_receiver_requestId;
     unsigned i_requestId;
 
-    bool        has_input;
+    bool           has_input;
+    input_state_e  input_state;
 
     std::string GetMedia();
     std::string artwork;

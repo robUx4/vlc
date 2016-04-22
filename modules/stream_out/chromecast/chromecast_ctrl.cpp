@@ -84,6 +84,7 @@ vlc_renderer_sys::vlc_renderer_sys(vlc_object_t * const p_this, int port, std::s
  , i_receiver_requestId(0)
  , i_requestId(0)
  , has_input(false)
+ , input_state( INIT_S )
  , m_time_playback_started( -1 )
  , i_ts_local_start( VLC_TS_INVALID )
  , m_chromecast_start_time( -1 )
@@ -772,38 +773,12 @@ void vlc_renderer_sys::msgPlayerLoad()
     pushMediaPlayerMessage( ss );
 }
 
-void vlc_renderer_sys::msgPlayerPlay()
-{
-    assert(!mediaSessionId.empty());
-
-    std::stringstream ss;
-    ss << "{\"type\":\"PLAY\","
-       <<  "\"mediaSessionId\":" << mediaSessionId << ","
-       <<  "\"requestId\":" << i_requestId++
-       << "}";
-
-    pushMediaPlayerMessage( ss );
-}
-
 void vlc_renderer_sys::msgPlayerStop()
 {
     assert(!mediaSessionId.empty());
 
     std::stringstream ss;
     ss << "{\"type\":\"STOP\","
-       <<  "\"mediaSessionId\":" << mediaSessionId << ","
-       <<  "\"requestId\":" << i_requestId++
-       << "}";
-
-    pushMediaPlayerMessage( ss );
-}
-
-void vlc_renderer_sys::msgPlayerPause()
-{
-    assert(!mediaSessionId.empty());
-
-    std::stringstream ss;
-    ss << "{\"type\":\"PAUSE\","
        <<  "\"mediaSessionId\":" << mediaSessionId << ","
        <<  "\"requestId\":" << i_requestId++
        << "}";
