@@ -132,6 +132,21 @@ int vlc_memfd (void)
     return fd;
 }
 
+int vlc_close (int fd)
+{
+#ifdef POSIX_CLOSE_RESTART
+    return posix_close (fd, 0);
+#else
+    int ret = close (fd);
+    /* POSIX.2008 (and earlier) does not specify if the file descriptor is
+     * closed on failure. Assume it is as on Linux and most other common OSes.
+     * Also emulate the correct error code as per newer POSIX versions. */
+    if (unlikely(ret != 0) && unlikely(errno == EINTR))
+        errno = EINPROGRESS;
+    return ret;
+#endif
+}
+
 int vlc_mkdir (const char *dirname, mode_t mode)
 {
     return mkdir (dirname, mode);

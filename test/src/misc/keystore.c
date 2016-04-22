@@ -31,6 +31,7 @@
 #include <vlc_keystore.h>
 #include <vlc_dialog.h>
 #include <vlc_url.h>
+#include <vlc_fs.h>
 
 #undef NDEBUG
 #include <assert.h>
@@ -305,7 +306,7 @@ main(void)
     printf("creating tmp plaintext keystore file\n");
     char psz_tmp_path[] = "/tmp/libvlc_XXXXXX";
     int i_tmp_fd = -1;
-    i_tmp_fd = mkstemp(psz_tmp_path);
+    i_tmp_fd = vlc_mkstemp(psz_tmp_path);
     assert(i_tmp_fd != -1);
 
     int i_vlc_argc = 4;
@@ -330,7 +331,7 @@ main(void)
     }
 
     libvlc_release(p_libvlc);
-    close(i_tmp_fd);
+    vlc_close(i_tmp_fd);
 
     return 0;
 }
