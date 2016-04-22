@@ -819,6 +819,9 @@ static int InitSout( input_thread_t * p_input )
     char *psz = var_GetNonEmptyString( p_input, "sout" );
     if( psz && strncasecmp( p_input->p->p_item->psz_uri, "vlc:", 4 ) )
     {
+        /* push the old sout for possible reuse */
+        if ( p_input->p->p_sout )
+            input_resource_RequestSout( p_input->p->p_resource, p_input->p->p_sout, NULL );
         p_input->p->p_sout  = input_resource_RequestSout( p_input->p->p_resource, NULL, psz );
         if( !p_input->p->p_sout )
         {
