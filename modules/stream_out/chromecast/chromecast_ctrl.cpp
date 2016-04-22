@@ -72,7 +72,6 @@ static void *ChromecastThread(void *data);
  *****************************************************************************/
 vlc_renderer_sys::vlc_renderer_sys(vlc_object_t * const p_this, int port, std::string device_addr, int device_port)
  : p_module( p_this )
- , has_input(false)
  , i_port(port)
  , i_target_port(device_port)
  , targetIP(device_addr)
@@ -84,6 +83,7 @@ vlc_renderer_sys::vlc_renderer_sys(vlc_object_t * const p_this, int port, std::s
  , cmd_status(NO_CMD_PENDING)
  , i_receiver_requestId(0)
  , i_requestId(0)
+ , has_input(false)
  , m_time_playback_started( -1 )
  , i_ts_local_start( VLC_TS_INVALID )
  , m_chromecast_start_time( -1 )
