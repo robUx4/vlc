@@ -81,6 +81,14 @@ static input_source_t *InputSourceNew( input_thread_t *, const char *,
                                        bool b_in_can_fail );
 static void InputSourceDestroy( input_source_t * );
 static void InputSourceMeta( input_thread_t *, input_source_t *, vlc_meta_t * );
+#ifdef ENABLE_SOUT
+static int InitSout( input_thread_t * p_input );
+#endif
+static int SoutChanged(vlc_object_t *, char const *,
+                              vlc_value_t, vlc_value_t, void *);
+
+static int ForwardStringValueChanged(vlc_object_t *, char const *,
+                                 vlc_value_t, vlc_value_t, void *);
 
 /* TODO */
 //static void InputGetAttachments( input_thread_t *, input_source_t * );
@@ -400,6 +408,7 @@ static input_thread_t *Create( vlc_object_t *p_parent, input_item_t *p_item,
 
     /* Create Objects variables for public Get and Set */
     input_ControlVarInit( p_input );
+    atomic_init( &p_input->p->b_restart_output, false );
 
     /* */
     if( !p_input->b_preparsing )
@@ -681,6 +690,36 @@ static void MainLoop( input_thread_t *p_input, bool b_interactive )
     {
         mtime_t i_wakeup = -1;
         bool b_paused = p_input->p->i_state == PAUSE_S;
+
+        if ( atomic_load( &p_input->p->b_restart_output ) )
+        {
+            atomic_store( &p_input->p->b_restart_output, false );
+
+            double f_restart_position;
+            input_Control( p_input, INPUT_GET_POSITION, &f_restart_position );
+
+#ifdef ENABLE_SOUT
+            if( InitSout( p_input ) )
+                break; /* TODO */
+#endif
+
+            es_out_Control( p_input->p->p_es_out, ES_OUT_RESTART_ES, NULL );
+
+            if ( p_input->p->p_sout == NULL )
+                input_resource_TerminateSout( p_input->p->p_resource );
+
+            if( !p_input->b_preparsing && p_input->p->p_sout )
+            {
+                p_input->p->b_out_pace_control = (p_input->p->p_sout->i_out_pace_nocontrol > 0);
+
+                msg_Dbg( p_input, "starting in %s mode",
+                         p_input->p->b_out_pace_control ? "async" : "sync" );
+            }
+
+            if ( f_restart_position != -1.0 )
+                input_Control( p_input, INPUT_SET_POSITION, f_restart_position);
+        }
+
         /* FIXME if p_input->p->i_state == PAUSE_S the access/access_demux
          * is paused -> this may cause problem with some of them
          * The same problem can be seen when seeking while paused */
@@ -1178,6 +1217,10 @@ static int Init( input_thread_t * p_input )
         goto error;
     p_input->p->master = master;
 
+    var_AddCallback( p_input, "sout", SoutChanged, p_input );
+
+    var_AddCallback( p_input->p_libvlc, "sout", ForwardStringValueChanged, p_input );
+
     InitTitle( p_input );
 
     /* Load master infos */
@@ -1309,6 +1352,10 @@ static void End( input_thread_t * p_input )
     for( int i = 0; i < p_input->p->i_slave; i++ )
         InputSourceDestroy( p_input->p->slave[i] );
     free( p_input->p->slave );
+
+    var_DelCallback( p_input, "sout", SoutChanged, p_input );
+
+    var_DelCallback( p_input->p_libvlc, "sout", ForwardStringValueChanged, p_input );
 
     /* Clean up master */
     InputSourceDestroy( p_input->p->master );
@@ -2920,4 +2967,36 @@ char *input_CreateFilename( input_thread_t *input, const char *psz_path, const c
         path_sanitize( psz_file );
         return psz_file;
     }
+}
+
+int SoutChanged( vlc_object_t *p_this, char const *psz_var,
+                 vlc_value_t oldval, vlc_value_t val, void *p_data )
+{
+    VLC_UNUSED(p_data);
+#ifdef ENABLE_SOUT
+    VLC_UNUSED(psz_var);
+    if ( oldval.psz_string != val.psz_string &&
+         ( oldval.psz_string == NULL || val.psz_string == NULL ||
+           strcmp( oldval.psz_string, val.psz_string ) ) )
+    {
+        input_thread_t *p_input = (input_thread_t *) p_this;
+        atomic_store( &p_input->p->b_restart_output, true );
+    }
+#endif
+    return VLC_SUCCESS;
+}
+
+
+int ForwardStringValueChanged( vlc_object_t *p_this, char const *psz_var,
+                               vlc_value_t oldval, vlc_value_t val, void *p_data )
+{
+    VLC_UNUSED(p_this);
+    vlc_object_t *p_target = (vlc_object_t *) p_data;
+    if ( oldval.psz_string != val.psz_string &&
+         ( oldval.psz_string == NULL || val.psz_string == NULL ||
+           strcmp( oldval.psz_string, val.psz_string ) ) )
+    {
+        var_SetString( p_target, psz_var, val.psz_string  );
+    }
+    return VLC_SUCCESS;
 }
