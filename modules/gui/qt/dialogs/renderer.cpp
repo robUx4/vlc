@@ -51,6 +51,8 @@ public:
         vlc_renderer_item_release(m_obj);
     }
 
+    bool isItemSout( const char *psz_sout, bool as_output ) const;
+
 protected:
     vlc_renderer_item* m_obj;
 
@@ -138,7 +140,7 @@ void RendererDialog::setVisible(bool visible)
                 for ( row = 0 ; row < ui.receiversListWidget->count(); row++ )
                 {
                     RendererItem *rowItem = reinterpret_cast<RendererItem*>( ui.receiversListWidget->item( row ) );
-                    if ( isItemSout( psz_renderer, rowItem->m_obj ) )
+                    if ( rowItem->isItemSout( psz_renderer, false ) )
                         break;
                 }
                 if ( row == ui.receiversListWidget->count() )
@@ -176,6 +178,7 @@ void RendererDialog::setVisible(bool visible)
                 b_rd_started = false;
             }
         }
+        ui.receiversListWidget->clear();
     }
 }
 
@@ -204,7 +207,7 @@ void RendererDialog::discoveryEventReceived( const vlc_event_t * p_event )
         for ( ; row < ui.receiversListWidget->count(); row++ )
         {
             RendererItem *rowItem = reinterpret_cast<RendererItem*>( ui.receiversListWidget->item( row ) );
-            if ( isItemSout( vlc_renderer_item_sout( p_item ), rowItem->m_obj ) )
+            if ( rowItem->isItemSout( vlc_renderer_item_sout( p_item ), false ) )
                 return;
         }
 
@@ -214,7 +217,7 @@ void RendererDialog::discoveryEventReceived( const vlc_event_t * p_event )
         char *psz_renderer = var_InheritString( THEPL->p_libvlc, "sout" );
         if ( psz_renderer != NULL )
         {
-            if ( isItemSout( psz_renderer, p_item ) )
+            if ( newItem->isItemSout( psz_renderer, true ) )
                 ui.receiversListWidget->setCurrentItem( newItem );
             free( psz_renderer );
         }
@@ -236,15 +239,20 @@ void RendererDialog::setSout( const vlc_renderer_item *p_item )
     var_SetString( THEPL->p_libvlc, "sout", s_sout.str().c_str() );
 }
 
-bool RendererDialog::isItemSout( const char *psz_sout, const vlc_renderer_item *p_item )
+bool RendererItem::isItemSout( const char *psz_sout, bool as_output ) const
 {
     std::stringstream s_sout;
-    const char *psz_out = NULL;
-    if ( p_item )
+    if ( psz_sout == NULL )
+        psz_sout = "";
+    if ( m_obj )
     {
-        psz_out = vlc_renderer_item_sout( p_item );
-        if ( psz_out )
-            s_sout << '#' << psz_out;
+        const char *psz_out = vlc_renderer_item_sout( m_obj );
+        if ( likely( psz_out != NULL ) )
+        {
+            if ( as_output )
+                s_sout << '#';
+            s_sout << psz_out;
+        }
     }
     return s_sout.str() == psz_sout;
 }

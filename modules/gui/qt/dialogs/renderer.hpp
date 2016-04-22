@@ -57,7 +57,7 @@ private:
     bool                  b_rd_started;
     void                  setSout( const vlc_renderer_item *p_item );
 
-    static bool           isItemSout( const char *psz_sout, const vlc_renderer_item *p_item );
+    static bool           isItemSout( const char *psz_sout, const vlc_renderer_item *p_item, bool as_output );
     static void           renderer_event_received( const vlc_event_t * p_event, void * user_data );
 };
 
