@@ -67,83 +67,6 @@ static const std::string NAMESPACE_RECEIVER         = "urn:x-cast:com.google.cas
  *****************************************************************************/
 static void *ChromecastThread(void *data);
 
-#ifdef MODULE_NAME_IS_chromecast
-static int Open(vlc_object_t *);
-static void Close(vlc_object_t *);
-
-static int SetInput(vlc_renderer *p_renderer, input_thread_t *p_input);
-
-static int MuteChanged( vlc_object_t *, char const *,
-                          vlc_value_t, vlc_value_t, void * );
-static int VolumeChanged( vlc_object_t *, char const *,
-                          vlc_value_t, vlc_value_t, void * );
-
-/*****************************************************************************
- * Module descriptor
- *****************************************************************************/
-
-#define HTTP_PORT_TEXT N_("HTTP port")
-#define HTTP_PORT_LONGTEXT N_("This sets the HTTP port of the server " \
-                              "used to stream the media to the Chromecast.")
-#define MUXER_TEXT N_("Muxer")
-#define MUXER_LONGTEXT N_("This sets the muxer used to stream to the Chromecast.")
-#define MIME_TEXT N_("MIME content type")
-#define MIME_LONGTEXT N_("This sets the media MIME content type sent to the Chromecast.")
-
-vlc_module_begin ()
-    set_shortname( N_("Chromecast") )
-    set_category(CAT_ADVANCED)
-    set_subcategory(SUBCAT_ADVANCED_RENDERER)
-    set_description( N_("Chromecast renderer") )
-    set_capability( "renderer", 0 )
-    add_shortcut("chromecast")
-    add_integer(CONTROL_CFG_PREFIX "http-port", HTTP_PORT, HTTP_PORT_TEXT, HTTP_PORT_LONGTEXT, false)
-    add_string(CONTROL_CFG_PREFIX "mime", "video/x-matroska", MIME_TEXT, MIME_LONGTEXT, false)
-    add_string(CONTROL_CFG_PREFIX "mux", "avformat{mux=matroska}", MUXER_TEXT, MUXER_LONGTEXT, false)
-    set_callbacks( Open, Close )
-
-vlc_module_end ()
-
-/*****************************************************************************
- * Open: connect to the Chromecast and initialize the demux-filter
- *****************************************************************************/
-int Open(vlc_object_t *p_module)
-{
-    vlc_renderer *p_renderer = reinterpret_cast<vlc_renderer*>(p_module);
-    vlc_renderer_sys *p_sys = new(std::nothrow) vlc_renderer_sys( p_module,
-                                                                  var_InheritInteger( p_module, CONTROL_CFG_PREFIX "http-port") );
-    if (unlikely(p_sys == NULL))
-        return VLC_ENOMEM;
-    p_renderer->p_sys = p_sys;
-
-    p_renderer->pf_set_input = SetInput;
-
-    var_AddCallback( p_module->p_parent, "mute",   MuteChanged,   p_renderer );
-    var_AddCallback( p_module->p_parent, "volume", VolumeChanged, p_renderer );
-
-    return VLC_SUCCESS;
-
-error:
-    delete p_sys;
-    return VLC_EGENERIC;
-}
-
-
-/*****************************************************************************
- * Close: destroy interface
- *****************************************************************************/
-void Close(vlc_object_t *p_module)
-{
-    vlc_renderer *p_renderer = reinterpret_cast<vlc_renderer*>(p_module);
-    vlc_renderer_sys *p_sys = p_renderer->p_sys;
-
-    var_DelCallback( p_module->p_parent, "mute",   MuteChanged,   p_renderer );
-    var_DelCallback( p_module->p_parent, "volume", VolumeChanged, p_renderer );
-
-    delete p_sys;
-}
-#endif
-
 /*****************************************************************************
  * vlc_renderer_sys: class definition
  *****************************************************************************/
@@ -218,45 +141,6 @@ vlc_renderer_sys::~vlc_renderer_sys()
     vlc_cond_destroy(&loadCommandCond);
     vlc_mutex_destroy(&lock);
 }
-
-#ifdef MODULE_NAME_IS_chromecast
-static int MuteChanged( vlc_object_t *p_this, char const *psz_var,
-                          vlc_value_t oldval, vlc_value_t val, void *p_data )
-{
-    VLC_UNUSED( p_this );
-    VLC_UNUSED( psz_var );
-    VLC_UNUSED( oldval );
-    vlc_renderer *p_renderer = reinterpret_cast<vlc_renderer*>(p_data);
-    vlc_renderer_sys *p_sys = p_renderer->p_sys;
-
-    if (!p_sys->mediaSessionId.empty())
-        p_sys->msgPlayerSetMute( val.b_bool );
-
-    return VLC_SUCCESS;
-}
-
-static int VolumeChanged( vlc_object_t *p_this, char const *psz_var,
-                          vlc_value_t oldval, vlc_value_t val, void *p_data )
-{
-    VLC_UNUSED( p_this );
-    VLC_UNUSED( psz_var );
-    VLC_UNUSED( oldval );
-    vlc_renderer *p_renderer = reinterpret_cast<vlc_renderer*>(p_data);
-    vlc_renderer_sys *p_sys = p_renderer->p_sys;
-
-    if ( !p_sys->mediaSessionId.empty() )
-        p_sys->msgPlayerSetVolume( val.f_float );
-
-    return VLC_SUCCESS;
-}
-
-static int SetInput(vlc_renderer *p_renderer, input_thread_t *p_input)
-{
-    vlc_renderer_sys *p_sys = p_renderer->p_sys;
-    p_sys->InputUpdated( p_input != NULL );
-    return VLC_SUCCESS;
-}
-#endif
 
 void vlc_renderer_sys::InputUpdated( bool b_has_input, const std::string mime_type )
 {

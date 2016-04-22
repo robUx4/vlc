@@ -32,9 +32,6 @@
 #include <vlc_common.h>
 #include <vlc_interface.h>
 #include <vlc_plugin.h>
-#ifdef MODULE_NAME_IS_chromecast
-#include <vlc_renderer.h>
-#endif
 #include <vlc_tls.h>
 
 #include <sstream>
