@@ -3023,13 +3023,14 @@ char *input_CreateFilename( input_thread_t *input, const char *psz_path, const c
 int SoutChanged( vlc_object_t *p_this, char const *psz_var,
                  vlc_value_t oldval, vlc_value_t val, void *p_data )
 {
-    VLC_UNUSED(p_this);
+    VLC_UNUSED(p_data);
 #ifdef ENABLE_SOUT
     VLC_UNUSED(psz_var);
-    input_thread_t *p_input = (input_thread_t *) p_data;
-    if ( strcmp( oldval.psz_string, val.psz_string ) )
+    if ( oldval.psz_string != val.psz_string &&
+         ( oldval.psz_string == NULL || val.psz_string == NULL ||
+           strcmp( oldval.psz_string, val.psz_string ) ) )
     {
-        var_SetString( p_input, "sout", val.psz_string );
+        input_thread_t *p_input = (input_thread_t *) p_this;
         atomic_store( &p_input->p->b_restart_output, true );
     }
 #endif
