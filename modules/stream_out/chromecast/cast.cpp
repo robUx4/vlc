@@ -80,12 +80,15 @@ struct sout_stream_sys_t
     const bool b_has_video;
     const int i_port;
 
-    int WaitEsReady( sout_stream_t * );
+    sout_stream_id_sys_t *GetSubId( sout_stream_t*, sout_stream_id_sys_t* );
 
     vlc_mutex_t                        es_lock;
     vlc_cond_t                         es_changed_cond;
     mtime_t                            last_added_ts;
     std::vector<sout_stream_id_sys_t*> streams;
+
+    int WaitEsReady( sout_stream_t * );
+private:
 };
 
 #define SOUT_CFG_PREFIX "sout-chromecast-"
@@ -355,6 +358,32 @@ int sout_stream_sys_t::WaitEsReady( sout_stream_t *p_stream )
     return VLC_SUCCESS;
 }
 
+sout_stream_id_sys_t *sout_stream_sys_t::GetSubId( sout_stream_t *p_stream,
+                                                   sout_stream_id_sys_t *id )
+{
+    size_t i;
+
+    assert( p_stream->p_sys == this );
+
+    vlc_mutex_lock( &es_lock );
+    for (i = 0; i < streams.size(); ++i)
+    {
+        if ( id == (sout_stream_id_sys_t*) streams[i] )
+        {
+            id = streams[i]->p_out;
+            break;
+        }
+    }
+    if ( unlikely(i == streams.size()) )
+    {
+        vlc_mutex_unlock( &es_lock );
+        msg_Err( p_stream, "unknown stream ID");
+        return NULL;
+    }
+    vlc_mutex_unlock( &es_lock );
+    return id;
+}
+
 static int Send( sout_stream_t *p_stream, sout_stream_id_sys_t *id,
                  block_t *p_buffer )
 {
@@ -367,23 +396,11 @@ static int Send( sout_stream_t *p_stream, sout_stream_id_sys_t *id,
         vlc_mutex_unlock( &p_sys->es_lock );
         return err;
     }
-
-    size_t i;
-    for (i = 0; i < p_sys->streams.size(); ++i)
-    {
-        if ( id == (sout_stream_id_sys_t*) p_sys->streams[i] )
-        {
-            id = p_sys->streams[i]->p_out;
-            break;
-        }
-    }
-    if ( unlikely(i == p_sys->streams.size()) )
-    {
-        msg_Err( p_stream, "unknown stream ID");
-        vlc_mutex_unlock( &p_sys->es_lock );
-        return VLC_EBADVAR;
-    }
     vlc_mutex_unlock( &p_sys->es_lock );
+
+    id = p_sys->GetSubId( p_stream, id );
+    if ( id == NULL )
+        return VLC_EBADVAR;
 
     return sout_StreamIdSend(p_sys->p_out, id, p_buffer);
 }
@@ -399,23 +416,11 @@ static void Flush( sout_stream_t *p_stream, sout_stream_id_sys_t *id )
         vlc_mutex_unlock( &p_sys->es_lock );
         return;
     }
-
-    size_t i;
-    for (i = 0; i < p_sys->streams.size(); ++i)
-    {
-        if ( id == (sout_stream_id_sys_t*) p_sys->streams[i] )
-        {
-            id = p_sys->streams[i]->p_out;
-            break;
-        }
-    }
-    if ( unlikely(i == p_sys->streams.size()) )
-    {
-        msg_Err( p_stream, "unknown stream ID");
-        vlc_mutex_unlock( &p_sys->es_lock );
-        return;
-    }
     vlc_mutex_unlock( &p_sys->es_lock );
+
+    id = p_sys->GetSubId( p_stream, id );
+    if ( id == NULL )
+        return;
 
     sout_StreamFlush( p_sys->p_out, id );
 }
