@@ -196,13 +196,9 @@ static void Del(sout_stream_t *p_stream, sout_stream_id_sys_t *id)
             es_format_Clean( &p_sys->streams[i]->fmt );
             free( p_sys->streams[i] );
             p_sys->streams.erase( p_sys->streams.begin() +  i );
-            p_sys->last_added_ts = mdate();
-            vlc_cond_signal( &p_sys->es_changed_cond );
             break;
         }
     }
-    /* TODO if there's no new stream after a while we should tell the Chromecast to stop waiting */
-    /* p_sys->p_renderer->InputUpdated( false ); */
 
     if ( p_sys->streams.empty() )
     {
