@@ -87,8 +87,8 @@ struct sout_stream_sys_t
     mtime_t                            last_added_ts;
     std::vector<sout_stream_id_sys_t*> streams;
 
-    int WaitEsReady( sout_stream_t * );
 private:
+    int WaitEsReady( sout_stream_t * );
 };
 
 #define SOUT_CFG_PREFIX "sout-chromecast-"
@@ -150,7 +150,7 @@ vlc_module_end ()
 struct sout_stream_id_sys_t
 {
     es_format_t           fmt;
-    sout_stream_id_sys_t  *p_out;
+    sout_stream_id_sys_t  *p_sub_id;
 };
 
 /*****************************************************************************
@@ -170,7 +170,7 @@ static sout_stream_id_sys_t *Add(sout_stream_t *p_stream, const es_format_t *p_f
     if (p_sys_id != NULL)
     {
         es_format_Copy( &p_sys_id->fmt, p_fmt );
-        p_sys_id->p_out = NULL;
+        p_sys_id->p_sub_id = NULL;
 
         vlc_mutex_locker locker( &p_sys->es_lock );
         p_sys->streams.push_back( p_sys_id );
@@ -190,8 +190,8 @@ static void Del(sout_stream_t *p_stream, sout_stream_id_sys_t *id)
     {
         if ( p_sys->streams[i] == id )
         {
-            if ( p_sys->streams[i]->p_out != NULL )
-                sout_StreamIdDel( p_sys->p_out, p_sys->streams[i]->p_out );
+            if ( p_sys->streams[i]->p_sub_id != NULL )
+                sout_StreamIdDel( p_sys->p_out, p_sys->streams[i]->p_sub_id );
 
             es_format_Clean( &p_sys->streams[i]->fmt );
             free( p_sys->streams[i] );
@@ -343,8 +343,8 @@ int sout_stream_sys_t::WaitEsReady( sout_stream_t *p_stream )
         for (std::vector<sout_stream_id_sys_t*>::iterator it = streams.begin(); it != streams.end(); ++it)
         {
             sout_stream_id_sys_t *p_sys_id = *it;
-            p_sys_id->p_out = sout_StreamIdAdd( p_out, &p_sys_id->fmt );
-            if ( p_sys_id->p_out == NULL )
+            p_sys_id->p_sub_id = sout_StreamIdAdd( p_out, &p_sys_id->fmt );
+            if ( p_sys_id->p_sub_id == NULL )
             {
                 msg_Err( p_stream, "can't handle a stream" );
                 streams.erase( it, it );
@@ -365,23 +365,18 @@ sout_stream_id_sys_t *sout_stream_sys_t::GetSubId( sout_stream_t *p_stream,
 
     assert( p_stream->p_sys == this );
 
-    vlc_mutex_lock( &es_lock );
+    vlc_mutex_locker locker( &es_lock );
+    if ( WaitEsReady( p_stream ) != VLC_SUCCESS )
+        return NULL;
+
     for (i = 0; i < streams.size(); ++i)
     {
         if ( id == (sout_stream_id_sys_t*) streams[i] )
-        {
-            id = streams[i]->p_out;
-            break;
-        }
+            return streams[i]->p_sub_id;
     }
-    if ( unlikely(i == streams.size()) )
-    {
-        vlc_mutex_unlock( &es_lock );
-        msg_Err( p_stream, "unknown stream ID");
-        return NULL;
-    }
-    vlc_mutex_unlock( &es_lock );
-    return id;
+
+    msg_Err( p_stream, "unknown stream ID" );
+    return NULL;
 }
 
 static int Send( sout_stream_t *p_stream, sout_stream_id_sys_t *id,
@@ -389,18 +384,9 @@ static int Send( sout_stream_t *p_stream, sout_stream_id_sys_t *id,
 {
     sout_stream_sys_t *p_sys = p_stream->p_sys;
 
-    vlc_mutex_lock( &p_sys->es_lock );
-    int err = p_sys->WaitEsReady( p_stream );
-    if ( err != VLC_SUCCESS )
-    {
-        vlc_mutex_unlock( &p_sys->es_lock );
-        return err;
-    }
-    vlc_mutex_unlock( &p_sys->es_lock );
-
     id = p_sys->GetSubId( p_stream, id );
     if ( id == NULL )
-        return VLC_EBADVAR;
+        return VLC_EGENERIC;
 
     return sout_StreamIdSend(p_sys->p_out, id, p_buffer);
 }
@@ -408,15 +394,6 @@ static int Send( sout_stream_t *p_stream, sout_stream_id_sys_t *id,
 static void Flush( sout_stream_t *p_stream, sout_stream_id_sys_t *id )
 {
     sout_stream_sys_t *p_sys = p_stream->p_sys;
-
-    vlc_mutex_lock( &p_sys->es_lock );
-    int err = p_sys->WaitEsReady( p_stream );
-    if ( err != VLC_SUCCESS )
-    {
-        vlc_mutex_unlock( &p_sys->es_lock );
-        return;
-    }
-    vlc_mutex_unlock( &p_sys->es_lock );
 
     id = p_sys->GetSubId( p_stream, id );
     if ( id == NULL )
