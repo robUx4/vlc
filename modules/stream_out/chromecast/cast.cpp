@@ -41,7 +41,7 @@
 
 struct sout_stream_sys_t
 {
-    sout_stream_sys_t(vlc_renderer_sys * const renderer, bool has_video, int port,
+    sout_stream_sys_t(intf_sys_t * const renderer, bool has_video, int port,
                       const char *psz_default_muxer, const char *psz_default_mime)
         : p_out(NULL)
         , default_muxer(psz_default_muxer)
@@ -76,7 +76,7 @@ struct sout_stream_sys_t
     const std::string  default_muxer;
     const std::string  default_mime;
 
-    vlc_renderer_sys * const p_renderer;
+    intf_sys_t * const p_renderer;
     const bool b_has_video;
     const int i_port;
 
@@ -422,7 +422,7 @@ static int Open(vlc_object_t *p_this)
 {
     sout_stream_t *p_stream = reinterpret_cast<sout_stream_t*>(p_this);
     sout_stream_sys_t *p_sys = NULL;
-    vlc_renderer_sys *p_renderer = NULL;
+    intf_sys_t *p_renderer = NULL;
     char *psz_ip = NULL;
     char *psz_mux = NULL;
     char *psz_var_mime = NULL;
@@ -444,7 +444,7 @@ static int Open(vlc_object_t *p_this)
     i_local_server_port = var_InheritInteger(p_stream, SOUT_CFG_PREFIX "http-port");
 
     srender << "chromecast://" << psz_ip;
-    p_renderer = new(std::nothrow) vlc_renderer_sys( p_this, i_local_server_port, psz_ip, i_device_port );
+    p_renderer = new(std::nothrow) intf_sys_t( p_this, i_local_server_port, psz_ip, i_device_port );
     if ( p_renderer == NULL)
     {
         msg_Err( p_this, "cannot load the Chromecast controler" );

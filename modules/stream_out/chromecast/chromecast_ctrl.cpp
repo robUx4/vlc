@@ -73,7 +73,7 @@ static const std::string NAMESPACE_RECEIVER         = "urn:x-cast:com.google.cas
  * @param destinationId the destination idenifier
  * @return the generated CastMessage
  */
-void vlc_renderer_sys::buildMessage(const std::string & namespace_,
+void intf_sys_t::buildMessage(const std::string & namespace_,
                               const std::string & payload,
                               const std::string & destinationId,
                               castchannel::CastMessage_PayloadType payloadType)
@@ -94,9 +94,9 @@ void vlc_renderer_sys::buildMessage(const std::string & namespace_,
 }
 
 /*****************************************************************************
- * vlc_renderer_sys: class definition
+ * intf_sys_t: class definition
  *****************************************************************************/
-vlc_renderer_sys::vlc_renderer_sys(vlc_object_t * const p_this, int port, std::string device_addr, int device_port)
+intf_sys_t::intf_sys_t(vlc_object_t * const p_this, int port, std::string device_addr, int device_port)
  : p_module( p_this )
  , i_port(port)
  , i_target_port(device_port)
@@ -146,7 +146,7 @@ vlc_renderer_sys::vlc_renderer_sys(vlc_object_t * const p_this, int port, std::s
     }
 }
 
-vlc_renderer_sys::~vlc_renderer_sys()
+intf_sys_t::~intf_sys_t()
 {
     var_SetString( p_module->p_libvlc, "demux-filter", NULL );
     InputUpdated( false, "" );
@@ -182,7 +182,7 @@ vlc_renderer_sys::~vlc_renderer_sys()
     vlc_mutex_destroy(&lock);
 }
 
-void vlc_renderer_sys::InputUpdated( bool b_has_input, const std::string mime_type )
+void intf_sys_t::InputUpdated( bool b_has_input, const std::string mime_type )
 {
     vlc_mutex_locker locker(&lock);
     msg_Dbg( p_module, "InputUpdated device:%s session:%s",
@@ -229,7 +229,7 @@ void vlc_renderer_sys::InputUpdated( bool b_has_input, const std::string mime_ty
  * @brief Connect to the Chromecast
  * @return the opened socket file descriptor or -1 on error
  */
-int vlc_renderer_sys::connectChromecast()
+int intf_sys_t::connectChromecast()
 {
     unsigned devicePort = i_target_port;
     if (devicePort == 0)
@@ -262,7 +262,7 @@ int vlc_renderer_sys::connectChromecast()
 /**
  * @brief Disconnect from the Chromecast
  */
-void vlc_renderer_sys::disconnectChromecast()
+void intf_sys_t::disconnectChromecast()
 {
     if (p_tls)
     {
@@ -390,7 +390,7 @@ extern "C" int recvPacket(vlc_object_t *p_module, bool &b_msgReceived,
  * @param msg the CastMessage to process
  * @return 0 if the message has been successfuly processed else -1
  */
-void vlc_renderer_sys::processMessage(const castchannel::CastMessage &msg)
+void intf_sys_t::processMessage(const castchannel::CastMessage &msg)
 {
     const std::string & namespace_ = msg.namespace_();
 
@@ -699,7 +699,7 @@ void vlc_renderer_sys::processMessage(const castchannel::CastMessage &msg)
 /*****************************************************************************
  * Message preparation
  *****************************************************************************/
-void vlc_renderer_sys::msgAuth()
+void intf_sys_t::msgAuth()
 {
     castchannel::DeviceAuthMessage authMessage;
     authMessage.mutable_challenge();
@@ -709,27 +709,27 @@ void vlc_renderer_sys::msgAuth()
 }
 
 
-void vlc_renderer_sys::msgPing()
+void intf_sys_t::msgPing()
 {
     std::string s("{\"type\":\"PING\"}");
     buildMessage( NAMESPACE_HEARTBEAT, s );
 }
 
 
-void vlc_renderer_sys::msgPong()
+void intf_sys_t::msgPong()
 {
     std::string s("{\"type\":\"PONG\"}");
     buildMessage( NAMESPACE_HEARTBEAT, s );
 }
 
-void vlc_renderer_sys::msgConnect(const std::string & destinationId)
+void intf_sys_t::msgConnect(const std::string & destinationId)
 {
     std::string s("{\"type\":\"CONNECT\"}");
     buildMessage( NAMESPACE_CONNECTION, s, destinationId );
 }
 
 
-void vlc_renderer_sys::msgReceiverClose(std::string destinationId)
+void intf_sys_t::msgReceiverClose(std::string destinationId)
 {
     std::string s("{\"type\":\"CLOSE\"}");
     buildMessage( NAMESPACE_CONNECTION, s, destinationId );
@@ -742,7 +742,7 @@ void vlc_renderer_sys::msgReceiverClose(std::string destinationId)
     }
 }
 
-void vlc_renderer_sys::msgReceiverGetStatus()
+void intf_sys_t::msgReceiverGetStatus()
 {
     std::stringstream ss;
     ss << "{\"type\":\"GET_STATUS\","
@@ -751,7 +751,7 @@ void vlc_renderer_sys::msgReceiverGetStatus()
     buildMessage( NAMESPACE_RECEIVER, ss.str() );
 }
 
-void vlc_renderer_sys::msgReceiverLaunchApp()
+void intf_sys_t::msgReceiverLaunchApp()
 {
     std::stringstream ss;
     ss << "{\"type\":\"LAUNCH\","
@@ -761,7 +761,7 @@ void vlc_renderer_sys::msgReceiverLaunchApp()
     buildMessage( NAMESPACE_RECEIVER, ss.str() );
 }
 
-void vlc_renderer_sys::msgPlayerGetStatus()
+void intf_sys_t::msgPlayerGetStatus()
 {
     std::stringstream ss;
     ss << "{\"type\":\"GET_STATUS\","
@@ -771,7 +771,7 @@ void vlc_renderer_sys::msgPlayerGetStatus()
     pushMediaPlayerMessage( ss );
 }
 
-std::string vlc_renderer_sys::GetMedia()
+std::string intf_sys_t::GetMedia()
 {
     std::stringstream ss;
 
@@ -800,7 +800,7 @@ std::string vlc_renderer_sys::GetMedia()
     return ss.str();
 }
 
-void vlc_renderer_sys::msgPlayerLoad()
+void intf_sys_t::msgPlayerLoad()
 {
     std::stringstream ss;
     ss << "{\"type\":\"LOAD\","
@@ -812,7 +812,7 @@ void vlc_renderer_sys::msgPlayerLoad()
     pushMediaPlayerMessage( ss );
 }
 
-void vlc_renderer_sys::msgPlayerPlay()
+void intf_sys_t::msgPlayerPlay()
 {
     assert(!mediaSessionId.empty());
 
@@ -825,7 +825,7 @@ void vlc_renderer_sys::msgPlayerPlay()
     pushMediaPlayerMessage( ss );
 }
 
-void vlc_renderer_sys::msgPlayerStop()
+void intf_sys_t::msgPlayerStop()
 {
     assert(!mediaSessionId.empty());
 
@@ -838,7 +838,7 @@ void vlc_renderer_sys::msgPlayerStop()
     pushMediaPlayerMessage( ss );
 }
 
-void vlc_renderer_sys::msgPlayerPause()
+void intf_sys_t::msgPlayerPause()
 {
     assert(!mediaSessionId.empty());
 
@@ -851,7 +851,7 @@ void vlc_renderer_sys::msgPlayerPause()
     pushMediaPlayerMessage( ss );
 }
 
-void vlc_renderer_sys::msgPlayerSetVolume(float f_volume)
+void intf_sys_t::msgPlayerSetVolume(float f_volume)
 {
     assert(!mediaSessionId.empty());
 
@@ -868,7 +868,7 @@ void vlc_renderer_sys::msgPlayerSetVolume(float f_volume)
     pushMediaPlayerMessage( ss );
 }
 
-void vlc_renderer_sys::msgPlayerSetMute(bool b_mute)
+void intf_sys_t::msgPlayerSetMute(bool b_mute)
 {
     assert(!mediaSessionId.empty());
 
@@ -882,7 +882,7 @@ void vlc_renderer_sys::msgPlayerSetMute(bool b_mute)
     pushMediaPlayerMessage( ss );
 }
 
-void vlc_renderer_sys::msgPlayerSeek(const std::string & timestamp)
+void intf_sys_t::msgPlayerSeek(const std::string & timestamp)
 {
     assert(!mediaSessionId.empty());
 
@@ -901,7 +901,7 @@ void vlc_renderer_sys::msgPlayerSeek(const std::string & timestamp)
  * @param msg the CastMessage to send
  * @return vlc error code
  */
-int vlc_renderer_sys::sendMessage(const castchannel::CastMessage &msg)
+int intf_sys_t::sendMessage(const castchannel::CastMessage &msg)
 {
     int i_size = msg.ByteSize();
     uint8_t *p_data = new(std::nothrow) uint8_t[PACKET_HEADER_LEN + i_size];
@@ -924,7 +924,7 @@ int vlc_renderer_sys::sendMessage(const castchannel::CastMessage &msg)
     return VLC_EGENERIC;
 }
 
-void vlc_renderer_sys::pushMediaPlayerMessage(const std::stringstream & payload) {
+void intf_sys_t::pushMediaPlayerMessage(const std::stringstream & payload) {
     assert(!appTransportId.empty());
     buildMessage( NAMESPACE_MEDIA, payload.str(), appTransportId );
 }
@@ -932,10 +932,10 @@ void vlc_renderer_sys::pushMediaPlayerMessage(const std::stringstream & payload)
 /*****************************************************************************
  * Chromecast thread
  *****************************************************************************/
-void* vlc_renderer_sys::ChromecastThread(void* p_data)
+void* intf_sys_t::ChromecastThread(void* p_data)
 {
     int canc;
-    vlc_renderer_sys *p_sys = reinterpret_cast<vlc_renderer_sys*>(p_data);
+    intf_sys_t *p_sys = reinterpret_cast<intf_sys_t*>(p_data);
     p_sys->setConnectionStatus( CHROMECAST_DISCONNECTED );
 
     p_sys->i_sock_fd = p_sys->connectChromecast();
@@ -984,7 +984,7 @@ void* vlc_renderer_sys::ChromecastThread(void* p_data)
     return NULL;
 }
 
-void vlc_renderer_sys::handleMessages()
+void intf_sys_t::handleMessages()
 {
     unsigned i_received = 0;
     uint8_t p_packet[PACKET_MAX_LEN];
@@ -1031,7 +1031,7 @@ void vlc_renderer_sys::handleMessages()
     vlc_restorecancel(canc);
 }
 
-bool vlc_renderer_sys::seekTo(mtime_t i_pts)
+bool intf_sys_t::seekTo(mtime_t i_pts)
 {
     vlc_mutex_locker locker(&lock);
     if (conn_status == CHROMECAST_CONNECTION_DEAD)
@@ -1059,7 +1059,7 @@ bool vlc_renderer_sys::seekTo(mtime_t i_pts)
     return true;
 }
 
-void vlc_renderer_sys::waitAppStarted()
+void intf_sys_t::waitAppStarted()
 {
     vlc_mutex_locker locker(&lock);
     mutex_cleanup_push(&lock);
@@ -1069,7 +1069,7 @@ void vlc_renderer_sys::waitAppStarted()
     vlc_cleanup_pop();
 }
 
-void vlc_renderer_sys::waitSeekDone()
+void intf_sys_t::waitSeekDone()
 {
     vlc_mutex_locker locker(&lock);
     if ( m_seek_request_time != -1 )
@@ -1091,7 +1091,7 @@ void vlc_renderer_sys::waitSeekDone()
     }
 }
 
-void vlc_renderer_sys::setInputState(input_state_e state)
+void intf_sys_t::setInputState(input_state_e state)
 {
     input_state = state;
     msg_Dbg( p_module, "new %d state for %s", state, title.c_str() );
@@ -1116,65 +1116,65 @@ void vlc_renderer_sys::setInputState(input_state_e state)
     }
 }
 
-void vlc_renderer_sys::wait_app_started(void *pt)
+void intf_sys_t::wait_app_started(void *pt)
 {
-    vlc_renderer_sys *p_this = reinterpret_cast<vlc_renderer_sys*>(pt);
+    intf_sys_t *p_this = reinterpret_cast<intf_sys_t*>(pt);
     p_this->waitAppStarted();
 }
 
-void vlc_renderer_sys::set_input_state(void *pt, input_state_e state)
+void intf_sys_t::set_input_state(void *pt, input_state_e state)
 {
-    vlc_renderer_sys *p_this = reinterpret_cast<vlc_renderer_sys*>(pt);
+    intf_sys_t *p_this = reinterpret_cast<intf_sys_t*>(pt);
     p_this->setInputState( state );
 }
 
-void vlc_renderer_sys::set_length(void *pt, mtime_t length)
+void intf_sys_t::set_length(void *pt, mtime_t length)
 {
-    vlc_renderer_sys *p_this = reinterpret_cast<vlc_renderer_sys*>(pt);
+    intf_sys_t *p_this = reinterpret_cast<intf_sys_t*>(pt);
     p_this->i_length = length;
 }
 
-mtime_t vlc_renderer_sys::get_time(void *pt)
+mtime_t intf_sys_t::get_time(void *pt)
 {
-    vlc_renderer_sys *p_this = reinterpret_cast<vlc_renderer_sys*>(pt);
+    intf_sys_t *p_this = reinterpret_cast<intf_sys_t*>(pt);
     vlc_mutex_locker locker( &p_this->lock );
     return p_this->getPlaybackTimestamp();
 }
 
-double vlc_renderer_sys::get_position(void *pt)
+double intf_sys_t::get_position(void *pt)
 {
-    vlc_renderer_sys *p_this = reinterpret_cast<vlc_renderer_sys*>(pt);
+    intf_sys_t *p_this = reinterpret_cast<intf_sys_t*>(pt);
     vlc_mutex_locker locker( &p_this->lock );
     return p_this->getPlaybackPosition( p_this->i_length );
 }
 
-bool vlc_renderer_sys::seek_to(void *pt, mtime_t i_pts)
+bool intf_sys_t::seek_to(void *pt, mtime_t i_pts)
 {
-    vlc_renderer_sys *p_this = reinterpret_cast<vlc_renderer_sys*>(pt);
+    intf_sys_t *p_this = reinterpret_cast<intf_sys_t*>(pt);
     return p_this->seekTo( i_pts );
 }
 
-void vlc_renderer_sys::wait_seek_done(void *pt)
+void intf_sys_t::wait_seek_done(void *pt)
 {
-    vlc_renderer_sys *p_this = reinterpret_cast<vlc_renderer_sys*>(pt);
+    intf_sys_t *p_this = reinterpret_cast<intf_sys_t*>(pt);
     p_this->waitSeekDone();
 }
 
-enum connection_status vlc_renderer_sys::get_connection_status(void *pt)
+enum connection_status intf_sys_t::get_connection_status(void *pt)
 {
-    vlc_renderer_sys *p_this = reinterpret_cast<vlc_renderer_sys*>(pt);
+    intf_sys_t *p_this = reinterpret_cast<intf_sys_t*>(pt);
     vlc_mutex_locker locker( &p_this->lock );
     return p_this->getConnectionStatus();
 }
 
-void vlc_renderer_sys::set_title(void *pt, const char *psz_title)
+void intf_sys_t::set_title(void *pt, const char *psz_title)
 {
-    vlc_renderer_sys *p_this = reinterpret_cast<vlc_renderer_sys*>(pt);
+    intf_sys_t *p_this = reinterpret_cast<intf_sys_t*>(pt);
     p_this->setTitle( psz_title );
 }
 
-void vlc_renderer_sys::set_artwork(void *pt, const char *psz_artwork)
+void intf_sys_t::set_artwork(void *pt, const char *psz_artwork)
 {
-    vlc_renderer_sys *p_this = reinterpret_cast<vlc_renderer_sys*>(pt);
+    intf_sys_t *p_this = reinterpret_cast<intf_sys_t*>(pt);
     p_this->setArtwork( psz_artwork );
 }

@@ -67,12 +67,12 @@ enum receiver_state {
 
 
 /*****************************************************************************
- * vlc_renderer_sys: description and status of interface
+ * intf_sys_t: description and status of interface
  *****************************************************************************/
-struct vlc_renderer_sys
+struct intf_sys_t
 {
-    vlc_renderer_sys(vlc_object_t * const p_this, int local_port, std::string device_addr, int device_port = 0);
-    ~vlc_renderer_sys();
+    intf_sys_t(vlc_object_t * const p_this, int local_port, std::string device_addr, int device_port = 0);
+    ~intf_sys_t();
 
     bool isFinishedPlaying() {
         vlc_mutex_locker locker(&lock);
