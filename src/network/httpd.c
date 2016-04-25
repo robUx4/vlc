@@ -56,12 +56,7 @@
 #   include <sys/socket.h>
 #endif
 
-#if defined(_WIN32)
-/* We need HUGE buffer otherwise TCP throughput is very limited */
-#define HTTPD_CL_BUFSIZE 1000000
-#else
 #define HTTPD_CL_BUFSIZE 10000
-#endif
 
 static void httpd_ClientDestroy(httpd_client_t *cl);
 static void httpd_AppendData(httpd_stream_t *stream, uint8_t *p_data, int i_data);
