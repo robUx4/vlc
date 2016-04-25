@@ -94,7 +94,7 @@ void intf_sys_t::buildMessage(const std::string & namespace_,
  * intf_sys_t: class definition
  *****************************************************************************/
 intf_sys_t::intf_sys_t(vlc_object_t * const p_this, int port, std::string device_addr, int device_port)
- : p_module( p_this )
+ : p_module(p_this)
  , i_port(port)
  , i_target_port(device_port)
  , targetIP(device_addr)
@@ -184,14 +184,6 @@ void intf_sys_t::InputUpdated( bool b_has_input, const std::string mime_type )
     vlc_mutex_locker locker(&lock);
     msg_Dbg( p_module, "InputUpdated device:%s session:%s",
              targetIP.c_str(), mediaSessionId.c_str() );
-
-    if( this->has_input )
-    {
-#if 0 /* the Chromecast doesn't work well with consecutives calls if stopped between them */
-        if ( receiverState != RECEIVER_IDLE )
-            msgPlayerStop();
-#endif
-    }
 
     this->has_input = b_has_input;
     this->mime = mime_type;
@@ -879,13 +871,13 @@ void intf_sys_t::msgPlayerSetMute(bool b_mute)
     pushMediaPlayerMessage( ss );
 }
 
-void intf_sys_t::msgPlayerSeek(const std::string & timestamp)
+void intf_sys_t::msgPlayerSeek(const std::string & currentTime)
 {
     assert(!mediaSessionId.empty());
 
     std::stringstream ss;
     ss << "{\"type\":\"SEEK\","
-       <<  "\"currentTime\":" << timestamp << ","
+       <<  "\"currentTime\":" << currentTime << ","
        <<  "\"mediaSessionId\":" << mediaSessionId << ","
        <<  "\"requestId\":" << i_requestId++
        << "}";
@@ -1028,6 +1020,31 @@ void intf_sys_t::handleMessages()
     vlc_restorecancel(canc);
 }
 
+void intf_sys_t::setInputState(input_state_e state)
+{
+    input_state = state;
+    msg_Dbg( p_module, "new %d state for %s", state, title.c_str() );
+    switch( input_state )
+    {
+        case PLAYING_S:
+            if ( !mediaSessionId.empty() && receiverState != RECEIVER_IDLE )
+            {
+                msgPlayerPlay();
+                setPlayerStatus(CMD_PLAYBACK_SENT);
+            }
+            break;
+        case PAUSE_S:
+            if ( !mediaSessionId.empty() && receiverState != RECEIVER_IDLE )
+            {
+                msgPlayerPause();
+                setPlayerStatus(CMD_PLAYBACK_SENT);
+            }
+            break;
+        default:
+            break;
+    }
+}
+
 bool intf_sys_t::seekTo(mtime_t i_pts)
 {
     vlc_mutex_locker locker(&lock);
@@ -1085,31 +1102,6 @@ void intf_sys_t::waitSeekDone()
         }
         vlc_cleanup_pop();
         m_seek_request_time = -1;
-    }
-}
-
-void intf_sys_t::setInputState(input_state_e state)
-{
-    input_state = state;
-    msg_Dbg( p_module, "new %d state for %s", state, title.c_str() );
-    switch( input_state )
-    {
-        case PLAYING_S:
-            if ( !mediaSessionId.empty() && receiverState != RECEIVER_IDLE )
-            {
-                msgPlayerPlay();
-                setPlayerStatus(CMD_PLAYBACK_SENT);
-            }
-            break;
-        case PAUSE_S:
-            if ( !mediaSessionId.empty() && receiverState != RECEIVER_IDLE )
-            {
-                msgPlayerPause();
-                setPlayerStatus(CMD_PLAYBACK_SENT);
-            }
-            break;
-        default:
-            break;
     }
 }
 

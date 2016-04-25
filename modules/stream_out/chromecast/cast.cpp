@@ -38,16 +38,17 @@
 
 struct sout_stream_sys_t
 {
-    sout_stream_sys_t(intf_sys_t * const renderer, bool has_video, int port,
+    sout_stream_sys_t(intf_sys_t * const intf, bool has_video, int port,
                       const char *psz_default_muxer, const char *psz_default_mime)
         : p_out(NULL)
         , default_muxer(psz_default_muxer)
         , default_mime(psz_default_mime)
-        , p_renderer(renderer)
+        , p_intf(intf)
         , b_has_video(has_video)
         , i_port(port)
         , last_added_ts( VLC_TS_INVALID )
     {
+        assert(p_intf != NULL);
         vlc_mutex_init( &es_lock );
         vlc_cond_init( &es_changed_cond );
     }
@@ -55,14 +56,9 @@ struct sout_stream_sys_t
     ~sout_stream_sys_t()
     {
         sout_StreamChainDelete(p_out, p_out);
-        delete p_renderer;
+        delete p_intf;
         vlc_cond_destroy( &es_changed_cond );
         vlc_mutex_destroy( &es_lock );
-    }
-
-    bool isFinishedPlaying() const {
-        /* check if the Chromecast to be done playing */
-        return p_renderer == NULL || p_renderer->isFinishedPlaying();
     }
 
     bool canDecodeVideo( const es_format_t *p_es ) const;
@@ -73,7 +69,7 @@ struct sout_stream_sys_t
     const std::string  default_muxer;
     const std::string  default_mime;
 
-    intf_sys_t * const p_renderer;
+    intf_sys_t * const p_intf;
     const bool b_has_video;
     const int i_port;
 
@@ -93,6 +89,7 @@ const static mtime_t MAX_WAIT_BETWEEN_ADD = (CLOCK_FREQ / 3);
 
 static const vlc_fourcc_t DEFAULT_TRANSCODE_AUDIO = VLC_CODEC_MP3;
 static const vlc_fourcc_t DEFAULT_TRANSCODE_VIDEO = VLC_CODEC_H264;
+static const char DEFAULT_MUXER[] = "avformat{mux=matroska}";
 
 
 /*****************************************************************************
@@ -126,7 +123,7 @@ static const char *const ppsz_sout_options[] = {
 
 vlc_module_begin ()
 
-    set_shortname( "Chromecast" )
+    set_shortname(N_("Chromecast"))
     set_description(N_("Chromecast stream output"))
     set_capability("sout stream", 0)
     add_shortcut("chromecast")
@@ -138,7 +135,7 @@ vlc_module_begin ()
     add_integer(SOUT_CFG_PREFIX "port", CHROMECAST_CONTROL_PORT, PORT_TEXT, PORT_LONGTEXT, false)
     add_integer(SOUT_CFG_PREFIX "http-port", HTTP_PORT, HTTP_PORT_TEXT, HTTP_PORT_LONGTEXT, false)
     add_bool(SOUT_CFG_PREFIX "video", true, HAS_VIDEO_TEXT, HAS_VIDEO_LONGTEXT, false)
-    add_string(SOUT_CFG_PREFIX "mux", "avformat{mux=matroska}", MUX_TEXT, MUX_LONGTEXT, false)
+    add_string(SOUT_CFG_PREFIX "mux", DEFAULT_MUXER, MUX_TEXT, MUX_LONGTEXT, false)
     add_string(SOUT_CFG_PREFIX "mime", "video/x-matroska", MIME_TEXT, MIME_LONGTEXT, false)
 
 vlc_module_end ()
@@ -242,7 +239,7 @@ int sout_stream_sys_t::WaitEsReady( sout_stream_t *p_stream )
             vlc_cleanup_pop();
         }
         last_added_ts = VLC_TS_INVALID;
-        msg_Dbg( p_stream, "prepare new sub-sout for %s", p_renderer->title.c_str() );
+        msg_Dbg( p_stream, "prepare new sub-sout for %s", p_intf->title.c_str() );
 
         bool canRemux = true;
         vlc_fourcc_t i_codec_video = 0, i_codec_audio = 0;
@@ -273,7 +270,6 @@ int sout_stream_sys_t::WaitEsReady( sout_stream_t *p_stream )
         }
 
         std::stringstream ssout;
-        //ssout << '#';
         if ( !canRemux )
         {
             if ( i_codec_audio == 0 )
@@ -305,9 +301,11 @@ int sout_stream_sys_t::WaitEsReady( sout_stream_t *p_stream )
             ssout << "}:";
         }
         std::string mime;
-        if ( !b_has_video )
+        if ( !b_has_video && default_muxer == DEFAULT_MUXER )
             mime = "audio/x-matroska";
-        else if (i_codec_audio == VLC_CODEC_VORBIS && i_codec_video == VLC_CODEC_VP8 )
+        else if ( i_codec_audio == VLC_CODEC_VORBIS &&
+                  i_codec_video == VLC_CODEC_VP8 &&
+                  default_muxer == DEFAULT_MUXER )
             mime = "video/webm";
         else
             mime = default_mime;
@@ -345,7 +343,7 @@ int sout_stream_sys_t::WaitEsReady( sout_stream_t *p_stream )
         }
 
         /* tell the chromecast to load the content */
-        p_renderer->InputUpdated( true, mime );
+        p_intf->InputUpdated( true, mime );
     }
 
     return VLC_SUCCESS;
@@ -372,8 +370,8 @@ sout_stream_id_sys_t *sout_stream_sys_t::GetSubId( sout_stream_t *p_stream,
     return NULL;
 }
 
-static int Send( sout_stream_t *p_stream, sout_stream_id_sys_t *id,
-                 block_t *p_buffer )
+static int Send(sout_stream_t *p_stream, sout_stream_id_sys_t *id,
+                block_t *p_buffer)
 {
     sout_stream_sys_t *p_sys = p_stream->p_sys;
 
@@ -402,7 +400,8 @@ static int Control(sout_stream_t *p_stream, int i_query, va_list args)
     if (i_query == SOUT_STREAM_EMPTY)
     {
         bool *b = va_arg( args, bool * );
-        *b = p_sys->isFinishedPlaying();
+        /* check if the Chromecast to be done playing */
+        *b = p_sys->p_intf == NULL || p_sys->p_intf->isFinishedPlaying();
         return VLC_SUCCESS;
     }
 
@@ -419,14 +418,14 @@ static int Open(vlc_object_t *p_this)
 {
     sout_stream_t *p_stream = reinterpret_cast<sout_stream_t*>(p_this);
     sout_stream_sys_t *p_sys = NULL;
-    intf_sys_t *p_renderer = NULL;
+    intf_sys_t *p_intf = NULL;
     char *psz_ip = NULL;
     char *psz_mux = NULL;
     char *psz_var_mime = NULL;
     sout_stream_t *p_sout = NULL;
     bool b_has_video = true;
     int i_local_server_port, i_device_port;
-    std::stringstream srender, ss;
+    std::stringstream ss;
 
     config_ChainParse(p_stream, SOUT_CFG_PREFIX, ppsz_sout_options, p_stream->p_cfg);
 
@@ -440,9 +439,8 @@ static int Open(vlc_object_t *p_this)
     i_device_port = var_InheritInteger(p_stream, SOUT_CFG_PREFIX "port");
     i_local_server_port = var_InheritInteger(p_stream, SOUT_CFG_PREFIX "http-port");
 
-    srender << "chromecast://" << psz_ip;
-    p_renderer = new(std::nothrow) intf_sys_t( p_this, i_local_server_port, psz_ip, i_device_port );
-    if ( p_renderer == NULL)
+    p_intf = new(std::nothrow) intf_sys_t( p_this, i_local_server_port, psz_ip, i_device_port );
+    if ( p_intf == NULL)
     {
         msg_Err( p_this, "cannot load the Chromecast controler" );
         goto error;
@@ -470,12 +468,10 @@ static int Open(vlc_object_t *p_this)
 
     b_has_video = var_GetBool(p_stream, SOUT_CFG_PREFIX "video");
 
-    p_sys = new(std::nothrow) sout_stream_sys_t( p_renderer, b_has_video, i_local_server_port,
+    p_sys = new(std::nothrow) sout_stream_sys_t( p_intf, b_has_video, i_local_server_port,
                                                  psz_mux, psz_var_mime );
     if (unlikely(p_sys == NULL))
-    {
         goto error;
-    }
     sout_StreamChainDelete( p_sout, p_sout );
 
     // Set the sout callbacks.
@@ -492,7 +488,7 @@ static int Open(vlc_object_t *p_this)
     return VLC_SUCCESS;
 
 error:
-    delete p_renderer;
+    delete p_intf;
     free(psz_ip);
     free(psz_mux);
     free(psz_var_mime);

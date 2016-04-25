@@ -118,7 +118,7 @@ struct intf_sys_t
     std::string    serverIP;
     const int      i_target_port;
     std::string    targetIP;
-    std::string    muxer;
+    std::string    mime;
 
     std::string appTransportId;
     std::string mediaSessionId;
@@ -129,11 +129,18 @@ struct intf_sys_t
     vlc_tls_t *p_tls;
 
     vlc_mutex_t  lock;
+    vlc_cond_t   loadCommandCond;
     vlc_thread_t chromecastThread;
 
-    void handleMessages();
+    void msgAuth();
+    void msgReceiverClose(std::string destinationId);
+
+    std::string title;
 
     void InputUpdated( bool has_input, const std::string mime_type );
+
+private:
+    void handleMessages();
 
     connection_status getConnectionStatus() const
     {
@@ -158,9 +165,6 @@ struct intf_sys_t
 
     int connectChromecast();
     void disconnectChromecast();
-
-    void msgAuth();
-    void msgReceiverClose(std::string destinationId);
 
     void msgPing();
     void msgPong();
@@ -194,7 +198,6 @@ struct intf_sys_t
         else
             title = "";
     }
-    std::string title;
 
     void setArtwork( const char *psz_artwork )
     {
@@ -204,7 +207,6 @@ struct intf_sys_t
             artwork = "";
     }
 
-private:
     int sendMessage(const castchannel::CastMessage &msg);
 
     void buildMessage(const std::string & namespace_,
@@ -233,11 +235,9 @@ private:
 
     std::string GetMedia();
     std::string artwork;
-    std::string mime;
 
     static void* ChromecastThread(void* p_data);
 
-    vlc_cond_t   loadCommandCond;
     vlc_cond_t   seekCommandCond;
 
     /* local date when playback started/resumed */
