@@ -105,6 +105,7 @@ static void VarInit( access_t * );
 static int  ParseMRL( access_t * );
 
 static int ScanFrontendTuningHandler( scan_t *, void *, const scan_tuner_config_t * );
+static int ScanFilterHandler( scan_t *, void *, uint16_t, bool );
 static int ScanStatsCallback( scan_t *p_scan, void *p_privdata, int *pi_snr );
 static int ScanReadCallback( scan_t *, void *,  unsigned, size_t, uint8_t *, size_t *);
 
@@ -144,16 +145,16 @@ static int Open( vlc_object_t *p_this )
         return VLC_EGENERIC; /* let the DTV plugin do the work */
 
     /* Getting frontend info */
-    if( FrontendOpen( p_access) )
+    if( FrontendOpen( p_this, &p_sys->dvb, p_access->psz_access ) )
     {
         free( p_sys );
         return VLC_EGENERIC;
     }
 
     /* Opening DVR device */
-    if( DVROpen( p_access ) < 0 )
+    if( DVROpen( p_this, &p_sys->dvb ) < 0 )
     {
-        FrontendClose( p_access );
+        FrontendClose( p_this, &p_sys->dvb );
         free( p_sys );
         return VLC_EGENERIC;
     }
@@ -165,16 +166,11 @@ static int Open( vlc_object_t *p_this )
 
     parameter.b_use_nit = var_InheritBool( p_access, "dvb-scan-nit" );
 
-    msg_Dbg( p_access, "setting filter on PAT/NIT/SDT (DVB only)" );
-    FilterSet( p_access, 0x00, OTHER_TYPE );    // PAT
-    FilterSet( p_access, 0x11, OTHER_TYPE );    // SDT
-    if( parameter.b_use_nit )
-        FilterSet( p_access, 0x10, OTHER_TYPE );    // NIT
-
-    if( FrontendFillScanParameter( p_access, &parameter ) ||
+    if( FrontendFillScanParameter( p_this, &p_sys->dvb, &parameter ) ||
             (p_scan = scan_New( VLC_OBJECT(p_access), &parameter,
                                 ScanFrontendTuningHandler,
                                 ScanStatsCallback,
+                                ScanFilterHandler,
                                 ScanReadCallback,
                                 p_access )) == NULL )
     {
@@ -204,8 +200,8 @@ static void Close( vlc_object_t *p_this )
 
     FilterUnset( p_access, MAX_DEMUX );
 
-    DVRClose( p_access );
-    FrontendClose( p_access );
+    DVRClose( p_this, &p_sys->dvb );
+    FrontendClose( p_this, &p_sys->dvb );
     scan_Destroy( p_sys->scan );
 
     free( p_sys );
@@ -230,7 +226,7 @@ static int ScanFrontendTuningHandler( scan_t *p_scan, void *p_privdata,
     msg_Dbg( p_access, " bandwidth %d", p_cfg->i_bandwidth );
 
     /* Setting frontend parameters for tuning the hardware */
-    if( FrontendSet( p_access ) < 0 )
+    if( FrontendSet( VLC_OBJECT(p_access), &p_access->p_sys->dvb ) < 0 )
     {
         msg_Err( p_access, "Failed to tune the frontend" );
         return VLC_EGENERIC;
@@ -245,13 +241,24 @@ static int ScanStatsCallback( scan_t *p_scan, void *p_privdata, int *pi_snr )
     VLC_UNUSED(p_scan);
 
     frontend_statistic_t stat;
-    if( !FrontendGetStatistic( p_access, &stat ) )
+    if( !FrontendGetStatistic( &p_access->p_sys->dvb, &stat ) )
     {
         *pi_snr = stat.i_snr;
         return VLC_SUCCESS;
     }
 
     return VLC_EGENERIC;
+}
+
+static int ScanFilterHandler( scan_t *p_scan, void *p_privdata, uint16_t i_pid, bool b_set )
+{
+    access_t *p_access = (access_t *) p_privdata;
+    VLC_UNUSED(p_scan);
+
+    if( b_set )
+        FilterSet( p_access, i_pid, OTHER_TYPE );
+
+    return VLC_SUCCESS;
 }
 
 static int ScanReadCallback( scan_t *p_scan, void *p_privdata,
@@ -265,13 +272,13 @@ static int ScanReadCallback( scan_t *p_scan, void *p_privdata,
     /* Initialize file descriptor sets */
     struct pollfd ufds[2];
 
-    ufds[0].fd = p_sys->i_handle;
+    ufds[0].fd = p_sys->dvb.i_handle;
     ufds[0].events = POLLIN;
-    ufds[1].fd = p_sys->i_frontend_handle;
+    ufds[1].fd = p_sys->dvb.i_frontend_handle;
     ufds[1].events = POLLPRI;
 
     frontend_status_t status;
-    FrontendGetStatus( p_access, &status );
+    FrontendGetStatus( &p_sys->dvb, &status );
     bool b_has_lock = status.b_has_lock;
 
     mtime_t i_scan_start = mdate();
@@ -309,9 +316,9 @@ static int ScanReadCallback( scan_t *p_scan, void *p_privdata,
 
         if( ufds[1].revents )
         {
-            FrontendPoll( p_access );
+            FrontendPoll( VLC_OBJECT(p_access), &p_sys->dvb );
 
-            FrontendGetStatus( p_access, &status );
+            FrontendGetStatus( &p_sys->dvb, &status );
             if( status.b_has_lock && !b_has_lock )
             {
                 i_scan_start = mdate();
@@ -323,7 +330,7 @@ static int ScanReadCallback( scan_t *p_scan, void *p_privdata,
         {
             for( size_t i=0; i<i_packets_max; i++ )
             {
-                ssize_t i_read = read( p_sys->i_handle, p_packet, TS_PACKET_SIZE * i_packets_max );
+                ssize_t i_read = read( p_sys->dvb.i_handle, p_packet, TS_PACKET_SIZE * i_packets_max );
                 if( i_read < 0 )
                 {
                     msg_Warn( p_access, "read failed: %s", vlc_strerror_c(errno) );
@@ -396,7 +403,7 @@ static int Control( access_t *p_access, int i_query, va_list args )
             pf2 = (double*)va_arg( args, double * );
 
             *pf1 = *pf2 = 0;
-            if( !FrontendGetStatistic( p_access, &stat ) )
+            if( !FrontendGetStatistic( &p_access->p_sys->dvb, &stat ) )
             {
                 *pf1 = (double)stat.i_snr / 65535.0;
                 *pf2 = (double)stat.i_signal_strenth / 65535.0;
@@ -434,7 +441,7 @@ static void FilterSet( access_t *p_access, int i_pid, int i_type )
         return;
     }
 
-    if( DMXSetFilter( p_access, i_pid,
+    if( DMXSetFilter( VLC_OBJECT(p_access), i_pid,
                            &p_sys->p_demux_handles[i].i_handle, i_type ) )
     {
         msg_Err( p_access, "DMXSetFilter failed" );
@@ -453,7 +460,7 @@ static void FilterUnset( access_t *p_access, int i_max )
     {
         if( p_sys->p_demux_handles[i].i_type )
         {
-            DMXUnsetFilter( p_access, p_sys->p_demux_handles[i].i_handle );
+            DMXUnsetFilter( VLC_OBJECT(p_access), p_sys->p_demux_handles[i].i_handle );
             p_sys->p_demux_handles[i].i_type = 0;
         }
     }

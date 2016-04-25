@@ -1060,6 +1060,8 @@ static int GuessType( const input_item_t *p_item, bool *p_net )
         { "nfs",    ITEM_TYPE_FILE, true },
         { "ofdm",   ITEM_TYPE_CARD, false },
         { "oss",    ITEM_TYPE_CARD, false },
+        { "pulse",  ITEM_TYPE_CARD, false },
+        { "qtsound",ITEM_TYPE_CARD, false },
         { "pnm",    ITEM_TYPE_STREAM, true },
         { "qam",    ITEM_TYPE_CARD, false },
         { "qpsk",   ITEM_TYPE_CARD, false },
@@ -1076,11 +1078,14 @@ static int GuessType( const input_item_t *p_item, bool *p_net )
         { "svcd",   ITEM_TYPE_DISC, false },
         { "tcp",    ITEM_TYPE_STREAM, true },
         { "terres", ITEM_TYPE_CARD, false }, /* terrestrial */
+        { "upnp",   ITEM_TYPE_FILE, true },
         { "udp",    ITEM_TYPE_STREAM, true },  /* udplite too */
         { "unsv",   ITEM_TYPE_STREAM, true },
         { "usdigi", ITEM_TYPE_CARD, false }, /* usdigital */
         { "v4l",    ITEM_TYPE_CARD, false },
         { "vcd",    ITEM_TYPE_DISC, false },
+        { "vdr",    ITEM_TYPE_STREAM, true },
+        { "wasapi", ITEM_TYPE_CARD, false },
         { "window", ITEM_TYPE_CARD, false },
     };
     int i_item_type = ITEM_TYPE_UNKNOWN;

@@ -39,6 +39,7 @@
 #include <vlc_sout.h>
 #include <vlc_block.h>
 #include <vlc_rand.h>
+#include <vlc_charset.h>
 
 #include <vlc_iso_lang.h>
 
@@ -334,7 +335,6 @@ struct sout_mux_sys_t
 
     dvbpsi_t        *p_dvbpsi;
     bool            b_es_id_pid;
-    bool            b_sdt;
     int             i_pid_video;
     int             i_pid_audio;
     int             i_pid_spu;
@@ -596,7 +596,7 @@ static int Open( vlc_object_t *p_this )
     if ( val.i_int )
         p_sys->sdt.i_netid = val.i_int;
     else
-        p_sys->sdt.i_netid = 0xff00 | ( nrand48(subi) & 0xff );
+        p_sys->sdt.i_netid = 0xff00 | ( nrand48(subi) & 0xfa );
 
     p_sys->i_pmt_version_number = nrand48(subi) & 0x1f;
     p_sys->sdt.ts.i_pid = 0x11;
@@ -606,8 +606,6 @@ static int Open( vlc_object_t *p_this )
     /* Syntax is provider_sdt1,service_name_sdt1,provider_sdt2,service_name_sdt2... */
     if( sdtdesc )
     {
-        p_sys->b_sdt = true;
-
         char *psz_sdttoken = sdtdesc;
 
         for (int i = 0; i < MAX_SDT_DESC * 2 && psz_sdttoken; i++)
@@ -617,9 +615,9 @@ static int Open( vlc_object_t *p_this )
                 *psz_end++ = '\0';
 
             if (i % 2)
-                p_sys->sdt.desc[i/2].psz_service_name = strdup(psz_sdttoken);
+                p_sys->sdt.desc[i/2].psz_service_name = FromLocaleDup( psz_sdttoken );
             else
-                p_sys->sdt.desc[i/2].psz_provider = strdup(psz_sdttoken);
+                p_sys->sdt.desc[i/2].psz_provider = FromLocaleDup( psz_sdttoken );
 
             psz_sdttoken = psz_end;
         }
@@ -884,6 +882,11 @@ static int AddStream( sout_mux_t *p_mux, sout_input_t *p_input )
         p_stream->ts.i_pid = AllocatePID( p_mux, p_input->p_fmt->i_cat );
 
     p_stream->pes.i_codec = p_input->p_fmt->i_codec;
+    if( p_input->p_fmt->i_cat == VIDEO_ES )
+    {
+        p_stream->pes.i_width = p_input->fmt.video.i_width;
+        p_stream->pes.i_height = p_input->fmt.video.i_height;
+    }
 
     p_stream->pes.i_stream_type = -1;
     switch( p_input->p_fmt->i_codec )
@@ -922,9 +925,6 @@ static int AddStream( sout_mux_t *p_mux, sout_input_t *p_input )
     case VLC_CODEC_MJPG:
         p_stream->pes.i_stream_type = 0xa0; /* private */
         p_stream->pes.i_stream_id = 0xa0;   /* beurk */
-        p_stream->pes.i_bih_codec  = p_input->p_fmt->i_codec;
-        p_stream->pes.i_bih_width  = p_input->p_fmt->video.i_width;
-        p_stream->pes.i_bih_height = p_input->p_fmt->video.i_height;
         break;
     case VLC_CODEC_DIRAC:
         /* stream_id makes use of stream_id_extension */

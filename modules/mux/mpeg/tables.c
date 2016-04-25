@@ -92,12 +92,16 @@ void BuildPAT( dvbpsi_t *p_dvbpsi,
         dvbpsi_pat_program_add( &patpsi, pi_programs_number[i], p_pmt[i].i_pid );
 
     p_section = dvbpsi_pat_sections_generate( p_dvbpsi, &patpsi, 0 );
-    block_t *p_block = WritePSISection( p_section );
-
-    PEStoTS( p_opaque, pf_callback, p_block, p_pat->i_pid,
-             &p_pat->b_discontinuity, &p_pat->i_continuity_counter );
-
-    dvbpsi_DeletePSISections( p_section );
+    if( likely(p_section) )
+    {
+        block_t *p_block = WritePSISection( p_section );
+        if( likely(p_block) )
+        {
+            PEStoTS( p_opaque, pf_callback, p_block, p_pat->i_pid,
+                     &p_pat->b_discontinuity, &p_pat->i_continuity_counter );
+        }
+        dvbpsi_DeletePSISections( p_section );
+    }
     dvbpsi_pat_empty( &patpsi );
 }
 #if 1
@@ -247,6 +251,108 @@ static void GetPMTmpeg4( vlc_object_t *p_object, dvbpsi_pmt_t *p_dvbpmt,
     dvbpsi_pmt_descriptor_add(&p_dvbpmt[0], 0x1d, bits.i_data, bits.p_data);
 }
 
+static void UpdateServiceType( uint8_t *pi_service_cat, uint8_t *pi_service_type, const pes_stream_t *p_pes )
+{
+    uint8_t i_type = 0x00;
+
+    switch( p_pes->i_stream_type )
+    {
+        case 0x01: /* MPEG1 */
+        case 0x02: /* MPEG2 */
+        case 0x80:
+            if( p_pes->i_height > 468 && p_pes->i_width > 720 )
+                i_type = 0x19;
+            else
+                i_type = 0x01;
+            break;
+
+        case 0x24: /* HEVC */
+        case 0x10: /* MPEG4 */
+        case 0x1b: /* H264 */
+        case 0xA0: /* private */
+        case 0xd1: /* dirac */
+            i_type = 0x16;
+            break;
+
+        default:
+            break;
+    }
+
+    if( i_type == 0x01 && p_pes->i_height > 468 && p_pes->i_width > 720 ) /* MPEG2 SD -> HD */
+    {
+         i_type = 0x11;
+    }
+    else if( i_type == 0x16 && p_pes->i_height > 468 && p_pes->i_width > 720 ) /* Advanced codec SD -> HD */
+    {
+         i_type = 0x19;
+    }
+
+    if( i_type != 0x00 )
+    {
+        if( *pi_service_cat != VIDEO_ES || i_type > *pi_service_type )
+        {
+            *pi_service_type = i_type;
+            *pi_service_cat = VIDEO_ES;
+        }
+        return;
+    }
+
+    if( *pi_service_cat != VIDEO_ES ) /* Don't overwrite video */
+    {
+        /* Not video, try audio */
+        switch( p_pes->i_stream_type )
+        {
+            case 0x03: /* MPEG1 audio */
+            case 0x04: /* MPEG2 audio */
+                i_type = 0x02;
+                break;
+
+            case 0x06:
+            case 0x0f:
+            case 0x81:
+            case 0x83:
+                i_type = 0x0A; /* Avanced codec digital radio */
+                break;
+
+            default:
+                break;
+        }
+
+        if( i_type > *pi_service_type )
+            *pi_service_type = i_type;
+    }
+}
+
+static inline size_t Write_AnnexA_String( uint8_t *p_dest, const char *p_src )
+{
+    size_t i_src;
+    if( p_src == NULL || !(i_src = strlen( p_src )) )
+    {
+        p_dest[0] = 0;
+        return 1;
+    }
+
+    bool b_latin = (p_src[0] > 0x20);
+    for ( size_t i=0; i< i_src && b_latin; i++ )
+        b_latin &= !( p_src[i] & 0x80 );
+
+    if( b_latin )
+    {
+        i_src = __MIN( i_src, UINT8_MAX );
+        p_dest[0] = i_src; /* Total size */
+        memcpy( &p_dest[1], p_src, i_src );
+        return 1 + i_src;
+    }
+    else
+    {
+        i_src = __MIN( i_src, UINT8_MAX - 1 );
+        p_dest[0] = 1 + i_src; /* Total size */
+        p_dest[1] = 0x15; /* UTF8 Encoding */
+        memcpy( &p_dest[2], p_src, i_src );
+        return 2 + i_src;
+    }
+}
+
 void BuildPMT( dvbpsi_t *p_dvbpsi, vlc_object_t *p_object,
                void *p_opaque, PEStoTSCallback pf_callback,
                int i_tsid, int i_pmt_version_number,
@@ -260,8 +366,19 @@ void BuildPMT( dvbpsi_t *p_dvbpsi, vlc_object_t *p_object,
             return;
 
     dvbpsi_sdt_t sdtpsi;
+    uint8_t *pi_service_types = NULL;
+    uint8_t *pi_service_cats = NULL;
     if( p_sdt )
+    {
         dvbpsi_sdt_init( &sdtpsi, 0x42, i_tsid, 1, true, p_sdt->i_netid );
+        pi_service_types = calloc( i_programs * 2, sizeof(uint8_t *) );
+        if( !pi_service_types )
+        {
+            free( dvbpmt );
+            return;
+        }
+        pi_service_cats = &pi_service_types[i_programs];
+    }
 
     for (unsigned i = 0; i < i_programs; i++ )
     {
@@ -270,40 +387,6 @@ void BuildPMT( dvbpsi_t *p_dvbpsi, vlc_object_t *p_object,
                         i_pmt_version_number,
                         true,      /* b_current_next */
                         i_pcr_pid );
-
-        if( !p_sdt )
-            continue;
-
-        dvbpsi_sdt_service_t *p_service = dvbpsi_sdt_service_add( &sdtpsi,
-            pi_programs_number[i],  /* service id */
-            false,     /* eit schedule */
-            false,     /* eit present */
-            4,         /* running status ("4=RUNNING") */
-            false );   /* free ca */
-
-        const char *psz_sdtprov = p_sdt->desc[i].psz_provider;
-        const char *psz_sdtserv = p_sdt->desc[i].psz_service_name;
-
-        if( !psz_sdtprov || !psz_sdtserv )
-            continue;
-        size_t provlen = VLC_CLIP(strlen(psz_sdtprov), 0, 255);
-        size_t servlen = VLC_CLIP(strlen(psz_sdtserv), 0, 255);
-
-        uint8_t psz_sdt_desc[3 + provlen + servlen];
-
-        psz_sdt_desc[0] = 0x01; /* digital television service */
-
-        /* service provider name length */
-        psz_sdt_desc[1] = (char)provlen;
-        memcpy( &psz_sdt_desc[2], psz_sdtprov, provlen );
-
-        /* service name length */
-        psz_sdt_desc[ 2 + provlen ] = (char)servlen;
-        memcpy( &psz_sdt_desc[3+provlen], psz_sdtserv, servlen );
-
-        dvbpsi_sdt_service_descriptor_add( p_service, 0x48,
-                                           (3 + provlen + servlen),
-                                           psz_sdt_desc );
     }
 
     for (unsigned i = 0; i < i_mapped_streams; i++ )
@@ -341,11 +424,11 @@ void BuildPMT( dvbpsi_t *p_dvbpsi, vlc_object_t *p_object,
             int i_extra = __MIN( p_stream->pes->i_extra, 502 );
 
             /* private DIV3 descripor */
-            memcpy( &data[0], &p_stream->pes->i_bih_codec, 4 );
-            data[4] = ( p_stream->pes->i_bih_width >> 8 )&0xff;
-            data[5] = ( p_stream->pes->i_bih_width      )&0xff;
-            data[6] = ( p_stream->pes->i_bih_height>> 8 )&0xff;
-            data[7] = ( p_stream->pes->i_bih_height     )&0xff;
+            memcpy( &data[0], &p_stream->pes->i_codec, 4 );
+            data[4] = ( p_stream->pes->i_width >> 8 )&0xff;
+            data[5] = ( p_stream->pes->i_width      )&0xff;
+            data[6] = ( p_stream->pes->i_height>> 8 )&0xff;
+            data[7] = ( p_stream->pes->i_height     )&0xff;
             data[8] = ( i_extra >> 8 )&0xff;
             data[9] = ( i_extra      )&0xff;
             if( i_extra > 0 )
@@ -442,29 +525,75 @@ void BuildPMT( dvbpsi_t *p_dvbpsi, vlc_object_t *p_object,
             dvbpsi_pmt_es_descriptor_add( p_es, 0x0a, 4*p_stream->pes->i_langs,
                 p_stream->pes->lang);
         }
+
+        if( p_sdt )
+        {
+            UpdateServiceType( &pi_service_cats[p_stream->i_mapped_prog],
+                               &pi_service_types[p_stream->i_mapped_prog],
+                               p_stream->pes );
+        }
     }
 
     for (unsigned i = 0; i < i_programs; i++ )
     {
         dvbpsi_psi_section_t *sect = dvbpsi_pmt_sections_generate( p_dvbpsi, &dvbpmt[i] );
-        block_t *pmt = WritePSISection( sect );
-        PEStoTS( p_opaque, pf_callback, pmt, p_pmt[i].i_pid,
-                 &p_pmt[i].b_discontinuity, &p_pmt[i].i_continuity_counter );
-        dvbpsi_DeletePSISections(sect);
+        if( likely(sect) )
+        {
+            block_t *pmt = WritePSISection( sect );
+            if( likely(pmt) )
+            {
+                PEStoTS( p_opaque, pf_callback, pmt, p_pmt[i].i_pid,
+                         &p_pmt[i].b_discontinuity, &p_pmt[i].i_continuity_counter );
+            }
+            dvbpsi_DeletePSISections(sect);
+        }
         dvbpsi_pmt_empty( &dvbpmt[i] );
     }
+    free( dvbpmt );
 
     if( p_sdt )
     {
+        for (unsigned i = 0; i < i_programs; i++ )
+        {
+            dvbpsi_sdt_service_t *p_service = dvbpsi_sdt_service_add( &sdtpsi,
+                                                                      pi_programs_number[i], /* service id */
+                                                                      false,     /* eit schedule */
+                                                                      false,     /* eit present */
+                                                                      4,         /* running status ("4=RUNNING") */
+                                                                      false );   /* free ca */
+
+            const char *psz_sdtprov = p_sdt->desc[i].psz_provider;
+            const char *psz_sdtserv = p_sdt->desc[i].psz_service_name;
+
+            uint8_t p_sdt_desc[4 + 255 * 2];
+            size_t i_sdt_desc = 0;
+
+            /* mapped service type according to es types */
+            p_sdt_desc[i_sdt_desc++] = pi_service_types[i];
+
+            /* service provider name length */
+            i_sdt_desc += Write_AnnexA_String( &p_sdt_desc[i_sdt_desc], psz_sdtprov );
+
+            /* service name length */
+            i_sdt_desc += Write_AnnexA_String( &p_sdt_desc[i_sdt_desc], psz_sdtserv );
+
+            dvbpsi_sdt_service_descriptor_add( p_service, 0x48, i_sdt_desc, p_sdt_desc );
+        }
+        free( pi_service_types );
+
         dvbpsi_psi_section_t *sect = dvbpsi_sdt_sections_generate( p_dvbpsi, &sdtpsi );
-        block_t *p_sdtblock = WritePSISection( sect );
-        PEStoTS( p_opaque, pf_callback, p_sdtblock, p_sdt->ts.i_pid,
-                 &p_sdt->ts.b_discontinuity, &p_sdt->ts.i_continuity_counter );
-        dvbpsi_DeletePSISections( sect );
+        if( likely(sect) )
+        {
+            block_t *p_sdtblock = WritePSISection( sect );
+            if( likely(p_sdtblock) )
+            {
+                PEStoTS( p_opaque, pf_callback, p_sdtblock, p_sdt->ts.i_pid,
+                         &p_sdt->ts.b_discontinuity, &p_sdt->ts.i_continuity_counter );
+            }
+            dvbpsi_DeletePSISections( sect );
+        }
         dvbpsi_sdt_empty( &sdtpsi );
     }
-
-    free( dvbpmt );
 }
 
 

@@ -278,7 +278,7 @@ typedef struct vlc_dialog_cbs
      * Called when an error message needs to be displayed
      *
      * @param p_data opaque pointer for the callback
-     * @param psz_title title of the diaog
+     * @param psz_title title of the dialog
      * @param psz_text text of the dialog
      */
     void (*pf_display_error)(void *p_data, const char *psz_title,
@@ -290,12 +290,12 @@ typedef struct vlc_dialog_cbs
      * You can interact with this dialog by calling vlc_dialog_id_post_login()
      * to post an answer or vlc_dialog_id_dismiss() to cancel this dialog.
      *
-     * @note to receive this callack, vlc_dialog_cbs.pf_cancel should not be
+     * @note to receive this callback, vlc_dialog_cbs.pf_cancel should not be
      * NULL.
      *
      * @param p_data opaque pointer for the callback
      * @param p_id id used to interact with the dialog
-     * @param psz_title title of the diaog
+     * @param psz_title title of the dialog
      * @param psz_text text of the dialog
      * @param psz_default_username user name that should be set on the user form
      * @param b_ask_store if true, ask the user if he wants to save the
@@ -312,12 +312,12 @@ typedef struct vlc_dialog_cbs
      * You can interact with this dialog by calling vlc_dialog_id_post_action()
      * to post an answer or vlc_dialog_id_dismiss() to cancel this dialog.
      *
-     * @note to receive this callack, vlc_dialog_cbs.pf_cancel should not be
+     * @note to receive this callback, vlc_dialog_cbs.pf_cancel should not be
      * NULL.
      *
      * @param p_data opaque pointer for the callback
      * @param p_id id used to interact with the dialog
-     * @param psz_title title of the diaog
+     * @param psz_title title of the dialog
      * @param psz_text text of the dialog
      * @param i_type question type (or severity) of the dialog
      * @param psz_cancel text of the cancel button
@@ -338,12 +338,12 @@ typedef struct vlc_dialog_cbs
      * If cancellable (psz_cancel != NULL), you can cancel this dialog by
      * calling vlc_dialog_id_dismiss()
      *
-     * @note to receive this callack, vlc_dialog_cbs.pf_cancel and
+     * @note to receive this callback, vlc_dialog_cbs.pf_cancel and
      * vlc_dialog_cbs.pf_update_progress should not be NULL.
      *
      * @param p_data opaque pointer for the callback
      * @param p_id id used to interact with the dialog
-     * @param psz_title title of the diaog
+     * @param psz_title title of the dialog
      * @param psz_text text of the dialog
      * @param b_indeterminate true if the progress dialog is indeterminate
      * @param f_position initial position of the progress bar (between 0.0 and

@@ -18,11 +18,6 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston MA 02110-1301, USA.
  *****************************************************************************/
 
-/**
- * @file
- * This file declares VLC renderer discvoery structures and functions
- */
-
 #ifndef VLC_RENDERER_DISCOVERY_H
 #define VLC_RENDERER_DISCOVERY_H 1
 
@@ -34,6 +29,10 @@
 /**
  * @defgroup vlc_renderer VLC renderer discovery
  * @{
+ *
+ * @file
+ * This file declares VLC renderer discvoery structures and functions
+ *
  * @defgroup vlc_renderer_item VLC renderer items returned by the discovery
  * @{
  */
@@ -222,9 +221,6 @@ static int vlc_rd_probe_open(vlc_object_t *obj) \
         set_capability("renderer probe", 100) \
         set_callbacks(vlc_rd_probe_open, NULL)
 
-/**
- * @}
- * @}
- */
+/** @} @} */
 
 #endif
