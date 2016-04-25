@@ -38,6 +38,7 @@
 #include <sstream>
 
 #include "cast_channel.pb.h"
+#include "chromecast_common.h"
 
 #define PACKET_HEADER_LEN 4
 
@@ -50,15 +51,6 @@ static const std::string NAMESPACE_MEDIA            = "urn:x-cast:com.google.cas
 #define HTTP_PORT               8010
 
 // Status
-enum connection_status
-{
-    CHROMECAST_DISCONNECTED,
-    CHROMECAST_TLS_CONNECTED,
-    CHROMECAST_AUTHENTICATED,
-    CHROMECAST_APP_STARTED,
-    CHROMECAST_CONNECTION_DEAD,
-};
-
 enum command_status {
     NO_CMD_PENDING,
     CMD_LOAD_SENT,
@@ -157,6 +149,7 @@ struct vlc_renderer_sys
 #endif
             conn_status = status;
             vlc_cond_broadcast(&loadCommandCond);
+            vlc_cond_signal(&seekCommandCond);
         }
     }
 
@@ -242,6 +235,8 @@ private:
     std::string artwork;
     std::string mime;
 
+    static void* ChromecastThread(void* p_data);
+
     vlc_cond_t   loadCommandCond;
     vlc_cond_t   seekCommandCond;
 
@@ -254,6 +249,23 @@ private:
     /* seek time with Chromecast relative timestamp */
     mtime_t           m_seek_request_time;
 
+    mtime_t           i_length;
+
+    /* shared structure with the demux-filter */
+    chromecast_common      common;
+
+    static void wait_app_started(void*);
+    static void set_input_state(void*, input_state_e state);
+
+    static void set_length(void*, mtime_t length);
+    static mtime_t get_time(void*);
+    static double get_position(void*);
+    static bool seek_to(void*, mtime_t i_pts);
+    static void wait_seek_done(void*);
+    static enum connection_status get_connection_status(void*);
+
+    static void set_title(void*, const char *psz_title);
+    static void set_artwork(void*, const char *psz_artwork);
 };
 
 #endif /* VLC_CHROMECAST_H */

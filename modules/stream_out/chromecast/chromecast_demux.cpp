@@ -28,12 +28,14 @@
 # include "config.h"
 #endif
 
-#include "chromecast.h"
+#include "chromecast_common.h"
 
 #include <vlc_demux.h>
 #include <vlc_input.h>
+#include <vlc_plugin.h>
 
 #include <cassert>
+#include <new>
 
 static int DemuxOpen(vlc_object_t *);
 static void DemuxClose(vlc_object_t *);
@@ -59,7 +61,7 @@ vlc_module_end ()
 
 struct demux_sys_t
 {
-    demux_sys_t(demux_t * const demux, vlc_renderer_sys * const renderer)
+    demux_sys_t(demux_t * const demux, chromecast_common * const renderer)
         :p_demux(demux)
         ,p_renderer(renderer)
         ,i_length(-1)
@@ -71,15 +73,16 @@ struct demux_sys_t
         if ( p_item )
         {
             char *psz_title = input_item_GetTitleFbName( p_item );
-            p_renderer->setTitle( psz_title );
+            p_renderer->pf_set_title( p_renderer->p_opaque, psz_title );
             free( psz_title );
 
             psz_title = input_item_GetArtworkURL( p_item );
-            p_renderer->setArtwork( psz_title );
+            p_renderer->pf_set_artwork( p_renderer->p_opaque, psz_title );
             free( psz_title );
         }
 
-        p_renderer->setInputState( (input_state_e) var_GetInteger( p_demux->p_input, "state" ) );
+        p_renderer->pf_set_input_state( p_renderer->p_opaque,
+                                        (input_state_e) var_GetInteger( p_demux->p_input, "state" ) );
         var_AddCallback( p_demux->p_input, "intf-event", InputEvent, this );
     }
 
@@ -87,8 +90,8 @@ struct demux_sys_t
     {
         var_DelCallback( p_demux->p_input, "intf-event", InputEvent, this );
 
-        p_renderer->setTitle( NULL );
-        p_renderer->setArtwork( NULL );
+        p_renderer->pf_set_title( p_renderer->p_opaque, NULL );
+        p_renderer->pf_set_artwork( p_renderer->p_opaque, NULL );
     }
 
     /**
@@ -97,14 +100,12 @@ struct demux_sys_t
      */
     mtime_t getPlaybackTime()
     {
-        vlc_mutex_locker locker(&p_renderer->lock);
-        return p_renderer->getPlaybackTimestamp();
+        return p_renderer->pf_get_time( p_renderer->p_opaque );
     }
 
     double getPlaybackPosition()
     {
-        vlc_mutex_locker locker(&p_renderer->lock);
-        return p_renderer->getPlaybackPosition(i_length);
+        return p_renderer->pf_get_position( p_renderer->p_opaque );
     }
 
     void setCanSeek( bool canSeek )
@@ -124,7 +125,7 @@ struct demux_sys_t
         if ( !canSeek )
             return false;
 
-        if ( p_renderer->seekTo( i_pos ) )
+        if ( p_renderer->pf_seek_to( p_renderer->p_opaque, i_pos ) )
         {
             /* seeking will be handled with the Chromecast */
             m_seektime = i_pos;
@@ -136,27 +137,20 @@ struct demux_sys_t
     void setLength( mtime_t length )
     {
         this->i_length = length;
+        p_renderer->pf_set_length( p_renderer->p_opaque, length );
     }
 
     int Demux() {
-        vlc_mutex_lock(&p_renderer->lock);
         if (!demuxReady)
         {
             msg_Dbg(p_demux, "wait to demux");
-            p_renderer->waitAppStarted();
+            p_renderer->pf_wait_app_started( p_renderer->p_opaque );
             demuxReady = true;
             msg_Dbg(p_demux, "ready to demux");
         }
 
-        if (p_renderer->getConnectionStatus() != CHROMECAST_APP_STARTED)
-        {
-            msg_Dbg(p_demux, "app not started:%d, don't demux", p_renderer->getConnectionStatus());
-            vlc_mutex_unlock(&p_renderer->lock);
-            return VLC_DEMUXER_EOF;
-        }
-
         /* hold the data while seeking */
-        /* wait until the device is buffering for seeked data */
+        /* wait until the device is buffering for data after the seek command */
         if ( m_seektime != VLC_TS_INVALID )
         {
             msg_Dbg( p_demux, "do the actual seek" );
@@ -165,26 +159,25 @@ struct demux_sys_t
             if (i_ret != VLC_SUCCESS)
             {
                 msg_Warn( p_demux, "failed to seek in the muxer %d", i_ret );
-                vlc_mutex_unlock(&p_renderer->lock);
                 return VLC_DEMUXER_EGENERIC;
             }
 
-            p_renderer->waitSeekDone();
-
-            if (p_renderer->getConnectionStatus() != CHROMECAST_APP_STARTED) {
-                msg_Warn(p_demux, "cannot seek as the Chromecast app is not running %d", p_renderer->getConnectionStatus());
-                vlc_mutex_unlock(&p_renderer->lock);
-                return VLC_DEMUXER_EOF;
-            }
+            p_renderer->pf_wait_seek_done( p_renderer->p_opaque );
         }
-        vlc_mutex_unlock(&p_renderer->lock);
+
+        enum connection_status status = p_renderer->pf_get_connection_status( p_renderer->p_opaque );
+        if ( status != CHROMECAST_APP_STARTED)
+        {
+            msg_Dbg(p_demux, "app not started:%d, don't demux", status);
+            return VLC_DEMUXER_EOF;
+        }
 
         return demux_Demux( p_demux->p_source );
     }
 
 protected:
     demux_t       * const p_demux;
-    vlc_renderer_sys  * const p_renderer;
+    chromecast_common  * const p_renderer;
     mtime_t       i_length;
     bool          demuxReady;
     bool          canSeek;
@@ -312,7 +305,8 @@ int demux_sys_t::InputEvent( vlc_object_t *p_this, char const *psz_var,
 
     assert( p_input == p_input );
     if( val.i_int == INPUT_EVENT_STATE )
-        p_sys->p_renderer->setInputState( (input_state_e) var_GetInteger( p_input, "state" ) );
+        p_sys->p_renderer->pf_set_input_state( p_sys->p_renderer->p_opaque,
+                                               (input_state_e) var_GetInteger( p_input, "state" ) );
 
     return VLC_SUCCESS;
 }
@@ -331,7 +325,7 @@ int DemuxOpen(vlc_object_t *p_this)
         msg_Err(p_demux, "Missing the control interface to work");
         return VLC_EBADVAR;
     }
-    vlc_renderer_sys *p_renderer = (vlc_renderer_sys *) i_chromecast_control;
+    chromecast_common *p_renderer = (chromecast_common *) i_chromecast_control;
 
     demux_sys_t *p_sys = new(std::nothrow) demux_sys_t(p_demux, p_renderer);
     if (unlikely(p_sys == NULL))
