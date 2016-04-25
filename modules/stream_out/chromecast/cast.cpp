@@ -32,12 +32,9 @@
 
 #include "chromecast.h"
 
-#include <vlc_input.h>
-#include <vlc_playlist.h>
 #include <vlc_sout.h>
 
 #include <cassert>
-#include <vector>
 
 struct sout_stream_sys_t
 {

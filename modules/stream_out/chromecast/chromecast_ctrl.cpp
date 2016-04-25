@@ -32,9 +32,6 @@
 
 #include "chromecast.h"
 
-#include <vlc_input.h>
-#include <vlc_playlist.h>
-
 #include <cassert>
 #include <cerrno>
 #ifdef HAVE_POLL
