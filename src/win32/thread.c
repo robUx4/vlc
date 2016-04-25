@@ -442,6 +442,7 @@ retry:
 
 /*** Threads ***/
 static DWORD thread_key;
+static DWORD cancel_key;
 
 struct vlc_thread
 {
@@ -454,6 +455,7 @@ struct vlc_thread
     atomic_bool    killed;
 #endif
     vlc_cleanup_t *cleaners;
+    vlc_cleanup_t *cancelers;
 
     void        *(*entry) (void *);
     void          *data;
@@ -499,6 +501,7 @@ static int vlc_clone_attr (vlc_thread_t *p_handle, bool detached,
     atomic_init(&th->killed, false);
 #endif
     th->cleaners = NULL;
+    th->cancelers = NULL;
 
     /* When using the MSVCRT C library you have to use the _beginthreadex
      * function instead of CreateThread, otherwise you'll end up with
@@ -573,7 +576,11 @@ static void CALLBACK vlc_cancel_self (ULONG_PTR self)
     struct vlc_thread *th = (void *)self;
 
     if (likely(th != NULL))
+    {
         th->killed = true;
+        for (vlc_cleanup_t *p = th->cancelers; p != NULL; p = p->next)
+            p->proc (p->data);
+    }
 }
 #endif
 
@@ -660,6 +667,22 @@ void vlc_control_cancel (int cmd, ...)
         case VLC_CLEANUP_POP:
         {
             th->cleaners = th->cleaners->next;
+            break;
+        }
+
+        case VLC_CANCEL_PUSH:
+        {
+            /* cleaner is a pointer to the caller stack, no need to allocate
+             * and copy anything. As a nice side effect, this cannot fail. */
+            vlc_cleanup_t *canceler = va_arg (ap, vlc_cleanup_t *);
+            canceler->next = th->cancelers;
+            th->cancelers = canceler;
+            break;
+        }
+
+        case VLC_CANCEL_POP:
+        {
+            th->cancelers = th->cancelers->next;
             break;
         }
     }
@@ -1031,6 +1054,12 @@ BOOL WINAPI DllMain (HINSTANCE hinstDll, DWORD fdwReason, LPVOID lpvReserved)
             thread_key = TlsAlloc();
             if (unlikely(thread_key == TLS_OUT_OF_INDEXES))
                 return FALSE;
+            cancel_key = TlsAlloc();
+            if (unlikely(cancel_key == TLS_OUT_OF_INDEXES))
+            {
+                TlsFree(thread_key);
+                return FALSE;
+            }
             InitializeCriticalSection (&clock_lock);
             vlc_mutex_init (&super_mutex);
             vlc_cond_init (&super_variable);
@@ -1043,6 +1072,7 @@ BOOL WINAPI DllMain (HINSTANCE hinstDll, DWORD fdwReason, LPVOID lpvReserved)
             vlc_cond_destroy (&super_variable);
             vlc_mutex_destroy (&super_mutex);
             DeleteCriticalSection (&clock_lock);
+            TlsFree(cancel_key);
             TlsFree(thread_key);
             break;
 
