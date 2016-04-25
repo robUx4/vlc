@@ -1019,7 +1019,7 @@ AS_IF([test "${enable_optimizations}" != "no"], [
   ])
   AS_IF([test "${ac_cv_c_fast_math}" = "no"], [VLC_RESTORE_FLAGS])
   AH_BOTTOM([
-#ifndef __FAST_MATH__
+#if !defined(__FAST_MATH__) && defined(NDEBUG)
 # ifndef _MSC_VER
 #  pragma STDC FENV_ACCESS OFF
 #  pragma STDC FP_CONTRACT ON
