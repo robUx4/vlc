@@ -103,6 +103,8 @@ struct intf_sys_t
     void msgAuth();
     void msgReceiverClose(std::string destinationId);
 
+    void setHasInput( bool has_input, const std::string mime_type = "");
+
     void handleMessages();
 
     connection_status getConnectionStatus() const
@@ -172,6 +174,7 @@ private:
     unsigned i_receiver_requestId;
     unsigned i_requestId;
 
+    bool           has_input;
     static void* ChromecastThread(void* p_data);
 };
 
