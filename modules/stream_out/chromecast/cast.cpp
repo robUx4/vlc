@@ -46,19 +46,15 @@ struct sout_stream_sys_t
         , p_intf(intf)
         , b_has_video(has_video)
         , i_port(port)
-        , last_added_ts( VLC_TS_INVALID )
+        , es_changed( true )
     {
         assert(p_intf != NULL);
-        vlc_mutex_init( &es_lock );
-        vlc_cond_init( &es_changed_cond );
     }
     
     ~sout_stream_sys_t()
     {
         sout_StreamChainDelete(p_out, p_out);
         delete p_intf;
-        vlc_cond_destroy( &es_changed_cond );
-        vlc_mutex_destroy( &es_lock );
     }
 
     bool canDecodeVideo( const es_format_t *p_es ) const;
@@ -75,9 +71,7 @@ struct sout_stream_sys_t
 
     sout_stream_id_sys_t *GetSubId( sout_stream_t*, sout_stream_id_sys_t* );
 
-    vlc_mutex_t                        es_lock;
-    vlc_cond_t                         es_changed_cond;
-    mtime_t                            last_added_ts;
+    bool                               es_changed;
     std::vector<sout_stream_id_sys_t*> streams;
 
 private:
@@ -85,7 +79,6 @@ private:
 };
 
 #define SOUT_CFG_PREFIX "sout-chromecast-"
-const static mtime_t MAX_WAIT_BETWEEN_ADD = (CLOCK_FREQ / 3);
 
 static const vlc_fourcc_t DEFAULT_TRANSCODE_AUDIO = VLC_CODEC_MP3;
 static const vlc_fourcc_t DEFAULT_TRANSCODE_VIDEO = VLC_CODEC_H264;
@@ -166,10 +159,8 @@ static sout_stream_id_sys_t *Add(sout_stream_t *p_stream, const es_format_t *p_f
         es_format_Copy( &p_sys_id->fmt, p_fmt );
         p_sys_id->p_sub_id = NULL;
 
-        vlc_mutex_locker locker( &p_sys->es_lock );
         p_sys->streams.push_back( p_sys_id );
-        p_sys->last_added_ts = mdate();
-        vlc_cond_signal( &p_sys->es_changed_cond );
+        p_sys->es_changed = true;
     }
     return p_sys_id;
 }
@@ -179,7 +170,6 @@ static void Del(sout_stream_t *p_stream, sout_stream_id_sys_t *id)
 {
     sout_stream_sys_t *p_sys = p_stream->p_sys;
 
-    vlc_mutex_locker locker( &p_sys->es_lock );
     for (size_t i=0; i<p_sys->streams.size(); i++)
     {
         if ( p_sys->streams[i] == id )
@@ -190,6 +180,7 @@ static void Del(sout_stream_t *p_stream, sout_stream_id_sys_t *id)
             es_format_Clean( &p_sys->streams[i]->fmt );
             free( p_sys->streams[i] );
             p_sys->streams.erase( p_sys->streams.begin() +  i );
+            p_sys->es_changed = true;
             break;
         }
     }
@@ -229,17 +220,9 @@ int sout_stream_sys_t::UpdateOutput( sout_stream_t *p_stream )
 {
     assert( p_stream->p_sys == this );
 
-    if ( last_added_ts != VLC_TS_INVALID )
+    if ( es_changed )
     {
-        while ( last_added_ts + MAX_WAIT_BETWEEN_ADD < mdate() )
-        {
-            // wait for adding/removing ES expired
-            mutex_cleanup_push( &es_lock );
-            vlc_cond_timedwait( &es_changed_cond, &es_lock, last_added_ts + MAX_WAIT_BETWEEN_ADD );
-            vlc_cleanup_pop();
-        }
-        last_added_ts = VLC_TS_INVALID;
-        msg_Dbg( p_stream, "prepare new sub-sout for %s", p_intf->title.c_str() );
+        es_changed = false;
 
         bool canRemux = true;
         vlc_fourcc_t i_codec_video = 0, i_codec_audio = 0;
@@ -356,7 +339,6 @@ sout_stream_id_sys_t *sout_stream_sys_t::GetSubId( sout_stream_t *p_stream,
 
     assert( p_stream->p_sys == this );
 
-    vlc_mutex_locker locker( &es_lock );
     if ( UpdateOutput( p_stream ) != VLC_SUCCESS )
         return NULL;
 
