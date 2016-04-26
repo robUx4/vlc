@@ -465,6 +465,7 @@ static int Open(vlc_object_t *p_this)
         msg_Dbg(p_stream, "could not create sout chain:%s", ss.str().c_str());
         goto error;
     }
+    sout_StreamChainDelete( p_sout, p_sout );
 
     b_has_video = var_GetBool(p_stream, SOUT_CFG_PREFIX "video");
 
@@ -472,7 +473,6 @@ static int Open(vlc_object_t *p_this)
                                                  psz_mux, psz_var_mime );
     if (unlikely(p_sys == NULL))
         goto error;
-    sout_StreamChainDelete( p_sout, p_sout );
 
     // Set the sout callbacks.
     p_stream->pf_add     = Add;
