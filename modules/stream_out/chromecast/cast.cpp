@@ -81,7 +81,7 @@ struct sout_stream_sys_t
     std::vector<sout_stream_id_sys_t*> streams;
 
 private:
-    int WaitEsReady( sout_stream_t * );
+    int UpdateOutput( sout_stream_t * );
 };
 
 #define SOUT_CFG_PREFIX "sout-chromecast-"
@@ -225,7 +225,7 @@ bool sout_stream_sys_t::canDecodeAudio( const es_format_t *p_es ) const
     return false;
 }
 
-int sout_stream_sys_t::WaitEsReady( sout_stream_t *p_stream )
+int sout_stream_sys_t::UpdateOutput( sout_stream_t *p_stream )
 {
     assert( p_stream->p_sys == this );
 
@@ -357,7 +357,7 @@ sout_stream_id_sys_t *sout_stream_sys_t::GetSubId( sout_stream_t *p_stream,
     assert( p_stream->p_sys == this );
 
     vlc_mutex_locker locker( &es_lock );
-    if ( WaitEsReady( p_stream ) != VLC_SUCCESS )
+    if ( UpdateOutput( p_stream ) != VLC_SUCCESS )
         return NULL;
 
     for (i = 0; i < streams.size(); ++i)
