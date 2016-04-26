@@ -343,7 +343,7 @@ int sout_stream_sys_t::WaitEsReady( sout_stream_t *p_stream )
         }
 
         /* tell the chromecast to load the content */
-        p_intf->InputUpdated( true, mime );
+        p_intf->setHasInput( true, mime );
     }
 
     return VLC_SUCCESS;

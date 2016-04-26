@@ -137,7 +137,7 @@ struct intf_sys_t
 
     std::string title;
 
-    void InputUpdated( bool has_input, const std::string mime_type );
+    void setHasInput( bool has_input, const std::string mime_type );
 
 private:
     void handleMessages();

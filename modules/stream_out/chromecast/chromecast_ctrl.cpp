@@ -146,7 +146,7 @@ intf_sys_t::intf_sys_t(vlc_object_t * const p_this, int port, std::string device
 intf_sys_t::~intf_sys_t()
 {
     var_SetString( p_module->p_libvlc, "demux-filter", NULL );
-    InputUpdated( false, "" );
+    setHasInput( false, "" );
 
     /* disconnect the current Chromecast */
     switch (getConnectionStatus())
@@ -179,7 +179,7 @@ intf_sys_t::~intf_sys_t()
     vlc_mutex_destroy(&lock);
 }
 
-void intf_sys_t::InputUpdated( bool b_has_input, const std::string mime_type )
+void intf_sys_t::setHasInput( bool b_has_input, const std::string mime_type )
 {
     vlc_mutex_locker locker(&lock);
     msg_Dbg( p_module, "InputUpdated device:%s session:%s",
@@ -666,7 +666,7 @@ void intf_sys_t::processMessage(const castchannel::CastMessage &msg)
         if (type == "CLOSE")
         {
             msg_Warn( p_module, "received close message");
-            InputUpdated( false, "" );
+            setHasInput( false, "" );
             vlc_mutex_locker locker(&lock);
             setConnectionStatus(CHROMECAST_CONNECTION_DEAD);
             // make sure we unblock the demuxer
