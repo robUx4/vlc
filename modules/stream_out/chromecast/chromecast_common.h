@@ -50,9 +50,8 @@ typedef struct
     void (*pf_set_length)(void*, mtime_t length);
     mtime_t (*pf_get_time)(void*);
     double (*pf_get_position)(void*);
-    bool (*pf_seek_to)(void*, mtime_t i_pts);
+    void (*pf_request_seek)(void*);
     void (*pf_wait_seek_done)(void*);
-    enum connection_status (*pf_get_connection_status)(void*);
 
     void (*pf_set_title)(void*, const char *psz_title);
     void (*pf_set_artwork)(void*, const char *psz_artwork);

@@ -79,40 +79,12 @@ struct intf_sys_t
         return conn_status == CHROMECAST_CONNECTION_DEAD || (receiverState == RECEIVER_BUFFERING && cmd_status != CMD_SEEK_SENT);
     }
 
-    mtime_t getPlaybackTimestamp() const
-    {
-        switch( receiverState )
-        {
-        case RECEIVER_PLAYING:
-            return ( mdate() - m_time_playback_started ) + i_ts_local_start;
+    void setHasInput( bool has_input, const std::string mime_type = "");
 
-        case RECEIVER_IDLE:
-            msg_Dbg(p_module, "receiver idle using buffering time %" PRId64, i_ts_local_start);
-            break;
-        case RECEIVER_BUFFERING:
-            msg_Dbg(p_module, "receiver buffering using buffering time %" PRId64, i_ts_local_start);
-            break;
-        case RECEIVER_PAUSED:
-            msg_Dbg(p_module, "receiver paused using buffering time %" PRId64, i_ts_local_start);
-            break;
-        }
-        return i_ts_local_start;
-    }
+    void requestPlayerSeek();
+    void requestPlayerStop();
 
-    double getPlaybackPosition( mtime_t i_length ) const
-    {
-        if( i_length > 0 && m_time_playback_started != -1)
-            return (double) getPlaybackTimestamp() / (double)( i_length );
-        return 0.0;
-    }
-
-    /**
-     * @brief seekTo
-     * @param pos
-     * @return true if the device was sent a SEEK command and we need to wait until it's processed
-     */
-    bool seekTo(mtime_t pos);
-
+private:
     vlc_object_t  * const p_module;
     const int      i_port;
     std::string    serverIP;
@@ -125,6 +97,7 @@ struct intf_sys_t
     receiver_state receiverState;
 
     int i_sock_fd;
+    int i_send_ready_fd;
     vlc_tls_creds_t *p_creds;
     vlc_tls_t *p_tls;
 
@@ -135,17 +108,7 @@ struct intf_sys_t
     void msgAuth();
     void msgReceiverClose(std::string destinationId);
 
-    std::string title;
-
-    void setHasInput( bool has_input, const std::string mime_type = "");
-
-private:
-    void handleMessages();
-
-    connection_status getConnectionStatus() const
-    {
-        return conn_status;
-    }
+    bool handleMessages();
 
     void setConnectionStatus(connection_status status)
     {
@@ -184,10 +147,9 @@ private:
 
     void processMessage(const castchannel::CastMessage &msg);
 
-    command_status getPlayerStatus() const
-    {
-        return cmd_status;
-    }
+    void notifySendRequest();
+    bool requested_stop;
+    bool requested_seek;
 
     void setInputState(input_state_e state);
 
@@ -235,8 +197,36 @@ private:
 
     std::string GetMedia();
     std::string artwork;
+    std::string title;
 
     static void* ChromecastThread(void* p_data);
+
+    mtime_t getPlaybackTimestamp() const
+    {
+        switch( receiverState )
+        {
+        case RECEIVER_PLAYING:
+            return ( mdate() - m_time_playback_started ) + i_ts_local_start;
+
+        case RECEIVER_IDLE:
+            msg_Dbg(p_module, "receiver idle using buffering time %" PRId64, i_ts_local_start);
+            break;
+        case RECEIVER_BUFFERING:
+            msg_Dbg(p_module, "receiver buffering using buffering time %" PRId64, i_ts_local_start);
+            break;
+        case RECEIVER_PAUSED:
+            msg_Dbg(p_module, "receiver paused using buffering time %" PRId64, i_ts_local_start);
+            break;
+        }
+        return i_ts_local_start;
+    }
+
+    double getPlaybackPosition( mtime_t i_length ) const
+    {
+        if( i_length > 0 && m_time_playback_started != -1)
+            return (double) getPlaybackTimestamp() / (double)( i_length );
+        return 0.0;
+    }
 
     vlc_cond_t   seekCommandCond;
 
@@ -260,9 +250,8 @@ private:
     static void set_length(void*, mtime_t length);
     static mtime_t get_time(void*);
     static double get_position(void*);
-    static bool seek_to(void*, mtime_t i_pts);
+    static void request_seek(void*);
     static void wait_seek_done(void*);
-    static enum connection_status get_connection_status(void*);
 
     static void set_title(void*, const char *psz_title);
     static void set_artwork(void*, const char *psz_artwork);

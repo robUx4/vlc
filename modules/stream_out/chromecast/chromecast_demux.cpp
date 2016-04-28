@@ -125,13 +125,11 @@ struct demux_sys_t
         if ( !canSeek )
             return false;
 
-        if ( p_renderer->pf_seek_to( p_renderer->p_opaque, i_pos ) )
-        {
-            /* seeking will be handled with the Chromecast */
-            m_seektime = i_pos;
-            return true;
-        }
-        return false;
+        /* seeking will be handled with the Chromecast */
+        m_seektime = i_pos;
+        p_renderer->pf_request_seek( p_renderer->p_opaque );
+
+        return true;
     }
 
     void setLength( mtime_t length )
@@ -165,12 +163,14 @@ struct demux_sys_t
             p_renderer->pf_wait_seek_done( p_renderer->p_opaque );
         }
 
+#if TODO /* do we need to block muxing if the output won't use it ? */
         enum connection_status status = p_renderer->pf_get_connection_status( p_renderer->p_opaque );
         if ( status != CHROMECAST_APP_STARTED)
         {
             msg_Dbg(p_demux, "app not started:%d, don't demux", status);
             return VLC_DEMUXER_EOF;
         }
+#endif
 
         return demux_Demux( p_demux->p_source );
     }
