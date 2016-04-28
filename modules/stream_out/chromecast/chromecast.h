@@ -88,6 +88,8 @@ struct intf_sys_t
 
     void setHasInput( bool has_input, const std::string mime_type = "");
 
+    void requestPlayerStop();
+
 private:
     vlc_object_t  * const p_module;
     const int      i_port;
@@ -147,6 +149,7 @@ private:
     void processMessage(const castchannel::CastMessage &msg);
 
     void notifySendRequest();
+    bool requested_stop;
 
     int sendMessage(const castchannel::CastMessage &msg);
 

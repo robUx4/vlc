@@ -100,6 +100,7 @@ intf_sys_t::intf_sys_t(vlc_object_t * const p_this, int port, std::string device
  , i_sock_fd(-1)
  , p_creds(NULL)
  , p_tls(NULL)
+ , requested_stop(false)
  , conn_status(CHROMECAST_DISCONNECTED)
  , cmd_status(NO_CMD_PENDING)
  , i_receiver_requestId(0)
@@ -882,6 +883,19 @@ bool intf_sys_t::handleMessages()
     bool b_msgReceived = false;
     uint32_t i_payloadSize = 0;
 
+    int canc = vlc_savecancel();
+    // Not cancellation-safe part.
+
+    vlc_mutex_lock(&lock);
+    if ( requested_stop )
+    {
+        msgPlayerStop();
+        requested_stop = false;
+    }
+
+    vlc_mutex_unlock(&lock);
+    vlc_restorecancel(canc);
+
     int i_ret = recvPacket( p_module, b_msgReceived, i_payloadSize, i_sock_fd,
                            p_tls, &i_received, p_packet, &b_pingTimeout,
                            &i_waitdelay, &i_retries);
@@ -921,4 +935,17 @@ bool intf_sys_t::handleMessages()
 void intf_sys_t::notifySendRequest()
 {
     vlc_interrupt_raise( p_ctl_thread_interrupt );
+}
+
+void intf_sys_t::requestPlayerStop()
+{
+    vlc_mutex_locker locker(&lock);
+    if ( conn_status == CHROMECAST_CONNECTION_DEAD )
+        return;
+
+    if ( mediaSessionId.empty() )
+        return;
+
+    requested_stop = true;
+    notifySendRequest();
 }
