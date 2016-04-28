@@ -91,7 +91,7 @@ void intf_sys_t::buildMessage(const std::string & namespace_,
 /*****************************************************************************
  * intf_sys_t: class definition
  *****************************************************************************/
-intf_sys_t::intf_sys_t(vlc_object_t * const p_this, int port, std::string device_addr, int device_port)
+intf_sys_t::intf_sys_t(vlc_object_t * const p_this, int port, std::string device_addr, int device_port, vlc_interrupt_t *p_interrupt)
  : p_module(p_this)
  , i_port(port)
  , i_target_port(device_port)
@@ -105,6 +105,7 @@ intf_sys_t::intf_sys_t(vlc_object_t * const p_this, int port, std::string device
  , i_receiver_requestId(0)
  , i_requestId(0)
  , has_input(false)
+ , p_ctl_thread_interrupt(p_interrupt)
 {
     vlc_mutex_init(&lock);
     vlc_cond_init(&loadCommandCond);
@@ -137,10 +138,14 @@ intf_sys_t::~intf_sys_t()
         break;
     }
 
+    vlc_interrupt_kill( p_ctl_thread_interrupt );
+
     vlc_cancel(chromecastThread);
     vlc_join(chromecastThread, NULL);
 
     disconnectChromecast();
+
+    vlc_interrupt_destroy( p_ctl_thread_interrupt );
 
     vlc_cond_destroy(&loadCommandCond);
     vlc_mutex_destroy(&lock);
@@ -254,7 +259,11 @@ extern "C" int recvPacket(vlc_object_t *p_module, bool &b_msgReceived,
      * If we do not receive one after 6 seconds, we send a PING.
      * If after this PING, we do not receive a PONG, then we consider the
      * connection as dead. */
-    if (poll(ufd, 1, *pi_wait_delay) == 0)
+    ssize_t val = vlc_poll_i11e(ufd, 1, *pi_wait_delay);
+    if ( val == -1 && errno != EINTR )
+        return -1;
+
+    if (val == 0)
     {
         if (*pb_pingTimeout)
         {
@@ -282,37 +291,54 @@ extern "C" int recvPacket(vlc_object_t *p_module, bool &b_msgReceived,
         *pi_wait_retries = PING_WAIT_RETRIES;
     }
 
-    int i_ret;
-
-    /* Packet structure:
-     * +------------------------------------+------------------------------+
-     * | Payload size (uint32_t big endian) |         Payload data         |
-     * +------------------------------------+------------------------------+ */
-    while (*pi_received < PACKET_HEADER_LEN)
+    int i_ret = 0;
+    if ( ufd[0].revents & POLLIN )
     {
-        // We receive the header.
-        i_ret = tls_Recv(p_tls, p_data + *pi_received, PACKET_HEADER_LEN - *pi_received);
-        if (i_ret <= 0)
-            return i_ret;
-        *pi_received += i_ret;
-    }
+        /* we have received stuff */
 
-    // We receive the payload.
+        /* Packet structure:
+         * +------------------------------------+------------------------------+
+         * | Payload size (uint32_t big endian) |         Payload data         |
+         * +------------------------------------+------------------------------+ */
+        while (*pi_received < PACKET_HEADER_LEN)
+        {
+            // We receive the header.
+            i_ret = tls_Recv(p_tls, p_data + *pi_received, PACKET_HEADER_LEN - *pi_received);
+            if (i_ret <= 0)
+                return i_ret;
+            *pi_received += i_ret;
+        }
 
-    // Get the size of the payload
-    i_payloadSize = U32_AT( p_data );
-    const uint32_t i_maxPayloadSize = PACKET_MAX_LEN - PACKET_HEADER_LEN;
+        // We receive the payload.
 
-    if (i_payloadSize > i_maxPayloadSize)
-    {
-        // Error case: the packet sent by the Chromecast is too long: we drop it.
-        msg_Err( p_module, "Packet too long: droping its data");
+        // Get the size of the payload
+        i_payloadSize = U32_AT( p_data );
+        const uint32_t i_maxPayloadSize = PACKET_MAX_LEN - PACKET_HEADER_LEN;
 
-        uint32_t i_size = i_payloadSize - (*pi_received - PACKET_HEADER_LEN);
-        if (i_size > i_maxPayloadSize)
-            i_size = i_maxPayloadSize;
+        if (i_payloadSize > i_maxPayloadSize)
+        {
+            // Error case: the packet sent by the Chromecast is too long: we drop it.
+            msg_Err( p_module, "Packet too long: droping its data");
 
-        i_ret = tls_Recv(p_tls, p_data + PACKET_HEADER_LEN, i_size);
+            uint32_t i_size = i_payloadSize - (*pi_received - PACKET_HEADER_LEN);
+            if (i_size > i_maxPayloadSize)
+                i_size = i_maxPayloadSize;
+
+            i_ret = tls_Recv(p_tls, p_data + PACKET_HEADER_LEN, i_size);
+            if (i_ret <= 0)
+                return i_ret;
+            *pi_received += i_ret;
+
+            if (*pi_received < i_payloadSize + PACKET_HEADER_LEN)
+                return i_ret;
+
+            *pi_received = 0;
+            return -1;
+        }
+
+        // Normal case
+        i_ret = tls_Recv(p_tls, p_data + *pi_received,
+                         i_payloadSize - (*pi_received - PACKET_HEADER_LEN));
         if (i_ret <= 0)
             return i_ret;
         *pi_received += i_ret;
@@ -320,23 +346,15 @@ extern "C" int recvPacket(vlc_object_t *p_module, bool &b_msgReceived,
         if (*pi_received < i_payloadSize + PACKET_HEADER_LEN)
             return i_ret;
 
+        assert(*pi_received == i_payloadSize + PACKET_HEADER_LEN);
         *pi_received = 0;
-        return -1;
+        b_msgReceived = true;
     }
 
-    // Normal case
-    i_ret = tls_Recv(p_tls, p_data + *pi_received,
-                     i_payloadSize - (*pi_received - PACKET_HEADER_LEN));
-    if (i_ret <= 0)
-        return i_ret;
-    *pi_received += i_ret;
+    if ( val == -1 && errno == EINTR )
+        /* we have stuff to send */
+        i_ret = 1;
 
-    if (*pi_received < i_payloadSize + PACKET_HEADER_LEN)
-        return i_ret;
-
-    assert(*pi_received == i_payloadSize + PACKET_HEADER_LEN);
-    *pi_received = 0;
-    b_msgReceived = true;
     return i_ret;
 }
 
@@ -836,6 +854,7 @@ void* intf_sys_t::ChromecastThread(void* p_data)
         return NULL;
     }
 
+    vlc_interrupt_set( p_sys->p_ctl_thread_interrupt );
     canc = vlc_savecancel();
     p_sys->serverIP = psz_localIP;
 
@@ -846,7 +865,7 @@ void* intf_sys_t::ChromecastThread(void* p_data)
     p_sys->msgAuth();
     vlc_restorecancel(canc);
 
-    while ( p_sys->handleMessages() );
+    while ( !vlc_killed() && p_sys->handleMessages() );
 
     return NULL;
 }
@@ -862,11 +881,12 @@ bool intf_sys_t::handleMessages()
 
     bool b_msgReceived = false;
     uint32_t i_payloadSize = 0;
+
     int i_ret = recvPacket( p_module, b_msgReceived, i_payloadSize, i_sock_fd,
                            p_tls, &i_received, p_packet, &b_pingTimeout,
                            &i_waitdelay, &i_retries);
 
-    int canc = vlc_savecancel();
+    canc = vlc_savecancel();
     // Not cancellation-safe part.
 
 #if defined(_WIN32)
@@ -896,4 +916,9 @@ bool intf_sys_t::handleMessages()
 
     vlc_mutex_locker locker(&lock);
     return conn_status != CHROMECAST_CONNECTION_DEAD;
+}
+
+void intf_sys_t::notifySendRequest()
+{
+    vlc_interrupt_raise( p_ctl_thread_interrupt );
 }
