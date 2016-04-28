@@ -102,6 +102,7 @@ private:
     receiver_state receiverState;
 
     int i_sock_fd;
+    int i_send_ready_fd;
     vlc_tls_creds_t *p_creds;
     vlc_tls_t *p_tls;
 
@@ -146,6 +147,8 @@ private:
     void msgPlayerSetMute(bool mute);
 
     void processMessage(const castchannel::CastMessage &msg);
+
+    void notifySendRequest();
 
     int sendMessage(const castchannel::CastMessage &msg);
 
