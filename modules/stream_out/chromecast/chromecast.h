@@ -112,7 +112,7 @@ private:
     void msgAuth();
     void msgReceiverClose(std::string destinationId);
 
-    void handleMessages();
+    bool handleMessages();
 
     connection_status getConnectionStatus() const
     {
