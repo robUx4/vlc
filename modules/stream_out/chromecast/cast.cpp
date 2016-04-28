@@ -406,7 +406,8 @@ static int Open(vlc_object_t *p_this)
     char *psz_var_mime = NULL;
     sout_stream_t *p_sout = NULL;
     bool b_has_video = true;
-    int i_local_server_port, i_device_port;
+    int i_local_server_port;
+    int i_device_port;
     std::stringstream ss;
 
     config_ChainParse(p_stream, SOUT_CFG_PREFIX, ppsz_sout_options, p_stream->p_cfg);
