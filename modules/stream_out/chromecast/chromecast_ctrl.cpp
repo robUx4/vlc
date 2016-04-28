@@ -37,6 +37,7 @@
 #ifdef HAVE_POLL
 # include <poll.h>
 #endif
+#include <vlc_network.h>
 
 #include "../../misc/webservices/json.h"
 
@@ -98,6 +99,7 @@ intf_sys_t::intf_sys_t(vlc_object_t * const p_this, int port, std::string device
  , targetIP(device_addr)
  , receiverState(RECEIVER_IDLE)
  , i_sock_fd(-1)
+ , i_send_ready_fd(-1)
  , p_creds(NULL)
  , p_tls(NULL)
  , conn_status(CHROMECAST_DISCONNECTED)
@@ -142,6 +144,9 @@ intf_sys_t::~intf_sys_t()
     vlc_join(chromecastThread, NULL);
 
     disconnectChromecast();
+
+    if ( i_send_ready_fd != -1 )
+        net_Close( i_send_ready_fd );
 
     vlc_cond_destroy(&loadCommandCond);
     vlc_mutex_destroy(&lock);
@@ -243,19 +248,21 @@ void intf_sys_t::disconnectChromecast()
  */
 // Use here only C linkage and POD types as this function is a cancelation point.
 extern "C" int recvPacket(vlc_object_t *p_module, bool &b_msgReceived,
-                          uint32_t &i_payloadSize, int i_sock_fd, vlc_tls_t *p_tls,
+                          uint32_t &i_payloadSize, int i_sock_fd, int i_send_fd, vlc_tls_t *p_tls,
                           unsigned *pi_received, uint8_t *p_data, bool *pb_pingTimeout,
                           int *pi_wait_delay, int *pi_wait_retries)
 {
-    struct pollfd ufd[1];
+    struct pollfd ufd[2];
     ufd[0].fd = i_sock_fd;
     ufd[0].events = POLLIN;
+    ufd[1].fd = i_send_fd;
+    ufd[1].events = POLLRDNORM | POLLHUP | POLLERR;
 
     /* The Chromecast normally sends a PING command every 5 seconds or so.
      * If we do not receive one after 6 seconds, we send a PING.
      * If after this PING, we do not receive a PONG, then we consider the
      * connection as dead. */
-    if (poll(ufd, 1, *pi_wait_delay) == 0)
+    if (poll(ufd, 2, *pi_wait_delay) == 0)
     {
         if (*pb_pingTimeout)
         {
@@ -283,37 +290,54 @@ extern "C" int recvPacket(vlc_object_t *p_module, bool &b_msgReceived,
         *pi_wait_retries = PING_WAIT_RETRIES;
     }
 
-    int i_ret;
-
-    /* Packet structure:
-     * +------------------------------------+------------------------------+
-     * | Payload size (uint32_t big endian) |         Payload data         |
-     * +------------------------------------+------------------------------+ */
-    while (*pi_received < PACKET_HEADER_LEN)
+    int i_ret = 0;
+    if ( ufd[0].revents & POLLIN )
     {
-        // We receive the header.
-        i_ret = tls_Recv(p_tls, p_data + *pi_received, PACKET_HEADER_LEN - *pi_received);
-        if (i_ret <= 0)
-            return i_ret;
-        *pi_received += i_ret;
-    }
+        /* we have received stuff */
 
-    // We receive the payload.
+        /* Packet structure:
+         * +------------------------------------+------------------------------+
+         * | Payload size (uint32_t big endian) |         Payload data         |
+         * +------------------------------------+------------------------------+ */
+        while (*pi_received < PACKET_HEADER_LEN)
+        {
+            // We receive the header.
+            i_ret = tls_Recv(p_tls, p_data + *pi_received, PACKET_HEADER_LEN - *pi_received);
+            if (i_ret <= 0)
+                return i_ret;
+            *pi_received += i_ret;
+        }
 
-    // Get the size of the payload
-    i_payloadSize = U32_AT( p_data );
-    const uint32_t i_maxPayloadSize = PACKET_MAX_LEN - PACKET_HEADER_LEN;
+        // We receive the payload.
 
-    if (i_payloadSize > i_maxPayloadSize)
-    {
-        // Error case: the packet sent by the Chromecast is too long: we drop it.
-        msg_Err( p_module, "Packet too long: droping its data");
+        // Get the size of the payload
+        i_payloadSize = U32_AT( p_data );
+        const uint32_t i_maxPayloadSize = PACKET_MAX_LEN - PACKET_HEADER_LEN;
 
-        uint32_t i_size = i_payloadSize - (*pi_received - PACKET_HEADER_LEN);
-        if (i_size > i_maxPayloadSize)
-            i_size = i_maxPayloadSize;
+        if (i_payloadSize > i_maxPayloadSize)
+        {
+            // Error case: the packet sent by the Chromecast is too long: we drop it.
+            msg_Err( p_module, "Packet too long: droping its data");
 
-        i_ret = tls_Recv(p_tls, p_data + PACKET_HEADER_LEN, i_size);
+            uint32_t i_size = i_payloadSize - (*pi_received - PACKET_HEADER_LEN);
+            if (i_size > i_maxPayloadSize)
+                i_size = i_maxPayloadSize;
+
+            i_ret = tls_Recv(p_tls, p_data + PACKET_HEADER_LEN, i_size);
+            if (i_ret <= 0)
+                return i_ret;
+            *pi_received += i_ret;
+
+            if (*pi_received < i_payloadSize + PACKET_HEADER_LEN)
+                return i_ret;
+
+            *pi_received = 0;
+            return -1;
+        }
+
+        // Normal case
+        i_ret = tls_Recv(p_tls, p_data + *pi_received,
+                         i_payloadSize - (*pi_received - PACKET_HEADER_LEN));
         if (i_ret <= 0)
             return i_ret;
         *pi_received += i_ret;
@@ -321,23 +345,15 @@ extern "C" int recvPacket(vlc_object_t *p_module, bool &b_msgReceived,
         if (*pi_received < i_payloadSize + PACKET_HEADER_LEN)
             return i_ret;
 
+        assert(*pi_received == i_payloadSize + PACKET_HEADER_LEN);
         *pi_received = 0;
-        return -1;
+        b_msgReceived = true;
     }
 
-    // Normal case
-    i_ret = tls_Recv(p_tls, p_data + *pi_received,
-                     i_payloadSize - (*pi_received - PACKET_HEADER_LEN));
-    if (i_ret <= 0)
-        return i_ret;
-    *pi_received += i_ret;
+    if ( ufd[1].revents )
+        /* we have stuff to send */
+        i_ret = 1;
 
-    if (*pi_received < i_payloadSize + PACKET_HEADER_LEN)
-        return i_ret;
-
-    assert(*pi_received == i_payloadSize + PACKET_HEADER_LEN);
-    *pi_received = 0;
-    b_msgReceived = true;
     return i_ret;
 }
 
@@ -864,12 +880,34 @@ bool intf_sys_t::handleMessages()
 
     bool b_msgReceived = false;
     uint32_t i_payloadSize = 0;
-    int i_ret = recvPacket( p_module, b_msgReceived, i_payloadSize, i_sock_fd,
-                           p_tls, &i_received, p_packet, &b_pingTimeout,
-                           &i_waitdelay, &i_retries);
 
     int canc = vlc_savecancel();
     // Not cancellation-safe part.
+
+    vlc_mutex_lock(&lock);
+
+    /* dummy socket that we close to unblock the receiver, so we can send data */
+    /* net_Socket( p_module, AF_INET, SOCK_DGRAM, IPPROTO_UDP ); */
+    i_send_ready_fd = net_ConnectUDP( p_module, "localhost", 0, 0 );
+    if (i_send_ready_fd == -1)
+        msg_Err( p_module, "can't create the internal communication" );
+    vlc_mutex_unlock(&lock);
+    vlc_restorecancel(canc);
+
+    int i_ret = recvPacket( p_module, b_msgReceived, i_payloadSize, i_sock_fd, i_send_ready_fd,
+                           p_tls, &i_received, p_packet, &b_pingTimeout,
+                           &i_waitdelay, &i_retries);
+
+    canc = vlc_savecancel();
+    // Not cancellation-safe part.
+
+    vlc_mutex_lock(&lock);
+    if ( i_send_ready_fd != -1 )
+    {
+        net_Close( i_send_ready_fd );
+        i_send_ready_fd = -1;
+    }
+    vlc_mutex_unlock(&lock);
 
 #if defined(_WIN32)
     if ((i_ret < 0 && WSAGetLastError() != WSAEWOULDBLOCK) || (i_ret == 0))
@@ -898,4 +936,13 @@ bool intf_sys_t::handleMessages()
 
     vlc_mutex_locker locker(&lock);
     return conn_status != CHROMECAST_CONNECTION_DEAD;
+}
+
+void intf_sys_t::notifySendRequest()
+{
+    if ( i_send_ready_fd != -1 )
+    {
+        net_Close( i_send_ready_fd );
+        i_send_ready_fd = -1;
+    }
 }
