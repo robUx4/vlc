@@ -87,6 +87,9 @@ struct intf_sys_t
         return conn_status == CHROMECAST_CONNECTION_DEAD || (receiverState == RECEIVER_BUFFERING && cmd_status != CMD_SEEK_SENT);
     }
 
+    void setHasInput( bool has_input, const std::string mime_type = "");
+
+private:
     vlc_object_t  * const p_module;
     const int      i_port;
     std::string    serverIP;
@@ -108,8 +111,6 @@ struct intf_sys_t
 
     void msgAuth();
     void msgReceiverClose(std::string destinationId);
-
-    void setHasInput( bool has_input, const std::string mime_type = "");
 
     void handleMessages();
 
@@ -151,7 +152,6 @@ struct intf_sys_t
 
     void processMessage(const castchannel::CastMessage &msg);
 
-private:
     int sendMessage(const castchannel::CastMessage &msg);
 
     void buildMessage(const std::string & namespace_,
