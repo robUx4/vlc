@@ -102,6 +102,7 @@ intf_sys_t::intf_sys_t(vlc_object_t * const p_this, int port, std::string device
  , i_send_ready_fd(-1)
  , p_creds(NULL)
  , p_tls(NULL)
+ , requested_stop(false)
  , conn_status(CHROMECAST_DISCONNECTED)
  , cmd_status(NO_CMD_PENDING)
  , i_receiver_requestId(0)
@@ -884,6 +885,11 @@ bool intf_sys_t::handleMessages()
     // Not cancellation-safe part.
 
     vlc_mutex_lock(&lock);
+    if ( requested_stop )
+    {
+        msgPlayerStop();
+        requested_stop = false;
+    }
 
     /* dummy socket that we close to unblock the receiver, so we can send data */
     i_send_ready_fd = vlc_socket( AF_UNSPEC, SOCK_DGRAM, IPPROTO_UDP, true );
@@ -943,4 +949,17 @@ void intf_sys_t::notifySendRequest()
         net_Close( i_send_ready_fd );
         i_send_ready_fd = -1;
     }
+}
+
+void intf_sys_t::requestPlayerStop()
+{
+    vlc_mutex_locker locker(&lock);
+    if ( conn_status == CHROMECAST_CONNECTION_DEAD )
+        return;
+
+    if ( mediaSessionId.empty() )
+        return;
+
+    requested_stop = true;
+    notifySendRequest();
 }
