@@ -114,11 +114,6 @@ private:
 
     bool handleMessages();
 
-    connection_status getConnectionStatus() const
-    {
-        return conn_status;
-    }
-
     void setConnectionStatus(connection_status status)
     {
         if (conn_status != status)
