@@ -117,10 +117,6 @@ static int Open( vlc_object_t *p_this )
     access_t     *p_access = (access_t*)p_this;
     access_sys_t *p_sys;
 
-    /* Only if selected */
-    if( *p_access->psz_access == '\0' )
-        return VLC_EGENERIC;
-
     p_access->p_sys = p_sys = calloc( 1, sizeof( access_sys_t ) );
     if( !p_sys )
         return VLC_ENOMEM;
@@ -328,18 +324,15 @@ static int ScanReadCallback( scan_t *p_scan, void *p_privdata,
 
         if ( ufds[0].revents )
         {
-            for( size_t i=0; i<i_packets_max; i++ )
+            ssize_t i_read = read( p_sys->dvb.i_handle, p_packet, TS_PACKET_SIZE * i_packets_max );
+            if( i_read < 0 )
             {
-                ssize_t i_read = read( p_sys->dvb.i_handle, p_packet, TS_PACKET_SIZE * i_packets_max );
-                if( i_read < 0 )
-                {
-                    msg_Warn( p_access, "read failed: %s", vlc_strerror_c(errno) );
-                    break;
-                }
-                else if ( i_read == TS_PACKET_SIZE )
-                {
-                    *pi_count = i_read / TS_PACKET_SIZE;
-                }
+                msg_Warn( p_access, "read failed: %s", vlc_strerror_c(errno) );
+                break;
+            }
+            else
+            {
+                *pi_count = i_read / TS_PACKET_SIZE;
             }
         }
     }
