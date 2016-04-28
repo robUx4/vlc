@@ -89,6 +89,7 @@ struct intf_sys_t
 
     void setHasInput( bool has_input, const std::string mime_type = "");
 
+    void requestPlayerSeek();
     void requestPlayerStop();
 
 private:
@@ -152,6 +153,7 @@ private:
 
     void notifySendRequest();
     bool requested_stop;
+    bool requested_seek;
 
     int sendMessage(const castchannel::CastMessage &msg);
 
