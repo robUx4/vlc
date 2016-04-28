@@ -557,6 +557,13 @@ static inline input_state_e input_GetState( input_thread_t * p_input )
 }
 
 /**
+  * Update the output chain while playback is running
+  *
+  * For example when switching from "sout" to "vout+aout"
+  */
+VLC_API void input_RequestUpdateOutput( input_thread_t * );
+
+/**
  * Return one of the video output (if any). If possible, you should use
  * INPUT_GET_VOUTS directly and process _all_ video outputs instead.
  * @param p_input an input thread from which to get a video output

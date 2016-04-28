@@ -171,6 +171,7 @@ input_DecoderDecode
 input_DecoderDrain
 input_DecoderFlush
 input_GetItem
+input_RequestUpdateOutput
 input_item_AddInfo
 input_item_AddOption
 input_item_AddOptions

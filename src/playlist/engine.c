@@ -190,6 +190,23 @@ static int VideoSplitterCallback( vlc_object_t *p_this, char const *psz_cmd,
     return VLC_SUCCESS;
 }
 
+static int SoutCallback( vlc_object_t *p_this, char const *psz_cmd,
+                         vlc_value_t oldval, vlc_value_t newval, void *a )
+{
+    VLC_UNUSED(psz_cmd); VLC_UNUSED(oldval); VLC_UNUSED(newval); VLC_UNUSED(a);
+    playlist_t *p_playlist = (playlist_t*)p_this;
+    playlist_private_t *p_sys = pl_priv(p_playlist);
+
+    PL_LOCK;
+    if ( p_sys->p_input != NULL )
+    {
+        var_SetString( p_sys->p_input, "sout", newval.psz_string );
+        input_RequestUpdateOutput( p_sys->p_input );
+    }
+    PL_UNLOCK;
+    return VLC_SUCCESS;
+}
+
 /**
  * Create playlist
  *
@@ -484,6 +501,10 @@ static void VariablesInit( playlist_t *p_playlist )
     var_Create( p_playlist, "mute", VLC_VAR_BOOL );
     var_Create( p_playlist, "volume", VLC_VAR_FLOAT );
     var_SetFloat( p_playlist, "volume", -1.f );
+
+    /* Sout for the renderer */
+    var_Create( p_playlist, "sout", VLC_VAR_STRING | VLC_VAR_DOINHERIT );
+    var_AddCallback( p_playlist, "sout", SoutCallback, NULL );
 }
 
 playlist_item_t * playlist_CurrentPlayingItem( playlist_t * p_playlist )

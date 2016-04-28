@@ -540,6 +540,22 @@ static int volume_changed(vlc_object_t *obj, const char *name, vlc_value_t old,
     return VLC_SUCCESS;
 }
 
+static int sout_changed(vlc_object_t *obj, const char *name, vlc_value_t old,
+                        vlc_value_t cur, void *opaque)
+{
+    libvlc_media_player_t *p_mi = (libvlc_media_player_t *)obj;
+    VLC_UNUSED(name); VLC_UNUSED(old); VLC_UNUSED(opaque);
+    lock_input( p_mi );
+    input_thread_t *p_input_thread = p_mi->input.p_thread;
+    if( p_input_thread )
+    {
+        var_SetString( p_input_thread, "sout", cur.psz_string );
+        input_RequestUpdateOutput( p_input_thread );
+    }
+    unlock_input( p_mi );
+    return VLC_SUCCESS;
+}
+
 /**************************************************************************
  * Create a Media Instance object.
  *
@@ -573,6 +589,7 @@ libvlc_media_player_new( libvlc_instance_t *instance )
 
     /* Video */
     var_Create (mp, "vout", VLC_VAR_STRING|VLC_VAR_DOINHERIT);
+    var_Create (mp, "sout", VLC_VAR_STRING|VLC_VAR_DOINHERIT);
     var_Create (mp, "window", VLC_VAR_STRING);
     var_Create (mp, "vmem-lock", VLC_VAR_ADDRESS);
     var_Create (mp, "vmem-unlock", VLC_VAR_ADDRESS);
@@ -698,6 +715,7 @@ libvlc_media_player_new( libvlc_instance_t *instance )
     var_AddCallback(mp, "audio-device", audio_device_changed, NULL);
     var_AddCallback(mp, "mute", mute_changed, NULL);
     var_AddCallback(mp, "volume", volume_changed, NULL);
+    var_AddCallback(mp, "sout", sout_changed, NULL);
 
     /* Snapshot initialization */
     /* Attach a var callback to the global object to provide the glue between
@@ -745,6 +763,7 @@ static void libvlc_media_player_destroy( libvlc_media_player_t *p_mi )
                      "snapshot-file", snapshot_was_taken, p_mi );
 
     /* Detach callback from the media player / input manager object */
+    var_DelCallback( p_mi, "sout", sout_changed, NULL );
     var_DelCallback( p_mi, "volume", volume_changed, NULL );
     var_DelCallback( p_mi, "mute", mute_changed, NULL );
     var_DelCallback( p_mi, "audio-device", audio_device_changed, NULL );
