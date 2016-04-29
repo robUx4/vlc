@@ -2197,6 +2197,8 @@ static input_source_t *InputSourceNew( input_thread_t *p_input,
         return NULL;
     }
 
+    char *psz_demux_chain = var_InheritString(p_input, "demux-filter");
+
     /* Get infos from (access_)demux */
     bool b_can_seek;
     if( demux_Control( in->p_demux, DEMUX_CAN_SEEK, &b_can_seek ) )
