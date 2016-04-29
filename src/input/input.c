@@ -2197,7 +2197,17 @@ static input_source_t *InputSourceNew( input_thread_t *p_input,
         return NULL;
     }
 
-    char *psz_demux_chain = var_InheritString(p_input, "demux-filter");
+    char *psz_demux_chain = var_GetNonEmptyString(p_input, "demux-filter");
+    if ( psz_demux_chain != NULL )
+    {
+        /* add the chain of demux filters */
+        demux_t *p_filtered_demux = demux_FilterNew( in->p_demux, psz_demux_chain, p_input->b_preparsing );
+        if ( p_filtered_demux == NULL )
+            msg_Dbg( p_input, "Failed to create demux filter %s", psz_demux_chain );
+        else
+            in->p_demux = p_filtered_demux;
+        free( psz_demux_chain );
+    }
 
     /* Get infos from (access_)demux */
     bool b_can_seek;
@@ -2301,7 +2311,16 @@ static void InputSourceDestroy( input_source_t *in )
     int i;
 
     if( in->p_demux )
+    {
+        while (in->p_demux->p_source )
+        {
+            demux_t *p_old = in->p_demux;
+            in->p_demux = p_old->p_source;
+            p_old->s = NULL; /* the master owns the stream */
+            demux_Delete( p_old );
+        }
         demux_Delete( in->p_demux );
+    }
 
     if( in->i_title > 0 )
     {

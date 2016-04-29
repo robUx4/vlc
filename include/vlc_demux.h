@@ -54,7 +54,8 @@ struct demux_t
     char        *psz_file;
 
     /* input stream */
-    stream_t    *s;     /* NULL in case of a access+demux in one */
+    stream_t    *s;        /* NULL in case of a access+demux in one */
+    demux_t     *p_source; /* non-NULL for a demux-filter           */
 
     /* es output */
     es_out_t    *out;   /* our p_es_out */
@@ -394,6 +395,8 @@ VLC_API void demux_PacketizerDestroy( decoder_t *p_packetizer );
     p_demux->p_sys = calloc( 1, sizeof( demux_sys_t ) ); \
     if( !p_demux->p_sys ) return VLC_ENOMEM;\
     } while(0)
+
+demux_t *demux_FilterNew( demux_t *p_demux, const char *psz_name, bool quick );
 
 /**
  * @}

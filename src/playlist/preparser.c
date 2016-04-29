@@ -180,6 +180,10 @@ static void Preparse( playlist_preparser_t *preparser, input_item_t *p_item,
         break;
     }
 
+#ifndef NDEBUG
+    b_preparse = false;
+#endif
+
     /* Do not preparse if it is already done (like by playing it) */
     if( b_preparse && !input_item_IsPreparsed( p_item ) )
     {
