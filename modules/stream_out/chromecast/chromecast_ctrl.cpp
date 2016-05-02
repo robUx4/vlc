@@ -125,13 +125,13 @@ intf_sys_t::intf_sys_t(vlc_object_t * const p_this, int port, std::string device
     common.p_opaque = this;
     common.pf_get_position = get_position;
     common.pf_get_time = get_time;
-    common.pf_request_seek = request_seek;
-    common.pf_set_artwork = set_artwork;
-    common.pf_set_input_state = set_input_state;
     common.pf_set_length = set_length;
-    common.pf_set_title = set_title;
     common.pf_wait_app_started = wait_app_started;
+    common.pf_request_seek = request_seek;
     common.pf_wait_seek_done = wait_seek_done;
+    common.pf_set_input_state = set_input_state;
+    common.pf_set_artwork = set_artwork;
+    common.pf_set_title = set_title;
 
     std::stringstream sdemux;
     sdemux << "cc_demux{control=" << &common << '}';
