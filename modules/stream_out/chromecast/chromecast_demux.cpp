@@ -46,10 +46,14 @@ struct demux_filter_sys_t
         ,canSeek(false)
         ,m_seektime( VLC_TS_INVALID )
     {
+        p_renderer->pf_set_input_state( p_renderer->p_opaque,
+                                        (input_state_e) var_GetInteger( p_demux->p_demux->p_input, "state" ) );
+        var_AddCallback( p_demux->p_demux->p_input, "intf-event", InputEvent, this );
     }
 
     ~demux_filter_sys_t()
     {
+        var_DelCallback( p_demux->p_demux->p_input, "intf-event", InputEvent, this );
     }
 
     /**
@@ -125,6 +129,9 @@ protected:
     bool          canSeek;
     /* seek time kept while waiting for the chromecast to "seek" */
     mtime_t       m_seektime;
+
+    static int InputEvent( vlc_object_t *p_this, char const *psz_var,
+                           vlc_value_t oldval, vlc_value_t val, void * );
 };
 
 static int Demux( demux_filter_t *p_demux_filter )
@@ -222,6 +229,21 @@ static int Control( demux_filter_t *p_demux_filter, int i_query, va_list args)
     }
 
     return demux_FilterControl( p_demux_filter, i_query, args );
+}
+
+int demux_filter_sys_t::InputEvent( vlc_object_t *p_this, char const *psz_var,
+                                    vlc_value_t oldval, vlc_value_t val, void *p_data )
+{
+    VLC_UNUSED(psz_var);
+    VLC_UNUSED(oldval);
+    input_thread_t *p_input = reinterpret_cast<input_thread_t*>( p_this );
+    demux_filter_sys_t *p_sys = reinterpret_cast<demux_filter_sys_t*>( p_data );
+
+    if( val.i_int == INPUT_EVENT_STATE )
+        p_sys->p_renderer->pf_set_input_state( p_sys->p_renderer->p_opaque,
+                                               (input_state_e) var_GetInteger( p_input, "state" ) );
+
+    return VLC_SUCCESS;
 }
 
 int Open(vlc_object_t *p_this)
