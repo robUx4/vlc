@@ -46,6 +46,18 @@ struct demux_filter_sys_t
         ,canSeek(false)
         ,m_seektime( VLC_TS_INVALID )
     {
+        input_item_t *p_item = input_GetItem( p_demux->p_demux->p_input );
+        if ( p_item )
+        {
+            char *psz_title = input_item_GetTitleFbName( p_item );
+            p_renderer->pf_set_title( p_renderer->p_opaque, psz_title );
+            free( psz_title );
+
+            psz_title = input_item_GetArtworkURL( p_item );
+            p_renderer->pf_set_artwork( p_renderer->p_opaque, psz_title );
+            free( psz_title );
+        }
+
         p_renderer->pf_set_input_state( p_renderer->p_opaque,
                                         (input_state_e) var_GetInteger( p_demux->p_demux->p_input, "state" ) );
         var_AddCallback( p_demux->p_demux->p_input, "intf-event", InputEvent, this );
@@ -54,6 +66,9 @@ struct demux_filter_sys_t
     ~demux_filter_sys_t()
     {
         var_DelCallback( p_demux->p_demux->p_input, "intf-event", InputEvent, this );
+
+        p_renderer->pf_set_title( p_renderer->p_opaque, NULL );
+        p_renderer->pf_set_artwork( p_renderer->p_opaque, NULL );
     }
 
     /**
