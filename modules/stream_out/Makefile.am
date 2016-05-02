@@ -80,7 +80,8 @@ SUFFIXES += .proto .pb.cc
 %.pb.h %.pb.cc: %.proto
 	$(PROTOC) --cpp_out=. -I$(srcdir) $<
 
-libdemux_chromecast_plugin_la_SOURCES = stream_out/chromecast/chromecast_demux.cpp stream_out/chromecast/chromecast.h
+libdemux_chromecast_plugin_la_SOURCES = stream_out/chromecast/chromecast_demux.cpp stream_out/chromecast/chromecast.h \
+                                        stream_out/chromecast/chromecast_common.h
 libdemux_chromecast_plugin_la_CPPFLAGS = $(AM_CPPFLAGS) -Istream_out/chromecast $(CHROMECAST_CFLAGS)
 
 libstream_out_chromecast_plugin_la_SOURCES = stream_out/chromecast/cast.cpp stream_out/chromecast/chromecast.h \
