@@ -40,12 +40,23 @@
  * Demultiplexer modules interface
  */
 
+#define DEMUX_FILTER_COMMON_MEMBERS                                  \
+    VLC_COMMON_MEMBERS                                               \
+    module_t    *p_module;                                           \
+    union {                                                          \
+        int (*pf_demux)       ( demux_t * );                         \
+        int (*pf_filter_demux)( demux_filter_t * );                  \
+    };                                                               \
+    union {                                                          \
+        int (*pf_control)( demux_t *, int i_query, va_list args);    \
+        int (*pf_filter_control)( demux_filter_t *, int i_query, va_list args);        \
+    };                                                               \
+    demux_sys_t *p_sys;                                              \
+    demux_filter_t       *p_next;
+
 struct demux_t
 {
-    VLC_COMMON_MEMBERS
-
-    /* Module properties */
-    module_t    *p_module;
+    DEMUX_FILTER_COMMON_MEMBERS
 
     /* eg informative but needed (we can have access+demux) */
     char        *psz_access;
@@ -59,10 +70,6 @@ struct demux_t
     /* es output */
     es_out_t    *out;   /* our p_es_out */
 
-    /* set by demuxer */
-    int (*pf_demux)  ( demux_t * );   /* demux one frame only */
-    int (*pf_control)( demux_t *, int i_query, va_list args);
-
     /* Demux has to maintain them uptodate
      * when it is responsible of seekpoint/title */
     struct
@@ -73,10 +80,14 @@ struct demux_t
         int          i_title;       /* idem, start from 0 (could be menu) */
         int          i_seekpoint;   /* idem, start from 0 */
     } info;
-    demux_sys_t *p_sys;
 
     /* Weak link to parent input */
     input_thread_t *p_input;
+};
+
+struct demux_filter_t
+{
+    DEMUX_FILTER_COMMON_MEMBERS
 };
 
 /* pf_demux return values */
@@ -294,25 +305,54 @@ VLC_API void demux_Delete( demux_t * );
 VLC_API int demux_vaControlHelper( stream_t *, int64_t i_start, int64_t i_end,
                                    int64_t i_bitrate, int i_align, int i_query, va_list args );
 
-VLC_USED static inline int demux_Demux( demux_t *p_demux )
+VLC_USED static inline demux_t *demux_FilterDemuxer( demux_filter_t *p_filter )
+{
+    while ( p_filter->p_next )
+        p_filter = p_filter->p_next;
+    return (demux_t *) p_filter;
+}
+
+VLC_USED static inline int demux_Demux( demux_filter_t *p_demux )
 {
     if( !p_demux->pf_demux )
         return VLC_DEMUXER_SUCCESS;
 
-    return p_demux->pf_demux( p_demux );
+    return p_demux->pf_filter_demux( p_demux );
+}
+
+VLC_USED static inline int demux_FilterDemuxNext( demux_filter_t *p_demux_filter )
+{
+    p_demux_filter = p_demux_filter->p_next;
+    if ( p_demux_filter->p_next != NULL )
+        return p_demux_filter->pf_filter_demux( p_demux_filter );
+    /* last in the chain is the real demuxer */
+    return demux_Demux( p_demux_filter );
 }
 
 VLC_API int demux_vaControl( demux_t *p_demux, int i_query, va_list args );
 
-static inline int demux_Control( demux_t *p_demux, int i_query, ... )
+static inline int demux_Control( demux_filter_t *p_demux, int i_query, ... )
 {
     va_list args;
     int     i_result;
 
     va_start( args, i_query );
-    i_result = demux_vaControl( p_demux, i_query, args );
+    if ( p_demux->p_next != NULL )
+        i_result = p_demux->pf_filter_control( p_demux, i_query, args );
+    else
+        /* last in the chain is the real demuxer */
+        i_result = demux_vaControl( (demux_t*) p_demux, i_query, args  );
     va_end( args );
     return i_result;
+}
+
+VLC_USED static inline int demux_vaFilterControlNext( demux_filter_t *p_demux_filter, int i_query, va_list args )
+{
+    p_demux_filter = p_demux_filter->p_next;
+    if ( p_demux_filter->p_next != NULL )
+        return p_demux_filter->pf_filter_control( p_demux_filter, i_query, args );
+    /* last in the chain is the real demuxer */
+    return demux_vaControl( (demux_t*) p_demux_filter, i_query, args );
 }
 
 /*************************************************************************
@@ -394,6 +434,9 @@ VLC_API void demux_PacketizerDestroy( decoder_t *p_packetizer );
     p_demux->p_sys = calloc( 1, sizeof( demux_sys_t ) ); \
     if( !p_demux->p_sys ) return VLC_ENOMEM;\
     } while(0)
+
+demux_filter_t *demux_FilterChainNew( demux_filter_t *p_demux, const char *psz_name );
+void demux_FilterDelete( demux_filter_t * );
 
 /**
  * @}
