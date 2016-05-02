@@ -66,6 +66,8 @@ struct demux_filter_sys_t
         ,p_renderer(renderer)
         ,i_length(-1)
         ,demuxReady(false)
+        ,canSeek(false)
+        ,m_seektime( VLC_TS_INVALID )
     {
         input_item_t *p_item = input_GetItem( p_demux->p_demux->p_input );
         if ( p_item )
@@ -96,6 +98,29 @@ struct demux_filter_sys_t
         return p_renderer->pf_get_position( p_renderer->p_opaque );
     }
 
+    void setCanSeek( bool canSeek )
+    {
+        this->canSeek = canSeek;
+    }
+
+    bool seekTo( double pos )
+    {
+        if (i_length == -1)
+            return false;
+        return seekTo( mtime_t( i_length * pos ) );
+    }
+
+    bool seekTo( mtime_t i_pos )
+    {
+        if ( !canSeek )
+            return false;
+
+        /* seeking will be handled with the Chromecast */
+        m_seektime = i_pos;
+        p_renderer->pf_request_seek( p_renderer->p_opaque, m_seektime );
+
+        return true;
+    }
 
     void setLength( mtime_t length )
     {
@@ -112,6 +137,24 @@ struct demux_filter_sys_t
             msg_Dbg(p_demux, "ready to demux");
         }
 
+        /* hold the data while seeking */
+        /* wait until the device is buffering for data after the seek command */
+        if ( m_seektime != VLC_TS_INVALID )
+        {
+            msg_Dbg( p_demux, "do the actual seek" );
+            int i_ret = source_Control( DEMUX_SET_TIME, m_seektime );
+            m_seektime = VLC_TS_INVALID;
+            if (i_ret != VLC_SUCCESS)
+            {
+                msg_Warn( p_demux, "failed to seek in the muxer %d", i_ret );
+                return VLC_DEMUXER_EGENERIC;
+            }
+
+            /* TODO simplify */
+
+            p_renderer->pf_wait_seek_done( p_renderer->p_opaque );
+        }
+
         return demux_FilterDemux( p_demux );
     }
 
@@ -123,6 +166,18 @@ protected:
     bool          canSeek;
     /* seek time kept while waiting for the chromecast to "seek" */
     mtime_t       m_seektime;
+
+private:
+    int source_Control(int cmd, ...)
+    {
+        va_list ap;
+        int ret;
+
+        va_start(ap, cmd);
+        ret = demux_FilterControl( p_demux, cmd, ap);
+        va_end(ap);
+        return ret;
+    }
 };
 
 static int Demux( demux_filter_t *p_demux_filter )
@@ -146,6 +201,19 @@ static int Control( demux_filter_t *p_demux_filter, int i_query, va_list args)
         *va_arg(args, int64_t *) = p_sys->getPlaybackTime();
         return VLC_SUCCESS;
 
+    case DEMUX_CAN_SEEK:
+    {
+        int ret;
+        va_list ap;
+
+        va_copy( ap, args );
+        ret = demux_FilterControl( p_demux_filter, i_query, args );
+        if( ret == VLC_SUCCESS )
+            p_sys->setCanSeek( *va_arg( ap, bool* ) );
+        va_end( ap );
+        return ret;
+    }
+
     case DEMUX_GET_LENGTH:
     {
         int ret;
@@ -159,6 +227,51 @@ static int Control( demux_filter_t *p_demux_filter, int i_query, va_list args)
         return ret;
     }
 
+    case DEMUX_SET_POSITION:
+    {
+        int ret = VLC_SUCCESS;
+        va_list ap;
+
+        va_copy( ap, args );
+        double pos = va_arg( ap, double );
+        va_end( ap );
+
+        if ( p_sys->getPlaybackTime() == VLC_TS_INVALID )
+        {
+            msg_Dbg( p_demux_filter, "internal seek to %f when the playback didn't start", pos );
+            break; // seek before device started, likely on-the-fly restart
+        }
+
+        if ( !p_sys->seekTo( pos ) )
+        {
+            msg_Err( p_demux_filter, "failed to seek to %f", pos );
+            ret = VLC_EGENERIC;
+        }
+        return ret;
+    }
+
+    case DEMUX_SET_TIME:
+    {
+        int ret = VLC_SUCCESS;
+        va_list ap;
+
+        va_copy( ap, args );
+        mtime_t pos = va_arg( ap, mtime_t );
+        va_end( ap );
+
+        if ( p_sys->getPlaybackTime() == VLC_TS_INVALID )
+        {
+            msg_Dbg( p_demux_filter, "internal seek to %" PRId64 " when the playback didn't start", pos );
+            break; // seek before device started, likely on-the-fly restart
+        }
+
+        if ( !p_sys->seekTo( pos ) )
+        {
+            msg_Err( p_demux_filter, "failed to seek to time %" PRId64, pos );
+            return VLC_EGENERIC;
+        }
+        return ret;
+    }
     }
     return demux_FilterControl( p_demux_filter, i_query, args );
 }

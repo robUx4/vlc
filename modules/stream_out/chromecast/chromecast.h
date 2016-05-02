@@ -32,7 +32,6 @@
 #include <vlc_common.h>
 #include <vlc_interface.h>
 #include <vlc_plugin.h>
-#include <vlc_sout.h>
 #include <vlc_tls.h>
 
 #include <sstream>
@@ -81,7 +80,7 @@ struct intf_sys_t
 
     void setHasInput( bool has_input, const std::string mime_type = "");
 
-    void requestPlayerSeek();
+    void requestPlayerSeek(mtime_t pos);
     void requestPlayerStop();
 
 private:
@@ -119,10 +118,12 @@ private:
 #endif
             conn_status = status;
             vlc_cond_broadcast(&loadCommandCond);
+            vlc_cond_signal(&seekCommandCond);
         }
     }
 
     void waitAppStarted();
+    void waitSeekDone();
 
     int connectChromecast();
     void disconnectChromecast();
@@ -199,15 +200,22 @@ private:
 
     double getPlaybackPosition( mtime_t i_length ) const
     {
-        if( i_length > 0 && m_time_playback_started != -1)
+        if( i_length > 0 && m_time_playback_started != VLC_TS_INVALID)
             return (double) getPlaybackTimestamp() / (double)( i_length );
         return 0.0;
     }
 
-    /* local date when playback started/resumed */
+    vlc_cond_t   seekCommandCond;
+
+    /* local date when playback started/resumed, used by monotone clock */
     mtime_t           m_time_playback_started;
     /* local playback time of the input when playback started/resumed */
     mtime_t           i_ts_local_start;
+
+    /* playback time reported by the receiver, used to wait for seeking point */
+    mtime_t           m_chromecast_start_time;
+    /* seek time with Chromecast relative timestamp */
+    mtime_t           m_seek_request_time;
 
     mtime_t           i_length;
 
@@ -220,7 +228,7 @@ private:
     static void set_length(void*, mtime_t length);
     static mtime_t get_time(void*);
     static double get_position(void*);
-    static void request_seek(void*);
+    static void request_seek(void*, mtime_t pos);
     static void wait_seek_done(void*);
 
     static void set_title(void*, const char *psz_title);
