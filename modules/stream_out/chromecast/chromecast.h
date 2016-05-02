@@ -36,6 +36,7 @@
 #include <sstream>
 
 #include "cast_channel.pb.h"
+#include "chromecast_common.h"
 
 #define PACKET_HEADER_LEN 4
 
@@ -178,6 +179,9 @@ private:
 
     bool           has_input;
     static void* ChromecastThread(void* p_data);
+
+    /* shared structure with the demux-filter */
+    chromecast_common      common;
 };
 
 #endif /* VLC_CHROMECAST_H */
