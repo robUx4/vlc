@@ -101,8 +101,6 @@ demux_t *demux_NewAdvanced( vlc_object_t *p_obj, input_thread_t *p_parent_input,
     if( unlikely(p_demux == NULL) )
         return NULL;
 
-    //assert( !(s != NULL && p_source != NULL) );
-
     if( s != NULL && (!strcasecmp( psz_demux, "any" ) || !psz_demux[0]) )
     {   /* Look up demux by Content-Type for hard to detect formats */
         char *type = stream_ContentType( s );
@@ -130,7 +128,6 @@ demux_t *demux_NewAdvanced( vlc_object_t *p_obj, input_thread_t *p_parent_input,
                  p_demux->psz_access, p_demux->psz_demux,
                  p_demux->psz_location, p_demux->psz_file );
 
-    //p_demux->p_source   = p_source;
     p_demux->s          = s;
     p_demux->out        = out;
 
