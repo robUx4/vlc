@@ -118,7 +118,6 @@ demux_t *demux_NewAdvanced( vlc_object_t *p_obj, input_thread_t *p_parent_input,
     p_demux->psz_location = strdup( psz_location );
     p_demux->psz_file = get_path( psz_location ); /* parse URL */
     p_demux->p_source = p_wrapped;
-    p_demux->p_cfg = p_cfg;
 
     if( unlikely(p_demux->psz_access == NULL
               || p_demux->psz_demux == NULL

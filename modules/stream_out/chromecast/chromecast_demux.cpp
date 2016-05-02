@@ -317,15 +317,13 @@ int DemuxOpen(vlc_object_t *p_this)
     if ( unlikely( p_demux->p_source == NULL ) )
         return VLC_EBADVAR;
 
-    config_ChainParse(p_demux, DEMUXFILTER_CFG_PREFIX, ppsz_sout_options, p_demux->p_cfg);
-
-    intptr_t i_chromecast_control = var_InheritInteger( p_demux, DEMUXFILTER_CFG_PREFIX "control" );
-    if ( i_chromecast_control == 0 )
+    chromecast_common *p_renderer = reinterpret_cast<chromecast_common *>(
+                var_InheritAddress( p_demux->p_source, CC_SHARED_VAR_NAME ) );
+    if ( p_renderer == NULL )
     {
-        msg_Err(p_demux, "Missing the control interface to work");
-        return VLC_EBADVAR;
+        msg_Warn( p_this, "using Chromecast demuxer with no sout" );
+        return VLC_ENOOBJ;
     }
-    chromecast_common *p_renderer = (chromecast_common *) i_chromecast_control;
 
     demux_sys_t *p_sys = new(std::nothrow) demux_sys_t(p_demux, p_renderer);
     if (unlikely(p_sys == NULL))

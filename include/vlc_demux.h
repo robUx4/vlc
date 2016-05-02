@@ -80,7 +80,6 @@ struct demux_t
 
     /* for demux-filter */
     demux_t *p_source;
-    config_chain_t *p_cfg;
 };
 
 /* pf_demux return values */

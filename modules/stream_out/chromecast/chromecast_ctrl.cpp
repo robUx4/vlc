@@ -133,10 +133,9 @@ intf_sys_t::intf_sys_t(vlc_object_t * const p_this, int port, std::string device
     common.pf_set_artwork = set_artwork;
     common.pf_set_title = set_title;
 
-    std::stringstream sdemux;
-    sdemux << "cc_demux{control=" << &common << '}';
-    msg_Dbg( p_module, "force demux to %s", sdemux.str().c_str());
-    var_SetString( p_module->p_libvlc, "demux-filter", sdemux.str().c_str() );
+    assert( var_Type( p_module->p_parent->p_parent, CC_SHARED_VAR_NAME) == 0 );
+    if (var_Create( p_module->p_parent->p_parent, CC_SHARED_VAR_NAME, VLC_VAR_ADDRESS ) == VLC_SUCCESS )
+        var_SetAddress( p_module->p_parent->p_parent, CC_SHARED_VAR_NAME, &common );
 
     // Start the Chromecast event thread.
     if (vlc_clone(&chromecastThread, ChromecastThread, this,
@@ -148,8 +147,9 @@ intf_sys_t::intf_sys_t(vlc_object_t * const p_this, int port, std::string device
 
 intf_sys_t::~intf_sys_t()
 {
-    var_SetString( p_module->p_libvlc, "demux-filter", NULL );
     setHasInput( false );
+
+    var_Destroy( p_module->p_parent->p_parent, CC_SHARED_VAR_NAME );
 
     switch ( conn_status )
     {
