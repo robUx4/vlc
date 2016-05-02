@@ -82,9 +82,7 @@ SUFFIXES += .proto .pb.cc
 
 libdemux_chromecast_plugin_la_SOURCES = stream_out/chromecast/chromecast_demux.cpp stream_out/chromecast/chromecast.h \
                                         stream_out/chromecast/chromecast_common.h
-nodist_libdemux_chromecast_plugin_la_SOURCES = stream_out/chromecast/cast_channel.pb.cc
 libdemux_chromecast_plugin_la_CPPFLAGS = $(AM_CPPFLAGS) -Istream_out/chromecast $(CHROMECAST_CFLAGS)
-libdemux_chromecast_plugin_la_LIBADD = $(CHROMECAST_LIBS) $(SOCKET_LIBS)
 
 libstream_out_chromecast_plugin_la_SOURCES = stream_out/chromecast/cast.cpp stream_out/chromecast/chromecast.h \
                                              stream_out/chromecast/cast_channel.proto \

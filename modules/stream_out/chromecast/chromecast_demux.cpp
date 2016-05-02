@@ -51,7 +51,7 @@ vlc_module_begin ()
     set_category( CAT_INPUT )
     set_subcategory( SUBCAT_INPUT_DEMUX )
     set_description( N_( "chromecast demux wrapper" ) )
-    set_capability( "demux", 0 )
+    set_capability( "demux_filter", 1 ) // try to insert the filter by default
     add_shortcut( "cc_demux" )
     set_callbacks( DemuxOpen, DemuxClose )
 
@@ -59,9 +59,9 @@ vlc_module_begin ()
 
 vlc_module_end ()
 
-struct demux_sys_t
+struct demux_filter_sys_t
 {
-    demux_sys_t(demux_t * const demux, chromecast_common * const renderer)
+    demux_filter_sys_t(demux_filter_t * const demux, chromecast_common * const renderer)
         :p_demux(demux)
         ,p_renderer(renderer)
         ,i_length(-1)
@@ -69,7 +69,7 @@ struct demux_sys_t
         ,canSeek(false)
         ,m_seektime( VLC_TS_INVALID )
     {
-        input_item_t *p_item = input_GetItem( p_demux->p_input );
+        input_item_t *p_item = input_GetItem( p_demux->p_demux->p_input );
         if ( p_item )
         {
             char *psz_title = input_item_GetTitleFbName( p_item );
@@ -82,13 +82,13 @@ struct demux_sys_t
         }
 
         p_renderer->pf_set_input_state( p_renderer->p_opaque,
-                                        (input_state_e) var_GetInteger( p_demux->p_input, "state" ) );
-        var_AddCallback( p_demux->p_input, "intf-event", InputEvent, this );
+                                        (input_state_e) var_GetInteger( p_demux->p_demux->p_input, "state" ) );
+        var_AddCallback( p_demux->p_demux->p_input, "intf-event", InputEvent, this );
     }
 
-    ~demux_sys_t()
+    ~demux_filter_sys_t()
     {
-        var_DelCallback( p_demux->p_input, "intf-event", InputEvent, this );
+        var_DelCallback( p_demux->p_demux->p_input, "intf-event", InputEvent, this );
 
         p_renderer->pf_set_title( p_renderer->p_opaque, NULL );
         p_renderer->pf_set_artwork( p_renderer->p_opaque, NULL );
@@ -172,11 +172,11 @@ struct demux_sys_t
         }
 #endif
 
-        return demux_Demux( p_demux->p_source );
+        return demux_FilterDemux( p_demux );
     }
 
 protected:
-    demux_t       * const p_demux;
+    demux_filter_t     * const p_demux;
     chromecast_common  * const p_renderer;
     mtime_t       i_length;
     bool          demuxReady;
@@ -191,7 +191,7 @@ private:
         int ret;
 
         va_start(ap, cmd);
-        ret = p_demux->p_source->pf_control(p_demux->p_source, cmd, ap);
+        ret = demux_FilterControl( p_demux, cmd, ap);
         va_end(ap);
         return ret;
     }
@@ -200,14 +200,16 @@ private:
                            vlc_value_t oldval, vlc_value_t val, void *p_data );
 };
 
-static int DemuxDemux( demux_t *p_demux )
+static int Demux( demux_filter_t *p_demux_filter )
 {
-    return p_demux->p_sys->Demux();
+    demux_filter_sys_t *p_sys = p_demux_filter->p_sys;
+
+    return p_sys->Demux();
 }
 
-static int DemuxControl( demux_t *p_demux, int i_query, va_list args)
+static int Control( demux_filter_t *p_demux_filter, int i_query, va_list args)
 {
-    demux_sys_t *p_sys = p_demux->p_sys;
+    demux_filter_sys_t *p_sys = p_demux_filter->p_sys;
 
     switch (i_query)
     {
@@ -225,7 +227,7 @@ static int DemuxControl( demux_t *p_demux, int i_query, va_list args)
         va_list ap;
 
         va_copy( ap, args );
-        ret = p_demux->p_source->pf_control( p_demux->p_source, i_query, args );
+        ret = demux_FilterControl( p_demux_filter, i_query, args );
         if( ret == VLC_SUCCESS )
             p_sys->setCanSeek( *va_arg( ap, bool* ) );
         va_end( ap );
@@ -238,7 +240,7 @@ static int DemuxControl( demux_t *p_demux, int i_query, va_list args)
         va_list ap;
 
         va_copy( ap, args );
-        ret = p_demux->p_source->pf_control( p_demux->p_source, i_query, args );
+        ret = demux_FilterControl( p_demux_filter, i_query, args );
         if( ret == VLC_SUCCESS )
             p_sys->setLength( *va_arg( ap, int64_t * ) );
         va_end( ap );
@@ -256,13 +258,13 @@ static int DemuxControl( demux_t *p_demux, int i_query, va_list args)
 
         if ( p_sys->getPlaybackTime() == VLC_TS_INVALID )
         {
-            msg_Dbg( p_demux, "internal seek to %f when the playback didn't start", pos );
+            msg_Dbg( p_demux_filter, "internal seek to %f when the playback didn't start", pos );
             break; // seek before device started, likely on-the-fly restart
         }
 
         if ( !p_sys->seekTo( pos ) )
         {
-            msg_Err( p_demux, "failed to seek to %f", pos );
+            msg_Err( p_demux_filter, "failed to seek to %f", pos );
             ret = VLC_EGENERIC;
         }
         return ret;
@@ -279,29 +281,28 @@ static int DemuxControl( demux_t *p_demux, int i_query, va_list args)
 
         if ( p_sys->getPlaybackTime() == VLC_TS_INVALID )
         {
-            msg_Dbg( p_demux, "internal seek to %" PRId64 " when the playback didn't start", pos );
+            msg_Dbg( p_demux_filter, "internal seek to %" PRId64 " when the playback didn't start", pos );
             break; // seek before device started, likely on-the-fly restart
         }
 
         if ( !p_sys->seekTo( pos ) )
         {
-            msg_Err( p_demux, "failed to seek to time %" PRId64, pos );
+            msg_Err( p_demux_filter, "failed to seek to time %" PRId64, pos );
             return VLC_EGENERIC;
         }
         return ret;
     }
     }
-
-    return p_demux->p_source->pf_control( p_demux->p_source, i_query, args );
+    return demux_FilterControl( p_demux_filter, i_query, args );
 }
 
-int demux_sys_t::InputEvent( vlc_object_t *p_this, char const *psz_var,
-                             vlc_value_t oldval, vlc_value_t val, void *p_data )
+int demux_filter_sys_t::InputEvent( vlc_object_t *p_this, char const *psz_var,
+                                    vlc_value_t oldval, vlc_value_t val, void *p_data )
 {
     VLC_UNUSED(psz_var);
     VLC_UNUSED(oldval);
     input_thread_t *p_input = reinterpret_cast<input_thread_t*>( p_this );
-    demux_sys_t *p_sys = reinterpret_cast<demux_sys_t*>( p_data );
+    demux_filter_sys_t *p_sys = reinterpret_cast<demux_filter_sys_t*>( p_data );
 
     assert( p_input == p_input );
     if( val.i_int == INPUT_EVENT_STATE )
@@ -313,24 +314,24 @@ int demux_sys_t::InputEvent( vlc_object_t *p_this, char const *psz_var,
 
 int DemuxOpen(vlc_object_t *p_this)
 {
-    demux_t *p_demux = reinterpret_cast<demux_t*>(p_this);
-    if ( unlikely( p_demux->p_source == NULL ) )
+    demux_filter_t *p_demux = reinterpret_cast<demux_filter_t*>(p_this);
+    if ( unlikely( p_demux->p_demux == NULL ) )
         return VLC_EBADVAR;
 
     chromecast_common *p_renderer = reinterpret_cast<chromecast_common *>(
-                var_InheritAddress( p_demux->p_source, CC_SHARED_VAR_NAME ) );
+                var_InheritAddress( p_demux->p_demux, CC_SHARED_VAR_NAME ) );
     if ( p_renderer == NULL )
     {
         msg_Warn( p_this, "using Chromecast demuxer with no sout" );
         return VLC_ENOOBJ;
     }
 
-    demux_sys_t *p_sys = new(std::nothrow) demux_sys_t(p_demux, p_renderer);
+    demux_filter_sys_t *p_sys = new(std::nothrow) demux_filter_sys_t( p_demux, p_renderer );
     if (unlikely(p_sys == NULL))
         return VLC_ENOMEM;
 
-    p_demux->pf_demux = DemuxDemux;
-    p_demux->pf_control = DemuxControl;
+    p_demux->pf_demux = Demux;
+    p_demux->pf_control = Control;
 
     p_demux->p_sys = p_sys;
     return VLC_SUCCESS;
@@ -338,8 +339,8 @@ int DemuxOpen(vlc_object_t *p_this)
 
 void DemuxClose(vlc_object_t *p_this)
 {
-    demux_t *p_demux = reinterpret_cast<demux_t*>(p_this);
-    demux_sys_t *p_sys = p_demux->p_sys;
+    demux_filter_t *p_demux = reinterpret_cast<demux_filter_t*>(p_this);
+    demux_filter_sys_t *p_sys = p_demux->p_sys;
 
     delete p_sys;
 }

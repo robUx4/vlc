@@ -1226,10 +1226,7 @@ static int Init( input_thread_t * p_input )
         goto error;
     p_input->p->master = master;
 
-    demux_t *p_master_demux = master->p_demux;
-    while ( p_master_demux->p_source )
-        p_master_demux = p_master_demux->p_source;
-    var_AddCallback( p_input, "demux-filter", DemuxFilterChanged, p_master_demux );
+    var_AddCallback( p_input, "demux-filter", DemuxFilterChanged, NULL );
 
     var_AddCallback( p_input->p_libvlc, "demux-filter", ForwardStringValueChanged, p_input );
 
@@ -1366,10 +1363,7 @@ static void End( input_thread_t * p_input )
         InputSourceDestroy( p_input->p->slave[i] );
     free( p_input->p->slave );
 
-    demux_t *p_master_demux = p_input->p->master->p_demux;
-    while ( p_master_demux->p_source )
-        p_master_demux = p_master_demux->p_source;
-    var_DelCallback( p_input, "demux-filter", DemuxFilterChanged, p_master_demux );
+    var_DelCallback( p_input, "demux-filter", DemuxFilterChanged, NULL );
 
     var_DelCallback( p_input->p_libvlc, "demux-filter", ForwardStringValueChanged, p_input );
 
@@ -2264,7 +2258,7 @@ static input_source_t *InputSourceNew( input_thread_t *p_input,
 
     char *psz_demux_chain = NULL;
     if (b_with_filter)
-        psz_demux_chain = var_InheritString(p_input, "demux-filter");
+        psz_demux_chain = var_GetNonEmptyString(p_input, "demux-filter");
     UpdateDemuxer( p_input, in, psz_demux_chain );
     if (psz_demux_chain)
         free(psz_demux_chain);
@@ -2278,13 +2272,13 @@ static input_source_t *InputSourceNew( input_thread_t *p_input,
 static void UpdateDemuxer(input_thread_t *p_input, input_source_t *in, const char *psz_var_demux_filters)
 {
     /* add the chain of demux filters */
-    if (psz_var_demux_filters != NULL && psz_var_demux_filters[0])
+    if (psz_var_demux_filters != NULL)
     {
-        demux_t *p_filtered_demux = demux_FilterChainNew(in->p_demux, psz_var_demux_filters);
-        if (p_filtered_demux == NULL)
-            msg_Dbg(p_input, "Failed to create demux filter %s", psz_var_demux_filters);
-        else
-            in->p_demux = p_filtered_demux;
+        /* add the chain of demux filters */
+        demux_filter_t *p_filtered_demux = demux_FilterChainNew( in->p_demux, psz_var_demux_filters );
+        in->p_demux->p_filters = p_filtered_demux;
+        if ( p_filtered_demux == NULL && psz_var_demux_filters != NULL)
+            msg_Dbg( p_input, "Failed to create demux filter chain %s", psz_var_demux_filters );
     }
 
     /* Get infos from (access_)demux */
@@ -2385,13 +2379,11 @@ static void InputSourceDestroy( input_source_t *in )
 
     if( in->p_demux )
     {
-        while (in->p_demux->p_source )
+        while (in->p_demux->p_filters )
         {
-            demux_t *p_old = in->p_demux;
-            in->p_demux = p_old->p_source;
-            in->p_demux->s = p_old->s;
-            p_old->s = NULL;
-            demux_Delete( p_old );
+            demux_filter_t *p_old = in->p_demux->p_filters;
+            in->p_demux->p_filters = p_old->p_next;
+            vlc_object_release( p_old );
         }
         demux_Delete( in->p_demux );
     }
@@ -3036,19 +3028,16 @@ int DemuxFilterChanged( vlc_object_t *p_this, char const *psz_var,
 {
     VLC_UNUSED(psz_var);
     input_thread_t *p_input = (input_thread_t *) p_this;
-    demux_t *p_main_demux = (demux_t *) p_data;
     if ( oldval.psz_string != val.psz_string &&
          ( oldval.psz_string == NULL || val.psz_string == NULL ||
            strcmp( oldval.psz_string, val.psz_string ) ) )
     {
         input_source_t *in = p_input->p->master;
-        while (in->p_demux && in->p_demux != p_main_demux)
+        while (in->p_demux->p_filters )
         {
-            demux_t *p_old = in->p_demux;
-            in->p_demux = p_old->p_source;
-            in->p_demux->s = p_old->s;
-            p_old->s = NULL;
-            demux_Delete( p_old );
+            demux_filter_t *p_old = in->p_demux->p_filters;
+            in->p_demux->p_filters = p_old->p_next;
+            vlc_object_release( p_old );
         }
         assert( in->p_demux != NULL ); /* we need to restart on the base master */
         UpdateDemuxer( p_input, p_input->p->master, val.psz_string );
