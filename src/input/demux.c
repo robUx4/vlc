@@ -697,7 +697,7 @@ error:
 demux_filter_t *demux_FilterChainNew( demux_filter_t *p_demux, const char *psz_chain )
 {
     if( !psz_chain || !*psz_chain )
-        return NULL;
+        return demux_FilterNew( p_demux, NULL ); /* add permanent filters */
 
     char *psz_parser = strdup(psz_chain);
     if(!psz_parser)
