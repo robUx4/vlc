@@ -150,6 +150,8 @@ private:
     bool requested_stop;
     bool requested_seek;
 
+    void setInputState(input_state_e state);
+
     int sendMessage(const castchannel::CastMessage &msg);
 
     void buildMessage(const std::string & namespace_,
