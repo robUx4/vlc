@@ -88,7 +88,7 @@ static void SlaveDemux( input_thread_t *p_input );
 static void SlaveSeek( input_thread_t *p_input );
 
 static void InputMetaUser( input_thread_t *p_input, vlc_meta_t *p_meta );
-static void InputUpdateMeta( input_thread_t *p_input, demux_t *p_demux );
+static void InputUpdateMeta( input_thread_t *p_input, demux_filter_t *p_demux );
 static void InputGetExtraFiles( input_thread_t *p_input,
                                 int *pi_list, char ***pppsz_list,
                                 const char *psz_access, const char *psz_path );
@@ -553,12 +553,13 @@ static void MainLoopDemux( input_thread_t *p_input, bool *pb_changed )
 
     if( i_ret > 0 )
     {
-        if( p_input->p->master->p_demux->info.i_update )
+        demux_t *p_demux = demux_FilterDemuxer( p_input->p->master->p_demux );
+        if( p_demux->info.i_update )
         {
-            if( p_input->p->master->p_demux->info.i_update & INPUT_UPDATE_TITLE_LIST )
+            if( p_demux->info.i_update & INPUT_UPDATE_TITLE_LIST )
             {
                 UpdateTitleListfromDemux( p_input );
-                p_input->p->master->p_demux->info.i_update &= ~INPUT_UPDATE_TITLE_LIST;
+                p_demux->info.i_update &= ~INPUT_UPDATE_TITLE_LIST;
             }
             if( p_input->p->master->b_title_demux )
             {
@@ -696,7 +697,8 @@ static void MainLoop( input_thread_t *p_input, bool b_interactive )
 
                 MainLoopDemux( p_input, &b_force_update );
 
-                if( p_input->p->master->p_demux->pf_demux != NULL )
+                demux_t *p_demux = demux_FilterDemuxer( p_input->p->master->p_demux );
+                if( p_demux->pf_demux != NULL )
                     i_wakeup = es_out_GetWakeup( p_input->p->p_es_out );
                 if( b_force_update )
                     i_intf_update = 0;
@@ -1524,9 +1526,7 @@ static void ControlPause( input_thread_t *p_input, mtime_t i_control_date )
 
     if( p_input->p->b_can_pause )
     {
-        demux_t *p_demux = p_input->p->master->p_demux;
-
-        if( demux_Control( p_demux, DEMUX_SET_PAUSE_STATE, true ) )
+        if( demux_Control( p_input->p->master->p_demux, DEMUX_SET_PAUSE_STATE, true ) )
         {
             msg_Warn( p_input, "cannot set pause state" );
             return;
@@ -1549,9 +1549,7 @@ static void ControlUnpause( input_thread_t *p_input, mtime_t i_control_date )
 {
     if( p_input->p->b_can_pause )
     {
-        demux_t *p_demux = p_input->p->master->p_demux;
-
-        if( demux_Control( p_demux, DEMUX_SET_PAUSE_STATE, false ) )
+        if( demux_Control( p_input->p->master->p_demux, DEMUX_SET_PAUSE_STATE, false ) )
         {
             msg_Err( p_input, "cannot resume" );
             input_ChangeState( p_input, ERROR_S );
@@ -1724,7 +1722,7 @@ static bool Control( input_thread_t *p_input,
             if( i_rate != p_input->p->i_rate &&
                 !p_input->p->b_can_pace_control && p_input->p->b_can_rate_control )
             {
-                demux_t *p_demux = p_input->p->master->p_demux;
+                demux_t *p_demux = demux_FilterDemuxer( p_input->p->master->p_demux );
                 int i_ret = VLC_EGENERIC;
 
                 if( p_demux->s == NULL )
@@ -1803,7 +1801,8 @@ static bool Control( input_thread_t *p_input,
             if( p_input->p->master->i_title <= 0 )
                 break;
 
-            int i_title = p_input->p->master->p_demux->info.i_title;
+            demux_t *p_demux = demux_FilterDemuxer( p_input->p->master->p_demux );
+            int i_title = p_demux->info.i_title;
             if( i_type == INPUT_CONTROL_SET_TITLE_PREV )
                 i_title--;
             else if( i_type == INPUT_CONTROL_SET_TITLE_NEXT )
@@ -1831,7 +1830,7 @@ static bool Control( input_thread_t *p_input,
             if( p_input->p->master->i_title <= 0 )
                 break;
 
-            demux_t *p_demux = p_input->p->master->p_demux;
+            demux_t *p_demux = demux_FilterDemuxer( p_input->p->master->p_demux );
 
             int i_title = p_demux->info.i_title;
             int i_seekpoint = p_demux->info.i_seekpoint;
@@ -2023,7 +2022,7 @@ static int UpdateTitleSeekpoint( input_thread_t *p_input,
  *****************************************************************************/
 static int UpdateTitleSeekpointFromDemux( input_thread_t *p_input )
 {
-    demux_t *p_demux = p_input->p->master->p_demux;
+    demux_t *p_demux = demux_FilterDemuxer( p_input->p->master->p_demux );
 
     /* TODO event-like */
     if( p_demux->info.i_update & INPUT_UPDATE_TITLE )
@@ -2047,18 +2046,18 @@ static int UpdateTitleSeekpointFromDemux( input_thread_t *p_input )
 
 static void UpdateGenericFromDemux( input_thread_t *p_input )
 {
-    demux_t *p_demux = p_input->p->master->p_demux;
+    demux_t *p_demux = demux_FilterDemuxer( p_input->p->master->p_demux );
 
     if( p_demux->info.i_update & INPUT_UPDATE_META )
     {
-        InputUpdateMeta( p_input, p_demux );
+        InputUpdateMeta( p_input, p_input->p->master->p_demux );
         p_demux->info.i_update &= ~INPUT_UPDATE_META;
     }
     {
         double quality;
         double strength;
 
-        if( !demux_Control( p_demux, DEMUX_GET_SIGNAL, &quality, &strength ) )
+        if( !demux_Control( p_input->p->master->p_demux, DEMUX_GET_SIGNAL, &quality, &strength ) )
             input_SendEventSignal( p_input, quality, strength );
     }
 }
@@ -2178,7 +2177,7 @@ static input_source_t *InputSourceNew( input_thread_t *p_input,
         TAB_CLEAN( count, tab );
     }
 
-    in->p_demux = input_DemuxNew( VLC_OBJECT(in), psz_access, psz_demux,
+    in->p_demux = (demux_filter_t*) input_DemuxNew( VLC_OBJECT(in), psz_access, psz_demux,
                                   psz_path, p_input->p->p_es_out,
                                   p_input->b_preparsing, p_input );
     free( psz_dup );
@@ -2193,6 +2192,15 @@ static input_source_t *InputSourceNew( input_thread_t *p_input,
         return NULL;
     }
 
+    char *psz_demux_chain = var_GetNonEmptyString(p_input, "demux-filter");
+    /* add the chain of demux filters */
+    demux_filter_t *p_filtered_demux = demux_FilterChainNew( in->p_demux, psz_demux_chain );
+    if ( p_filtered_demux != NULL )
+        in->p_demux = p_filtered_demux;
+    else if ( psz_demux_chain != NULL )
+        msg_Dbg(p_input, "Failed to create demux filter %s", psz_demux_chain);
+    free( psz_demux_chain );
+
     /* Get infos from (access_)demux */
     bool b_can_seek;
     if( demux_Control( in->p_demux, DEMUX_CAN_SEEK, &b_can_seek ) )
@@ -2203,9 +2211,10 @@ static input_source_t *InputSourceNew( input_thread_t *p_input,
                        &in->b_can_pace_control ) )
         in->b_can_pace_control = false;
 
-    assert( in->p_demux->pf_demux != NULL || !in->b_can_pace_control );
+    demux_t *p_demux = demux_FilterDemuxer( in->p_demux );
+    assert( p_demux->pf_demux != NULL || !in->b_can_pace_control );
 
-    if( in->p_demux->s != NULL )
+    if( p_demux->s != NULL )
     {
         if( !in->b_can_pace_control )
         {
@@ -2267,7 +2276,7 @@ static input_source_t *InputSourceNew( input_thread_t *p_input,
         {
             vlc_mutex_lock( &p_input->p->p_item->lock );
             AppendAttachment( &p_input->p->i_attachment, &p_input->p->attachment, &p_input->p->attachment_demux,
-                              i_attachment, attachment, in->p_demux );
+                              i_attachment, attachment, p_demux);
             vlc_mutex_unlock( &p_input->p->p_item->lock );
         }
 
@@ -2295,7 +2304,7 @@ static void InputSourceDestroy( input_source_t *in )
     int i;
 
     if( in->p_demux )
-        demux_Delete( in->p_demux );
+        demux_FilterDelete( in->p_demux );
 
     if( in->i_title > 0 )
     {
@@ -2311,9 +2320,9 @@ static void InputSourceDestroy( input_source_t *in )
  * InputSourceMeta:
  *****************************************************************************/
 static void InputSourceMeta( input_thread_t *p_input,
-                             input_source_t *p_source, vlc_meta_t *p_meta )
+                             input_source_t *p_next, vlc_meta_t *p_meta )
 {
-    demux_t *p_demux = p_source->p_demux;
+    demux_filter_t *p_demux = p_next->p_demux;
 
     /* XXX Remember that checking against p_item->p_meta->i_status & ITEM_PREPARSED
      * is a bad idea */
@@ -2334,7 +2343,7 @@ static void InputSourceMeta( input_thread_t *p_input,
         return;
 
     demux_meta_t *p_demux_meta =
-        vlc_custom_create( p_source, sizeof( *p_demux_meta ), "demux meta" );
+        vlc_custom_create( p_next, sizeof( *p_demux_meta ), "demux meta" );
     if( unlikely(p_demux_meta == NULL) )
         return;
     p_demux_meta->p_item = p_input->p->p_item;
@@ -2352,7 +2361,7 @@ static void InputSourceMeta( input_thread_t *p_input,
         {
             vlc_mutex_lock( &p_input->p->p_item->lock );
             AppendAttachment( &p_input->p->i_attachment, &p_input->p->attachment, &p_input->p->attachment_demux,
-                              p_demux_meta->i_attachments, p_demux_meta->attachments, p_demux);
+                              p_demux_meta->i_attachments, p_demux_meta->attachments, demux_FilterDemuxer( p_demux ));
             vlc_mutex_unlock( &p_input->p->p_item->lock );
         }
         module_unneed( p_demux, p_id3 );
@@ -2503,7 +2512,7 @@ static void AppendAttachment( int *pi_attachment, input_attachment_t ***ppp_atta
  * InputUpdateMeta: merge p_item meta data with p_meta taking care of
  * arturl and locking issue.
  *****************************************************************************/
-static void InputUpdateMeta( input_thread_t *p_input, demux_t *p_demux )
+static void InputUpdateMeta( input_thread_t *p_input, demux_filter_t *p_demux )
 {
     vlc_meta_t *p_meta = vlc_meta_New();
     if( unlikely(p_meta == NULL) )
@@ -2525,7 +2534,7 @@ static void InputUpdateMeta( input_thread_t *p_input, demux_t *p_demux )
             int j = 0;
             for( int i = 0; i < p_input->p->i_attachment; i++ )
             {
-                if( p_input->p->attachment_demux[i] == p_demux )
+                if( p_input->p->attachment_demux[i] == demux_FilterDemuxer( p_demux ) )
                     vlc_input_attachment_Delete( p_input->p->attachment[i] );
                 else
                 {
@@ -2537,7 +2546,7 @@ static void InputUpdateMeta( input_thread_t *p_input, demux_t *p_demux )
             p_input->p->i_attachment = j;
         }
         AppendAttachment( &p_input->p->i_attachment, &p_input->p->attachment, &p_input->p->attachment_demux,
-                          i_attachment, attachment, p_demux );
+                          i_attachment, attachment, demux_FilterDemuxer( p_demux ) );
         vlc_mutex_unlock( &p_input->p->p_item->lock );
     }
 

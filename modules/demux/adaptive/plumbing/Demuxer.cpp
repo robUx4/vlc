@@ -106,14 +106,14 @@ bool Demuxer::restart(CommandsQueue &queue)
 
 void Demuxer::drain()
 {
-    while(p_demux && demux_Demux(p_demux) == VLC_DEMUXER_SUCCESS);
+    while(p_demux && demux_Demux((demux_filter_t*) p_demux) == VLC_DEMUXER_SUCCESS);
 }
 
 int Demuxer::demux(mtime_t)
 {
     if(!p_demux || b_eof)
         return VLC_DEMUXER_EOF;
-    int i_ret = demux_Demux(p_demux);
+    int i_ret = demux_Demux( (demux_filter_t*) p_demux);
     if(i_ret != VLC_DEMUXER_SUCCESS)
         b_eof = true;
     return i_ret;
@@ -137,7 +137,7 @@ bool SlaveDemuxer::create()
     if(Demuxer::create())
     {
         length = VLC_TS_INVALID;
-        if(demux_Control(p_demux, DEMUX_GET_LENGTH, &length) != VLC_SUCCESS)
+        if(demux_Control( (demux_filter_t*) p_demux, DEMUX_GET_LENGTH, &length) != VLC_SUCCESS)
             b_eof = true;
         return true;
     }
@@ -146,7 +146,7 @@ bool SlaveDemuxer::create()
 
 int SlaveDemuxer::demux(mtime_t nz_deadline)
 {
-    if( demux_Control(p_demux, DEMUX_SET_NEXT_DEMUX_TIME, VLC_TS_0 + nz_deadline) != VLC_SUCCESS )
+    if( demux_Control( (demux_filter_t*) p_demux, DEMUX_SET_NEXT_DEMUX_TIME, VLC_TS_0 + nz_deadline) != VLC_SUCCESS )
     {
         b_eof = true;
         return VLC_DEMUXER_EOF;
