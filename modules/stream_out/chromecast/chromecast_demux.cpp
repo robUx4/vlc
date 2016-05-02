@@ -51,7 +51,7 @@ vlc_module_begin ()
     set_category( CAT_INPUT )
     set_subcategory( SUBCAT_INPUT_DEMUX )
     set_description( N_( "chromecast demux wrapper" ) )
-    set_capability( "demux_filter", 0 )
+    set_capability( "demux_filter", 1 ) // try to insert the filter by default
     add_shortcut( "cc_demux" )
     set_callbacks( DemuxOpen, DemuxClose )
 
