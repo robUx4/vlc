@@ -128,13 +128,7 @@ static int Open( vlc_object_t *p_this )
     es_format_t         fmt;
     int i_out_ports = 0;
 
-    p_demux->pf_demux = Demux;
-    p_demux->pf_control = Control;
-
-    /* Allocate structure */
-    p_demux->p_sys = p_sys = calloc( 1, sizeof( demux_sys_t ) );
-    if( !p_sys )
-        return VLC_ENOMEM;
+    DEMUX_INIT_COMMON(); p_sys = p_demux->p_sys;
 
     /* Parse MRL */
     Parse( p_demux );
