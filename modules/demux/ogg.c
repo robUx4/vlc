@@ -246,7 +246,7 @@ static int Open( vlc_object_t * p_this )
     TAB_INIT( p_sys->i_seekpoints, p_sys->pp_seekpoints );
 
 
-    while ( !p_sys->b_preparsing_done && p_demux->pf_demux( p_demux ) > 0 )
+    while ( !p_sys->b_preparsing_done && demux_Demux( p_demux ) > 0 )
     {}
 
     return VLC_SUCCESS;
