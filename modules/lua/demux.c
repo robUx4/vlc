@@ -214,12 +214,7 @@ int Import_LuaPlaylist( vlc_object_t *p_this )
     demux_t *p_demux = (demux_t *)p_this;
     int ret;
 
-    p_demux->p_sys = calloc( 1, sizeof( demux_sys_t ) );
-    if( !p_demux->p_sys )
-        return VLC_ENOMEM;
-
-    p_demux->pf_control = Control;
-    p_demux->pf_demux = Demux;
+    DEMUX_INIT_COMMON();
 
     ret = vlclua_scripts_batch_execute( p_this, "playlist",
                                         &probe_luascript, NULL );
