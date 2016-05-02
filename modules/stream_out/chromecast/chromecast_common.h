@@ -43,7 +43,7 @@ typedef struct
     void (*pf_set_length)(void*, mtime_t length);
     mtime_t (*pf_get_time)(void*);
     double (*pf_get_position)(void*);
-    void (*pf_request_seek)(void*);
+    void (*pf_request_seek)(void*, mtime_t pos);
     void (*pf_wait_seek_done)(void*);
 
     void (*pf_set_title)(void*, const char *psz_title);

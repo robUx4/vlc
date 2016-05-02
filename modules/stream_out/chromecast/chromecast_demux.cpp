@@ -127,7 +127,7 @@ struct demux_filter_sys_t
 
         /* seeking will be handled with the Chromecast */
         m_seektime = i_pos;
-        p_renderer->pf_request_seek( p_renderer->p_opaque );
+        p_renderer->pf_request_seek( p_renderer->p_opaque, m_seektime );
 
         return true;
     }
@@ -159,6 +159,8 @@ struct demux_filter_sys_t
                 msg_Warn( p_demux, "failed to seek in the muxer %d", i_ret );
                 return VLC_DEMUXER_EGENERIC;
             }
+
+            /* TODO simplify */
 
             p_renderer->pf_wait_seek_done( p_renderer->p_opaque );
         }
