@@ -33,15 +33,6 @@ extern "C" {
 
 static const char *CC_SHARED_VAR_NAME = "cc_sout";
 
-enum connection_status
-{
-    CHROMECAST_DISCONNECTED,
-    CHROMECAST_TLS_CONNECTED,
-    CHROMECAST_AUTHENTICATED,
-    CHROMECAST_APP_STARTED,
-    CHROMECAST_CONNECTION_DEAD,
-};
-
 typedef struct
 {
     void *p_opaque;

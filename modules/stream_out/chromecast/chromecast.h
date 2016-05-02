@@ -50,6 +50,15 @@ static const std::string NAMESPACE_MEDIA            = "urn:x-cast:com.google.cas
 #define HTTP_PORT               8010
 
 // Status
+enum connection_status
+{
+    CHROMECAST_DISCONNECTED,
+    CHROMECAST_TLS_CONNECTED,
+    CHROMECAST_AUTHENTICATED,
+    CHROMECAST_APP_STARTED,
+    CHROMECAST_CONNECTION_DEAD,
+};
+
 enum command_status {
     NO_CMD_PENDING,
     CMD_LOAD_SENT,
