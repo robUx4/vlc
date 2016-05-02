@@ -122,6 +122,8 @@ private:
         }
     }
 
+    void waitAppStarted();
+
     int connectChromecast();
     void disconnectChromecast();
 

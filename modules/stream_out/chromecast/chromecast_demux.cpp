@@ -61,13 +61,13 @@ vlc_module_end ()
 
 struct demux_filter_sys_t
 {
-    demux_filter_sys_t(demux_t * const demux, chromecast_common * const renderer)
+    demux_filter_sys_t(demux_filter_t * const demux, chromecast_common * const renderer)
         :p_demux(demux)
         ,p_renderer(renderer)
         ,i_length(-1)
         ,demuxReady(false)
     {
-        input_item_t *p_item = input_GetItem( p_demux->p_input );
+        input_item_t *p_item = input_GetItem( p_demux->p_demux->p_input );
         if ( p_item )
         {
             char *psz_title = input_item_GetTitleFbName( p_item );
@@ -86,38 +86,29 @@ struct demux_filter_sys_t
         if (!demuxReady)
         {
             msg_Dbg(p_demux, "wait to demux");
+            p_renderer->pf_wait_app_started( p_renderer->p_opaque );
             demuxReady = true;
             msg_Dbg(p_demux, "ready to demux");
         }
 
-        return demux_Demux( p_demux );
+        return demux_FilterDemux( p_demux );
     }
 
 protected:
-    demux_t       * const p_demux;
+    demux_filter_t     * const p_demux;
     chromecast_common  * const p_renderer;
     mtime_t       i_length;
     bool          demuxReady;
     bool          canSeek;
     /* seek time kept while waiting for the chromecast to "seek" */
     mtime_t       m_seektime;
-
-private:
-    int source_Control(int cmd, ...)
-    {
-        va_list ap;
-        int ret;
-
-        va_start(ap, cmd);
-        ret = p_demux->pf_control(p_demux, cmd, ap);
-        va_end(ap);
-        return ret;
-    }
 };
 
 static int Demux( demux_filter_t *p_demux_filter )
 {
-    return demux_FilterDemux( p_demux_filter );
+    demux_filter_sys_t *p_sys = p_demux_filter->p_sys;
+
+    return p_sys->Demux();
 }
 
 static int Control( demux_filter_t *p_demux_filter, int i_query, va_list args)
@@ -141,7 +132,7 @@ int DemuxOpen(vlc_object_t *p_this)
         return VLC_ENOOBJ;
     }
 
-    demux_filter_sys_t *p_sys = new(std::nothrow) demux_filter_sys_t( p_demux->p_demux, p_renderer );
+    demux_filter_sys_t *p_sys = new(std::nothrow) demux_filter_sys_t( p_demux, p_renderer );
     if (unlikely(p_sys == NULL))
         return VLC_ENOMEM;
 

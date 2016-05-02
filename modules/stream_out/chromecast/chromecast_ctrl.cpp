@@ -116,6 +116,7 @@ intf_sys_t::intf_sys_t(vlc_object_t * const p_this, int port, std::string device
     vlc_cond_init(&loadCommandCond);
 
     common.p_opaque = this;
+    common.pf_wait_app_started = wait_app_started;
 #if TODO
     common.pf_get_position = get_position;
     common.pf_get_time = get_time;
@@ -124,7 +125,6 @@ intf_sys_t::intf_sys_t(vlc_object_t * const p_this, int port, std::string device
     common.pf_set_input_state = set_input_state;
     common.pf_set_length = set_length;
     common.pf_set_title = set_title;
-    common.pf_wait_app_started = wait_app_started;
     common.pf_wait_seek_done = wait_seek_done;
 #endif
 
@@ -1013,4 +1013,20 @@ void intf_sys_t::requestPlayerSeek()
 
     requested_seek = true;
     notifySendRequest();
+}
+
+void intf_sys_t::waitAppStarted()
+{
+    vlc_mutex_locker locker(&lock);
+    mutex_cleanup_push(&lock);
+    while ( conn_status != CHROMECAST_APP_STARTED &&
+            conn_status != CHROMECAST_CONNECTION_DEAD )
+        vlc_cond_wait(&loadCommandCond, &lock);
+    vlc_cleanup_pop();
+}
+
+void intf_sys_t::wait_app_started(void *pt)
+{
+    intf_sys_t *p_this = reinterpret_cast<intf_sys_t*>(pt);
+    p_this->waitAppStarted();
 }
