@@ -2193,6 +2193,14 @@ static input_source_t *InputSourceNew( input_thread_t *p_input,
         return NULL;
     }
 
+    char *psz_demux_chain = var_GetNonEmptyString(p_input, "demux-filter");
+    /* add the chain of demux filters */
+    demux_filter_t *p_filtered_demux = demux_FilterChainNew( in->p_demux, psz_demux_chain );
+    in->p_demux->p_filters = p_filtered_demux;
+    if ( p_filtered_demux == NULL && psz_demux_chain != NULL)
+        msg_Dbg( p_input, "Failed to create demux filter chain %s", psz_demux_chain );
+    free( psz_demux_chain );
+
     /* Get infos from (access_)demux */
     bool b_can_seek;
     if( demux_Control( in->p_demux, DEMUX_CAN_SEEK, &b_can_seek ) )
@@ -2295,7 +2303,15 @@ static void InputSourceDestroy( input_source_t *in )
     int i;
 
     if( in->p_demux )
+    {
+        while (in->p_demux->p_filters )
+        {
+            demux_filter_t *p_old = in->p_demux->p_filters;
+            in->p_demux->p_filters = p_old->p_next;
+            vlc_object_release( p_old );
+        }
         demux_Delete( in->p_demux );
+    }
 
     if( in->i_title > 0 )
     {

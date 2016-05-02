@@ -363,7 +363,10 @@ static int demux_ControlInternal( demux_t *demux, int query, ... )
     va_list ap;
 
     va_start( ap, query );
-    ret = demux->pf_control( demux, query, ap );
+    if ( demux->p_filters )
+        ret = demux->p_filters->pf_control( demux->p_filters, query, ap );
+    else
+        ret = demux->pf_control( demux, query, ap );
     va_end( ap );
     return ret;
 }
@@ -382,7 +385,10 @@ int demux_vaControl( demux_t *demux, int query, va_list args )
                 va_list ap;
 
                 va_copy( ap, args );
-                ret = demux->pf_control( demux, query, args );
+                if ( demux->p_filters )
+                    ret = demux->p_filters->pf_control( demux->p_filters, query, args );
+                else
+                    ret = demux->pf_control( demux, query, args );
                 if( ret != VLC_SUCCESS )
                     ret = stream_vaControl( demux->s, query, ap );
                 va_end( ap );
@@ -416,6 +422,8 @@ int demux_vaControl( demux_t *demux, int query, va_list args )
             }
         }
 
+    if ( demux->p_filters )
+        return demux->p_filters->pf_control( demux->p_filters, query, args );
     return demux->pf_control( demux, query, args );
 }
 
@@ -656,3 +664,89 @@ static bool SkipAPETag( demux_t *p_demux )
     return true;
 }
 
+static demux_filter_t *demux_FilterNew( demux_t *p_demux, const char *p_name,
+                                        const config_chain_t *p_cfg )
+{
+    demux_filter_t *p_filter = vlc_custom_create( VLC_OBJECT(p_demux), sizeof( *p_filter ), "demux_filter" );
+    if( unlikely(p_filter == NULL) )
+        return NULL;
+
+    p_filter->p_demux = p_demux;
+    p_filter->p_cfg = p_cfg;
+    p_filter->p_module = module_need( p_filter, "demux_filter", p_name, true);
+    if( p_filter->p_module == NULL )
+        goto error;
+
+    return p_filter;
+
+error:
+    vlc_object_release( p_filter );
+    return NULL;
+}
+
+demux_filter_t *demux_FilterChainNew( demux_t *p_demux, const char *psz_chain )
+{
+    if( !psz_chain || !*psz_chain )
+        return NULL;
+
+    char *psz_parser = strdup(psz_chain);
+    if(!psz_parser)
+        return NULL;
+
+    vlc_array_t cfg, name;
+    vlc_array_init(&cfg);
+    vlc_array_init(&name);
+
+    /* parse chain */
+    while(psz_parser)
+    {
+        config_chain_t *p_cfg;
+        char *psz_name;
+        char *psz_rest_chain = config_ChainCreate( &psz_name, &p_cfg, psz_parser );
+        free( psz_parser );
+        psz_parser = psz_rest_chain;
+
+        vlc_array_append(&cfg, p_cfg);
+        vlc_array_append(&name, psz_name);
+    }
+
+    demux_filter_t *p_prev = NULL;
+    demux_filter_t *p_next = NULL;
+    int i = vlc_array_count(&name);
+    while (i--)
+    {
+        const char *p_name = vlc_array_item_at_index(&name, i);
+        p_next = demux_FilterNew( p_demux, p_name, vlc_array_item_at_index(&cfg, i) );
+        if ( p_next == NULL )
+            goto error;
+
+        p_next->p_next = p_prev;
+        p_prev = p_next;
+    }
+
+    vlc_array_clear(&name);
+    vlc_array_clear(&cfg);
+
+    return p_next;
+ error:
+    i++;    /* last module couldn't be created */
+
+    /* destroy all modules created  */
+    while(p_prev)
+    {
+        p_next = p_prev->p_next;
+        vlc_object_release( p_prev );
+    }
+
+    /* then destroy all names and config which weren't destroyed by
+     * sout_StreamDelete */
+    while(i--)
+    {
+        free(vlc_array_item_at_index(&name, i));
+        config_ChainDestroy(vlc_array_item_at_index(&cfg, i));
+    }
+    vlc_array_clear(&name);
+    vlc_array_clear(&cfg);
+
+    return NULL;
+}
