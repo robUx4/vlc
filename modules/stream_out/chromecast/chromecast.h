@@ -152,6 +152,22 @@ private:
 
     void setInputState(input_state_e state);
 
+    void setTitle( const char *psz_title )
+    {
+        if ( psz_title )
+            title = psz_title;
+        else
+            title = "";
+    }
+
+    void setArtwork( const char *psz_artwork )
+    {
+        if ( psz_artwork )
+            artwork = psz_artwork;
+        else
+            artwork = "";
+    }
+
     int sendMessage(const castchannel::CastMessage &msg);
 
     void buildMessage(const std::string & namespace_,
@@ -177,6 +193,10 @@ private:
 
     bool           has_input;
     input_state_e  input_state;
+
+    std::string GetMedia();
+    std::string artwork;
+    std::string title;
 
     static void* ChromecastThread(void* p_data);
 
