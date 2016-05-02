@@ -90,7 +90,7 @@ struct intf_sys_t
 
     void setHasInput( bool has_input, const std::string mime_type = "");
 
-    void requestPlayerSeek();
+    void requestPlayerSeek(mtime_t pos);
     void requestPlayerStop();
 
 private:
@@ -127,10 +127,12 @@ private:
 #endif
             conn_status = status;
             vlc_cond_broadcast(&loadCommandCond);
+            vlc_cond_signal(&seekCommandCond);
         }
     }
 
     void waitAppStarted();
+    void waitSeekDone();
 
     int connectChromecast();
     void disconnectChromecast();
@@ -217,6 +219,13 @@ private:
     mtime_t           i_ts_local_start;
     mtime_t           i_length;
 
+    /* playback time reported by the receiver, used to wait for seeking point */
+    mtime_t           m_chromecast_start_time;
+    /* seek time with Chromecast relative timestamp */
+    mtime_t           m_seek_request_time;
+
+    vlc_cond_t   seekCommandCond;
+
     /* shared structure with the demux-filter */
     chromecast_common      common;
 
@@ -225,6 +234,9 @@ private:
     static double get_position(void*);
 
     static void wait_app_started(void*);
+
+    static void request_seek(void*, mtime_t pos);
+    static void wait_seek_done(void*);
 };
 
 #endif /* VLC_CHROMECAST_H */
