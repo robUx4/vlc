@@ -115,6 +115,23 @@ intf_sys_t::intf_sys_t(vlc_object_t * const p_this, int port, std::string device
     vlc_mutex_init_recursive(&lock);
     vlc_cond_init(&loadCommandCond);
 
+    common.p_opaque = this;
+#if TODO
+    common.pf_get_position = get_position;
+    common.pf_get_time = get_time;
+    common.pf_request_seek = request_seek;
+    common.pf_set_artwork = set_artwork;
+    common.pf_set_input_state = set_input_state;
+    common.pf_set_length = set_length;
+    common.pf_set_title = set_title;
+    common.pf_wait_app_started = wait_app_started;
+    common.pf_wait_seek_done = wait_seek_done;
+#endif
+
+    assert( var_Type( p_module->p_parent->p_parent, CC_SHARED_VAR_NAME) == 0 );
+    if (var_Create( p_module->p_parent->p_parent, CC_SHARED_VAR_NAME, VLC_VAR_ADDRESS ) == VLC_SUCCESS )
+        var_SetAddress( p_module->p_parent->p_parent, CC_SHARED_VAR_NAME, &common );
+
     // Start the Chromecast event thread.
     if (vlc_clone(&chromecastThread, ChromecastThread, this,
                   VLC_THREAD_PRIORITY_LOW))
@@ -126,6 +143,8 @@ intf_sys_t::intf_sys_t(vlc_object_t * const p_this, int port, std::string device
 intf_sys_t::~intf_sys_t()
 {
     setHasInput( false );
+
+    var_Destroy( p_module->p_parent->p_parent, CC_SHARED_VAR_NAME );
 
     switch ( conn_status )
     {

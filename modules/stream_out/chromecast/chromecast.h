@@ -38,6 +38,7 @@
 #include <sstream>
 
 #include "cast_channel.pb.h"
+#include "chromecast_common.h"
 
 #define PACKET_HEADER_LEN 4
 
@@ -50,15 +51,6 @@ static const std::string NAMESPACE_MEDIA            = "urn:x-cast:com.google.cas
 #define HTTP_PORT               8010
 
 // Status
-enum connection_status
-{
-    CHROMECAST_DISCONNECTED,
-    CHROMECAST_TLS_CONNECTED,
-    CHROMECAST_AUTHENTICATED,
-    CHROMECAST_APP_STARTED,
-    CHROMECAST_CONNECTION_DEAD,
-};
-
 enum command_status {
     NO_CMD_PENDING,
     CMD_LOAD_SENT,
@@ -179,7 +171,24 @@ private:
     unsigned i_requestId;
 
     bool           has_input;
+    input_state_e  input_state;
+
     static void* ChromecastThread(void* p_data);
+
+    /* shared structure with the demux-filter */
+    chromecast_common      common;
+
+    static void wait_app_started(void*);
+    static void set_input_state(void*, input_state_e state);
+
+    static void set_length(void*, mtime_t length);
+    static mtime_t get_time(void*);
+    static double get_position(void*);
+    static void request_seek(void*);
+    static void wait_seek_done(void*);
+
+    static void set_title(void*, const char *psz_title);
+    static void set_artwork(void*, const char *psz_artwork);
 };
 
 #endif /* VLC_CHROMECAST_H */
