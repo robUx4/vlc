@@ -158,7 +158,7 @@ static int Demux( demux_t *p_demux_filter )
 
 static int Control( demux_t *p_demux_filter, int i_query, va_list args)
 {
-    demux_filter_sys_t *p_sys = p_demux_filter->p_sys;
+    demux_sys_t *p_sys = p_demux_filter->p_sys;
 
     switch (i_query)
     {
