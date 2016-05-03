@@ -36,9 +36,9 @@
 
 #include <new>
 
-struct demux_filter_sys_t
+struct demux_sys_t
 {
-    demux_filter_sys_t(demux_filter_t * const demux, chromecast_common * const renderer)
+    demux_sys_t(demux_t * const demux, chromecast_common * const renderer)
         :p_demux(demux)
         ,p_renderer(renderer)
         ,i_length(-1)
@@ -63,7 +63,7 @@ struct demux_filter_sys_t
         var_AddCallback( p_demux->p_demux->p_input, "intf-event", InputEvent, this );
     }
 
-    ~demux_filter_sys_t()
+    ~demux_sys_t()
     {
         var_DelCallback( p_demux->p_demux->p_input, "intf-event", InputEvent, this );
 
@@ -137,7 +137,7 @@ struct demux_filter_sys_t
     }
 
 protected:
-    demux_filter_t     * const p_demux;
+    demux_t            * const p_demux;
     chromecast_common  * const p_renderer;
     mtime_t       i_length;
     bool          demuxReady;
@@ -149,14 +149,14 @@ protected:
                            vlc_value_t oldval, vlc_value_t val, void * );
 };
 
-static int Demux( demux_filter_t *p_demux_filter )
+static int Demux( demux_t *p_demux_filter )
 {
-    demux_filter_sys_t *p_sys = p_demux_filter->p_sys;
+    demux_sys_t *p_sys = p_demux_filter->p_sys;
 
     return p_sys->Demux();
 }
 
-static int Control( demux_filter_t *p_demux_filter, int i_query, va_list args)
+static int Control( demux_t *p_demux_filter, int i_query, va_list args)
 {
     demux_filter_sys_t *p_sys = p_demux_filter->p_sys;
 
@@ -263,19 +263,19 @@ int demux_filter_sys_t::InputEvent( vlc_object_t *p_this, char const *psz_var,
 
 int Open(vlc_object_t *p_this)
 {
-    demux_filter_t *p_demux = reinterpret_cast<demux_filter_t*>(p_this);
-    if ( unlikely( p_demux->p_demux == NULL ) )
+    demux_t *p_demux = reinterpret_cast<demux_t*>(p_this);
+    if ( unlikely( p_demux->p_source == NULL ) )
         return VLC_EBADVAR;
 
     chromecast_common *p_renderer = reinterpret_cast<chromecast_common *>(
-                var_InheritAddress( p_demux->p_demux, CC_SHARED_VAR_NAME ) );
+                var_InheritAddress( p_demux, CC_SHARED_VAR_NAME ) );
     if ( p_renderer == NULL )
     {
         msg_Warn( p_this, "using Chromecast demuxer with no sout" );
         return VLC_ENOOBJ;
     }
 
-    demux_filter_sys_t *p_sys = new(std::nothrow) demux_filter_sys_t( p_demux, p_renderer );
+    demux_sys_t *p_sys = new(std::nothrow) demux_sys_t( p_demux, p_renderer );
     if (unlikely(p_sys == NULL))
         return VLC_ENOMEM;
 
@@ -288,8 +288,8 @@ int Open(vlc_object_t *p_this)
 
 void Close(vlc_object_t *p_this)
 {
-    demux_filter_t *p_demux = reinterpret_cast<demux_filter_t*>(p_this);
-    demux_filter_sys_t *p_sys = p_demux->p_sys;
+    demux_t *p_demux = reinterpret_cast<demux_t*>(p_this);
+    demux_sys_t *p_sys = p_demux->p_sys;
 
     delete p_sys;
 }
