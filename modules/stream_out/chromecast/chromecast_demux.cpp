@@ -198,7 +198,6 @@ static int Control( demux_t *p_demux_filter, int i_query, va_list args)
 
     case DEMUX_SET_POSITION:
     {
-        int ret = VLC_SUCCESS;
         va_list ap;
 
         va_copy( ap, args );
@@ -214,14 +213,13 @@ static int Control( demux_t *p_demux_filter, int i_query, va_list args)
         if ( !p_sys->seekTo( pos ) )
         {
             msg_Err( p_demux_filter, "failed to seek to %f", pos );
-            ret = VLC_EGENERIC;
+            return VLC_EGENERIC;
         }
         break;
     }
 
     case DEMUX_SET_TIME:
     {
-        int ret = VLC_SUCCESS;
         va_list ap;
 
         va_copy( ap, args );
