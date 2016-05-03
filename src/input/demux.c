@@ -84,7 +84,7 @@ demux_t *demux_New( vlc_object_t *p_obj, const char *psz_name,
     return demux_NewAdvanced( p_obj, NULL, NULL,
                               (s == NULL) ? psz_name : "",
                               (s != NULL) ? psz_name : "",
-                              psz_location, s, out, false );
+                              psz_location, s, out, NULL, false );
 }
 
 /*****************************************************************************
@@ -96,9 +96,12 @@ demux_t *demux_NewAdvanced( vlc_object_t *p_obj, demux_t *p_wrapped,
                             input_thread_t *p_parent_input,
                             const char *psz_access, const char *psz_demux,
                             const char *psz_location,
-                            stream_t *s, es_out_t *out, bool b_quick )
+                            stream_t *s, es_out_t *out,
+                            const config_chain_t *p_cfg, bool b_quick )
 {
-    demux_t *p_demux = vlc_custom_create( p_obj, sizeof( *p_demux ), "demux" );
+    demux_t *p_demux = vlc_custom_create( p_obj,
+                                          p_wrapped ? sizeof( demux_filter_t ) : sizeof( demux_t ),
+                                          p_wrapped ? "demux_filter" : "demux" );
     if( unlikely(p_demux == NULL) )
         return NULL;
 
@@ -180,6 +183,7 @@ demux_t *demux_NewAdvanced( vlc_object_t *p_obj, demux_t *p_wrapped,
 
     if( p_wrapped != NULL )
     {
+        ((demux_filter_t *) p_demux)->p_cfg = p_cfg;
         p_demux->p_module =
             module_need( p_demux, "demux_filter", p_demux->psz_demux, p_demux->psz_demux != NULL );
     }
@@ -282,7 +286,7 @@ demux_t *input_DemuxNew( vlc_object_t *obj, const char *access_name,
     }
     else /* Try access_demux first */
         demux = demux_NewAdvanced( obj, NULL, input, access_name, demux_name, path,
-                                   NULL, out, false );
+                                   NULL, out, NULL, false );
 
     if( demux == NULL )
     {   /* Then try a real access,stream,demux chain */
@@ -330,7 +334,7 @@ demux_t *input_DemuxNew( vlc_object_t *obj, const char *access_name,
         }
 
         demux = demux_NewAdvanced( obj, NULL, input, access_name, demux_name, path,
-                                   stream, out, quick );
+                                   stream, out, NULL, quick );
         if( demux == NULL )
         {
             msg_Err( obj, "cannot parse %s://%s", access_name, path );
@@ -669,7 +673,7 @@ static demux_t *demux_FilterNew( demux_t *p_demux, const char *p_name,
     return demux_NewAdvanced( VLC_OBJECT(p_demux), p_demux, p_demux->p_input,
                               p_demux->psz_access, p_name,
                               p_demux->psz_location, p_demux->s,
-                              p_demux->out, true );
+                              p_demux->out, p_cfg, true );
 }
 
 demux_t *demux_FilterChainNew( demux_t *p_demux, const char *psz_chain )

@@ -83,21 +83,9 @@ struct demux_t
 
 struct demux_filter_t
 {
-    VLC_COMMON_MEMBERS
-
-    /* Module properties */
-    module_t    *p_module;
-
-    /* return true if the demux should return the returned code */
-    int (*pf_demux)  ( demux_filter_t * );
-    int (*pf_control)( demux_filter_t *, int i_query, va_list args);
-
-    demux_t            *p_demux;
-    demux_filter_sys_t *p_sys;
+    demux_t              demux;
 
     const config_chain_t *p_cfg;
-
-    struct demux_filter_t *p_next;
 };
 
 /* pf_demux return values */
@@ -430,7 +418,7 @@ VLC_API void demux_PacketizerDestroy( decoder_t *p_packetizer );
     if( !p_demux->p_sys ) return VLC_ENOMEM;\
     } while(0)
 
-demux_filter_t *demux_FilterChainNew( demux_t *p_demux, const char *psz_name );
+demux_t *demux_FilterChainNew( demux_t *p_demux, const char *psz_name );
 
 /**
  * @}
