@@ -46,7 +46,7 @@ struct demux_sys_t
         ,canSeek(false)
         ,m_seektime( VLC_TS_INVALID )
     {
-        input_item_t *p_item = input_GetItem( p_demux->p_demux->p_input );
+        input_item_t *p_item = input_GetItem( p_demux->p_input );
         if ( p_item )
         {
             char *psz_title = input_item_GetTitleFbName( p_item );
