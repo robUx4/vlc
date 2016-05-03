@@ -74,10 +74,11 @@ struct demux_t
         int          i_seekpoint;   /* idem, start from 0 */
     } info;
     demux_sys_t *p_sys;
-    demux_filter_t *p_filters; /* chained list of demux-filters           */
 
     /* Weak link to parent input */
     input_thread_t *p_input;
+
+    demux_t *p_source;             /* chained list for demux-filters       */
 };
 
 struct demux_filter_t
@@ -316,22 +317,16 @@ VLC_API int demux_vaControlHelper( stream_t *, int64_t i_start, int64_t i_end,
 
 VLC_USED static inline int demux_Demux( demux_t *p_demux )
 {
-    if( !p_demux->pf_demux && !p_demux->p_filters )
+    if( !p_demux->pf_demux )
         return 1;
-
-    if ( p_demux->p_filters != NULL )
-        return p_demux->p_filters->pf_demux( p_demux->p_filters );
 
     return p_demux->pf_demux( p_demux );
 }
 
-VLC_USED static inline int demux_FilterDemux( demux_filter_t *p_demux_filter )
+VLC_USED static inline int demux_FilterDemux( demux_t *p_demux_filter )
 {
-    if ( p_demux_filter->p_next )
-        return p_demux_filter->p_next->pf_demux( p_demux_filter->p_next );
-
-    if ( p_demux_filter->p_demux )
-        return p_demux_filter->p_demux->pf_demux( p_demux_filter->p_demux );
+    if ( p_demux_filter->p_source )
+        return p_demux_filter->p_source->pf_demux( p_demux_filter->p_source );
     return 1;
 }
 
@@ -348,14 +343,11 @@ static inline int demux_Control( demux_t *p_demux, int i_query, ... )
     return i_result;
 }
 
-VLC_USED static inline int demux_FilterControl( demux_filter_t *p_demux_filter, int i_query, va_list args )
+VLC_USED static inline int demux_FilterControl( demux_t *p_demux_filter, int i_query, va_list args )
 {
-    if ( p_demux_filter->p_next )
-        return p_demux_filter->p_next->pf_control( p_demux_filter->p_next, i_query, args );
-
-    if ( p_demux_filter->p_demux )
-        return p_demux_filter->p_demux->pf_control( p_demux_filter->p_demux, i_query, args );
-    return 1;
+    if ( p_demux_filter->p_source )
+        return p_demux_filter->p_source->pf_control( p_demux_filter->p_source, i_query, args );
+    return VLC_SUCCESS;
 }
 
 /*************************************************************************
