@@ -13,8 +13,10 @@ ebml: libebml-$(EBML_VERSION).tar.bz2 .sum-ebml
 	$(MOVE)
 
 # libebml requires exceptions
-EBML_EXTRA_FLAGS = CXXFLAGS="${CXXFLAGS} -fexceptions -fvisibility=hidden" \
-					CPPFLAGS=""
+EBML_EXTRA_FLAGS = CXXFLAGS="${CXXFLAGS} -fexceptions -fvisibility=hidden"
+ifdef HAVE_ANDROID
+EBML_EXTRA_FLAGS += CPPFLAGS=""
+endif
 
 .ebml: ebml
 	cd $< && $(HOSTVARS) ./configure $(HOSTCONF) $(EBML_EXTRA_FLAGS)
