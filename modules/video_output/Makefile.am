@@ -277,7 +277,12 @@ libdirect3d11_plugin_la_SOURCES += video_output/win32/events.c \
  video_output/win32/win32touch.c video_output/win32/win32touch.h
 libdirect3d11_plugin_la_LIBADD = -lgdi32 $(LIBCOM) -luuid
 else
-libdirect3d11_plugin_la_LIBADD = -ld3dcompiler_47 $(LIBCOM) -luuid
+libdirect3d11_plugin_la_LIBADD = $(LIBCOM) -luuid
+if IS_GCC_COMPILER
+libdirect3d11_plugin_la_LIBADD += -ld3dcompiler_47
+else
+libdirect3d11_plugin_la_LIBADD += -ld3dcompiler
+endif
 endif
 libdirect3d11_plugin_la_LDFLAGS = $(AM_LDFLAGS) -rpath '$(voutdir)'
 vout_LTLIBRARIES += $(LTLIBdirect3d11)
