@@ -33,6 +33,9 @@
 # include <dxgidebug.h>
 #endif
 
+DEFINE_GUID(DXVA_ModeVP8_VLD,                       0x90b899ea, 0x3a62, 0x4705, 0x88, 0xb3, 0x8d, 0xf0, 0x4b, 0x27, 0x44, 0xe7);
+DEFINE_GUID(DXVA_ModeVP9_VLD_Profile0,              0x463707f8, 0xa1d0, 0x4585, 0x87, 0x6d, 0x83, 0xaa, 0x6d, 0x60, 0xb8, 0x9e);
+
 struct decoder_sys_t
 {
     /* DLL */
@@ -44,6 +47,7 @@ struct decoder_sys_t
     ID3D11Device          *d3ddev;
     ID3D11DeviceContext   *d3dctx;
     ID3D11VideoContext    *d3dvidctx;
+    ID3D11VideoDevice     *d3ddec;
 };
 
 static picture_t *Decode( decoder_t *p_dex, block_t **pp_block )
@@ -59,6 +63,8 @@ static void Close( vlc_object_t *p_this )
     decoder_t *p_dec = (decoder_t *) p_this;
     decoder_sys_t *sys = p_dec->p_sys;
 
+    if (sys->d3ddec)
+        ID3D11VideoDevice_Release(sys->d3ddec);
     if (sys->d3dvidctx)
         ID3D11VideoContext_Release(sys->d3dvidctx);
     if (sys->d3dctx)
@@ -119,6 +125,40 @@ static int Open( vlc_object_t *p_this )
     }
     sys->d3ddev = d3ddev;
     sys->d3dctx = d3dctx;
+
+    ID3D11VideoDevice *d3ddec = NULL;
+    hr = ID3D11Device_QueryInterface( (ID3D11Device*) sys->d3ddev, &IID_ID3D11VideoDevice, (void **)&d3ddec);
+    if (FAILED(hr)) {
+       msg_Err(p_dec, "Could not Query ID3D11VideoDevice Interface. (hr=0x%lX)", hr);
+       goto error;
+    }
+    sys->d3ddec = d3ddec;
+
+    GUID decoderGUID = {0};
+    UINT input_count = ID3D11VideoDevice_GetVideoDecoderProfileCount( sys->d3ddec );
+    for (unsigned i = 0; i < input_count; i++) {
+        GUID guid;
+        hr = ID3D11VideoDevice_GetVideoDecoderProfile( sys->d3ddec, i, &guid);
+        if (FAILED(hr))
+        {
+            msg_Err( p_dec, "GetVideoDecoderProfile %d failed. (hr=0x%lX)", i, hr);
+            goto error;
+        }
+        if ( p_dec->fmt_in.i_codec == VLC_CODEC_VP8 && IsEqualGUID(&guid, &DXVA_ModeVP8_VLD) )
+        {
+            msg_Dbg(p_dec, "found VP8 hardware decoder");
+            decoderGUID = DXVA_ModeVP8_VLD;
+            break;
+        }
+        if ( p_dec->fmt_in.i_codec == VLC_CODEC_VP9 && IsEqualGUID(&guid, &DXVA_ModeVP9_VLD_Profile0) )
+        {
+            msg_Dbg(p_dec, "found VP9 hardware decoder");
+            decoderGUID = DXVA_ModeVP9_VLD_Profile0;
+            break;
+        }
+    }
+    if ( decoderGUID.Data1 == 0)
+        goto error;
 
     ID3D11VideoContext *d3dvidctx = NULL;
     hr = ID3D11DeviceContext_QueryInterface(d3dctx, &IID_ID3D11VideoContext, (void **)&d3dvidctx);
