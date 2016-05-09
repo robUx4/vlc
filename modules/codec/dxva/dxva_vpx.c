@@ -142,7 +142,7 @@ static int Open( vlc_object_t *p_this )
         if (FAILED(hr))
         {
             msg_Err( p_dec, "GetVideoDecoderProfile %d failed. (hr=0x%lX)", i, hr);
-            goto error;
+            break;
         }
         if ( p_dec->fmt_in.i_codec == VLC_CODEC_VP8 && IsEqualGUID(&guid, &DXVA_ModeVP8_VLD) )
         {
