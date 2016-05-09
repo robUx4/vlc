@@ -555,3 +555,7 @@ libgstdecode_plugin_la_LIBADD = $(GST_VIDEO_LIBS) $(GST_APP_LIBS)
 if HAVE_GST_DECODE
 codec_LTLIBRARIES += libgstdecode_plugin.la
 endif
+
+libdxva_vpx_plugin_la_SOURCES = codec/dxva/dxva_vpx.c
+codec_LTLIBRARIES += libdxva_vpx_plugin.la
+
