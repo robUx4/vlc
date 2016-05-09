@@ -25,28 +25,138 @@
 #include <vlc_plugin.h>
 #include <vlc_codec.h>
 
+#define COBJMACROS
+#define INITGUID
+#include <d3d11.h>
+
+#if !defined(NDEBUG) && defined(HAVE_DXGIDEBUG_H)
+# include <dxgidebug.h>
+#endif
+
+struct decoder_sys_t
+{
+    /* DLL */
+    HINSTANCE             hdecoder_dll;
+#if !defined(NDEBUG) && defined(HAVE_DXGIDEBUG_H)
+    HINSTANCE             dxgidebug_dll;
+#endif
+
+    ID3D11Device          *d3ddev;
+    ID3D11DeviceContext   *d3dctx;
+    ID3D11VideoContext    *d3dvidctx;
+};
+
+static picture_t *Decode( decoder_t *p_dex, block_t **pp_block )
+{
+    return NULL;
+}
+
 /*****************************************************************************
  * Module descriptor.
  *****************************************************************************/
+static void Close( vlc_object_t *p_this )
+{
+    decoder_t *p_dec = (decoder_t *) p_this;
+    decoder_sys_t *sys = p_dec->p_sys;
+
+    if (sys->d3dvidctx)
+        ID3D11VideoContext_Release(sys->d3dvidctx);
+    if (sys->d3dctx)
+        ID3D11DeviceContext_Release(sys->d3dctx);
+    if (sys->d3ddev)
+        ID3D11Device_Release(sys->d3ddev);
+#if !defined(NDEBUG) && defined(HAVE_DXGIDEBUG_H)
+    if ( sys->dxgidebug_dll )
+        FreeLibrary( sys->dxgidebug_dll );
+#endif
+    if ( sys->hdecoder_dll )
+        FreeLibrary( sys->hdecoder_dll );
+    free( sys );
+}
+
 static int Open( vlc_object_t *p_this )
 {
     decoder_t *p_dec = (decoder_t *) p_this;
+    decoder_sys_t *sys = NULL;
 
     if( p_dec->fmt_in.i_codec != VLC_CODEC_VP8 &&
         p_dec->fmt_in.i_codec != VLC_CODEC_VP9 )
-    {
         return VLC_EGENERIC;
+
+    sys = (decoder_sys_t*) calloc( 1, sizeof(decoder_sys_t) );
+    if( sys == NULL )
+        return VLC_ENOMEM;
+
+    p_dec->p_sys = sys;
+
+    sys->hdecoder_dll = LoadLibrary(TEXT("D3D11.DLL"));
+    if (!sys->hdecoder_dll) {
+        msg_Warn(p_dec, "cannot load D3D11.dll");
+        goto error;
     }
 
-    return VLC_SUCCESS;
-}
+    PFN_D3D11_CREATE_DEVICE pf_CreateDevice;
+    pf_CreateDevice = (void *)GetProcAddress(sys->hdecoder_dll, "D3D11CreateDevice");
+    if (!pf_CreateDevice) {
+        msg_Err(p_dec, "Cannot locate reference to D3D11CreateDevice ABI in DLL");
+        goto error;
+    }
 
-static void Close( vlc_object_t * );
+    UINT creationFlags = D3D11_CREATE_DEVICE_VIDEO_SUPPORT;
+#if !defined(NDEBUG) //&& defined(_MSC_VER)
+    creationFlags |= D3D11_CREATE_DEVICE_DEBUG;
+#endif
+
+    /* */
+    ID3D11Device *d3ddev;
+    ID3D11DeviceContext *d3dctx;
+    HRESULT hr = pf_CreateDevice(NULL, D3D_DRIVER_TYPE_HARDWARE, NULL,
+                                 creationFlags, NULL, 0,
+                                 D3D11_SDK_VERSION, &d3ddev, NULL, &d3dctx);
+    if (FAILED(hr)) {
+        msg_Err(p_dec, "D3D11CreateDevice failed. (hr=0x%lX)", hr);
+        goto error;
+    }
+    sys->d3ddev = d3ddev;
+    sys->d3dctx = d3dctx;
+
+    ID3D11VideoContext *d3dvidctx = NULL;
+    hr = ID3D11DeviceContext_QueryInterface(d3dctx, &IID_ID3D11VideoContext, (void **)&d3dvidctx);
+    if (FAILED(hr)) {
+       msg_Err(p_dec, "Could not Query ID3D11VideoDevice Interface. (hr=0x%lX)", hr);
+       goto error;
+    }
+    sys->d3dvidctx = d3dvidctx;
+
+#if !defined(NDEBUG) && defined(HAVE_DXGIDEBUG_H)
+    sys->dxgidebug_dll = LoadLibrary(TEXT("DXGIDEBUG.DLL"));
+    HRESULT (WINAPI  * pf_DXGIGetDebugInterface)(const GUID *riid, void **ppDebug);
+    if (sys->dxgidebug_dll) {
+        pf_DXGIGetDebugInterface = (void *)GetProcAddress(sys->dxgidebug_dll, "DXGIGetDebugInterface");
+        if (pf_DXGIGetDebugInterface) {
+            IDXGIDebug *pDXGIDebug = NULL;
+            hr = pf_DXGIGetDebugInterface(&IID_IDXGIDebug, (void**)&pDXGIDebug);
+            if (SUCCEEDED(hr) && pDXGIDebug) {
+                hr = IDXGIDebug_ReportLiveObjects(pDXGIDebug, DXGI_DEBUG_ALL, DXGI_DEBUG_RLO_ALL);
+            }
+        }
+    }
+#endif
+
+    p_dec->fmt_out.i_cat = VIDEO_ES;
+    p_dec->pf_decode_video = Decode;
+
+    return VLC_SUCCESS;
+
+error:
+    Close( p_this );
+    return VLC_EGENERIC;
+}
 
 vlc_module_begin ()
     set_description( N_("DXVA 2.0 VPx decoder") )
     set_shortname( N_("DXVA VPx") )
-    set_capability( "decoder", 50 )
+    set_capability( "decoder", 110 )
     set_category( CAT_INPUT )
     set_subcategory( SUBCAT_INPUT_SCODEC )
     set_callbacks( Open, Close )
