@@ -23,7 +23,9 @@ DST_DXGI15_H = $(PREFIX)/include/dxgi1_5.h
 
 
 ifdef HAVE_WIN32
+ifndef HAVE_VISUALSTUDIO
 PKGS += d3d11
+endif
 endif
 
 $(TARBALLS)/d3d11.idl:
