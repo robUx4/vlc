@@ -16,7 +16,9 @@ DST_D3D9_H = $(PREFIX)/include/d3d9.h
 
 
 ifdef HAVE_WIN32
+ifndef HAVE_VISUALSTUDIO
 PKGS += d3d9
+endif
 endif
 
 $(TARBALLS)/d3d9caps.h:
