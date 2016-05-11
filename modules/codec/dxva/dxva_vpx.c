@@ -21,25 +21,32 @@
 # include "config.h"
 #endif
 
+# undef WINAPI_FAMILY
+# define WINAPI_FAMILY WINAPI_FAMILY_DESKTOP_APP
+
 #include <vlc_common.h>
 #include <vlc_plugin.h>
 #include <vlc_codec.h>
+#include "../video_chroma/dxgi_fmt.h"
 
 #define COBJMACROS
 #define INITGUID
 #include <d3d11.h>
+#include <dxva.h>
 
 #if !defined(NDEBUG) && defined(HAVE_DXGIDEBUG_H)
 # include <dxgidebug.h>
 #endif
 
-DEFINE_GUID(DXVA_ModeVP8_VLD,                       0x90b899ea, 0x3a62, 0x4705, 0x88, 0xb3, 0x8d, 0xf0, 0x4b, 0x27, 0x44, 0xe7);
-#ifndef NDEBUG
-DEFINE_GUID(DXVA_ModeVP9_VLD_Profile0/*DXVA2_ModeH264_E*/, 0x1b81be68, 0xa0c7,0x11d3, 0xb9,0x84,0x00,0xc0,0x4f,0x2e,0x73,0xc5);
-#else
-DEFINE_GUID(DXVA_ModeVP9_VLD_Profile0,              0x463707f8, 0xa1d0, 0x4585, 0x87, 0x6d, 0x83, 0xaa, 0x6d, 0x60, 0xb8, 0x9e);
-#endif
+#ifndef _MSC_VER
+DEFINE_GUID(DXVA_NoEncrypt,                        0x1b81bed0, 0xa0c7, 0x11d3, 0xb9, 0x84, 0x00, 0xc0, 0x4f, 0x2e, 0x73, 0xc5);
 
+DEFINE_GUID(D3D11_DECODER_PROFILE_VP8_VLD,                       0x90b899ea, 0x3a62, 0x4705, 0x88, 0xb3, 0x8d, 0xf0, 0x4b, 0x27, 0x44, 0xe7);
+#ifndef NDEBUG
+DEFINE_GUID(D3D11_DECODER_PROFILE_VP9_VLD_PROFILE0/*DXVA2_ModeH264_E*/, 0x1b81be68, 0xa0c7,0x11d3, 0xb9,0x84,0x00,0xc0,0x4f,0x2e,0x73,0xc5);
+#else
+DEFINE_GUID(D3D11_DECODER_PROFILE_VP9_VLD_PROFILE0,              0x463707f8, 0xa1d0, 0x4585, 0x87, 0x6d, 0x83, 0xaa, 0x6d, 0x60, 0xb8, 0x9e);
+#endif
 
 /* VPx-specific structures */
 
@@ -216,11 +223,16 @@ typedef struct _DXVA_Status_VPx {
     UCHAR  bReserved8Bits;
     USHORT wNumMbsAffected;
 } DXVA_Status_VPx, *LPDXVA_Status_VPx;
+#endif /* _MSC_VER */
+
+#define SURFACE_COUNT  4
 
 struct decoder_sys_t
 {
+#if !VLC_WINSTORE_APP
     /* DLL */
     HINSTANCE             hdecoder_dll;
+#endif
 #if !defined(NDEBUG) && defined(HAVE_DXGIDEBUG_H)
     HINSTANCE             dxgidebug_dll;
 #endif
@@ -229,11 +241,139 @@ struct decoder_sys_t
     ID3D11DeviceContext   *d3dctx;
     ID3D11VideoContext    *d3dvidctx;
     ID3D11VideoDevice     *d3ddec;
+    ID3D11VideoDecoder    *decoder;
+
+    ID3D11VideoDecoderOutputView *hw_surface[SURFACE_COUNT];
+    D3D11_VIDEO_DECODER_CONFIG   cfg;
+
+    GUID          input;
+    unsigned      surface_width;
+    unsigned      surface_height;
+    unsigned      surface_count;
 };
 
-static picture_t *Decode( decoder_t *p_dex, block_t **pp_block )
+static picture_t *Decode( decoder_t *p_dec, block_t **pp_block )
 {
     return NULL;
+}
+
+static int DxCreateDecoderSurfaces(decoder_t *p_dec, const video_format_t *fmt)
+{
+    decoder_sys_t *sys = p_dec->p_sys;
+    HRESULT hr;
+
+    D3D11_TEXTURE2D_DESC texDesc;
+    ZeroMemory(&texDesc, sizeof(texDesc));
+    texDesc.Width = sys->surface_width;
+    texDesc.Height = sys->surface_height;
+    texDesc.MipLevels = 1;
+    texDesc.Format = DXGI_FORMAT_NV12;
+    texDesc.SampleDesc.Count = 1;
+    texDesc.MiscFlags = 0;
+    texDesc.ArraySize = sys->surface_count;
+    texDesc.Usage = D3D11_USAGE_DEFAULT;
+    texDesc.BindFlags = D3D11_BIND_DECODER;
+    texDesc.CPUAccessFlags = 0;
+
+    ID3D11Texture2D *p_texture;
+    hr = ID3D11Device_CreateTexture2D( sys->d3ddev, &texDesc, NULL, &p_texture );
+    if (FAILED(hr)) {
+        msg_Err( p_dec, "CreateTexture2D %d failed. (hr=0x%0lx)", sys->surface_count, hr);
+        sys->surface_count = 0;
+        return VLC_EGENERIC;
+    }
+
+    D3D11_VIDEO_DECODER_OUTPUT_VIEW_DESC viewDesc;
+    ZeroMemory(&viewDesc, sizeof(viewDesc));
+    viewDesc.DecodeProfile = sys->input;
+    viewDesc.ViewDimension = D3D11_VDOV_DIMENSION_TEXTURE2D;
+
+    unsigned surface_count = sys->surface_count;
+    for (sys->surface_count = 0; sys->surface_count < surface_count; sys->surface_count++) {
+        viewDesc.Texture2D.ArraySlice = sys->surface_count;
+
+        hr = ID3D11VideoDevice_CreateVideoDecoderOutputView( sys->d3ddec,
+                                                             (ID3D11Resource*) p_texture,
+                                                             &viewDesc,
+                                                             &sys->hw_surface[sys->surface_count] );
+        if (FAILED(hr)) {
+            msg_Err( p_dec, "CreateVideoDecoderOutputView %d failed. (hr=0x%0lx)", sys->surface_count, hr);
+            ID3D11Texture2D_Release(p_texture);
+            return VLC_EGENERIC;
+        }
+    }
+    msg_Dbg( p_dec, "ID3D11VideoDecoderOutputView succeed with %d surfaces (%dx%d)",
+            sys->surface_count, sys->surface_width, sys->surface_height);
+
+    D3D11_VIDEO_DECODER_DESC decoderDesc;
+    ZeroMemory(&decoderDesc, sizeof(decoderDesc));
+    decoderDesc.Guid = sys->input;
+    decoderDesc.SampleWidth = fmt->i_width;
+    decoderDesc.SampleHeight = fmt->i_height;
+    decoderDesc.OutputFormat = DXGI_FORMAT_NV12;
+
+    UINT cfg_count;
+    hr = ID3D11VideoDevice_GetVideoDecoderConfigCount( (ID3D11VideoDevice*) sys->d3ddec, &decoderDesc, &cfg_count );
+    if (FAILED(hr)) {
+        msg_Err( p_dec, "GetVideoDecoderConfigCount failed. (hr=0x%lX)", hr);
+        return VLC_EGENERIC;
+    }
+
+    /* List all configurations available for the decoder */
+    D3D11_VIDEO_DECODER_CONFIG *cfg_list = alloca( cfg_count * sizeof( D3D11_VIDEO_DECODER_CONFIG ) );
+    for (unsigned i = 0; i < cfg_count; i++) {
+        hr = ID3D11VideoDevice_GetVideoDecoderConfig( (ID3D11VideoDevice*) sys->d3ddec, &decoderDesc, i, &cfg_list[i] );
+        if (FAILED(hr)) {
+            msg_Err( p_dec, "GetVideoDecoderConfig failed. (hr=0x%lX)", hr);
+            return VLC_EGENERIC;
+        }
+    }
+
+    msg_Dbg( p_dec, "we got %d decoder configurations", cfg_count);
+
+    /* Select the best decoder configuration */
+    int cfg_score = 0;
+    for (unsigned i = 0; i < cfg_count; i++) {
+        const D3D11_VIDEO_DECODER_CONFIG *cfg = &cfg_list[i];
+
+        /* */
+        msg_Dbg( p_dec, "configuration[%d] ConfigBitstreamRaw %d",
+                i, cfg->ConfigBitstreamRaw);
+
+        /* */
+        int score;
+        if (cfg->ConfigBitstreamRaw == 1)
+            score = 1;
+        else
+            continue;
+        if (IsEqualGUID(&cfg->guidConfigBitstreamEncryption, &DXVA_NoEncrypt))
+            score += 16;
+
+        if (cfg_score < score) {
+            sys->cfg = *cfg;
+            cfg_score = score;
+        }
+    }
+    if (cfg_score <= 0) {
+        msg_Err( p_dec, "Failed to find a supported decoder configuration");
+        return VLC_EGENERIC;
+    }
+
+    if( ( sys->cfg.ConfigDecoderSpecific && 0x80 ) == 0 )
+        msg_Dbg( p_dec, "a new decoder is needed on format change" );
+
+    /* Create the decoder */
+    ID3D11VideoDecoder *decoder;
+    hr = ID3D11VideoDevice_CreateVideoDecoder( sys->d3ddec, &decoderDesc, &sys->cfg, &decoder );
+    if (FAILED(hr)) {
+        msg_Err( p_dec, "ID3D11VideoDevice_CreateVideoDecoder failed. (hr=0x%lX)", hr);
+        sys->decoder = NULL;
+        return VLC_EGENERIC;
+    }
+    sys->decoder = decoder;
+
+    msg_Dbg( p_dec, "DxCreateDecoderSurfaces succeed");
+    return VLC_SUCCESS;
 }
 
 /*****************************************************************************
@@ -244,6 +384,14 @@ static void Close( vlc_object_t *p_this )
     decoder_t *p_dec = (decoder_t *) p_this;
     decoder_sys_t *sys = p_dec->p_sys;
 
+    if (sys->surface_count) {
+        ID3D11Resource *p_texture;
+        ID3D11VideoDecoderOutputView_GetResource( sys->hw_surface[0], &p_texture );
+        ID3D11Resource_Release(p_texture);
+        ID3D11Resource_Release(p_texture);
+    }
+    if ( sys->decoder )
+        ID3D11VideoDecoder_Release(sys->decoder);
     if (sys->d3ddec)
         ID3D11VideoDevice_Release(sys->d3ddec);
     if (sys->d3dvidctx)
@@ -256,10 +404,16 @@ static void Close( vlc_object_t *p_this )
     if ( sys->dxgidebug_dll )
         FreeLibrary( sys->dxgidebug_dll );
 #endif
+#if !VLC_WINSTORE_APP
     if ( sys->hdecoder_dll )
         FreeLibrary( sys->hdecoder_dll );
+#endif
     free( sys );
 }
+
+#if VLC_WINSTORE_APP
+#define pf_CreateDevice                 D3D11CreateDevice
+#endif
 
 static int Open( vlc_object_t *p_this )
 {
@@ -276,6 +430,7 @@ static int Open( vlc_object_t *p_this )
 
     p_dec->p_sys = sys;
 
+#ifndef VLC_WINSTORE_APP
     sys->hdecoder_dll = LoadLibrary(TEXT("D3D11.DLL"));
     if (!sys->hdecoder_dll) {
         msg_Warn(p_dec, "cannot load D3D11.dll");
@@ -288,10 +443,11 @@ static int Open( vlc_object_t *p_this )
         msg_Err(p_dec, "Cannot locate reference to D3D11CreateDevice ABI in DLL");
         goto error;
     }
+#endif
 
     UINT creationFlags = D3D11_CREATE_DEVICE_VIDEO_SUPPORT;
 #if !defined(NDEBUG) //&& defined(_MSC_VER)
-    creationFlags |= D3D11_CREATE_DEVICE_DEBUG;
+    //creationFlags |= D3D11_CREATE_DEVICE_DEBUG;
 #endif
 
     /* */
@@ -315,7 +471,6 @@ static int Open( vlc_object_t *p_this )
     }
     sys->d3ddec = d3ddec;
 
-    GUID decoderGUID = {0};
     UINT input_count = ID3D11VideoDevice_GetVideoDecoderProfileCount( sys->d3ddec );
     for (unsigned i = 0; i < input_count; i++) {
         GUID guid;
@@ -325,21 +480,73 @@ static int Open( vlc_object_t *p_this )
             msg_Err( p_dec, "GetVideoDecoderProfile %d failed. (hr=0x%lX)", i, hr);
             break;
         }
-        if ( p_dec->fmt_in.i_codec == VLC_CODEC_VP8 && IsEqualGUID(&guid, &DXVA_ModeVP8_VLD) )
+        if ( p_dec->fmt_in.i_codec == VLC_CODEC_VP8 && IsEqualGUID(&guid, &D3D11_DECODER_PROFILE_VP8_VLD ) )
         {
             msg_Dbg(p_dec, "found VP8 hardware decoder");
-            decoderGUID = DXVA_ModeVP8_VLD;
+            sys->input = D3D11_DECODER_PROFILE_VP8_VLD;
             break;
         }
-        if ( p_dec->fmt_in.i_codec == VLC_CODEC_VP9 && IsEqualGUID(&guid, &DXVA_ModeVP9_VLD_Profile0) )
+        if ( p_dec->fmt_in.i_codec == VLC_CODEC_VP9 && IsEqualGUID(&guid, &D3D11_DECODER_PROFILE_VP9_VLD_PROFILE0) )
         {
             msg_Dbg(p_dec, "found VP9 hardware decoder");
-            decoderGUID = DXVA_ModeVP9_VLD_Profile0;
+            sys->input = D3D11_DECODER_PROFILE_VP9_VLD_PROFILE0;
             break;
         }
+#ifndef NDEBUG
+        msg_Dbg( p_dec, "hardware decoder support for %s", directx_va_GetDecoderName( &guid ) );
+#endif
     }
-    if ( decoderGUID.Data1 == 0)
+    if( sys->input.Data1 == 0 )
+    {
+        msg_Dbg( p_dec, "hardware decoder for %4.4s not found", (char*) &p_dec->fmt_in.i_codec );
         goto error;
+    }
+
+    BOOL bSupported = false;
+#ifndef NDEBUG
+    for (int format = 0; format < 188; format++) {
+        hr = ID3D11VideoDevice_CheckVideoDecoderFormat( sys->d3ddec, &sys->input, format, &bSupported);
+        if (SUCCEEDED(hr) && bSupported)
+            msg_Dbg( p_dec, "format %s is supported for output", DxgiFormatToStr(format));
+    }
+#endif
+
+    /* TODO: better than NV12 for 10 bits sources */
+    hr = ID3D11VideoDevice_CheckVideoDecoderFormat(sys->d3ddec, &sys->input, DXGI_FORMAT_NV12, &bSupported);
+    if (SUCCEEDED(hr) && bSupported)
+        msg_Dbg(p_dec, "NV12 output is supported.");
+    else
+    {
+        msg_Dbg(p_dec, "Can't get a decoder output format NV12.");
+        goto error;
+    }
+
+    // check if we can create render texture of that format
+    // check the decoder can output to that format
+    const UINT i_quadSupportFlags = D3D11_FORMAT_SUPPORT_TEXTURE2D | D3D11_FORMAT_SUPPORT_SHADER_LOAD;
+    UINT i_formatSupport;
+    bool b_needsProcessor = true;
+    if( SUCCEEDED( ID3D11Device_CheckFormatSupport(sys->d3ddev,
+                                                   DXGI_FORMAT_NV12,
+                                                   &i_formatSupport)) &&
+            ( i_formatSupport & i_quadSupportFlags ) == i_quadSupportFlags )
+        b_needsProcessor = false;
+
+    if ( b_needsProcessor )
+    {
+        msg_Err(p_dec, "Can't allocate NV12 textures");
+        goto error;
+    }
+
+    sys->surface_width  = p_dec->fmt_in.video.i_width;
+    sys->surface_height = p_dec->fmt_in.video.i_height;
+    sys->surface_count  = SURFACE_COUNT;
+
+    if ( DxCreateDecoderSurfaces( p_dec, &p_dec->fmt_in.video ) != VLC_SUCCESS )
+    {
+        msg_Err(p_dec, "Can't allocate decoder surfaces");
+        goto error;
+    }
 
     ID3D11VideoContext *d3dvidctx = NULL;
     hr = ID3D11DeviceContext_QueryInterface(d3dctx, &IID_ID3D11VideoContext, (void **)&d3dvidctx);

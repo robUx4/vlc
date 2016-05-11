@@ -556,6 +556,12 @@ if HAVE_GST_DECODE
 codec_LTLIBRARIES += libgstdecode_plugin.la
 endif
 
-libdxva_vpx_plugin_la_SOURCES = codec/dxva/dxva_vpx.c
+libdxva_vpx_plugin_la_SOURCES = codec/dxva/dxva_vpx.c \
+	video_chroma/dxgi_fmt.c video_chroma/dxgi_fmt.h \
+	codec/avcodec/directx_va.c codec/avcodec/directx_va.h \
+	packetizer/h264_nal.c packetizer/h264_nal.h
+if HAVE_WINSTORE
+libdxva_vpx_plugin_la_LIBADD = -ld3d11
+endif
 codec_LTLIBRARIES += libdxva_vpx_plugin.la
 
