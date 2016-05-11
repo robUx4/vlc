@@ -788,6 +788,9 @@ vlc_module_begin ()
     add_string ("gnutls-priorities", "NORMAL", PRIORITIES_TEXT,
                 PRIORITIES_LONGTEXT, false)
         change_string_list (priorities_values, priorities_text)
+#if VLC_WINSTORE_APP
+    cannot_unload_broken_library();
+#endif
 #ifdef ENABLE_SOUT
     add_submodule ()
         set_description( N_("GNU TLS server") )
