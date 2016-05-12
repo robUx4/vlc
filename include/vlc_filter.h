@@ -157,6 +157,13 @@ static inline picture_t *filter_NewPicture( filter_t *p_filter )
     picture_t *pic = p_filter->owner.video.buffer_new( p_filter );
     if( pic == NULL )
         msg_Warn( p_filter, "can't get output picture" );
+
+    if ( p_filter->fmt_out.video.i_visible_width  == p_filter->fmt_in.video.i_visible_width &&
+         p_filter->fmt_out.video.i_visible_height == p_filter->fmt_in.video.i_visible_height )
+    {
+        pic->format.i_x_offset = p_filter->fmt_in.video.i_x_offset;
+        pic->format.i_y_offset = p_filter->fmt_in.video.i_y_offset;
+    }
     return pic;
 }
 
