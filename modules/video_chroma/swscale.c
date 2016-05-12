@@ -652,13 +652,6 @@ static picture_t *Filter( filter_t *p_filter, picture_t *p_pic )
         CopyPad( p_src, p_pic );
     }
 
-    if ( p_src->format.i_visible_width  == p_dst->format.i_visible_width &&
-         p_src->format.i_visible_height == p_dst->format.i_visible_height )
-    {
-        p_dst->format.i_x_offset = p_src->format.i_x_offset;
-        p_dst->format.i_y_offset = p_src->format.i_y_offset;
-    }
-
     if( p_sys->b_copy && p_sys->b_swap_uvi == p_sys->b_swap_uvo )
         picture_CopyPixels( p_dst, p_src );
     else if( p_sys->b_copy )

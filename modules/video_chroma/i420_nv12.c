@@ -118,9 +118,6 @@ VIDEO_FILTER_WRAPPER( YV12_NV12 )
 
 static void I420_YUV( filter_sys_t *p_sys, picture_t *p_src, picture_t *p_dst, bool invertUV )
 {
-    p_dst->format.i_x_offset = p_src->format.i_x_offset;
-    p_dst->format.i_y_offset = p_src->format.i_y_offset;
-
     const size_t u_plane = invertUV ? V_PLANE : U_PLANE;
     const size_t v_plane = invertUV ? U_PLANE : V_PLANE;
 
