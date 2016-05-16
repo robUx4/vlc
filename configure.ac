@@ -346,6 +346,15 @@ AM_CONDITIONAL(HAVE_WIN64,   test "${HAVE_WIN64}" = "1") dnl Only used for the p
 AM_CONDITIONAL([HAVE_WINSTORE], [test "$vlc_winstore_app" = "1"])
 AM_CONDITIONAL([HAVE_WIN32_DESKTOP], [test "${SYS}" = "mingw32" -a "$vlc_winstore_app" = "0"])
 
+compiler_is_gcc=0
+AC_PREPROC_IFELSE([AC_LANG_SOURCE([
+#if defined(__clang__) || !defined(__GNUC__)
+# error Not compiling with GCC
+#endif
+    ])],
+        [compiler_is_gcc=1], [])
+AM_CONDITIONAL(IS_GCC_COMPILER,  test "$compiler_is_gcc" = "1")
+
 dnl
 dnl Sadly autoconf does not think about testing foo.exe when ask to test
 dnl for program foo on win32
