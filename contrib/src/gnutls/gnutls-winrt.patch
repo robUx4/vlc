@@ -5,7 +5,7 @@
  # include <windows.h>
  # include <wincrypt.h>
 +# include <winapifamily.h>
-+# if WINAPI_FAMILY_PARTITION(WINAPI_PARTITION_APP)
++# if (WINAPI_FAMILY == WINAPI_FAMILY_PC_APP || WINAPI_FAMILY == WINAPI_FAMILY_PHONE_APP)
 +#  if defined(_WIN32_WINNT) && _WIN32_WINNT >= 0x0A00 /* Univeral Winstore */
 +#  undef CertOpenSystemStore
 +HCERTSTORE CertOpenSystemStore( HCRYPTPROV_LEGACY hprov, LPCSTR szSubsystemProtocol )
