@@ -95,7 +95,7 @@ ifdef HAVE_VISUALSTUDIO
 endif
 ifndef HAVE_VISUALSTUDIO
 ifdef HAVE_CROSS_COMPILE
-	cd $</src && $(MAKE) clean && $(MAKE) liblua.a && ranlib liblua.a && $(MAKE) luac
+	cd $< && $(MAKE) -C src clean && $(MAKE) -C src liblua.a && ranlib liblua.a && $(MAKE) -C src luac
 	cp $</src/luac $(PREFIX)/bin
 endif
 endif
