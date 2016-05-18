@@ -48,6 +48,18 @@ static int gnutls_Init (vlc_object_t *obj)
         msg_Err (obj, "unsupported GnuTLS version");
         return -1;
     }
+#ifdef _MSC_VER /* missing __attribute__((constructor)) */
+    static vlc_mutex_t gnutls_mutex = VLC_STATIC_MUTEX;
+    vlc_mutex_lock( &gnutls_mutex );
+    int val = gnutls_global_init();
+    vlc_mutex_unlock( &gnutls_mutex );
+
+    if( val )
+    {
+        msg_Err( obj, "cannot initialize GnuTLS" );
+        return -1;
+    }
+#endif
     msg_Dbg (obj, "using GnuTLS version %s", version);
     return 0;
 }
