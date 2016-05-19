@@ -1,0 +1,10 @@
+--- libass/libass/ass_directwrite.c	2016-05-19 08:57:30.393031500 +0200
++++ libass/libass/ass_directwrite.c.msvc	2016-05-19 08:57:46.807548900 +0200
+@@ -22,7 +22,6 @@
+ 
+ #include <initguid.h>
+ #include <ole2.h>
+-#include <shobjidl.h>
+ 
+ #include "dwrite_c.h"
+ 

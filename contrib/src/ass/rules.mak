@@ -45,6 +45,9 @@ libass: libass-$(ASS_VERSION).tar.gz .sum-ass
 ifdef HAVE_WIN32
 	$(APPLY) $(SRC)/ass/use-topendir.patch
 endif
+ifdef HAVE_VISUALSTUDIO
+	$(APPLY) $(SRC)/ass/msvc.patch
+endif
 	$(UPDATE_AUTOCONFIG)
 	$(MOVE)
 
