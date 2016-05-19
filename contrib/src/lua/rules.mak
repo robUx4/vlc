@@ -76,12 +76,15 @@ endif
 		Makefile
 	$(MOVE)
 
+LUAVARS=$(HOSTVARS) MYCFLAGS="$(CFLAGS)" MYLDFLAGS="$(LDFLAGS)"
+LUAVARS_PIC=$(HOSTVARS_PIC) MYCFLAGS="$(CFLAGS)" MYLDFLAGS="$(LDFLAGS)"
+
 .lua: lua
-	cd $< && $(HOSTVARS_PIC) $(MAKE) $(LUA_TARGET)
+	cd $< && $(LUAVARS_PIC) $(MAKE) $(LUA_TARGET)
 ifdef HAVE_WIN32
-	cd $</src && $(HOSTVARS) $(MAKE) liblua.a
+	cd $< && $(LUAVARS) $(MAKE) -C src liblua.a
 endif
-	cd $< && $(HOSTVARS) $(MAKE) install INSTALL_TOP="$(PREFIX)"
+	cd $< && $(LUAVARS) $(MAKE) install INSTALL_TOP="$(PREFIX)"
 	mkdir -p -- "$(PREFIX)/lib/pkgconfig"
 	sed -e 's/@VERSION_MAJOR@/$(LUA_VERSION_MAJOR)/g' -e 's/@VERSION@/$(LUA_VERSION)/g' <  $(SRC)/lua/lua.pc.in > "$(PREFIX)/lib/pkgconfig/lua.pc"
 ifdef HAVE_WIN32
