@@ -48,6 +48,9 @@ ifdef HAVE_WINSTORE
 	$(APPLY) $(SRC)/ass/dwrite.patch
 endif
 endif
+ifdef HAVE_VISUALSTUDIO
+	$(APPLY) $(SRC)/ass/msvc.patch
+endif
 	$(UPDATE_AUTOCONFIG)
 	$(MOVE)
 
