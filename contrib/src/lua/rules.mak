@@ -52,6 +52,9 @@ ifdef HAVE_WINSTORE
 	$(APPLY) $(SRC)/lua/winrt-nopopen.patch
 	$(APPLY) $(SRC)/lua/winrt-nosystem.patch
 endif
+ifdef HAVE_VISUALSTUDIO
+	$(APPLY) $(SRC)/lua/msvc.patch
+endif
 ifdef HAVE_DARWIN_OS
 	(cd $(UNPACK_DIR) && \
 	sed -e 's%gcc%$(CC)%' \
@@ -84,8 +87,13 @@ endif
 ifdef HAVE_WIN32
 	cd $< && $(RANLIB) "$(PREFIX)/lib/liblua.a"
 endif
+ifdef HAVE_VISUALSTUDIO
+	cp $</src/liblua.a "$(PREFIX)/lib/lua.lib"
+endif
+ifndef HAVE_VISUALSTUDIO
 ifdef HAVE_CROSS_COMPILE
 	cd $</src && $(MAKE) clean && $(MAKE) liblua.a && ranlib liblua.a && $(MAKE) luac
 	cp $</src/luac $(PREFIX)/bin
+endif
 endif
 	touch $@

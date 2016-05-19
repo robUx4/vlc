@@ -1,0 +1,33 @@
+--- lua-5.3.2/src/Makefile	2016-05-19 12:41:44.098129400 +0200
++++ lua-5.3.2/src/Makefile.msvc	2016-05-19 12:42:43.222444900 +0200
+@@ -12,7 +12,7 @@ LDFLAGS= $(SYSLDFLAGS) $(MYLDFLAGS)
+ LIBS= -lm $(SYSLIBS) $(MYLIBS)
+ 
+ AR= ar rcu
+-RANLIB= ranlib
++RANLIB= true
+ RM= rm -f
+ 
+ SYSCFLAGS=
+@@ -60,10 +60,10 @@ $(LUA_A): $(BASE_O)
+ 	$(RANLIB) $@
+ 
+ $(LUA_T): $(LUA_O) $(LUA_A)
+-	$(CC) -o $@ $(LDFLAGS) $(LUA_O) $(LUA_A) $(LIBS)
++	$(CC) -o $@ $(LDFLAGS) $(LUA_O) lapi.lib $(LIBS)
+ 
+ $(LUAC_T): $(LUAC_O) $(LUA_A)
+-	$(CC) -o $@ $(LDFLAGS) $(LUAC_O) $(LUA_A) $(LIBS)
++	$(CC) -o $@ $(LDFLAGS) $(LUAC_O) liblua.a $(LIBS)
+ 
+ clean:
+ 	$(RM) $(ALL_T) $(ALL_O)
+@@ -114,7 +114,7 @@ macosx:
+ 
+ mingw:
+ 	$(MAKE) "LUA_A=lua53.dll" "LUA_T=lua.exe" \
+-	"AR=$(CC) -shared -o" "RANLIB=strip --strip-unneeded" \
++	"AR=$(CC) -shared -o" \
+ 	"SYSCFLAGS=-DLUA_BUILD_AS_DLL" "SYSLIBS=" "SYSLDFLAGS=-s" lua.exe
+ 	$(MAKE) "LUAC_T=luac.exe" luac.exe
+ 
