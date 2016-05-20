@@ -30,6 +30,9 @@ endif
 	$(APPLY) $(SRC)/mad/Provide-Thumb-2-alternative-code-for-MAD_F_MLN.diff
 	$(APPLY) $(SRC)/mad/mad-mips-h-constraint-removal.patch
 	$(APPLY) $(SRC)/mad/mad-foreign.patch
+ifdef HAVE_VISUALSTUDIO
+	$(APPLY) $(SRC)/mad/msvc.patch
+endif
 	$(MOVE)
 
 .mad: libmad
