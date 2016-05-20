@@ -1,0 +1,13 @@
+--- libmad/configure.ac	2016-05-20 17:56:33.170178900 +0200
++++ libmad/configure.ac.msvc	2016-05-20 17:56:06.178695900 +0200
+@@ -340,8 +340,8 @@ then
+ 	    ;;
+ 	arm*-*)
+ 	    ASO="$ASO -DASO_INTERLEAVE1"
+-	    ASO="$ASO -DASO_IMDCT"
+-	    ASO_OBJS="imdct_l_arm.lo"
++	    #not yet ASO="$ASO -DASO_IMDCT"
++	    #not yet ASO_OBJS="imdct_l_arm.lo"
+ 	    ;;
+ 	mips*-*)
+ 	    ASO="$ASO -DASO_INTERLEAVE2"
