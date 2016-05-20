@@ -358,7 +358,11 @@ UPDATE_AUTOCONFIG = for dir in $(AUTOMAKE_DATA_DIRS); do \
 ifdef HAVE_IOS
 AUTORECONF = AUTOPOINT=true autoreconf
 else
+ifdef HAVE_WIN32
+AUTORECONF = rm -rf aclocal.m4 Makefile.in && autoreconf
+else
 AUTORECONF = autoreconf
+endif
 endif
 RECONF = mkdir -p -- $(PREFIX)/share/aclocal && \
 	cd $< && $(AUTORECONF) -fiv $(ACLOCAL_AMFLAGS)
