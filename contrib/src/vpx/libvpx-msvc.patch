@@ -1,0 +1,12 @@
+--- libvpx/build/make/Makefile	2016-08-09 16:58:48.715275200 +0200
++++ libvpx/build/make/Makefile.msvc	2016-08-09 16:57:38.292940800 +0200
+@@ -67,7 +67,9 @@ BUILD_ROOT?=.
+ VPATH=$(SRC_PATH_BARE)
+ CFLAGS+=-I$(BUILD_PFX)$(BUILD_ROOT) -I$(SRC_PATH)
+ CXXFLAGS+=-I$(BUILD_PFX)$(BUILD_ROOT) -I$(SRC_PATH)
++ifneq ($(AS), armasm)
+ ASFLAGS+=-I$(BUILD_PFX)$(BUILD_ROOT)/ -I$(SRC_PATH)/
++endif
+ DIST_DIR?=dist
+ HOSTCC?=gcc
+ TGT_ISA:=$(word 1, $(subst -, ,$(TOOLCHAIN)))
