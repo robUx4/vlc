@@ -1,0 +1,51 @@
+--- libvpx/configure	2015-04-03 20:49:19.000000000 +0200
++++ libvpx.ok/configure	2016-05-20 10:13:19.324061200 +0200
+@@ -107,6 +107,7 @@ all_platforms="${all_platforms} armv7-da
+ all_platforms="${all_platforms} armv7-linux-rvct"    #neon Cortex-A8
+ all_platforms="${all_platforms} armv7-linux-gcc"     #neon Cortex-A8
+ all_platforms="${all_platforms} armv7-none-rvct"     #neon Cortex-A8
++all_platforms="${all_platforms} armv7-win32-vsgcc"   #neon Cortex-A8
+ all_platforms="${all_platforms} armv7-win32-vs11"
+ all_platforms="${all_platforms} armv7-win32-vs12"
+ all_platforms="${all_platforms} armv7s-darwin-gcc"
+@@ -135,6 +136,7 @@ all_platforms="${all_platforms} x86-linu
+ all_platforms="${all_platforms} x86-os2-gcc"
+ all_platforms="${all_platforms} x86-solaris-gcc"
+ all_platforms="${all_platforms} x86-win32-gcc"
++all_platforms="${all_platforms} x86-win32-vsgcc"
+ all_platforms="${all_platforms} x86-win32-vs7"
+ all_platforms="${all_platforms} x86-win32-vs8"
+ all_platforms="${all_platforms} x86-win32-vs9"
+@@ -152,6 +154,7 @@ all_platforms="${all_platforms} x86_64-l
+ all_platforms="${all_platforms} x86_64-linux-icc"
+ all_platforms="${all_platforms} x86_64-solaris-gcc"
+ all_platforms="${all_platforms} x86_64-win64-gcc"
++all_platforms="${all_platforms} x86_64-win64-vsgcc"
+ all_platforms="${all_platforms} x86_64-win64-vs8"
+ all_platforms="${all_platforms} x86_64-win64-vs9"
+ all_platforms="${all_platforms} x86_64-win64-vs10"
+@@ -707,6 +710,9 @@ process_toolchain() {
+ 
+     # Enable the postbuild target if building for visual studio.
+     case "$tgt_cc" in
++        vsgcc) enable_feature msvs
++             INLINE="__forceinline"
++        ;;
+         vs*) enable_feature msvs
+              enable_feature solution
+              vs_version=${tgt_cc##vs}
+--- libvpx/build/make/configure.sh	2016-05-25 09:15:00.036738700 +0200
++++ libvpx/build/make/configure.sh.vsgcc	2016-05-25 09:12:30.205392200 +0200
+@@ -1060,6 +1060,12 @@ EOF
+           #for 32 bit x86 builds, -O3 did not turn on this flag
+           enabled optimizations && disabled gprof && check_add_cflags -fomit-frame-pointer
+           ;;
++        vsgcc)
++          AS=auto
++          msvs_arch_dir=x86-msvs
++          #for 32 bit x86 builds, -O3 did not turn on this flag
++          enabled optimizations && disabled gprof && check_add_cflags -fomit-frame-pointer
++          ;;
+         vs*)
+           # When building with Microsoft Visual Studio the assembler is
+           # invoked directly. Checking at configure time is unnecessary.
