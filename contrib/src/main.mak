@@ -285,6 +285,9 @@ else
 HOSTCONF += --with-pic
 PIC := -fPIC
 endif
+ifdef WITH_OPTIMIZATION
+HOSTCONF += --disable-dependency-tracking
+endif
 
 HOSTTOOLS := \
 	CC="$(CC)" CXX="$(CXX)" LD="$(LD)" \
