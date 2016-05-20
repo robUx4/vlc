@@ -1,0 +1,24 @@
+--- libvpx/vp9/common/vp9_systemdependent.h	2016-05-19 17:37:03.051535300 +0200
++++ libvpx/vp9/common/vp9_systemdependent.h.msvc	2016-05-19 17:36:51.740753500 +0200
+@@ -17,7 +17,9 @@
+ #  include <intrin.h>
+ #  define USE_MSC_INTRIN
+ # endif
++# if _MSC_VER < 1900
+ # define snprintf _snprintf
++# endif
+ #endif
+ 
+ #ifdef __cplusplus
+--- libvpx/build/make/Makefile	2015-04-03 20:49:19.000000000 +0200
++++ libvpx.ok/build/make/Makefile	2016-05-20 10:54:21.370050500 +0200
+@@ -68,7 +68,9 @@ BUILD_ROOT?=.
+ VPATH=$(SRC_PATH_BARE)
+ CFLAGS+=-I$(BUILD_PFX)$(BUILD_ROOT) -I$(SRC_PATH)
+ CXXFLAGS+=-I$(BUILD_PFX)$(BUILD_ROOT) -I$(SRC_PATH)
++ifneq ($(AS), armasm)
+ ASFLAGS+=-I$(BUILD_PFX)$(BUILD_ROOT)/ -I$(SRC_PATH)/
++endif
+ DIST_DIR?=dist
+ HOSTCC?=gcc
+ TGT_ISA:=$(word 1, $(subst -, ,$(TOOLCHAIN)))
