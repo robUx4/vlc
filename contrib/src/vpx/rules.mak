@@ -21,6 +21,7 @@ ifdef HAVE_ANDROID
 	$(APPLY) $(SRC)/vpx/libvpx-android.patch
 endif
 	$(APPLY) $(SRC)/vpx/libvpx-msvc.patch
+	$(APPLY) $(SRC)/vpx/msvc.patch
 	$(MOVE)
 
 DEPS_vpx =
@@ -74,7 +75,11 @@ endif
 VPX_TARGET := generic-gnu
 ifdef VPX_ARCH
 ifdef VPX_OS
+ifdef HAVE_VISUALSTUDIO
+VPX_TARGET := $(VPX_ARCH)-$(VPX_OS)-vsgcc
+else
 VPX_TARGET := $(VPX_ARCH)-$(VPX_OS)-gcc
+endif
 endif
 endif
 
@@ -133,4 +138,7 @@ endif
 	cd $< && $(MAKE)
 	cd $< && ../../../contrib/src/pkg-static.sh vpx.pc
 	cd $< && $(MAKE) install
+ifdef HAVE_VISUALSTUDIO
+	cd $< && cp "$(PREFIX)/lib/libvpx.a" "$(PREFIX)/lib/vpx.lib"
+endif
 	touch $@
