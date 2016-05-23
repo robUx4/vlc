@@ -1,0 +1,11 @@
+--- pthreads/version.rc	2016-05-23 13:36:10.177260500 +0200
++++ pthreads/version.rc.arm	2016-05-23 13:33:09.795578600 +0200
+@@ -51,6 +51,8 @@
+ #  define PTW32_ARCH "x64"
+ #elif defined(PTW32_ARCHx86)
+ #  define PTW32_ARCH "x86"
++#elif defined(PTW32_ARCHarm)
++#  define PTW32_ARCH "ARM"
+ #endif
+ 
+ #if defined(PTW32_RC_MSC)
