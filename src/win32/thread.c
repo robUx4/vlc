@@ -29,6 +29,9 @@
 # include "config.h"
 #endif
 
+#define LOG_COND    defined(NDEBUG) && 0
+#define LOG_THREAD  defined(NDEBUG) && 0
+
 #include <vlc_common.h>
 #include <vlc_atomic.h>
 
@@ -491,6 +494,9 @@ static unsigned __stdcall vlc_entry (void *p)
     struct vlc_thread *th = p;
 
 #if !IS_INTERRUPTIBLE
+#if LOG_THREAD
+    Debug( L"starting thread %p %d\n", th, GetCurrentThreadId() );
+#endif
     assert( th->uid < MAX_SIMULTANEOUS_THREADS );
     vlc_mutex_lock( &s_condvars[th->uid].mutex );
     s_condvars[th->uid].b_ended = false;
@@ -508,8 +514,16 @@ static unsigned __stdcall vlc_entry (void *p)
     s_condvars[th->uid].p_wake_up = NULL;
     vlc_mutex_unlock( &s_condvars[th->uid].mutex );
 #endif
+#if LOG_THREAD
+    Debug( L"ending thread %p %d\n", th, GetCurrentThreadId() );
+#endif /* LOG_THREAD */
     if (th->id == NULL) /* Detached thread */
+    {
+#if LOG_THREAD
+        Debug( L"destroying vlc_thread %p\n", th );
+#endif /* LOG_THREAD */
         vlc_thread_destroy(th);
+    }
     return 0;
 }
 
@@ -532,9 +546,15 @@ static int vlc_clone_attr (vlc_thread_t *p_handle, bool detached,
     th->wakeUp = CreateEvent( NULL, FALSE, FALSE, NULL );
     if( th->wakeUp == NULL )
     {
+#if LOG_THREAD
+        Debug( L"can't create a wakeup event for vlc_thread %p\n", th );
+#endif /* LOG_THREAD */
         free( th );
         return VLC_EGENERIC;
     }
+#if LOG_THREAD
+    Debug( L"vlc_clone_attr %p\n", th );
+#endif /* LOG_THREAD */
 #endif
     /* When using the MSVCRT C library you have to use the _beginthreadex
      * function instead of CreateThread, otherwise you'll end up with
@@ -544,6 +564,9 @@ static int vlc_clone_attr (vlc_thread_t *p_handle, bool detached,
     if (h == 0)
     {
         int err = errno;
+#if LOG_THREAD
+        Debug( L"can't start vlc_thread %p\n", th);
+#endif /* LOG_THREAD */
 #if !IS_INTERRUPTIBLE
         CloseHandle( th->wakeUp );
 #endif
@@ -559,6 +582,9 @@ static int vlc_clone_attr (vlc_thread_t *p_handle, bool detached,
     else
         th->id = (HANDLE)h;
 
+#if LOG_THREAD
+    Debug( L"vlc_clone_attr created %p %d/0x%x\n", th, th->id, th->id );
+#endif /* LOG_THREAD */
     if (p_handle != NULL)
         *p_handle = th;
 
@@ -578,6 +604,9 @@ void vlc_join (vlc_thread_t th, void **result)
 {
     DWORD ret;
 
+#if LOG_THREAD
+    Debug( L"vlc_join vlc_thread %p\n", th );
+#endif /* LOG_THREAD */
     do
     {
         vlc_testcancel ();
@@ -592,6 +621,9 @@ void vlc_join (vlc_thread_t th, void **result)
     CloseHandle(th->wakeUp);
 #endif
     CloseHandle (th->id);
+#if LOG_THREAD
+    Debug( L"destroying joined vlc_thread %p\n", th );
+#endif /* LOG_THREAD */
     vlc_thread_destroy(th);
 }
 
@@ -647,6 +679,9 @@ void vlc_cancel (vlc_thread_t th)
 #if IS_INTERRUPTIBLE
     QueueUserAPC (vlc_cancel_self, th->id, (uintptr_t)th);
 #else
+#if LOG_THREAD
+    Debug( L"vlc_cancel thread %p %d/0x%x from thread %d\n", th, th->id, th->id, GetCurrentThreadId() );
+#endif /* LOG_THREAD */
     vlc_mutex_lock(&s_condvars[th->uid].mutex);
     atomic_store (&th->killed, true);
     if (s_condvars[th->uid].p_wake_up != NULL)
@@ -690,6 +725,10 @@ void vlc_testcancel (void)
 
     th->killable = true; /* Do not re-enter cancellation cleanup */
 
+#if LOG_THREAD
+    Debug( L"killing thread %d\n", GetCurrentThreadId() );
+#endif /* LOG_THREAD */
+
     for (vlc_cleanup_t *p = th->cleaners; p != NULL; p = p->next)
         p->proc (p->data);
 
@@ -704,7 +743,12 @@ void vlc_testcancel (void)
     vlc_mutex_unlock( &s_condvars[th->uid].mutex );
 #endif
     if (th->id == NULL) /* Detached thread */
+    {
+#if LOG_THREAD
+        Debug( L"destroying canceled vlc_thread %p\n", th );
+#endif /* LOG_THREAD */
         vlc_thread_destroy(th);
+    }
     _endthreadex(0);
 }
 
