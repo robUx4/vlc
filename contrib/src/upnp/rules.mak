@@ -12,10 +12,10 @@ $(TARBALLS)/libupnp-$(UPNP_VERSION).tar.bz2:
 .sum-upnp: libupnp-$(UPNP_VERSION).tar.bz2
 
 ifdef HAVE_WIN32
-ifndef HAVE_VISUALSTUDIO
 DEPS_upnp += pthreads $(DEPS_pthreads)
+ifdef HAVE_VISUALSTUDIO
+LIBUPNP_ECFLAGS = -DPTW32_STATIC_LIB -DUPNP_USE_MSVCPP -DUPNP_INLINE=_inline
 endif
-LIBUPNP_ECFLAGS = -DPTW32_STATIC_LIB
 endif
 ifdef HAVE_WINSTORE
 CONFIGURE_ARGS=--disable-ipv6 --enable-unspecified_server
