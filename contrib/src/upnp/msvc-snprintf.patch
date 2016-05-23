@@ -1,0 +1,179 @@
+--- upnp/upnp/inc/UpnpStdInt.h	2011-04-03 04:50:36.000000000 +0200
++++ upnp/upnp/inc/UpnpStdInt.h.printf	2016-05-23 13:50:55.028998700 +0200
+@@ -7,6 +7,7 @@
+ #include <stdint.h>
+ 
+ #ifdef UPNP_USE_MSVCPP
++#if !defined(_MSC_VER) || _MSC_VER < 1900
+ 	/* no ssize_t defined for VC */
+ 	#ifdef  _WIN64
+ 		typedef int64_t ssize_t;
+@@ -14,6 +15,7 @@
+ 		typedef int32_t ssize_t;
+ 	#endif
+ #endif
++#endif
+ 
+ #endif /* !defined(UPNP_USE_BCBPP) */
+ 
+--- upnp/upnp/inc/UpnpUniStd.h	2010-12-23 21:24:06.000000000 +0100
++++ upnp/upnp/inc/UpnpUniStd.h.printf	2016-05-23 13:49:55.877351700 +0200
+@@ -1,7 +1,7 @@
+ #ifndef UPNPUNISTD_H
+ #define UPNPUNISTD_H
+ 
+-#ifdef WIN32
++#if defined(WIN32) && (!defined(_MSC_VER) || _MSC_VER < 1900)
+ 	/* Do not #include <unistd.h> on WIN32. */
+ #else /* WIN32 */
+ 	#include <unistd.h> /* for close() */
+--- upnp/upnp/src/api/upnptools.c	2013-11-15 17:01:35.000000000 +0100
++++ upnp/upnp/src/api/upnptools.c.printf	2016-05-23 13:51:59.663014700 +0200
+@@ -56,7 +56,7 @@
+ /*! Maximum action header buffer length. */
+ #define HEADER_LENGTH 2000
+ 
+-#ifdef WIN32
++#if defined(WIN32) && (!defined(_MSC_VER) || _MSC_VER < 1900)
+ 	#define snprintf _snprintf
+ #endif
+ 
+--- upnp/upnp/src/gena/gena_ctrlpt.c	2013-11-15 17:01:35.000000000 +0100
++++ upnp/upnp/src/gena/gena_ctrlpt.c.printf	2016-05-23 13:52:09.847198000 +0200
+@@ -52,7 +52,7 @@
+ #include "uuid.h"
+ #include "upnpapi.h"
+ 
+-#ifdef WIN32
++#if defined(WIN32) && (!defined(_MSC_VER) || _MSC_VER < 1900)
+ 	#define snprintf _snprintf
+ #endif
+ 
+--- upnp/upnp/src/gena/gena_device.c	2013-11-15 17:01:35.000000000 +0100
++++ upnp/upnp/src/gena/gena_device.c.printf	2016-05-23 13:52:14.630634700 +0200
+@@ -50,7 +50,7 @@
+ #include "upnpapi.h"
+ #include "uuid.h"
+ 
+-#ifdef WIN32
++#if defined(WIN32) && (!defined(_MSC_VER) || _MSC_VER < 1900)
+ 	#define snprintf _snprintf
+ #endif
+ 
+--- upnp/upnp/src/genlib/net/http/httpreadwrite.c	2013-11-15 17:01:35.000000000 +0100
++++ upnp/upnp/src/genlib/net/http/httpreadwrite.c.printf	2016-05-23 13:52:35.128948300 +0200
+@@ -59,7 +59,9 @@
+ #ifdef WIN32
+ 	#include <malloc.h>
+ 	#define fseeko fseek
++#if !defined(_MSC_VER) || _MSC_VER < 1900
+ 	#define snprintf _snprintf
++#endif
+ #else
+ 	#include <arpa/inet.h>
+ 	#include <sys/types.h>
+--- upnp/upnp/src/genlib/net/http/webserver.c	2013-11-15 17:01:35.000000000 +0100
++++ upnp/upnp/src/genlib/net/http/webserver.c.printf	2016-05-23 13:52:42.992013500 +0200
+@@ -62,7 +62,7 @@
+ #include <fcntl.h>
+ #include <sys/stat.h>
+ 
+-#ifdef WIN32
++#if defined(WIN32) && (!defined(_MSC_VER) || _MSC_VER < 1900)
+ 	 #define snprintf _snprintf
+ #endif
+ 
+--- upnp/upnp/src/genlib/net/uri/uri.c	2013-11-15 17:01:35.000000000 +0100
++++ upnp/upnp/src/genlib/net/uri/uri.c.printf	2016-05-23 13:53:02.830196900 +0200
+@@ -44,7 +44,7 @@
+ 		#include <lwres/netdb.h>
+ 	#endif
+ #endif
+-#ifdef WIN32
++#if defined(WIN32) && (!defined(_MSC_VER) || _MSC_VER < 1900)
+ 	#define snprintf _snprintf
+ #endif
+ #include <assert.h>
+--- upnp/upnp/src/inc/upnputil.h	2016-05-23 16:01:26.929859500 +0200
++++ upnp/upnp/src/inc/upnputil.h.printf	2016-05-23 13:46:15.923510700 +0200
+@@ -126,8 +126,10 @@ void linecopylen(
+ 		#ifndef EADDRINUSE		/* VS2010 has this defined */
+ 			#define EADDRINUSE		WSAEADDRINUSE
+ 		#endif
++#if !defined(_MSC_VER) || _MSC_VER < 1900
+ 		#define strcasecmp		stricmp
+ 		#define strncasecmp		strnicmp
++#endif
+ 		#define sleep(a)		Sleep((a)*1000)
+ 		#define usleep(a)		Sleep((a)/1000)
+ 		#define strerror_r(a,b,c)       strncpy( b, strerror(a), c)
+--- upnp/upnp/src/inc/uri.h	2012-03-26 18:49:42.000000000 +0200
++++ upnp/upnp/src/inc/uri.h.printf	2016-05-23 13:48:59.536371500 +0200
+@@ -61,7 +61,9 @@
+ #endif
+ 
+ #ifdef WIN32
++#if !defined(_MSC_VER) || _MSC_VER < 1900
+ 	#define strncasecmp strnicmp
++#endif
+ #else
+ 	/* Other systems have strncasecmp */
+ #endif
+--- upnp/upnp/src/soap/soap_device.c	2013-11-15 17:01:35.000000000 +0100
++++ upnp/upnp/src/soap/soap_device.c.printf	2016-05-23 13:53:09.334700200 +0200
+@@ -48,7 +48,7 @@
+ #include "unixutil.h"
+ #include "upnpapi.h"
+ 
+-#ifdef WIN32
++#if defined(WIN32) && (!defined(_MSC_VER) || _MSC_VER < 1900)
+ 	#define snprintf _snprintf
+ #endif
+ 
+--- upnp/upnp/src/ssdp/ssdp_ctrlpt.c	2013-11-15 17:01:35.000000000 +0100
++++ upnp/upnp/src/ssdp/ssdp_ctrlpt.c.printf	2016-05-23 13:53:26.302134500 +0200
+@@ -59,7 +59,9 @@
+ 
+ #ifdef WIN32
+ #include <string.h>
++#if !defined(_MSC_VER) || _MSC_VER < 1900
+ #define snprintf _snprintf
++#endif
+ #endif /* WIN32 */
+ 
+ /*!
+--- upnp/upnp/src/ssdp/ssdp_device.c	2012-06-21 03:06:38.000000000 +0200
++++ upnp/upnp/src/ssdp/ssdp_device.c.printf	2016-05-23 13:53:31.429697800 +0200
+@@ -56,7 +56,7 @@
+ #include <stdio.h>
+ #include <string.h>
+ 
+-#ifdef WIN32
++#if defined(WIN32) && (!defined(_MSC_VER) || _MSC_VER < 1900)
+ 	#define snprintf _snprintf
+ #endif
+ 
+--- upnp/upnp/src/ssdp/ssdp_server.c	2016-05-23 16:01:27.402358700 +0200
++++ upnp/upnp/src/ssdp/ssdp_server.c.printf	2016-05-23 13:53:47.989808700 +0200
+@@ -41,7 +41,9 @@
+ #ifndef WIN32
+ 	#include <sys/param.h>
+ #else
++#if !defined(_MSC_VER) || _MSC_VER < 1900
+ 	#define snprintf _snprintf
++#endif
+ #endif /* WIN32 */
+ 
+ #include "config.h"
+--- upnp/upnp/src/urlconfig/urlconfig.c	2013-11-15 16:50:02.000000000 +0100
++++ upnp/upnp/src/urlconfig/urlconfig.c.printf	2016-05-23 13:54:05.237756100 +0200
+@@ -50,7 +50,9 @@
+ #include <stdio.h>
+ 
+ #ifdef WIN32
++#if !defined(_MSC_VER) || _MSC_VER < 1900
+ 	#define snprintf _snprintf
++#endif
+ #else
+ 	#include <sys/types.h>
+ #endif
