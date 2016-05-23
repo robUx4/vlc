@@ -1,0 +1,114 @@
+--- gnutls/lib/system.c	2016-06-28 08:58:13.263530600 +0200
++++ gnutls/lib/system.c.msvc	2016-06-28 10:59:32.541022600 +0200
+@@ -43,6 +43,111 @@ HCERTSTORE CertOpenSystemStore( HCRYPTPR
+     return CertOpenStore( CERT_STORE_PROV_SYSTEM_A, X509_ASN_ENCODING, 0,
+         CERT_SYSTEM_STORE_CURRENT_USER, szSubsystemProtocol );
+ }
++#  else /* _WIN32_WINNT */
++#  define COBJMACROS
++#  define INITGUID
++#  include <winstring.h>
++#  include <windows.security.cryptography.core.h>
++
++#  ifdef _MSC_VER /* roapi.h is a C++ include file that doesn't work with C files */
++DECLSPEC_IMPORT HRESULT WINAPI RoGetActivationFactory(HSTRING activatableClassId, REFIID iid, void **factory);
++#  else /* _MSC_VER */
++#   include <roapi.h>
++#  endif /* _MSC_VER */
++typedef __x_ABI_CWindows_CSecurity_CCryptography_CCertificates_CICertificateStore         ICertificateStore;
++typedef __x_ABI_CWindows_CSecurity_CCryptography_CCertificates_CICertificateStoresStatics ICertificateStoresStatics;
++#define      ICertificateStoresStatics_Release                                  __x_ABI_CWindows_CSecurity_CCryptography_CCertificates_CICertificateStoresStatics_Release
++#define      ICertificateStoresStatics_get_TrustedRootCertificationAuthorities  __x_ABI_CWindows_CSecurity_CCryptography_CCertificates_CICertificateStoresStatics_get_TrustedRootCertificationAuthorities
++#define      ICertificateStoresStatics_get_IntermediateCertificationAuthorities __x_ABI_CWindows_CSecurity_CCryptography_CCertificates_CICertificateStoresStatics_get_IntermediateCertificationAuthorities
++#   ifndef _MSC_VER /* already defined in the MSVC toolchain */
++DEFINE_GUID(IID_ICertificateStoresStatics,   0xFBECC739, 0xC6FE, 0x4DE7, 0x99, 0xCF, 0x74, 0xC3, 0xE5, 0x96, 0xE0, 0x32);
++
++typedef void *HCRYPTPROV_LEGACY;
++typedef ICertificateStore *HCERTSTORE;
++
++typedef struct {
++    DWORD dwCertEncodingType;
++    BYTE *pbCertEncoded;
++    DWORD cbCertEncoded;
++} CERT_CONTEXT;
++typedef const CERT_CONTEXT *PCCERT_CONTEXT;
++typedef struct {
++    DWORD dwCertEncodingType;
++    BYTE *pbCrlEncoded;
++    DWORD cbCrlEncoded;
++} CRL_CONTEXT;
++typedef const CRL_CONTEXT *PCCRL_CONTEXT;
++
++#define X509_ASN_ENCODING  1
++
++
++/* __forceinline */ HCERTSTORE CertOpenSystemStore(HCRYPTPROV_LEGACY hprov, LPCSTR szSubsystemProtocol)
++{
++    static const WCHAR *className = L"Windows.Security.Cryptography.Certificates";
++    const UINT32 clen = wcslen(className);
++
++    HSTRING hClassName = NULL;
++    HSTRING_HEADER header;
++    HRESULT hr = WindowsCreateStringReference(className, clen, &header, &hClassName);
++    if (FAILED(hr)) {
++        WindowsDeleteString(hClassName);
++        return NULL;
++    }
++
++    ICertificateStoresStatics *certStoresStatics = NULL;
++    hr = RoGetActivationFactory(hClassName, &IID_ICertificateStoresStatics, (void**)&certStoresStatics);
++    WindowsDeleteString(hClassName);
++
++    if (FAILED(hr))
++        return NULL;
++    
++    if (!strcmp(szSubsystemProtocol, "ROOT"))
++    {
++        ICertificateStore *result;
++        hr = ICertificateStoresStatics_get_TrustedRootCertificationAuthorities(certStoresStatics, &result);
++        ICertificateStoresStatics_Release(certStoresStatics);
++        if (SUCCEEDED(hr))
++        {
++            return result;
++        }
++    }
++    else if (!strcmp(szSubsystemProtocol, "CA"))
++    {
++        ICertificateStore *result;
++        hr = ICertificateStoresStatics_get_IntermediateCertificationAuthorities(certStoresStatics, &result);
++        ICertificateStoresStatics_Release(certStoresStatics);
++        if (SUCCEEDED(hr))
++        {
++            return result;
++        }
++    }
++    else
++    {
++        ICertificateStoresStatics_Release(certStoresStatics);
++    }
++
++    return NULL;
++}
++
++/* __forceinline */ BOOL WINAPI CertCloseStore(HCERTSTORE hCertStore, DWORD dwFlags)
++{
++    HRESULT hr = ICertificateStoresStatics_Release(hCertStore);
++    return SUCCEEDED(hr);
++}
++
++__forceinline PCCERT_CONTEXT CertEnumCertificatesInStore(HCERTSTORE hCertStore, PCCERT_CONTEXT pPrevCertContext)
++{
++    return NULL;
++}
++
++__forceinline PCCRL_CONTEXT CertEnumCRLsInStore(HCERTSTORE hCertStore, PCCRL_CONTEXT pPrevCrlContext)
++{
++    return NULL;
++}
++
++#define Loaded_CertEnumCRLsInStore CertEnumCRLsInStore
++#   endif /* _MSC_VER */
++
+ #  endif /* _WIN32_WINNT */
+ # endif /* WINAPI_FAMILY */
+ # if defined(__MINGW32__) && !defined(__MINGW64_VERSION_MAJOR) && __MINGW32_MAJOR_VERSION <= 3 && __MINGW32_MINOR_VERSION <= 20
