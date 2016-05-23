@@ -40,6 +40,9 @@ ifdef HAVE_MACOSX
 	$(APPLY) $(SRC)/gnutls/gnutls-disable-getentropy-osx.patch
 endif
 	$(APPLY) $(SRC)/gnutls/gnutls-libidn.patch
+ifdef HAVE_WINSTORE
+	$(APPLY) $(SRC)/gnutls/winstore.patch
+endif
 	$(call pkg_static,"lib/gnutls.pc.in")
 	$(UPDATE_AUTOCONFIG)
 	$(MOVE)
