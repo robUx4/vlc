@@ -51,12 +51,27 @@ static CONDITION_VARIABLE super_variable;
 /*** Threads ***/
 static DWORD thread_key;
 
+#if !IS_INTERRUPTIBLE
+/* keep trace of what the threads are waiting for */
+#define MAX_SIMULTANEOUS_THREADS 128
+struct {
+    const HANDLE *p_wake_up;
+    vlc_mutex_t  mutex;
+    bool         b_ended;
+} s_condvars[MAX_SIMULTANEOUS_THREADS];
+static atomic_uint s_nbthreads = ATOMIC_VAR_INIT(0);
+#endif
+
 struct vlc_thread
 {
     HANDLE         id;
 
     bool           killable;
     atomic_bool    killed;
+#if !IS_INTERRUPTIBLE
+    HANDLE         wakeUp;
+    int            uid;
+#endif
     vlc_cleanup_t *cleaners;
 
     void        *(*entry) (void *);
@@ -454,6 +469,17 @@ void vlc_addr_broadcast(void *addr)
 }
 
 /*** Threads ***/
+#if !IS_INTERRUPTIBLE
+static bool isCancelled(void)
+{
+    struct vlc_thread *th = vlc_thread_self();
+    if (th == NULL)
+        return false; /* Main thread - cannot be cancelled anyway */
+
+    return th->killable && atomic_load(&th->killed);
+}
+#endif
+
 static void vlc_thread_destroy(vlc_thread_t th)
 {
     DeleteCriticalSection(&th->wait.lock);
@@ -464,11 +490,24 @@ static unsigned __stdcall vlc_entry (void *p)
 {
     struct vlc_thread *th = p;
 
+#if !IS_INTERRUPTIBLE
+    assert( th->uid < MAX_SIMULTANEOUS_THREADS );
+    vlc_mutex_lock( &s_condvars[th->uid].mutex );
+    s_condvars[th->uid].b_ended = false;
+    vlc_mutex_unlock( &s_condvars[th->uid].mutex );
+#endif
+
     TlsSetValue(thread_key, th);
     th->killable = true;
     th->data = th->entry (th->data);
     TlsSetValue(thread_key, NULL);
 
+#if !IS_INTERRUPTIBLE
+    vlc_mutex_lock( &s_condvars[th->uid].mutex );
+    s_condvars[th->uid].b_ended = true; /* mark the thread as already dead */
+    s_condvars[th->uid].p_wake_up = NULL;
+    vlc_mutex_unlock( &s_condvars[th->uid].mutex );
+#endif
     if (th->id == NULL) /* Detached thread */
         vlc_thread_destroy(th);
     return 0;
@@ -488,6 +527,15 @@ static int vlc_clone_attr (vlc_thread_t *p_handle, bool detached,
     th->wait.addr = NULL;
     InitializeCriticalSection(&th->wait.lock);
 
+#if !IS_INTERRUPTIBLE
+    th->uid = atomic_fetch_add( &s_nbthreads, 1 ) % MAX_SIMULTANEOUS_THREADS;
+    th->wakeUp = CreateEvent( NULL, FALSE, FALSE, NULL );
+    if( th->wakeUp == NULL )
+    {
+        free( th );
+        return VLC_EGENERIC;
+    }
+#endif
     /* When using the MSVCRT C library you have to use the _beginthreadex
      * function instead of CreateThread, otherwise you'll end up with
      * memory leaks and the signal functions not working (see Microsoft
@@ -496,6 +544,9 @@ static int vlc_clone_attr (vlc_thread_t *p_handle, bool detached,
     if (h == 0)
     {
         int err = errno;
+#if !IS_INTERRUPTIBLE
+        CloseHandle( th->wakeUp );
+#endif
         free (th);
         return err;
     }
@@ -537,6 +588,9 @@ void vlc_join (vlc_thread_t th, void **result)
 
     if (result != NULL)
         *result = th->data;
+#if !IS_INTERRUPTIBLE
+    CloseHandle(th->wakeUp);
+#endif
     CloseHandle (th->id);
     vlc_thread_destroy(th);
 }
@@ -592,6 +646,12 @@ void vlc_cancel (vlc_thread_t th)
 
 #if IS_INTERRUPTIBLE
     QueueUserAPC (vlc_cancel_self, th->id, (uintptr_t)th);
+#else
+    vlc_mutex_lock(&s_condvars[th->uid].mutex);
+    atomic_store (&th->killed, true);
+    if (s_condvars[th->uid].p_wake_up != NULL)
+        SetEvent(s_condvars[th->uid].p_wake_up);
+    vlc_mutex_unlock(&s_condvars[th->uid].mutex);
 #endif
 }
 
@@ -634,6 +694,15 @@ void vlc_testcancel (void)
         p->proc (p->data);
 
     th->data = NULL; /* TODO: special value? */
+#if !IS_INTERRUPTIBLE
+    vlc_mutex_lock( &s_condvars[th->uid].mutex );
+    if( s_condvars[th->uid].p_wake_up )
+    {
+        SetEvent( s_condvars[th->uid].p_wake_up = NULL );
+        s_condvars[th->uid].p_wake_up = NULL;
+    }
+    vlc_mutex_unlock( &s_condvars[th->uid].mutex );
+#endif
     if (th->id == NULL) /* Detached thread */
         vlc_thread_destroy(th);
     _endthreadex(0);
@@ -1065,10 +1134,18 @@ BOOL WINAPI DllMain (HINSTANCE hinstDll, DWORD fdwReason, LPVOID lpvReserved)
             InitializeConditionVariable(&super_variable);
             vlc_rwlock_init (&config_lock);
             vlc_CPU_init ();
+#if !IS_INTERRUPTIBLE
+            for (int i = 0; i < MAX_SIMULTANEOUS_THREADS; ++i)
+                vlc_mutex_init(&s_condvars[i].mutex);
+#endif
             break;
         }
 
         case DLL_PROCESS_DETACH:
+#if !IS_INTERRUPTIBLE
+            for (int i = 0; i < MAX_SIMULTANEOUS_THREADS; ++i)
+                vlc_mutex_destroy(&s_condvars[i].mutex);
+#endif
             vlc_rwlock_destroy (&config_lock);
             DeleteCriticalSection(&super_mutex);
             DeleteCriticalSection(&setup_lock);
