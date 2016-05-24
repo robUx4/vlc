@@ -1,0 +1,48 @@
+--- libgpg-error/src/Makefile.am	2016-05-24 11:04:15.247971400 +0200
++++ libgpg-error/src/Makefile.am.msvc	2016-05-24 10:55:28.950558100 +0200
+@@ -291,7 +291,7 @@ endif
+ gpg-error.h: Makefile mkheader $(parts_of_gpg_error_h) \
+              versioninfo.rc ../config.h
+ 	$(pre_mkheader_cmds)
+-	./mkheader $(host_os) $(host_triplet)  $(srcdir)/gpg-error.h.in \
++	./mkheader mingw32 $(host_triplet)  $(srcdir)/gpg-error.h.in \
+                    ../config.h $(PACKAGE_VERSION) $(VERSION_NUMBER) >$@
+ 
+ 
+--- libgpg-error/src/versioninfo.rc.in	2016-05-24 11:24:17.730109200 +0200
++++ libgpg-error/src/versioninfo.rc.in.msvc	2016-05-24 11:23:52.243586000 +0200
+@@ -12,9 +12,9 @@
+ 
+ /* This file is processed by configure to create versioninfo.rc */
+ 
+-#line __LINE__ "versioninfo.rc.in"
++//#line __LINE__ "versioninfo.rc.in"
+ 
+-#include <afxres.h>
++//#include <afxres.h>
+ 
+ 
+ VS_VERSION_INFO VERSIONINFO
+--- libgpg-error/po/LINGUAS	2016-05-24 11:43:00.881850100 +0200
++++ libgpg-error/po/LINGUAS.msvc	2016-05-24 11:42:25.034300900 +0200
+@@ -1,20 +1 @@
+ # Set of available languages.
+-cs
+-da
+-de
+-eo
+-fr
+-hu
+-it
+-ja
+-nl
+-pl
+-pt
+-ro
+-ru
+-sr
+-sv
+-uk
+-vi
+-zh_CN
+-zh_TW
