@@ -1,0 +1,33 @@
+--- nfs/examples/Makefile.am	2016-02-01 01:06:44.000000000 +0100
++++ nfs/examples/Makefile.am.gcc	2016-05-24 15:20:47.655557500 +0200
+@@ -8,7 +8,7 @@ AM_CPPFLAGS = \
+ 	-I$(abs_top_srcdir)/nfs \
+ 	-I$(abs_top_srcdir)/portmap \
+ 	-I$(abs_top_srcdir)/rquota \
+-	"-D_U_=__attribute__((unused))"
++	"-D_U_="
+ 
+ COMMON_LIBS = ../lib/libnfs.la -lpopt
+ nfsclient_async_LDADD = $(COMMON_LIBS)
+--- nfs/lib/Makefile.am	2016-02-01 01:06:44.000000000 +0100
++++ nfs/lib/Makefile.am.gcc	2016-05-24 15:20:56.100038000 +0200
+@@ -11,7 +11,7 @@ libnfs_la_CPPFLAGS = -I$(abs_top_srcdir)
+ 		     -I$(abs_top_srcdir)/portmap \
+ 		     -I$(abs_top_srcdir)/rquota \
+ 		     -I$(abs_top_srcdir)/win32 \
+-		     "-D_U_=__attribute__((unused))"
++		     "-D_U_="
+ 
+ libnfs_la_SOURCES = \
+ 	init.c \
+--- nfs/utils/Makefile.am	2016-02-01 01:06:44.000000000 +0100
++++ nfs/utils/Makefile.am.gcc	2016-05-24 15:21:00.839497200 +0200
+@@ -9,7 +9,7 @@ AM_CPPFLAGS = \
+ 	-I$(abs_top_srcdir)/include/nfsc \
+ 	-I$(abs_top_srcdir)/mount \
+ 	-I$(abs_top_srcdir)/win32 \
+-	"-D_U_=__attribute__((unused))"
++	"-D_U_="
+ 
+ COMMON_LIBS = ../lib/libnfs.la $(LIBSOCKET)
+ 
