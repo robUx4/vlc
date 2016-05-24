@@ -1,0 +1,12 @@
+--- nfs/win32/win32_compat.h	2016-02-01 01:06:44.000000000 +0100
++++ nfs/win32/win32_compat.h.msvc	2016-05-24 16:32:53.883922300 +0200
+@@ -103,7 +103,9 @@ struct pollfd {
+ #define ioctl ioctlsocket
+ 
+ /* Wrapper macros to call misc. functions win32 is missing */
++#ifndef HAVE_POLL_H
+ #define poll(x, y, z)        win32_poll(x, y, z)
++#endif
+ #define inet_pton(x,y,z)     win32_inet_pton(x,y,z)
+ int     win32_inet_pton(int af, const char * src, void * dst);
+ int     win32_poll(struct pollfd *fds, unsigned int nfsd, int timeout);
