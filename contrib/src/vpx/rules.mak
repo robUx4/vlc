@@ -20,6 +20,7 @@ libvpx: libvpx-$(VPX_VERSION).tar.bz2 .sum-vpx
 ifdef HAVE_ANDROID
 	$(APPLY) $(SRC)/vpx/libvpx-android.patch
 endif
+	$(APPLY) $(SRC)/vpx/windows-pthread.patch
 	$(MOVE)
 
 DEPS_vpx =
