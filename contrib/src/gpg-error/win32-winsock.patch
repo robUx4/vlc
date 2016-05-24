@@ -1,0 +1,12 @@
+--- libgpg-error/src/estream.c	2016-07-12 10:42:56.000000000 +0200
++++ libgpg-error/src/estream.c.msvc	2016-09-20 12:36:00.304641600 +0200
+@@ -86,9 +86,7 @@
+ #include <stddef.h>
+ #include <assert.h>
+ #ifdef HAVE_W32_SYSTEM
+-# ifdef HAVE_WINSOCK2_H
+ #  include <winsock2.h>
+-# endif
+ # include <windows.h>
+ #endif
+ 
