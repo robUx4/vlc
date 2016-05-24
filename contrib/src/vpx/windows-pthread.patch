@@ -1,0 +1,14 @@
+--- libvpx/libs.mk	2016-05-24 08:23:22.693712700 +0200
++++ libvpx/libs.mk.pthread	2016-05-24 08:22:01.918692200 +0200
+@@ -300,7 +300,11 @@ vpx.pc: config.mk libs.mk
+ 	$(qexec)echo 'Conflicts:' >> $@
+ 	$(qexec)echo 'Libs: -L$${libdir} -lvpx -lm' >> $@
+ ifeq ($(HAVE_PTHREAD_H),yes)
++ifeq ($(filter win%,$(TGT_OS)),$(TGT_OS))
++	$(qexec)echo 'Libs.private: -lm -lpthreadGC2' >> $@
++else
+ 	$(qexec)echo 'Libs.private: -lm -lpthread' >> $@
++endif
+ else
+ 	$(qexec)echo 'Libs.private: -lm' >> $@
+ endif
