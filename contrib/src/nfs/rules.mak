@@ -16,6 +16,10 @@ nfs: libnfs-$(NFS_VERSION).tar.gz .sum-nfs
 	$(UNPACK)
 	mv libnfs-libnfs-$(NFS_VERSION) libnfs-$(NFS_VERSION)
 	$(APPLY) $(SRC)/nfs/Android-statvfs.patch
+ifdef HAVE_VISUALSTUDIO
+	$(APPLY) $(SRC)/nfs/non-gcc.patch
+	$(APPLY) $(SRC)/nfs/msvc.patch
+endif
 	$(UPDATE_AUTOCONFIG)
 	$(MOVE)
 
