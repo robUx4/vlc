@@ -1,0 +1,54 @@
+--- libgcrypt/configure.ac	2016-05-26 14:40:54.586519300 +0200
++++ libgcrypt/configure.ac.msvc	2016-05-26 14:54:05.505210500 +0200
+@@ -1681,11 +1681,15 @@ if test "$found" = "1" ; then
+    case "${host}" in
+       x86_64-*-*)
+          # Build with the assembly implementation
++         if test "$gcry_cv_gcc_arm_platform_as_ok" = "yes" ; then
+          GCRYPT_CIPHERS="$GCRYPT_CIPHERS rijndael-amd64.lo"
++         fi
+       ;;
+       arm*-*-*)
+          # Build with the assembly implementation
++         if test "$gcry_cv_gcc_arm_platform_as_ok" = "yes" ; then
+          GCRYPT_CIPHERS="$GCRYPT_CIPHERS rijndael-arm.lo"
++         fi
+       ;;
+    esac
+ fi
+--- libgcrypt/src/gcrypt.h.in	2015-09-07 14:05:57.000000000 +0200
++++ libgcrypt/src/gcrypt.h.in.msvc	2016-05-24 12:44:16.854936200 +0200
+@@ -35,7 +35,7 @@
+ # include <winsock2.h>
+ # include <ws2tcpip.h>
+ # include <time.h>
+-# ifndef __GNUC__
++# if !defined(__GNUC__) && !defined(_MSC_VER)
+   typedef long ssize_t;
+   typedef int  pid_t;
+ # endif /*!__GNUC__*/
+--- libgcrypt/src/hwf-arm.c	2015-09-07 14:05:57.000000000 +0200
++++ libgcrypt/src/hwf-arm.c.msvc	2016-05-24 12:49:57.503076200 +0200
+@@ -27,7 +27,7 @@
+ #include "g10lib.h"
+ #include "hwf-common.h"
+ 
+-#if !defined (__arm__)
++#if !defined (__arm__) && !defined(_M_ARM)
+ # error Module build for wrong CPU.
+ #endif
+ 
+--- libgcrypt/src/versioninfo.rc.in	2013-03-15 20:25:38.000000000 +0100
++++ libgcrypt/src/versioninfo.rc.in.msvc	2016-05-24 12:50:47.530128700 +0200
+@@ -12,9 +12,9 @@
+ 
+ /* This file is processed by configure to create versioninfo.rc */
+ 
+-#line __LINE__ "versioninfo.rc.in"
++//#line __LINE__ "versioninfo.rc.in"
+ 
+-#include <afxres.h>
++//#include <afxres.h>
+ 
+ 
+ VS_VERSION_INFO VERSIONINFO

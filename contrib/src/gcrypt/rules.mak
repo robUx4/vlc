@@ -18,6 +18,10 @@ libgcrypt: libgcrypt-$(GCRYPT_VERSION).tar.bz2 .sum-gcrypt
 ifdef HAVE_WINSTORE
 	$(APPLY) $(SRC)/gcrypt/winrt.patch
 endif
+ifdef HAVE_VISUALSTUDIO
+	$(APPLY) $(SRC)/gcrypt/alloca.patch
+	$(APPLY) $(SRC)/gcrypt/msvc.patch
+endif
 	$(MOVE)
 
 DEPS_gcrypt = gpg-error
