@@ -17,7 +17,9 @@ $(TARBALLS)/microdns-$(LIBMICRODNS_VERSION).tar.gz:
 
 microdns: microdns-$(LIBMICRODNS_VERSION).tar.gz .sum-microdns
 	$(UNPACK)
-	mv microdns-$(LIBMICRODNS_VERSION) microdns
+	$(APPLY) $(SRC)/microdns/vla.patch
+	$(APPLY) $(SRC)/microdns/unused-header.patch
+	$(MOVE)
 
 .microdns: microdns
 	cd $< && $(HOSTVARS) ./configure $(HOSTCONF)
