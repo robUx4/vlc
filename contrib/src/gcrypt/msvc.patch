@@ -1,0 +1,328 @@
+--- libgcrypt/configure.ac	2017-04-24 17:37:20.479427200 +0200
++++ libgcrypt/configure.ac.msvc	2017-04-24 17:31:56.873058000 +0200
+@@ -1965,7 +1965,9 @@ if test "$found" = "1"; then
+    case "${host}" in
+       x86_64-*-*)
+          # Build with the assembly implementation
++         if test "$gcry_cv_gcc_amd64_platform_as_ok" = "yes" ; then
+          GCRYPT_CIPHERS="$GCRYPT_CIPHERS arcfour-amd64.lo"
++         fi
+       ;;
+    esac
+ fi
+@@ -1978,11 +1980,15 @@ if test "$found" = "1" ; then
+    case "${host}" in
+       x86_64-*-*)
+          # Build with the assembly implementation
++         if test "$gcry_cv_gcc_amd64_platform_as_ok" = "yes" ; then
+          GCRYPT_CIPHERS="$GCRYPT_CIPHERS blowfish-amd64.lo"
++         fi
+       ;;
+       arm*-*-*)
+          # Build with the assembly implementation
++         if test "$gcry_cv_gcc_arm_platform_as_ok" = "yes" ; then
+          GCRYPT_CIPHERS="$GCRYPT_CIPHERS blowfish-arm.lo"
++         fi
+       ;;
+    esac
+ fi
+@@ -1995,11 +2001,15 @@ if test "$found" = "1" ; then
+    case "${host}" in
+       x86_64-*-*)
+          # Build with the assembly implementation
++         if test "$gcry_cv_gcc_amd64_platform_as_ok" = "yes" ; then
+          GCRYPT_CIPHERS="$GCRYPT_CIPHERS cast5-amd64.lo"
++         fi
+       ;;
+       arm*-*-*)
+          # Build with the assembly implementation
++         if test "$gcry_cv_gcc_arm_platform_as_ok" = "yes" ; then
+          GCRYPT_CIPHERS="$GCRYPT_CIPHERS cast5-arm.lo"
++         fi
+       ;;
+    esac
+ fi
+@@ -2012,7 +2022,9 @@ if test "$found" = "1" ; then
+    case "${host}" in
+       x86_64-*-*)
+          # Build with the assembly implementation
++         if test "$gcry_cv_gcc_amd64_platform_as_ok" = "yes" ; then
+          GCRYPT_CIPHERS="$GCRYPT_CIPHERS des-amd64.lo"
++         fi
+       ;;
+    esac
+ fi
+@@ -2025,26 +2037,32 @@ if test "$found" = "1" ; then
+    case "${host}" in
+       x86_64-*-*)
+          # Build with the assembly implementation
++         if test "$gcry_cv_gcc_amd64_platform_as_ok" = "yes" ; then
+          GCRYPT_CIPHERS="$GCRYPT_CIPHERS rijndael-amd64.lo"
+ 
+          # Build with the SSSE3 implementation
+          GCRYPT_CIPHERS="$GCRYPT_CIPHERS rijndael-ssse3-amd64.lo"
++         fi
+       ;;
+       arm*-*-*)
+          # Build with the assembly implementation
++         if test "$gcry_cv_gcc_arm_platform_as_ok" = "yes" ; then
+          GCRYPT_CIPHERS="$GCRYPT_CIPHERS rijndael-arm.lo"
+ 
+          # Build with the ARMv8/AArch32 CE implementation
+          GCRYPT_CIPHERS="$GCRYPT_CIPHERS rijndael-armv8-ce.lo"
+          GCRYPT_CIPHERS="$GCRYPT_CIPHERS rijndael-armv8-aarch32-ce.lo"
++         fi
+       ;;
+       aarch64-*-*)
+          # Build with the assembly implementation
++         if test "$gcry_cv_gcc_aarch64_platform_as_ok" = "yes" ; then
+          GCRYPT_CIPHERS="$GCRYPT_CIPHERS rijndael-aarch64.lo"
+ 
+          # Build with the ARMv8/AArch64 CE implementation
+          GCRYPT_CIPHERS="$GCRYPT_CIPHERS rijndael-armv8-ce.lo"
+          GCRYPT_CIPHERS="$GCRYPT_CIPHERS rijndael-armv8-aarch64-ce.lo"
++         fi
+       ;;
+    esac
+ 
+@@ -2071,11 +2089,15 @@ if test "$found" = "1" ; then
+       ;;
+       arm*-*-*)
+          # Build with the assembly implementation
++         if test "$gcry_cv_gcc_arm_platform_as_ok" = "yes" ; then
+          GCRYPT_CIPHERS="$GCRYPT_CIPHERS twofish-arm.lo"
++         fi
+       ;;
+       aarch64-*-*)
+          # Build with the assembly implementation
++         if test "$gcry_cv_gcc_aarch64_platform_as_ok" = "yes" ; then
+          GCRYPT_CIPHERS="$GCRYPT_CIPHERS twofish-aarch64.lo"
++         fi
+       ;;
+    esac
+ fi
+@@ -2099,7 +2121,9 @@ if test "$found" = "1" ; then
+ 
+    if test x"$neonsupport" = xyes ; then
+       # Build with the NEON implementation
++      if test "$gcry_cv_gcc_arm_platform_as_ok" = "yes" ; then
+       GCRYPT_CIPHERS="$GCRYPT_CIPHERS serpent-armv7-neon.lo"
++      fi
+    fi
+ fi
+ 
+@@ -2123,11 +2147,15 @@ if test "$found" = "1" ; then
+    case "${host}" in
+       arm*-*-*)
+          # Build with the assembly implementation
++         if test "$gcry_cv_gcc_arm_platform_as_ok" = "yes" ; then
+          GCRYPT_CIPHERS="$GCRYPT_CIPHERS camellia-arm.lo"
++         fi
+       ;;
+       aarch64-*-*)
+          # Build with the assembly implementation
++         if test "$gcry_cv_gcc_aarch64_platform_as_ok" = "yes" ; then
+          GCRYPT_CIPHERS="$GCRYPT_CIPHERS camellia-aarch64.lo"
++         fi
+       ;;
+    esac
+ 
+@@ -2166,7 +2194,9 @@ if test "$found" = "1" ; then
+ 
+    if test x"$neonsupport" = xyes ; then
+      # Build with the NEON implementation
++     if test "$gcry_cv_gcc_arm_platform_as_ok" = "yes" ; then
+      GCRYPT_CIPHERS="$GCRYPT_CIPHERS salsa20-armv7-neon.lo"
++     fi
+    fi
+ fi
+ 
+@@ -2199,8 +2229,10 @@ fi
+ case "${host}" in
+    x86_64-*-*)
+       # Build with the assembly implementation
++      if test "$gcry_cv_gcc_amd64_platform_as_ok" = "yes" ; then
+       GCRYPT_CIPHERS="$GCRYPT_CIPHERS poly1305-sse2-amd64.lo"
+       GCRYPT_CIPHERS="$GCRYPT_CIPHERS poly1305-avx2-amd64.lo"
++      fi
+    ;;
+ esac
+ 
+@@ -2296,17 +2328,23 @@ if test "$found" = "1" ; then
+    case "${host}" in
+       x86_64-*-*)
+          # Build with the assembly implementation
++         if test "$gcry_cv_gcc_amd64_platform_as_ok" = "yes" ; then
+          GCRYPT_DIGESTS="$GCRYPT_DIGESTS sha256-ssse3-amd64.lo"
+          GCRYPT_DIGESTS="$GCRYPT_DIGESTS sha256-avx-amd64.lo"
+          GCRYPT_DIGESTS="$GCRYPT_DIGESTS sha256-avx2-bmi2-amd64.lo"
++         fi
+       ;;
+       arm*-*-*)
+          # Build with the assembly implementation
++         if test "$gcry_cv_gcc_arm_platform_as_ok" = "yes" ; then
+          GCRYPT_DIGESTS="$GCRYPT_DIGESTS sha256-armv8-aarch32-ce.lo"
++         fi
+       ;;
+       aarch64-*-*)
+          # Build with the assembly implementation
++         if test "$gcry_cv_gcc_aarch64_platform_as_ok" = "yes" ; then
+          GCRYPT_DIGESTS="$GCRYPT_DIGESTS sha256-armv8-aarch64-ce.lo"
++         fi
+       ;;
+    esac
+ fi
+@@ -2319,19 +2357,25 @@ if test "$found" = "1" ; then
+    case "${host}" in
+       x86_64-*-*)
+          # Build with the assembly implementation
++         if test "$gcry_cv_gcc_amd64_platform_as_ok" = "yes" ; then
+          GCRYPT_DIGESTS="$GCRYPT_DIGESTS sha512-ssse3-amd64.lo"
+          GCRYPT_DIGESTS="$GCRYPT_DIGESTS sha512-avx-amd64.lo"
+          GCRYPT_DIGESTS="$GCRYPT_DIGESTS sha512-avx2-bmi2-amd64.lo"
++         fi
+       ;;
+       arm*-*-*)
+          # Build with the assembly implementation
++         if test "$gcry_cv_gcc_arm_platform_as_ok" = "yes" ; then
+          GCRYPT_DIGESTS="$GCRYPT_DIGESTS sha512-arm.lo"
++         fi
+       ;;
+    esac
+ 
+    if test x"$neonsupport" = xyes ; then
+      # Build with the NEON implementation
++     if test "$gcry_cv_gcc_arm_platform_as_ok" = "yes" ; then
+      GCRYPT_DIGESTS="$GCRYPT_DIGESTS sha512-armv7-neon.lo"
++     fi
+    fi
+ fi
+ 
+@@ -2380,18 +2424,24 @@ AC_DEFINE(USE_SHA1, 1,   [Defined if thi
+ case "${host}" in
+   x86_64-*-*)
+     # Build with the assembly implementation
++    if test "$gcry_cv_gcc_amd64_platform_as_ok" = "yes" ; then
+     GCRYPT_DIGESTS="$GCRYPT_DIGESTS sha1-ssse3-amd64.lo"
+     GCRYPT_DIGESTS="$GCRYPT_DIGESTS sha1-avx-amd64.lo"
+     GCRYPT_DIGESTS="$GCRYPT_DIGESTS sha1-avx-bmi2-amd64.lo"
++    fi
+   ;;
+   arm*-*-*)
+     # Build with the assembly implementation
++    if test "$gcry_cv_gcc_arm_platform_as_ok" = "yes" ; then
+     GCRYPT_DIGESTS="$GCRYPT_DIGESTS sha1-armv7-neon.lo"
+     GCRYPT_DIGESTS="$GCRYPT_DIGESTS sha1-armv8-aarch32-ce.lo"
++    fi
+   ;;
+   aarch64-*-*)
+     # Build with the assembly implementation
++    if test "$gcry_cv_gcc_aarch64_platform_as_ok" = "yes" ; then
+     GCRYPT_DIGESTS="$GCRYPT_DIGESTS sha1-armv8-aarch64-ce.lo"
++    fi
+   ;;
+ esac
+ 
+--- libgcrypt-1.7.6/src/gcrypt.h.in	2017-04-14 15:05:14.319182300 +0200
++++ libgcrypt-1.7.6/src/gcrypt.h.in.msvc	2017-04-14 15:07:19.476539600 +0200
+@@ -35,7 +35,7 @@
+ # include <winsock2.h>
+ # include <ws2tcpip.h>
+ # include <time.h>
+-# ifndef __GNUC__
++# if !defined(__GNUC__) && !defined(_MSC_VER)
+   typedef long ssize_t;
+   typedef int  pid_t;
+ # endif /*!__GNUC__*/
+--- libgcrypt/src/hwf-arm.c	2016-08-19 10:27:55.000000000 +0200
++++ libgcrypt/src/hwf-arm.c.msvc	2017-04-14 15:15:38.812317800 +0200
+@@ -27,7 +27,7 @@
+ #include "g10lib.h"
+ #include "hwf-common.h"
+ 
+-#if !defined (__arm__) && !defined (__aarch64__)
++#if !defined (__arm__) && !defined (__aarch64__) && !defined(_M_ARM)
+ # error Module build for wrong CPU.
+ #endif
+ 
+--- libgcrypt/src/versioninfo.rc.in	2016-06-03 15:07:22.000000000 +0200
++++ libgcrypt/src/versioninfo.rc.in.msvc	2017-04-14 15:19:13.768233700 +0200
+@@ -12,9 +12,9 @@
+ 
+ /* This file is processed by configure to create versioninfo.rc */
+ 
+-#line __LINE__ "versioninfo.rc.in"
++//#line __LINE__ "versioninfo.rc.in"
+ 
+-#include <afxres.h>
++//#include <afxres.h>
+ 
+ 
+ VS_VERSION_INFO VERSIONINFO
+--- libgcrypt-1.7.3/mpi/config.links	2016-09-20 11:30:28.087280200 +0200
++++ libgcrypt-1.7.3/mpi/config.links.msvc	2016-09-20 11:54:09.515028700 +0200
+@@ -133,7 +133,7 @@ case "${host}" in
+ 	cat  $srcdir/mpi/i386/syntax.h	    >>./mpi/asm-syntax.h
+ 	cat  $srcdir/mpi/amd64/func_abi.h   >>./mpi/asm-syntax.h
+ 	path="amd64"
+-        mpi_cpu_arch="x86"
++        mpi_cpu_arch="amd64"
+ 	;;
+     x86_64-*mingw32*)
+ 	echo '#define USE_MS_ABI' >>./mpi/asm-syntax.h
+@@ -141,14 +141,14 @@ case "${host}" in
+ 	cat  $srcdir/mpi/i386/syntax.h	    >>./mpi/asm-syntax.h
+ 	cat  $srcdir/mpi/amd64/func_abi.h   >>./mpi/asm-syntax.h
+ 	path="amd64"
+-        mpi_cpu_arch="x86"
++        mpi_cpu_arch="amd64"
+         ;;
+     x86_64-*-*)
+ 	echo '#define ELF_SYNTAX' >>./mpi/asm-syntax.h
+ 	cat  $srcdir/mpi/i386/syntax.h	    >>./mpi/asm-syntax.h
+ 	cat  $srcdir/mpi/amd64/func_abi.h   >>./mpi/asm-syntax.h
+ 	path="amd64"
+-        mpi_cpu_arch="x86"
++        mpi_cpu_arch="amd64"
+ 	;;
+     alpha*-*-*)
+ 	echo '/* configured for alpha */' >>./mpi/asm-syntax.h
+--- libgcrypt/cipher/cipher-poly1305.c	2016-04-07 17:30:08.000000000 +0200
++++ libgcrypt/cipher/cipher-poly1305.c.msvc	2017-04-14 15:11:11.383837400 +0200
+@@ -71,7 +71,7 @@ poly1305_fill_bytecounts (gcry_cipher_hd
+ static void
+ poly1305_do_padding (gcry_cipher_hd_t c, u32 ctr[2])
+ {
+-  static const byte zero_padding_buf[15] = {};
++  static const byte zero_padding_buf[15] = {0};
+   u32 padding_count;
+ 
+   /* Padding to 16 byte boundary. */
+--- libgcrypt/cipher/Makefile.am	2017-01-18 12:35:27.000000000 +0100
++++ libgcrypt/cipher/Makefile.am.msvc	2017-04-24 13:54:03.118987900 +0200
+@@ -43,7 +43,7 @@ libcipher_la_SOURCES = \
+ cipher.c cipher-internal.h \
+ cipher-cbc.c cipher-cfb.c cipher-ofb.c cipher-ctr.c cipher-aeswrap.c \
+ cipher-ccm.c cipher-cmac.c cipher-gcm.c cipher-gcm-intel-pclmul.c \
+-  cipher-gcm-armv8-aarch32-ce.S cipher-gcm-armv8-aarch64-ce.S \
++ \
+ cipher-poly1305.c cipher-ocb.c \
+ cipher-selftest.c cipher-selftest.h \
+ pubkey.c pubkey-internal.h pubkey-util.c \
+@@ -61,14 +61,14 @@ dsa-common.c rsa-common.c \
+ sha1.h
+ 
+ EXTRA_libcipher_la_SOURCES = \
+-arcfour.c arcfour-amd64.S \
++arcfour.c \
+ blowfish.c blowfish-amd64.S blowfish-arm.S \
+ cast5.c cast5-amd64.S cast5-arm.S \
+ chacha20.c chacha20-sse2-amd64.S chacha20-ssse3-amd64.S chacha20-avx2-amd64.S \
+   chacha20-armv7-neon.S \
+ crc.c \
+   crc-intel-pclmul.c \
+-des.c des-amd64.S \
++des.c \
+ dsa.c \
+ elgamal.c \
+ ecc.c ecc-curves.c ecc-misc.c ecc-common.h \

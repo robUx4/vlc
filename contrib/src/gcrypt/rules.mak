@@ -24,6 +24,10 @@ ifeq ($(ARCH),mips64el)
 	$(APPLY) $(SRC)/gcrypt/clang-mips64.patch
 endif
 endif
+ifdef HAVE_VISUALSTUDIO
+	$(APPLY) $(SRC)/gcrypt/alloca.patch
+	$(APPLY) $(SRC)/gcrypt/msvc.patch
+endif
 	$(MOVE)
 
 DEPS_gcrypt = gpg-error
