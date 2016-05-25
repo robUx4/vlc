@@ -29,10 +29,10 @@
    hRNGProv = NULL;
  
 +#if (WINAPI_FAMILY == WINAPI_FAMILY_PC_APP || WINAPI_FAMILY == WINAPI_FAMILY_PHONE_APP)
-+    pCryptAcquireContext = CryptAcquireContext;
-+    pCryptGenRandom      = CryptGenRandom;
-+    pCryptReleaseContext = CryptReleaseContext;
-+    pRtlGenRandom        = CryptGenRandom;
++    pCryptAcquireContext = (CRYPTACQUIRECONTEXT) CryptAcquireContext;
++    pCryptGenRandom      = (CRYPTGENRANDOM) CryptGenRandom;
++    pCryptReleaseContext = (CRYPTRELEASECONTEXT) CryptReleaseContext;
++    pRtlGenRandom        = (RTLGENRANDOM) CryptGenRandom;
 +#else
    hAdvAPI32 = GetModuleHandle ("AdvAPI32.dll");
    if (!hAdvAPI32)
