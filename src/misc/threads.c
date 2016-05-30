@@ -52,7 +52,7 @@ void vlc_global_mutex (unsigned n, bool acquire)
         vlc_mutex_unlock (lock);
 }
 
-#if defined (_WIN32) && (_WIN32_WINNT < _WIN32_WINNT_WIN8)
+#if defined (_WIN32_WINNT) && (_WIN32_WINNT < _WIN32_WINNT_WIN8)
 /* Cannot define OS version-dependent stuff in public headers */
 # undef LIBVLC_NEED_SLEEP
 # undef LIBVLC_NEED_SEMAPHORE
@@ -110,7 +110,7 @@ static inline atomic_uint *vlc_cond_value(vlc_cond_t *cond)
     /* XXX: ugly but avoids including vlc_atomic.h in vlc_threads.h */
     static_assert (sizeof (cond->value) <= sizeof (atomic_uint),
                    "Size mismatch!");
-    static_assert ((alignof (cond->value) % alignof (atomic_uint)) == 0,
+    static_assert ((alignof (vlc_cond_t) % alignof (atomic_uint)) == 0,
                    "Alignment mismatch");
     return (atomic_uint *)&cond->value;
 }
