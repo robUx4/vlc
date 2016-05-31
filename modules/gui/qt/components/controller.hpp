@@ -35,7 +35,11 @@
 #include <QSizeGrip>
 
 #define MAIN_TB1_DEFAULT "64;39;64;38;65"
+#if defined(ENABLE_SOUT)
+#define MAIN_TB2_DEFAULT "0-2;64;3;1;4;64;7;9;64;10;20;19;64-4;37;26;65;35-4"
+#else
 #define MAIN_TB2_DEFAULT "0-2;64;3;1;4;64;7;9;64;10;20;19;64-4;37;65;35-4"
+#endif
 #define ADV_TB_DEFAULT "12;11;13;14"
 #define INPT_TB_DEFAULT "43;33-4;44"
 #define FSC_TB_DEFAULT "0-2;64;3;1;4;64;37;64;38;64;8;65;25;35-4;34"
