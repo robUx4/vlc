@@ -1,0 +1,14 @@
+--- cmake/Source/cmGlobalVisualStudio12Generator.cxx	2016-06-02 17:32:30.760289600 +0200
++++ cmake/Source/cmGlobalVisualStudio12Generator.cxx.winstore	2016-06-02 17:31:30.764316400 +0200
+@@ -163,8 +163,9 @@ cmGlobalVisualStudio12Generator::SelectW
+ {
+   if(this->SystemVersion == "8.1")
+     {
+-    if (this->IsWindowsPhoneToolsetInstalled() &&
+-        this->IsWindowsDesktopToolsetInstalled())
++      if (true)
++//    if (this->IsWindowsPhoneToolsetInstalled() &&
++//        this->IsWindowsDesktopToolsetInstalled())
+       {
+       toolset = "v120_wp81";
+       return true;
