@@ -18,6 +18,11 @@ game-music-emu: game-music-emu-$(GME_VERSION).tar.bz2 .sum-gme
 	$(MOVE)
 
 .gme: game-music-emu toolchain.cmake
-	cd $< && $(HOSTVARS_PIC) $(CMAKE) .
+	cd $< && $(HOSTVARS_CMAKE) $(CMAKE) .
+ifdef HAVE_VISUALSTUDIO
+	cd $< && msbuild.exe -p:VisualStudioVersion=$(MSBUILD_COMPILER) -p:Configuration=$(VLC_CONFIGURATION) -m -nologo INSTALL.vcxproj
+	mkdir -p -- "$(PREFIX)/lib"
+else
 	cd $< && $(MAKE) install
+endif
 	touch $@
