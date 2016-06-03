@@ -21,7 +21,7 @@ soxr: soxr-$(SOXR_VERSION)-Source.tar.xz .sum-soxr
 	$(MOVE)
 
 .soxr: soxr toolchain.cmake
-	cd $< && $(HOSTVARS_PIC) $(CMAKE) \
+	cd $< && $(HOSTVARS_CMAKE) $(CMAKE) \
 		-DBUILD_SHARED_LIBS=OFF \
 		-DCMAKE_BUILD_TYPE=Release \
 		-DBUILD_EXAMPLES=OFF \
