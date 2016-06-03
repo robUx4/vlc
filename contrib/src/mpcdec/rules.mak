@@ -45,7 +45,7 @@ endif
 .mpcdec: musepack toolchain.cmake
 	cd $< && $(HOSTVARS_CMAKE) $(CMAKE) -DSHARED=OFF .
 ifdef HAVE_VISUALSTUDIO
-	cd $< && msbuild.exe -p:Configuration=$(VLC_CONFIGURATION) -m -nologo INSTALL.vcxproj
+	cd $< && msbuild.exe -p:VisualStudioVersion=$(MSBUILD_COMPILER) -p:Configuration=$(VLC_CONFIGURATION) -m -nologo INSTALL.vcxproj
 	mkdir -p -- "$(PREFIX)/lib"
 	cd $< && cp libmpcdec/$(VLC_CONFIGURATION)/mpcdec_static.lib "$(PREFIX)/lib/mpcdec.lib"
 else
