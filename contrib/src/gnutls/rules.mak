@@ -37,11 +37,6 @@ ifdef HAVE_MACOSX
 endif
 ifdef HAVE_VISUALSTUDIO
 	$(APPLY) $(SRC)/gnutls/msvc.patch
-ifdef VS_IS_2013
-	$(APPLY) $(SRC)/gnutls/headers-msvc13.patch
-else
-	$(APPLY) $(SRC)/gnutls/headers-msvc15.patch
-endif
 endif
 	$(call pkg_static,"lib/gnutls.pc.in")
 	$(UPDATE_AUTOCONFIG)
