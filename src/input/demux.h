@@ -39,4 +39,7 @@ demux_t *demux_NewAdvanced( vlc_object_t *p_obj, input_thread_t *p_parent_input,
 demux_t *input_DemuxNew( vlc_object_t *, const char *access, const char *demux,
                          const char *path, es_out_t *out, bool quick,
                          input_thread_t * );
+
+demux_t *demux_FilterChainNew( demux_t *p_demux, const char *psz_name );
+
 #endif

@@ -77,16 +77,25 @@ struct demux_t
 
     /* Weak link to parent input */
     input_thread_t *p_input;
+
+    /* demux_t filter chaining */
+    demux_t        *p_next;
+    demux_t        *p_prev;
+    int (*pf_filter_demux)  ( demux_t *p_this, demux_t *p_next );
 };
 
 static inline void demux_InfoAddFlags( demux_t *p_demux, int flags )
 {
     p_demux->info.i_update |= flags;
+    if ( p_demux->p_prev )
+        demux_InfoAddFlags( p_demux->p_prev, flags );
 }
 
 static inline void demux_InfoDelFlags( demux_t *p_demux, int flags )
 {
     p_demux->info.i_update &= ~flags;
+    if ( p_demux->p_prev )
+        demux_InfoDelFlags( p_demux->p_prev, flags );
 }
 
 
@@ -325,6 +334,9 @@ VLC_API int demux_vaControlHelper( stream_t *, int64_t i_start, int64_t i_end,
 
 VLC_USED static inline int demux_Demux( demux_t *p_demux )
 {
+    if (p_demux->pf_filter_demux)
+        return p_demux->pf_filter_demux( p_demux, p_demux->p_next );
+
     if( !p_demux->pf_demux )
         return VLC_DEMUXER_SUCCESS;
 
