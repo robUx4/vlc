@@ -1224,8 +1224,7 @@ static void MP4_UpdateSeekpoint( demux_t *p_demux )
 
     if( i != p_demux->info.i_seekpoint && i >= 0 )
     {
-        p_demux->info.i_seekpoint = i;
-        p_demux->info.i_update |= INPUT_UPDATE_SEEKPOINT;
+        demux_SetSeekpoint( p_demux, i );
     }
 }
 /*****************************************************************************

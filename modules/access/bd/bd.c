@@ -470,7 +470,7 @@ static int Demux( demux_t *p_demux )
                 const seekpoint_t *p_seekpoint = p_title->seekpoint[p_demux->info.i_seekpoint+1];
                 if( p_seekpoint->i_time_offset >  i_time )
                     break;
-                p_demux->info.i_update |= INPUT_UPDATE_SEEKPOINT;
+                demux_InfoAddFlags( p_demux, INPUT_UPDATE_SEEKPOINT );
             }
         }
     }
@@ -564,9 +564,8 @@ static int SetTitle( demux_t *p_demux, int i_title )
         return VLC_EGENERIC;
 
     /* */
-    p_demux->info.i_update |= INPUT_UPDATE_TITLE | INPUT_UPDATE_SEEKPOINT;
-    p_demux->info.i_title = i_title;
-    p_demux->info.i_seekpoint = 0;
+    demux_SetTitle( p_demux, i_title );
+    demux_SetSeekpoint( p_demux, 0 );
 
     return VLC_SUCCESS;
 }
@@ -871,7 +870,7 @@ update:
         if( p_seekpoint->i_time_offset >  i_time )
             break;
     }
-    p_demux->info.i_update |= INPUT_UPDATE_SEEKPOINT;
+    demux_InfoAddFlags( p_demux, INPUT_UPDATE_SEEKPOINT );
     return VLC_SUCCESS;
 }
 

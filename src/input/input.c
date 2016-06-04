@@ -560,7 +560,7 @@ static void MainLoopDemux( input_thread_t *p_input, bool *pb_changed )
             if( p_input->p->master->p_demux->info.i_update & INPUT_UPDATE_TITLE_LIST )
             {
                 UpdateTitleListfromDemux( p_input );
-                p_input->p->master->p_demux->info.i_update &= ~INPUT_UPDATE_TITLE_LIST;
+                demux_InfoDelFlags( p_input->p->master->p_demux, INPUT_UPDATE_TITLE_LIST );
             }
             if( p_input->p->master->b_title_demux )
             {
@@ -2171,14 +2171,14 @@ static int UpdateTitleSeekpointFromDemux( input_thread_t *p_input )
     {
         input_SendEventTitle( p_input, p_demux->info.i_title );
 
-        p_demux->info.i_update &= ~INPUT_UPDATE_TITLE;
+        demux_InfoDelFlags( p_demux, INPUT_UPDATE_TITLE );
     }
     if( p_demux->info.i_update & INPUT_UPDATE_SEEKPOINT )
     {
         input_SendEventSeekpoint( p_input,
                                   p_demux->info.i_title, p_demux->info.i_seekpoint );
 
-        p_demux->info.i_update &= ~INPUT_UPDATE_SEEKPOINT;
+        demux_InfoDelFlags( p_demux, INPUT_UPDATE_SEEKPOINT );
     }
 
     return UpdateTitleSeekpoint( p_input,
@@ -2193,7 +2193,7 @@ static void UpdateGenericFromDemux( input_thread_t *p_input )
     if( p_demux->info.i_update & INPUT_UPDATE_META )
     {
         InputUpdateMeta( p_input, p_demux );
-        p_demux->info.i_update &= ~INPUT_UPDATE_META;
+        demux_InfoDelFlags( p_demux, INPUT_UPDATE_META );
     }
     {
         double quality;

@@ -276,8 +276,7 @@ static int Control (demux_t *demux, int query, va_list args)
             if (!result)
                 return  VLC_EGENERIC;
 
-            demux->info.i_title = i_idx;
-            demux->info.i_update = INPUT_UPDATE_TITLE;
+            demux_SetTitle( demux, i_idx );
             msg_Dbg( demux, "set song %i", i_idx);
 
             return VLC_SUCCESS;

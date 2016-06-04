@@ -208,8 +208,7 @@ static int Demux (demux_t *demux)
         if (++sys->track_id >= (unsigned)gme_track_count (sys->emu))
             return 0;
 
-        demux->info.i_update |= INPUT_UPDATE_TITLE;
-        demux->info.i_title = sys->track_id;
+        demux_SetTitle( demux, sys->track_id );
         gme_start_track (sys->emu, sys->track_id);
     }
 
@@ -324,8 +323,7 @@ static int Control (demux_t *demux, int query, va_list args)
             if (track_id >= gme_track_count (sys->emu))
                 break;
             gme_start_track (sys->emu, track_id);
-            demux->info.i_update |= INPUT_UPDATE_TITLE;
-            demux->info.i_title = track_id;
+            demux_SetTitle( demux, track_id );
             sys->track_id = track_id;
             return VLC_SUCCESS;
         }

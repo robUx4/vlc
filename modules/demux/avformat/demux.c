@@ -855,8 +855,7 @@ static void UpdateSeekPoint( demux_t *p_demux, int64_t i_time )
 
     if( i != p_demux->info.i_seekpoint && i >= 0 )
     {
-        p_demux->info.i_seekpoint = i;
-        p_demux->info.i_update |= INPUT_UPDATE_SEEKPOINT;
+        demux_SetSeekpoint( p_demux, i );
     }
 }
 

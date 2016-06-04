@@ -642,10 +642,8 @@ static int Control( demux_t *p_demux, int i_query, va_list args )
                 msg_Warn( p_demux, "cannot set title/chapter" );
                 return VLC_EGENERIC;
             }
-            p_demux->info.i_update |=
-                INPUT_UPDATE_TITLE | INPUT_UPDATE_SEEKPOINT;
-            p_demux->info.i_title = i;
-            p_demux->info.i_seekpoint = 0;
+            demux_SetTitle( p_demux, i);
+            demux_SetSeekpoint( p_demux, 0 );
             return VLC_SUCCESS;
 
         case DEMUX_SET_SEEKPOINT:
@@ -672,8 +670,7 @@ static int Control( demux_t *p_demux, int i_query, va_list args )
                 msg_Warn( p_demux, "cannot set title/chapter" );
                 return VLC_EGENERIC;
             }
-            p_demux->info.i_update |= INPUT_UPDATE_SEEKPOINT;
-            p_demux->info.i_seekpoint = i;
+            demux_SetSeekpoint( p_demux, i );
             return VLC_SUCCESS;
 
         case DEMUX_GET_PTS_DELAY:
@@ -749,10 +746,8 @@ static int Control( demux_t *p_demux, int i_query, va_list args )
                     return VLC_EGENERIC;
                 }
             }
-            p_demux->info.i_update |=
-                INPUT_UPDATE_TITLE | INPUT_UPDATE_SEEKPOINT;
-            p_demux->info.i_title = 0;
-            p_demux->info.i_seekpoint = 2;
+            demux_SetTitle( p_demux, 0 );
+            demux_SetSeekpoint( p_demux, 2 );
             break;
         }
 
@@ -968,8 +963,7 @@ static int Demux( demux_t *p_demux )
             if( i_title >= 0 && i_title < p_sys->i_title &&
                 p_demux->info.i_title != i_title )
             {
-                p_demux->info.i_update |= INPUT_UPDATE_TITLE;
-                p_demux->info.i_title = i_title;
+                demux_SetTitle( p_demux, i_title );
             }
         }
         break;
@@ -1002,13 +996,11 @@ static int Demux( demux_t *p_demux )
         {
             if( i_title >= 0 && i_title < p_sys->i_title )
             {
-                p_demux->info.i_update |= INPUT_UPDATE_TITLE;
-                p_demux->info.i_title = i_title;
+                demux_SetTitle( p_demux, i_title );
 
                 if( i_part >= 1 && i_part <= p_sys->title[i_title]->i_seekpoint )
                 {
-                    p_demux->info.i_update |= INPUT_UPDATE_SEEKPOINT;
-                    p_demux->info.i_seekpoint = i_part - 1;
+                    demux_SetSeekpoint( p_demux, i_part - 1 );
                 }
             }
         }

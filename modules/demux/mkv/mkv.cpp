@@ -394,9 +394,8 @@ static int Control( demux_t *p_demux, int i_query, va_list args )
                 p_sys->p_current_vsegment->p_current_vchapter = p_sys->p_current_vsegment->veditions[p_sys->p_current_vsegment->i_current_edition]->getChapterbyTimecode(0);
 
                 Seek( p_demux, static_cast<int64_t>( p_sys->titles[i_idx]->seekpoint[0]->i_time_offset ), -1, NULL);
-                p_demux->info.i_update |= INPUT_UPDATE_SEEKPOINT|INPUT_UPDATE_TITLE;
-                p_demux->info.i_seekpoint = 0;
-                p_demux->info.i_title = i_idx;
+                demux_SetSeekpoint( p_demux, 0 );
+                demux_SetTitle( p_demux, i_idx );
                 p_sys->f_duration = (float) p_sys->titles[i_idx]->i_length / 1000.f;
                 return VLC_SUCCESS;
             }
@@ -409,8 +408,7 @@ static int Control( demux_t *p_demux, int i_query, va_list args )
             if( p_sys->titles.size() && i_skp < p_sys->titles[p_sys->i_current_title]->i_seekpoint)
             {
                 Seek( p_demux, static_cast<int64_t>( p_sys->titles[p_sys->i_current_title]->seekpoint[i_skp]->i_time_offset ), -1, NULL);
-                p_demux->info.i_update |= INPUT_UPDATE_SEEKPOINT;
-                p_demux->info.i_seekpoint = i_skp;
+                demux_SetSeekpoint( p_demux, i_skp );
                 return VLC_SUCCESS;
             }
             return VLC_EGENERIC;

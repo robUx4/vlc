@@ -1828,7 +1828,7 @@ static int blurayControl(demux_t *p_demux, int query, va_list args)
         int i_title = (int)va_arg(args, int);
         if (bluraySetTitle(p_demux, i_title) != VLC_SUCCESS) {
             /* make sure GUI restores the old setting in title menu ... */
-            p_demux->info.i_update |= INPUT_UPDATE_TITLE | INPUT_UPDATE_SEEKPOINT;
+            demux_InfoAddFlags( p_demux, INPUT_UPDATE_TITLE | INPUT_UPDATE_SEEKPOINT );
             return VLC_EGENERIC;
         }
         break;
@@ -1837,7 +1837,7 @@ static int blurayControl(demux_t *p_demux, int query, va_list args)
     {
         int i_chapter = (int)va_arg(args, int);
         bd_seek_chapter(p_sys->bluray, i_chapter);
-        p_demux->info.i_update = INPUT_UPDATE_SEEKPOINT;
+        demux_InfoAddFlags( p_demux, INPUT_UPDATE_SEEKPOINT );
         break;
     }
 
@@ -1969,7 +1969,7 @@ static int blurayControl(demux_t *p_demux, int query, va_list args)
     case DEMUX_NAV_MENU:
         if (p_sys->b_menu) {
             if (bd_menu_call(p_sys->bluray, -1) == 1) {
-                p_demux->info.i_update |= INPUT_UPDATE_TITLE | INPUT_UPDATE_SEEKPOINT;
+                demux_InfoAddFlags( p_demux, INPUT_UPDATE_TITLE | INPUT_UPDATE_SEEKPOINT );
                 return VLC_SUCCESS;
             }
             msg_Err(p_demux, "Can't select Top Menu title");
@@ -2124,15 +2124,15 @@ static void blurayUpdatePlaylist(demux_t *p_demux, unsigned i_playlist)
 
     /* read title info and init some values */
     if (!p_sys->b_menu)
-        p_demux->info.i_title = bd_get_current_title(p_sys->bluray);
-    p_demux->info.i_seekpoint = 0;
-    p_demux->info.i_update |= INPUT_UPDATE_TITLE | INPUT_UPDATE_SEEKPOINT;
+        demux_SetTitle( p_demux, bd_get_current_title(p_sys->bluray) );
+    demux_SetSeekpoint( p_demux, 0 );
+    demux_InfoAddFlags( p_demux, INPUT_UPDATE_TITLE );
 
     BLURAY_TITLE_INFO *p_title_info = bd_get_playlist_info(p_sys->bluray, i_playlist, 0);
     if (p_title_info) {
         blurayUpdateTitleInfo(p_sys->pp_title[p_demux->info.i_title], p_title_info);
         if (p_sys->b_menu)
-            p_demux->info.i_update |= INPUT_UPDATE_TITLE_LIST;
+            demux_InfoAddFlags( p_demux, INPUT_UPDATE_TITLE_LIST );
     }
     setTitleInfo(p_sys, p_title_info);
 
@@ -2171,13 +2171,13 @@ static void blurayHandleEvent(demux_t *p_demux, const BD_EVENT *e)
     switch (e->event) {
     case BD_EVENT_TITLE:
         if (e->param == BLURAY_TITLE_FIRST_PLAY)
-            p_demux->info.i_title = p_sys->i_title - 1;
+            demux_SetTitle( p_demux, p_sys->i_title - 1 );
         else
-            p_demux->info.i_title = e->param;
+            demux_SetTitle( p_demux, e->param );
         /* this is feature title, we don't know yet which playlist it will play (if any) */
         setTitleInfo(p_sys, NULL);
         /* reset title infos here ? */
-        p_demux->info.i_update |= INPUT_UPDATE_TITLE | INPUT_UPDATE_SEEKPOINT; /* might be BD-J title with no video */
+        demux_InfoAddFlags( p_demux, INPUT_UPDATE_TITLE | INPUT_UPDATE_SEEKPOINT ); /* might be BD-J title with no video */
         break;
     case BD_EVENT_PLAYLIST:
         /* Start of playlist playback (?????.mpls) */
@@ -2195,10 +2195,9 @@ static void blurayHandleEvent(demux_t *p_demux, const BD_EVENT *e)
         break;
     case BD_EVENT_CHAPTER:
         if (e->param && e->param < 0xffff)
-          p_demux->info.i_seekpoint = e->param - 1;
+          demux_SetSeekpoint( p_demux, e->param - 1 );
         else
-          p_demux->info.i_seekpoint = 0;
-        p_demux->info.i_update |= INPUT_UPDATE_SEEKPOINT;
+          demux_SetSeekpoint( p_demux, 0 );
         break;
     case BD_EVENT_PLAYMARK:
     case BD_EVENT_ANGLE:

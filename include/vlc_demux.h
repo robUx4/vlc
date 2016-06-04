@@ -79,6 +79,17 @@ struct demux_t
     input_thread_t *p_input;
 };
 
+static inline void demux_InfoAddFlags( demux_t *p_demux, int flags )
+{
+    p_demux->info.i_update |= flags;
+}
+
+static inline void demux_InfoDelFlags( demux_t *p_demux, int flags )
+{
+    p_demux->info.i_update &= ~flags;
+}
+
+
 /* pf_demux return values */
 #define VLC_DEMUXER_EOF       0
 #define VLC_DEMUXER_EGENERIC -1
@@ -89,6 +100,22 @@ struct demux_t
 #define INPUT_UPDATE_SEEKPOINT  0x0020
 #define INPUT_UPDATE_META       0x0040
 #define INPUT_UPDATE_TITLE_LIST 0x0100
+
+static inline void demux_SetTitle( demux_t *p_demux, int i_title )
+{
+    p_demux->info.i_title = i_title;
+    p_demux->info.i_update |= INPUT_UPDATE_TITLE;
+    if ( p_demux->p_prev )
+        demux_SetTitle( p_demux->p_prev, i_title );
+}
+
+static inline void demux_SetSeekpoint( demux_t *p_demux, int i_seekpoint )
+{
+    p_demux->info.i_seekpoint = i_seekpoint;
+    p_demux->info.i_update |= INPUT_UPDATE_SEEKPOINT;
+    if ( p_demux->p_prev )
+        demux_SetSeekpoint( p_demux->p_prev, i_seekpoint );
+}
 
 /* demux_meta_t is returned by "meta reader" module to the demuxer */
 typedef struct demux_meta_t
@@ -329,15 +356,13 @@ static inline void demux_UpdateTitleFromStream( demux_t *demux )
     if( stream_Control( s, STREAM_GET_TITLE, &title ) == VLC_SUCCESS
      && title != (unsigned)demux->info.i_title )
     {
-        demux->info.i_title = title;
-        demux->info.i_update |= INPUT_UPDATE_TITLE;
+        demux_SetTitle( demux, title );
     }
 
     if( stream_Control( s, STREAM_GET_SEEKPOINT, &seekpoint ) == VLC_SUCCESS
      && seekpoint != (unsigned)demux->info.i_seekpoint )
     {
-        demux->info.i_seekpoint = seekpoint;
-        demux->info.i_update |= INPUT_UPDATE_SEEKPOINT;
+        demux_SetSeekpoint( demux, seekpoint );
     }
 }
 
