@@ -227,15 +227,21 @@ void RendererDialog::discoveryEventReceived( const vlc_event_t * p_event )
 void RendererDialog::setSout( const vlc_renderer_item *p_item )
 {
     std::stringstream s_sout;
+    std::stringstream s_demux_filter;
+    const char *psz_out = NULL;
     if ( p_item )
     {
-        const char *psz_out = vlc_renderer_item_sout( p_item );
+        psz_out = vlc_renderer_item_sout( p_item );
         if ( psz_out )
+        {
             s_sout << '#' << psz_out;
+            s_demux_filter << "cc_demux";
+        }
     }
 
     msg_Dbg( p_intf, "using sout: '%s'", s_sout.str().c_str() );
     var_SetString( THEPL, "sout", s_sout.str().c_str() );
+    var_SetString( THEPL, "demux-filter", s_demux_filter.str().c_str() );
 }
 
 bool RendererItem::isItemSout( const char *psz_sout, bool as_output ) const
