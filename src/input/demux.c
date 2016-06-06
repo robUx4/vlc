@@ -756,6 +756,7 @@ static demux_t *demux_FilterNew( demux_t *p_next, const char *p_name )
     /* elements from the next demuxer pushed to the top of the chain */
     p_demux->s            = p_next->s;
 
+    p_demux->p_next       = p_next;
     p_demux->p_input      = NULL;
     p_demux->pf_control   = NULL;
     p_demux->p_sys        = NULL;
@@ -769,8 +770,6 @@ static demux_t *demux_FilterNew( demux_t *p_next, const char *p_name )
 
     if( p_demux->p_module == NULL )
         goto error;
-
-    p_demux->p_next = p_next;
 
     return p_demux;
 error:
