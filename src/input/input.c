@@ -703,8 +703,7 @@ static void MainLoop( input_thread_t *p_input, bool b_interactive )
 
                 MainLoopDemux( p_input, &b_force_update );
 
-                if( p_input->p->master->p_demux->pf_demux != NULL )
-                    i_wakeup = es_out_GetWakeup( p_input->p->p_es_out );
+                i_wakeup = es_out_GetWakeup( p_input->p->p_es_out );
                 if( b_force_update )
                     i_intf_update = 0;
             }
@@ -2351,8 +2350,6 @@ static input_source_t *InputSourceNew( input_thread_t *p_input,
     if( demux_Control( in->p_demux, DEMUX_CAN_CONTROL_PACE,
                        &in->b_can_pace_control ) )
         in->b_can_pace_control = false;
-
-    assert( in->p_demux->pf_demux != NULL || !in->b_can_pace_control );
 
     if( in->p_demux->s != NULL )
     {
