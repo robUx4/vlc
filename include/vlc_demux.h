@@ -187,6 +187,11 @@ enum demux_query_e
      * arg1= int */
     DEMUX_SET_SEEKPOINT,        /* arg1= int            can fail */
 
+    DEMUX_GET_UPDATE_FLAGS,     /* arg1= int*           can fail */
+    DEMUX_CLEAR_UPDATE_FLAGS,   /* arg1= const int*     can fail */
+    DEMUX_GET_TITLE,            /* arg1= int*           can fail */
+    DEMUX_GET_SEEKPOINT,        /* arg1= int*           can fail */
+
     /* I. Common queries to access_demux and demux */
     /* POSITION double between 0.0 and 1.0 */
     DEMUX_GET_POSITION = 0x300, /* arg1= double *       res=    */
