@@ -416,6 +416,58 @@ int demux_vaControl( demux_t *demux, int query, va_list args )
             }
         }
 
+    switch( query )
+    {
+        case DEMUX_GET_UPDATE_FLAGS:
+        {
+            int ret;
+            va_list ap;
+
+            va_copy( ap, args );
+            ret = demux->pf_control( demux, query, args );
+            if (ret != VLC_SUCCESS)
+                *va_arg( ap, int * ) = demux->info.i_update;
+            va_end( ap );
+            return VLC_SUCCESS;
+        }
+        case DEMUX_CLEAR_UPDATE_FLAGS:
+        {
+            int ret;
+            va_list ap;
+
+            va_copy( ap, args );
+            ret = demux->pf_control( demux, query, args );
+            if (ret != VLC_SUCCESS)
+                demux->info.i_update &= ~(*va_arg( ap, const int * ));
+            va_end( ap );
+            return VLC_SUCCESS;
+        }
+        case DEMUX_GET_TITLE:
+        {
+            int ret;
+            va_list ap;
+
+            va_copy( ap, args );
+            ret = demux->pf_control( demux, query, args );
+            if (ret != VLC_SUCCESS)
+                *va_arg( ap, int * ) = demux->info.i_title;
+            va_end( ap );
+            return VLC_SUCCESS;
+        }
+        case DEMUX_GET_SEEKPOINT:
+        {
+            int ret;
+            va_list ap;
+
+            va_copy( ap, args );
+            ret = demux->pf_control( demux, query, args );
+            if (ret != VLC_SUCCESS)
+                *va_arg( ap, int * ) = demux->info.i_seekpoint;
+            va_end( ap );
+            return VLC_SUCCESS;
+        }
+    }
+
     return demux->pf_control( demux, query, args );
 }
 
@@ -658,20 +710,30 @@ static bool SkipAPETag( demux_t *p_demux )
 
 int demux_GetUpdateFlags( demux_t *p_demux )
 {
+    int i_update;
+    if ( demux_Control( p_demux, DEMUX_GET_UPDATE_FLAGS, &i_update ) == VLC_SUCCESS )
+        return i_update;
     return p_demux->info.i_update;
 }
 
 void demux_ResetUpdateFlags( demux_t *p_demux, int i_flags )
 {
-    p_demux->info.i_update &= ~i_flags;
+    if ( demux_Control( p_demux, DEMUX_CLEAR_UPDATE_FLAGS, &i_flags ) != VLC_SUCCESS )
+        p_demux->info.i_update &= ~i_flags;
 }
 
 int demux_GetTitle( demux_t *p_demux )
 {
-    return p_demux->info.i_title;
+    int i_title;
+    if ( demux_Control( p_demux, DEMUX_GET_TITLE, &i_title ) == VLC_SUCCESS )
+        return i_title;
+    return 0;
 }
 
 int demux_GetSeekpoint( demux_t *p_demux )
 {
-    return p_demux->info.i_seekpoint;
+    int i_seekpoint;
+    if ( demux_Control( p_demux, DEMUX_GET_SEEKPOINT, &i_seekpoint ) == VLC_SUCCESS  )
+        return i_seekpoint;
+    return 0;
 }
