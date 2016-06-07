@@ -182,6 +182,7 @@ int main (void)
 
     /*int fd = open (".", O_RDONLY);
     assert (fd != -1);*/
+#ifndef _WIN32 /* gets file://C:\tmp rather than file:///C:/tmp/ */
     val = chdir ("/tmp");
     assert (val != -1);
 
@@ -194,6 +195,7 @@ int main (void)
     test_current_directory_path ("movie.ogg", tmpdir, "movie.ogg");
     test_current_directory_path (".", tmpdir, ".");
     test_current_directory_path ("", tmpdir, "");
+#endif
 #endif
 
     /*val = fchdir (fd);
