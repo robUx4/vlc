@@ -31,16 +31,25 @@
 
 #include <sys/types.h>
 #include <unistd.h>
-#include <sys/socket.h>
+#ifndef _WIN32
+# include <sys/socket.h>
+#else
+# include <winsock2.h>
+#endif
 #ifndef SOCK_CLOEXEC
 # define SOCK_CLOEXEC 0
 # define accept4(a,b,c,d) accept(a,b,c)
 #endif
+#ifndef _WIN32
 #include <netinet/in.h>
-#include <arpa/inet.h>
+#endif
+#ifdef HAVE_ARPA_INET_H
+#   include <arpa/inet.h>
+#endif
 
 #include <vlc_common.h>
 #include <vlc_tls.h>
+#include <vlc_fs.h>
 #include "transport.h"
 
 static void proxy_client_process(int fd)
