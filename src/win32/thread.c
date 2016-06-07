@@ -69,15 +69,17 @@ struct vlc_thread
 /*** Mutexes ***/
 void vlc_mutex_init( vlc_mutex_t *p_mutex )
 {
-    /* This creates a recursive mutex. This is OK as fast mutexes have
-     * no defined behavior in case of recursive locking. */
     InitializeCriticalSection (&p_mutex->mutex);
+    p_mutex->locked = 0;
+    p_mutex->b_recursive = false;
     p_mutex->dynamic = true;
 }
 
 void vlc_mutex_init_recursive( vlc_mutex_t *p_mutex )
 {
     InitializeCriticalSection( &p_mutex->mutex );
+    p_mutex->locked = 0;
+    p_mutex->b_recursive = true;
     p_mutex->dynamic = true;
 }
 
@@ -102,13 +104,15 @@ void vlc_mutex_lock (vlc_mutex_t *p_mutex)
             vlc_cond_wait (&super_variable, &super_mutex);
             p_mutex->contention--;
         }
-        p_mutex->locked = true;
+        p_mutex->locked = 1;
         vlc_mutex_unlock (&super_mutex);
         vlc_restorecancel (canc);
         return;
     }
 
     EnterCriticalSection (&p_mutex->mutex);
+    assert(!p_mutex->locked || p_mutex->b_recursive);
+    p_mutex->locked++;
 }
 
 int vlc_mutex_trylock (vlc_mutex_t *p_mutex)
@@ -121,14 +125,23 @@ int vlc_mutex_trylock (vlc_mutex_t *p_mutex)
         vlc_mutex_lock (&super_mutex);
         if (!p_mutex->locked)
         {
-            p_mutex->locked = true;
+            p_mutex->locked = 1;
             ret = 0;
         }
         vlc_mutex_unlock (&super_mutex);
         return ret;
     }
 
-    return TryEnterCriticalSection (&p_mutex->mutex) ? 0 : EBUSY;
+    int ret = TryEnterCriticalSection (&p_mutex->mutex);
+    if (ret == 0)
+        return EBUSY;
+
+    assert(!p_mutex->locked || p_mutex->b_recursive);
+    if (unlikely(p_mutex->locked && !p_mutex->b_recursive))
+        return EDEADLK; /* we already had the non-recursive lock */
+
+    p_mutex->locked++;
+    return 0;
 }
 
 void vlc_mutex_unlock (vlc_mutex_t *p_mutex)
@@ -139,13 +152,15 @@ void vlc_mutex_unlock (vlc_mutex_t *p_mutex)
 
         vlc_mutex_lock (&super_mutex);
         assert (p_mutex->locked);
-        p_mutex->locked = false;
+        p_mutex->locked = 0;
         if (p_mutex->contention)
             vlc_cond_broadcast (&super_variable);
         vlc_mutex_unlock (&super_mutex);
         return;
     }
 
+    p_mutex->locked--;
+    assert(p_mutex->locked >= 0);
     LeaveCriticalSection (&p_mutex->mutex);
 }
 
