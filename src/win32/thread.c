@@ -461,10 +461,13 @@ static unsigned __stdcall vlc_entry (void *p)
 {
     struct vlc_thread *th = p;
 
-    TlsSetValue(thread_key, th);
-    th->killable = true;
-    th->data = th->entry (th->data);
-    TlsSetValue(thread_key, NULL);
+    if (!atomic_load_explicit(&th->killed, memory_order_relaxed))
+    {
+        TlsSetValue(thread_key, th);
+        th->killable = true;
+        th->data = th->entry (th->data);
+        TlsSetValue(thread_key, NULL);
+    }
 
     if (th->id == NULL) /* Detached thread */
         vlc_thread_destroy(th);
