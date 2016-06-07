@@ -485,6 +485,18 @@ void freeaddrinfo (struct addrinfo *res);
 char *realpath(const char * restrict pathname, char * restrict resolved_path);
 #endif
 
+#ifndef HAVE_ALARM
+unsigned int alarm(unsigned int seconds);
+#endif
+
+#ifndef HAVE_PAUSE
+int pause(void);
+#endif
+
+#ifndef HAVE_MKDTEMP
+char *mkdtemp(char *path_template);
+#endif
+
 #ifdef _WIN32
 FILE *vlc_win32_tmpfile(void);
 #endif
