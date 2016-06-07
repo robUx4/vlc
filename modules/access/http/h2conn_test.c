@@ -29,14 +29,23 @@
 #include <string.h>
 #include <sys/types.h>
 #include <unistd.h>
-#include <sys/socket.h>
+#ifndef _WIN32
+# include <sys/socket.h>
+#else
+# include <winsock2.h>
+#endif
 
 #include <vlc_common.h>
 #include <vlc_block.h>
 #include <vlc_tls.h>
+#include <vlc_fs.h>
 #include "h2frame.h"
 #include "conn.h"
 #include "message.h"
+
+#if defined(PF_UNIX) && !defined(PF_LOCAL)
+#    define PF_LOCAL PF_UNIX
+#endif
 
 static struct vlc_http_conn *conn;
 static int external_fd;

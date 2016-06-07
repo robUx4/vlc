@@ -29,18 +29,29 @@
 #include <string.h>
 
 #include <sys/types.h>
-#include <sys/socket.h>
-#include <poll.h>
+#if defined(_WIN32)
+#   include <winsock2.h>
+#else
+#   include <sys/socket.h>
+#endif
+#ifdef HAVE_POLL
+# include <poll.h>
+#endif
 #include <fcntl.h>
 #include <unistd.h>
 
 #include <vlc_common.h>
 #include <vlc_modules.h>
 #include <vlc_tls.h>
+#include <vlc_fs.h>
 #include <vlc_dialog.h>
 #include "../../../lib/libvlc_internal.h"
 
 #include <vlc/vlc.h>
+
+#if defined(PF_UNIX) && !defined(PF_LOCAL)
+#    define PF_LOCAL PF_UNIX
+#endif
 
 static int tlspair(int fds[2])
 {
