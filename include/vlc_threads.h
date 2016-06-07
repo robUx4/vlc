@@ -65,14 +65,7 @@ typedef struct
             bool locked;
             unsigned long contention;
         };
-        struct
-        {
-            CRITICAL_SECTION mutex;
-
-            /* non-recursive mutex */
-            bool b_recursive;
-            unsigned long lock_thread_id;
-        };
+        CRITICAL_SECTION mutex;
     };
 } vlc_mutex_t;
 #define VLC_STATIC_MUTEX { false, { { false, 0 } } }

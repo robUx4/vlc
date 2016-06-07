@@ -69,16 +69,16 @@ struct vlc_thread
 /*** Mutexes ***/
 void vlc_mutex_init( vlc_mutex_t *p_mutex )
 {
+    /* This creates a recursive mutex. This is OK as fast mutexes have
+     * no defined behavior in case of recursive locking. */
     InitializeCriticalSection (&p_mutex->mutex);
     p_mutex->dynamic = true;
-    p_mutex->b_recursive = false;
 }
 
 void vlc_mutex_init_recursive( vlc_mutex_t *p_mutex )
 {
     InitializeCriticalSection( &p_mutex->mutex );
     p_mutex->dynamic = true;
-    p_mutex->b_recursive = true;
 }
 
 
@@ -109,8 +109,6 @@ void vlc_mutex_lock (vlc_mutex_t *p_mutex)
     }
 
     EnterCriticalSection (&p_mutex->mutex);
-    assert(p_mutex->b_recursive || p_mutex->lock_thread_id != vlc_thread_id());
-    p_mutex->lock_thread_id = vlc_thread_id();
 }
 
 int vlc_mutex_trylock (vlc_mutex_t *p_mutex)
@@ -130,16 +128,7 @@ int vlc_mutex_trylock (vlc_mutex_t *p_mutex)
         return ret;
     }
 
-    int ret = TryEnterCriticalSection (&p_mutex->mutex);
-    assert(p_mutex->b_recursive || p_mutex->lock_thread_id != vlc_thread_id());
-    if (!ret)
-        return EBUSY;
-
-    if (!p_mutex->b_recursive && p_mutex->lock_thread_id == vlc_thread_id())
-        return EBUSY; /* we already had the non-recursive lock */
-
-    p_mutex->lock_thread_id = vlc_thread_id();
-    return 0;
+    return TryEnterCriticalSection (&p_mutex->mutex) ? 0 : EBUSY;
 }
 
 void vlc_mutex_unlock (vlc_mutex_t *p_mutex)
@@ -157,7 +146,6 @@ void vlc_mutex_unlock (vlc_mutex_t *p_mutex)
         return;
     }
 
-    p_mutex->lock_thread_id = 0;
     LeaveCriticalSection (&p_mutex->mutex);
 }
 
