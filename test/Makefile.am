@@ -69,8 +69,8 @@ samples/meta.sample:
 
 AM_CFLAGS = -DSRCDIR=\"$(srcdir)\"
 AM_LDFLAGS = -no-install
-LIBVLCCORE = ../src/libvlccore.la
-LIBVLC = ../lib/libvlc.la
+LIBVLCCORE = $(top_builddir)/src/libvlccore.la
+LIBVLC = $(top_builddir)/lib/libvlc.la
 
 test_libvlc_core_SOURCES = libvlc/core.c
 test_libvlc_core_LDADD = $(LIBVLC)
