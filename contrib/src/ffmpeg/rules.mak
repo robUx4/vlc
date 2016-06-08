@@ -8,6 +8,7 @@ ifdef USE_FFMPEG
 FFMPEG_HASH=cbd622be997e8307a409efc3b4bbe8765147def2
 FFMPEG_SNAPURL := http://git.videolan.org/?p=ffmpeg.git;a=snapshot;h=$(FFMPEG_HASH);sf=tgz
 FFMPEG_GITURL := http://git.videolan.org/git/ffmpeg.git
+PATCH_SUFFIX =.ffmpeg
 else
 FFMPEG_HASH=b3825723dceffc64240da7b0e562bd1fd024da26
 FFMPEG_SNAPURL := http://git.libav.org/?p=libav.git;a=snapshot;h=$(FFMPEG_HASH);sf=tgz
@@ -236,8 +237,8 @@ ffmpeg: ffmpeg-$(FFMPEG_BASENAME).tar.xz .sum-ffmpeg
 	mkdir -p $@-$(FFMPEG_BASENAME)
 	tar xvJf "$<" --strip-components=1 -C $@-$(FFMPEG_BASENAME)
 ifdef HAVE_VISUALSTUDIO
-	$(APPLY) $(SRC)/ffmpeg/msvc.patch
-	$(APPLY) $(SRC)/ffmpeg/near_field.patch
+	$(APPLY) $(SRC)/ffmpeg/msvc.patch$(PATCH_SUFFIX)
+	$(APPLY) $(SRC)/ffmpeg/near_field.patch$(PATCH_SUFFIX)
 endif
 	$(MOVE)
 
