@@ -972,7 +972,9 @@ else
 	$(AM_V_GEN)$(LN_S) -f bin/vlc-static$(EXEEXT) vlc$(EXEEXT)
 endif
 
+if !HAVE_WIN32
 TESTS = test/run_vlc.sh
+endif
 dist_noinst_SCRIPTS += test/run_vlc.sh
 
 if BUILD_VLC
