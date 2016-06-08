@@ -119,7 +119,7 @@ test_modules_packetizer_hxxx_LDFLAGS = -no-install -static # WTF
 test_modules_keystore_SOURCES = modules/keystore/test.c
 test_modules_keystore_LDADD = $(LIBVLCCORE) $(LIBVLC)
 test_modules_tls_SOURCES = modules/misc/tls.c
-test_modules_tls_LDADD = $(LIBVLCCORE) $(LIBVLC)
+test_modules_tls_LDADD = $(LIBVLCCORE) $(LIBVLC) $(SOCKET_LIBS)
 
 checkall:
 	$(MAKE) check_PROGRAMS="$(check_PROGRAMS) $(EXTRA_PROGRAMS)" check
