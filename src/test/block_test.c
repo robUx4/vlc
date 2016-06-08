@@ -23,6 +23,9 @@
 #endif
 
 #include <stdio.h>
+#ifdef _WIN32
+#include <share.h>
+#endif
 #include <string.h>
 #undef NDEBUG
 #include <assert.h>
@@ -39,7 +42,11 @@ static void test_block_File (void)
     FILE *stream;
     int res;
 
+#ifdef _WIN32
+    stream = _fsopen ("testfile.txt", "wb+", _SH_DENYNO);
+#else
     stream = fopen ("testfile.txt", "wb+e");
+#endif
     assert (stream != NULL);
 
     res = fputs (text, stream);
@@ -47,7 +54,9 @@ static void test_block_File (void)
     res = fflush (stream);
     assert (res != EOF);
 
-    block_t *block = block_File (fileno (stream));
+    int fd = fileno (stream);
+    assert(fd != -1);
+    block_t *block = block_File (fd);
     fclose (stream);
 
     assert (block != NULL);
