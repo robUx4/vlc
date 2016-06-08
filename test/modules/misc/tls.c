@@ -295,7 +295,9 @@ int main(void)
     vlc_tls_Delete(server_creds);
     libvlc_release(vlc);
 
+#ifndef _WIN32
     if (fork() == 0)
         execlp("rm", "rm", "-rf", homedir, (char *)NULL);
+#endif
     return 0;
 }
