@@ -15,7 +15,6 @@ extra_check_verbose__0 = $(extra_check_verbose_0)
 check_PROGRAMS = \
 	test_libvlc_core \
 	test_libvlc_equalizer \
-	test_libvlc_media \
 	test_libvlc_media_list \
 	test_libvlc_media_player \
 	test_libvlc_media_discoverer \
@@ -23,17 +22,24 @@ check_PROGRAMS = \
 	test_libvlc_slaves \
 	test_src_config_chain \
 	test_src_misc_variables \
-	test_src_crypto_update \
-	test_src_input_stream \
 	test_src_input_stream_fifo \
 	test_src_interface_dialog \
 	test_src_misc_bits \
 	test_src_misc_epg \
+	$(NULL)
+
+if !HAVE_WIN32
+check_PROGRAMS += \
+	test_libvlc_media \
+	test_libvlc_slaves \
+	test_src_crypto_update \
+	test_src_input_stream \
 	test_src_misc_keystore \
 	test_modules_packetizer_hxxx \
 	test_modules_keystore \
 	test_modules_tls \
 	$(NULL)
+endif
 
 check_SCRIPTS = \
 	modules/lua/telnet.sh \
