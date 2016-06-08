@@ -198,7 +198,7 @@ endif
 endif
 
 ifdef HAVE_VISUALSTUDIO
-FFMPEGCONF += --toolchain=msvc
+FFMPEGCONF += --toolchain=msvc --ld="$(LD)"
 endif
 
 else # !Windows
