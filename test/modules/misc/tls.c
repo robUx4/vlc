@@ -298,5 +298,6 @@ int main(void)
     vlc_tls_Delete(server_creds);
     libvlc_release(vlc);
 
+#endif
     return 0;
 }
