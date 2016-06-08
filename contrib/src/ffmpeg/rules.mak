@@ -226,11 +226,6 @@ ffmpeg: ffmpeg-$(FFMPEG_HASH).tar.xz .sum-ffmpeg
 ifdef HAVE_VISUALSTUDIO
 	$(APPLY) $(SRC)/ffmpeg/msvc.patch
 	$(APPLY) $(SRC)/ffmpeg/near_field.patch
-ifdef HAVE_WINSTORE
-ifndef VS_IS_2013
-	$(APPLY) $(SRC)/ffmpeg/vs15.patch
-endif
-endif
 endif
 	$(MOVE)
 
