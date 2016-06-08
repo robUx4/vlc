@@ -8,6 +8,7 @@ ifdef USE_FFMPEG
 FFMPEG_HASH=a82468514048fb87d9bf38689866bc3b9aaccd02
 FFMPEG_SNAPURL := http://git.videolan.org/?p=ffmpeg.git;a=snapshot;h=$(FFMPEG_HASH);sf=tgz
 FFMPEG_GITURL := http://git.videolan.org/git/ffmpeg.git
+PATCH_SUFFIX =.ffmpeg
 else
 FFMPEG_HASH=825e463a170c7004c63030dc484b2b2de869227b
 FFMPEG_SNAPURL := http://git.libav.org/?p=libav.git;a=snapshot;h=$(FFMPEG_HASH);sf=tgz
@@ -235,8 +236,8 @@ ifdef USE_FFMPEG
 	$(APPLY) $(SRC)/ffmpeg/force-unicode.patch
 endif
 ifdef HAVE_VISUALSTUDIO
-	$(APPLY) $(SRC)/ffmpeg/msvc.patch
-	$(APPLY) $(SRC)/ffmpeg/near_field.patch
+	$(APPLY) $(SRC)/ffmpeg/msvc.patch$(PATCH_SUFFIX)
+	$(APPLY) $(SRC)/ffmpeg/near_field.patch$(PATCH_SUFFIX)
 endif
 	$(MOVE)
 
