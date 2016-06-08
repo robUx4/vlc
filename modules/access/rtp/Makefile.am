@@ -16,9 +16,9 @@ libvlc_srtp_la_CFLAGS = $(GCRYPT_CFLAGS)
 libvlc_srtp_la_LDFLAGS = -static
 libvlc_srtp_la_LIBADD = $(GCRYPT_LIBS) $(LIBPTHREAD)
 srtp_test_recv_SOURCES = access/rtp/srtp-test-recv.c
-srtp_test_recv_LDADD = libvlc_srtp.la
+srtp_test_recv_LDADD = libvlc_srtp.la $(SOCKET_LIBS)
 srtp_test_aes_SOURCES = access/rtp/srtp-test-aes.c
-srtp_test_aes_LDADD = $(GCRYPT_LIBS)
+srtp_test_aes_LDADD = $(GCRYPT_LIBS) $(SOCKET_LIBS)
 
 librtp_plugin_la_DEPENDENCIES =
 if HAVE_GCRYPT
