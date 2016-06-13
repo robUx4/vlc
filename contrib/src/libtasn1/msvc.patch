@@ -1,0 +1,65 @@
+--- libtasn1.nok/lib/ASN1.c	2014-05-15 21:01:52.000000000 +0200
++++ libtasn1.nok/lib/ASN1.c.msvc	2016-06-10 14:52:18.932927700 +0200
+@@ -161,9 +161,9 @@ extern int _asn1_yydebug;
+     ASSIG = 258,
+     NUM = 259,
+     IDENTIFIER = 260,
+-    OPTIONAL = 261,
++    OPTIONAL_ = 261,
+     INTEGER = 262,
+-    SIZE = 263,
++    SIZE_ = 263,
+     OCTET = 264,
+     STRING = 265,
+     SEQUENCE = 266,
+@@ -176,7 +176,7 @@ extern int _asn1_yydebug;
+     OF = 273,
+     OBJECT = 274,
+     STR_IDENTIFIER = 275,
+-    BOOLEAN = 276,
++    BOOLEAN_ = 276,
+     ASN1_TRUE = 277,
+     ASN1_FALSE = 278,
+     TOKEN_NULL = 279,
+@@ -210,9 +210,9 @@ extern int _asn1_yydebug;
+ #define ASSIG 258
+ #define NUM 259
+ #define IDENTIFIER 260
+-#define OPTIONAL 261
++#define OPTIONAL_ 261
+ #define INTEGER 262
+-#define SIZE 263
++#define SIZE_ 263
+ #define OCTET 264
+ #define STRING 265
+ #define SEQUENCE 266
+@@ -225,7 +225,7 @@ extern int _asn1_yydebug;
+ #define OF 273
+ #define OBJECT 274
+ #define STR_IDENTIFIER 275
+-#define BOOLEAN 276
++#define BOOLEAN_ 276
+ #define ASN1_TRUE 277
+ #define ASN1_FALSE 278
+ #define TOKEN_NULL 279
+@@ -2591,9 +2591,9 @@ static const char *key_word[] = {
+   "UniversalString", "BMPString", "UTF8String", "VisibleString"};
+ 
+ static const int key_word_token[] = {
+-  ASSIG, OPTIONAL, INTEGER, SIZE, OCTET, STRING, SEQUENCE, BIT, UNIVERSAL,
+-      PRIVATE, OPTIONAL, DEFAULT, CHOICE, OF, OBJECT, STR_IDENTIFIER,
+-      BOOLEAN, ASN1_TRUE, ASN1_FALSE, APPLICATION, ANY, DEFINED, SET, BY,
++  ASSIG, OPTIONAL_, INTEGER, SIZE_, OCTET, STRING, SEQUENCE, BIT, UNIVERSAL,
++      PRIVATE, OPTIONAL_, DEFAULT, CHOICE, OF, OBJECT, STR_IDENTIFIER,
++      BOOLEAN_, ASN1_TRUE, ASN1_FALSE, APPLICATION, ANY, DEFINED, SET, BY,
+       EXPLICIT, IMPLICIT, DEFINITIONS, TAGS, BEGIN, END, UTCTime,
+       GeneralizedTime, GeneralString, FROM, IMPORTS, TOKEN_NULL,
+       ENUMERATED, NumericString, IA5String, TeletexString, PrintableString,
+--- libtasn1/lib/libtasn1.pc.in	2016-06-13 15:34:28.270054700 +0200
++++ libtasn1/lib/libtasn1.pc.in.msvc	2016-06-13 15:34:14.974716000 +0200
+@@ -27,4 +27,4 @@ Description: Library for ASN.1 and DER m
+ URL: http://www.gnu.org/software/libtasn1/
+ Version: @VERSION@
+ Libs: -L${libdir} -ltasn1
+-Cflags: -I${includedir}
++Cflags: -I${includedir} -DASN1_STATIC
