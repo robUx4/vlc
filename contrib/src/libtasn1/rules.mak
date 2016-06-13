@@ -17,9 +17,14 @@ libtasn1: libtasn1-$(LIBTASN1_VERSION).tar.gz .sum-libtasn1
 ifdef HAVE_WINSTORE
 	$(APPLY) $(SRC)/libtasn1/no-benchmark.patch
 endif
+ifdef HAVE_VISUALSTUDIO
+	$(APPLY) $(SRC)/libtasn1/msvc.patch
+endif
 	$(MOVE)
 
+LIBTASN1_CFLAGS := $(CFLAGS) -DASN1_STATIC
+
 .libtasn1: libtasn1
-	cd $< && $(HOSTVARS) ./configure $(HOSTCONF) --disable-doc
+	cd $< && $(HOSTVARS) CFLAGS="$(LIBTASN1_CFLAGS)" ./configure $(HOSTCONF) --disable-doc
 	cd $< && $(MAKE) install
 	touch $@
