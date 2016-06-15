@@ -1,0 +1,40 @@
+From 9a48d42e16be73f9fe724273416ede2a9e59b300 Mon Sep 17 00:00:00 2001
+From: Steve Lhomme <robux4@videolabs.io>
+Date: Wed, 15 Jun 2016 09:22:55 +0200
+Subject: [PATCH] d3d11va: don't keep the context lock while waiting for a
+ frame
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+also fixes a deadlock found by Денис Кулаков <kudesnik33ra@gmail.com>
+---
+ libavcodec/dxva2.c | 12 +++++++++---
+ 1 file changed, 9 insertions(+), 3 deletions(-)
+
+diff --git a/libavcodec/dxva2.c b/libavcodec/dxva2.c
+index 2cf57ad..f68df86 100644
+--- a/libavcodec/dxva2.c
++++ b/libavcodec/dxva2.c
+@@ -158,9 +158,15 @@ int ff_dxva2_common_end_frame(AVCodecContext *avctx, AVFrame *frame,
+                                                  ff_dxva2_get_surface(frame),
+                                                  NULL);
+ #endif
+-        if (hr == E_PENDING)
+-            av_usleep(2000);
+-    } while (hr == E_PENDING && ++runs < 50);
++        if (hr != E_PENDING || ++runs > 50)
++            break;
++#if CONFIG_D3D11VA
++        if (avctx->pix_fmt == AV_PIX_FMT_D3D11VA_VLD)
++            if (D3D11VA_CONTEXT(ctx)->context_mutex != INVALID_HANDLE_VALUE)
++                ReleaseMutex(D3D11VA_CONTEXT(ctx)->context_mutex);
++#endif
++        av_usleep(2000);
++    } while(1);
+ 
+     if (FAILED(hr)) {
+         av_log(avctx, AV_LOG_ERROR, "Failed to begin frame: 0x%lx\n", hr);
+-- 
+2.7.2.windows.1
+

@@ -228,6 +228,7 @@ ffmpeg: ffmpeg-$(FFMPEG_HASH).tar.xz .sum-ffmpeg
 	rm -Rf $@ $@-$(FFMPEG_HASH)
 	mkdir -p $@-$(FFMPEG_HASH)
 	$(XZCAT) "$<" | (cd $@-$(FFMPEG_HASH) && tar xv --strip-components=1)
+	$(APPLY) $(SRC)/ffmpeg/0001-d3d11va-don-t-keep-the-context-lock-while-waiting-fo.patch$(PATCH_SUFFIX)
 ifdef HAVE_VISUALSTUDIO
 	$(APPLY) $(SRC)/ffmpeg/msvc.patch$(PATCH_SUFFIX)
 	$(APPLY) $(SRC)/ffmpeg/near_field.patch$(PATCH_SUFFIX)
