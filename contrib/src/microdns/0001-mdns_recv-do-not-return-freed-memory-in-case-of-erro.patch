@@ -1,0 +1,24 @@
+From 7d06a55398b21de5f2c16d5e55198839e168f879 Mon Sep 17 00:00:00 2001
+From: Steve Lhomme <robux4@videolabs.io>
+Date: Wed, 15 Jun 2016 13:29:08 +0200
+Subject: [PATCH 1/2] mdns_recv: do not return freed memory in case of error
+
+---
+ src/mdns.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/src/mdns.c b/src/mdns.c
+index f08ca0c..607eac5 100644
+--- a/src/mdns.c
++++ b/src/mdns.c
+@@ -275,6 +275,7 @@ mdns_recv(const struct mdns_ctx *ctx, struct mdns_hdr *hdr, struct rr_entry **en
+         return (0);
+ err:
+         mdns_free(*entries);
++        *entries = NULL;
+         return (MDNS_STDERR);
+ }
+ 
+-- 
+2.7.2.windows.1
+

@@ -1,0 +1,24 @@
+From 947e1d72f89900209c8138ff109df3551a607a8f Mon Sep 17 00:00:00 2001
+From: Steve Lhomme <robux4@videolabs.io>
+Date: Wed, 15 Jun 2016 14:02:55 +0200
+Subject: [PATCH 2/2] mdns_recv: initialize the max size of buffer to read from
+
+---
+ src/mdns.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/src/mdns.c b/src/mdns.c
+index 607eac5..c9cf054 100644
+--- a/src/mdns.c
++++ b/src/mdns.c
+@@ -255,6 +255,7 @@ mdns_recv(const struct mdns_ctx *ctx, struct mdns_hdr *hdr, struct rr_entry **en
+                 return (MDNS_NETERR);
+ 
+         const uint8_t *ptr = mdns_read_header(buf, length, hdr);
++        n = length;
+ 
+         num_entry = hdr->num_qn + hdr->num_ans_rr + hdr->num_add_rr;
+         for (size_t i = 0; i < num_entry; ++i) {
+-- 
+2.7.2.windows.1
+

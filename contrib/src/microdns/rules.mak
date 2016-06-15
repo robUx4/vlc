@@ -21,6 +21,8 @@ microdns: microdns-$(LIBMICRODNS_VERSION).tar.gz .sum-microdns
 	$(UNPACK)
 	$(APPLY) $(SRC)/microdns/vla.patch
 	$(APPLY) $(SRC)/microdns/unused-header.patch
+	$(APPLY) $(SRC)/microdns/0001-mdns_recv-do-not-return-freed-memory-in-case-of-erro.patch
+	$(APPLY) $(SRC)/microdns/0002-mdns_recv-initialize-the-max-size-of-buffer-to-read-.patch
 	$(MOVE)
 
 .microdns: microdns
