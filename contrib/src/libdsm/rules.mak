@@ -20,9 +20,13 @@ endif
 
 libdsm: libdsm-$(LIBDSM_VERSION).tar.gz .sum-libdsm
 	$(UNPACK)
+	$(APPLY) $(SRC)/libdsm/winstore.patch
 	$(MOVE)
 
 DEPS_libdsm = libtasn1 iconv
+ifdef HAVE_WIN32
+DEPS_libdsm += pthreads $(DEPS_pthreads)
+endif
 
 .libdsm: libdsm
 	cd $< && $(HOSTVARS) ./configure --disable-programs $(LIBDSM_CONF)
