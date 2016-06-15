@@ -74,7 +74,11 @@ FFMPEGCONF += --enable-thumb
 endif
 endif
 else
+ifdef HAVE_VISUALSTUDIO
+FFMPEGCONF += --optflags=-O1
+else
 FFMPEGCONF += --optflags=-O0
+endif
 endif
 
 ifdef HAVE_CROSS_COMPILE
