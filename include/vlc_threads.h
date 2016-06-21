@@ -57,18 +57,16 @@ typedef struct vlc_thread *vlc_thread_t;
 # define LIBVLC_NEED_SLEEP
 typedef struct
 {
+    int locked;
+    bool b_recursive;
     bool dynamic;
     union
     {
-        struct
-        {
-            bool locked;
-            unsigned long contention;
-        };
-        CRITICAL_SECTION mutex;
+        unsigned long contention; /* static */
+        CRITICAL_SECTION mutex;   /* dynamic */
     };
 } vlc_mutex_t;
-#define VLC_STATIC_MUTEX { false, { { false, 0 } } }
+#define VLC_STATIC_MUTEX { 0, false, false, { 0 } }
 #define LIBVLC_NEED_CONDVAR
 #define LIBVLC_NEED_SEMAPHORE
 #define LIBVLC_NEED_RWLOCK
