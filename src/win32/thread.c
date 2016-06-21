@@ -187,6 +187,23 @@ void vlc_mutex_unlock (vlc_mutex_t *p_mutex)
     LeaveCriticalSection (&p_mutex->mutex);
 }
 
+#ifndef NDEBUG
+void vlc_assert_locked (vlc_mutex_t *p_mutex)
+{
+    if (!p_mutex->dynamic)
+    {   /* static mutexes */
+        EnterCriticalSection(&super_mutex);
+        assert (p_mutex->locked);
+        LeaveCriticalSection (&super_mutex);
+        return;
+    }
+
+    int ret = TryEnterCriticalSection (&p_mutex->mutex);
+    assert(ret != 0 && p_mutex->locked);
+    LeaveCriticalSection (&p_mutex->mutex);
+}
+#endif
+
 /*** Semaphore ***/
 #if (_WIN32_WINNT < _WIN32_WINNT_WIN8)
 # include <stdalign.h>
