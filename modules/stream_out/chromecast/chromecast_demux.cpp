@@ -46,10 +46,7 @@ struct demux_sys_t
         ,canSeek(false)
         ,m_seektime( VLC_TS_INVALID )
     {
-        demux_t *p_last_demux = demux->p_next;
-        while (p_last_demux->p_next)
-            p_last_demux = p_last_demux->p_next;
-        input_thread_t *p_input = p_last_demux->p_input;
+        input_thread_t *p_input = demux->p_input;
         input_item_t *p_item = input_GetItem( p_input );
         if ( p_item )
         {
@@ -69,10 +66,7 @@ struct demux_sys_t
 
     ~demux_sys_t()
     {
-        demux_t *p_last_demux = p_demux->p_next;
-        while (p_last_demux->p_next)
-            p_last_demux = p_last_demux->p_next;
-        input_thread_t *p_input = p_last_demux->p_input;
+        input_thread_t *p_input = p_demux->p_input;
         var_DelCallback( p_input, "intf-event", InputEvent, this );
 
         p_renderer->pf_set_title( p_renderer->p_opaque, NULL );

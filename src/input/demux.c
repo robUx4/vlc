@@ -711,7 +711,6 @@ static demux_t *demux_FilterNew( demux_t *p_next, const char *p_name )
         return NULL;
 
     p_demux->p_next       = p_next;
-    p_demux->s            = NULL;
     p_demux->p_input      = NULL;
     p_demux->p_sys        = NULL;
     p_demux->psz_access   = NULL;
