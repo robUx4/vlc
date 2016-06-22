@@ -47,6 +47,7 @@ static CONDITION_VARIABLE super_variable;
 
 /*** Threads ***/
 static DWORD thread_key;
+static DWORD cancel_key;
 
 struct vlc_thread
 {
@@ -55,6 +56,7 @@ struct vlc_thread
     bool           killable;
     atomic_bool    killed;
     vlc_cleanup_t *cleaners;
+    vlc_cleanup_t *cancelers;
 
     void        *(*entry) (void *);
     void          *data;
@@ -496,10 +498,13 @@ static unsigned __stdcall vlc_entry (void *p)
 {
     struct vlc_thread *th = p;
 
-    TlsSetValue(thread_key, th);
-    th->killable = true;
-    th->data = th->entry (th->data);
-    TlsSetValue(thread_key, NULL);
+    if (!atomic_load_explicit(&th->killed, memory_order_relaxed))
+    {
+        TlsSetValue(thread_key, th);
+        th->killable = true;
+        th->data = th->entry (th->data);
+        TlsSetValue(thread_key, NULL);
+    }
 
     if (th->id == NULL) /* Detached thread */
         vlc_thread_destroy(th);
@@ -517,6 +522,7 @@ static int vlc_clone_attr (vlc_thread_t *p_handle, bool detached,
     th->killable = false; /* not until vlc_entry() ! */
     atomic_init(&th->killed, false);
     th->cleaners = NULL;
+    th->cancelers = NULL;
     th->wait.addr = NULL;
     InitializeCriticalSection(&th->wait.lock);
 
@@ -606,7 +612,13 @@ int vlc_set_priority (vlc_thread_t th, int priority)
 /* APC procedure for thread cancellation */
 static void CALLBACK vlc_cancel_self (ULONG_PTR self)
 {
-    (void) self;
+    struct vlc_thread *th = (void *)self;
+
+    if (likely(th != NULL))
+    {
+        for (vlc_cleanup_t *p = th->cancelers; p != NULL; p = p->next)
+            p->proc (p->data);
+    }
 }
 #endif
 
@@ -697,6 +709,22 @@ void vlc_control_cancel (int cmd, ...)
         case VLC_CLEANUP_POP:
         {
             th->cleaners = th->cleaners->next;
+            break;
+        }
+
+        case VLC_CANCEL_PUSH:
+        {
+            /* cleaner is a pointer to the caller stack, no need to allocate
+             * and copy anything. As a nice side effect, this cannot fail. */
+            vlc_cleanup_t *canceler = va_arg (ap, vlc_cleanup_t *);
+            canceler->next = th->cancelers;
+            th->cancelers = canceler;
+            break;
+        }
+
+        case VLC_CANCEL_POP:
+        {
+            th->cancelers = th->cancelers->next;
             break;
         }
 
@@ -1134,6 +1162,12 @@ BOOL WINAPI DllMain (HINSTANCE hinstDll, DWORD fdwReason, LPVOID lpvReserved)
             thread_key = TlsAlloc();
             if (unlikely(thread_key == TLS_OUT_OF_INDEXES))
                 return FALSE;
+            cancel_key = TlsAlloc();
+            if (unlikely(cancel_key == TLS_OUT_OF_INDEXES))
+            {
+                TlsFree(thread_key);
+                return FALSE;
+            }
             InitializeCriticalSection (&clock_lock);
             InitializeCriticalSection(&super_mutex);
             InitializeConditionVariable(&super_variable);
@@ -1146,6 +1180,7 @@ BOOL WINAPI DllMain (HINSTANCE hinstDll, DWORD fdwReason, LPVOID lpvReserved)
             vlc_rwlock_destroy (&config_lock);
             DeleteCriticalSection(&super_mutex);
             DeleteCriticalSection (&clock_lock);
+            TlsFree(cancel_key);
             TlsFree(thread_key);
 #if (_WIN32_WINNT < _WIN32_WINNT_WIN8)
             if (WaitOnAddress_ == WaitOnAddressFallback)
