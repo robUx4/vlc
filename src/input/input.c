@@ -2297,6 +2297,7 @@ static input_source_t *InputSourceNew( input_thread_t *p_input,
         return NULL;
     }
 
+    const demux_t *p_demux = in->p_demux;
     char *psz_demux_chain = var_GetNonEmptyString(p_input, "demux-filter");
     /* add the chain of demux filters */
     demux_t *p_filtered_demux = demux_FilterChainNew( in->p_demux, psz_demux_chain );
@@ -2316,7 +2317,7 @@ static input_source_t *InputSourceNew( input_thread_t *p_input,
                        &in->b_can_pace_control ) )
         in->b_can_pace_control = false;
 
-    assert( in->p_demux->pf_demux != NULL || !in->b_can_pace_control );
+    assert( p_demux->pf_demux != NULL || !in->b_can_pace_control );
 
     if( !in->b_can_pace_control )
     {
