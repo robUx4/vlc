@@ -372,13 +372,16 @@ void ActionsManager::ScanRendererAction(bool checked)
 void ActionsManager::RendererSelected( QAction *selected )
 {
     QString s_sout;
+    QString s_demux_filter;
     QVariant data = selected->data();
     if (data.canConvert<QString>())
     {
         s_sout.append('#');
         s_sout.append(data.toString());
+        s_demux_filter = QString("cc_demux");
     }
     msg_Dbg( p_intf, "using sout: '%s'", s_sout.toUtf8().constData() );
     var_SetString( THEPL, "sout", s_sout.toUtf8().constData() );
+    var_SetString( THEPL, "demux-filter", s_demux_filter.toUtf8().constData() );
 }
 
