@@ -46,17 +46,43 @@ struct demux_sys_t
         ,canSeek(false)
         ,m_seektime( VLC_TS_INVALID )
     {
-        input_thread_t *p_input = demux->p_input;
-        input_item_t *p_item = input_GetItem( p_input );
-        if ( p_item )
+        const char *title = NULL;
+        const char *artwork = NULL;
+        vlc_meta_t *p_meta = vlc_meta_New();
+        if( likely(p_meta != NULL) )
         {
-            char *psz_title = input_item_GetTitleFbName( p_item );
-            p_renderer->pf_set_title( p_renderer->p_opaque, psz_title );
-            free( psz_title );
+            if (demux_Control( demux->p_next, DEMUX_GET_META, p_meta) == VLC_SUCCESS)
+            {
+                title = vlc_meta_Get( p_meta, vlc_meta_Title );
+                if ( title != NULL )
+                    p_renderer->pf_set_title( p_renderer->p_opaque, title );
+                artwork = vlc_meta_Get( p_meta, vlc_meta_ArtworkURL );
+                if ( artwork != NULL )
+                    p_renderer->pf_set_artwork( p_renderer->p_opaque, artwork );
+            }
+            vlc_meta_Delete(p_meta);
+        }
 
-            psz_title = input_item_GetArtworkURL( p_item );
-            p_renderer->pf_set_artwork( p_renderer->p_opaque, psz_title );
-            free( psz_title );
+        input_thread_t *p_input = demux->p_input;
+        if ( title == NULL || artwork == NULL )
+        {
+            input_item_t *p_item = input_GetItem( p_input );
+            if ( p_item )
+            {
+                if ( title == NULL )
+                {
+                    char *psz_title = input_item_GetTitleFbName( p_item );
+                    p_renderer->pf_set_title( p_renderer->p_opaque, psz_title );
+                    free( psz_title );
+                }
+
+                if ( artwork == NULL )
+                {
+                    char *psz_artwork = input_item_GetArtworkURL( p_item );
+                    p_renderer->pf_set_artwork( p_renderer->p_opaque, psz_artwork );
+                    free( psz_artwork );
+                }
+            }
         }
 
         p_renderer->pf_set_input_state( p_renderer->p_opaque,
