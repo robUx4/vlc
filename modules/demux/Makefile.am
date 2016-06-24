@@ -16,6 +16,9 @@ demux_LTLIBRARIES += $(LTLIBogg)
 libdemuxdump_plugin_la_SOURCES = demux/demuxdump.c
 demux_LTLIBRARIES += libdemuxdump_plugin.la
 
+libdummyfilter_plugin_la_SOURCES = demux/dummyfilter.c
+demux_LTLIBRARIES += libdummyfilter_plugin.la
+
 librawdv_plugin_la_SOURCES = demux/rawdv.c demux/rawdv.h
 demux_LTLIBRARIES += librawdv_plugin.la
 
