@@ -162,7 +162,7 @@ typedef struct demux_priv_t
 
 static void demux_DestroyDemux(demux_t *demux)
 {
-    assert(demux->s != NULL);
+    if (demux->s != NULL);
     vlc_stream_Delete(demux->s);
 }
 
