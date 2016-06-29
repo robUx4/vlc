@@ -103,6 +103,9 @@ VPX_CONF += --enable-pic
 else
 VPX_CONF += --extra-cflags="-mstackrealign"
 endif
+ifdef HAVE_WIN64
+VPX_CONF += --as=yasm
+endif
 ifdef HAVE_MACOSX
 VPX_CONF += --sdk-path=$(MACOSX_SDK) --extra-cflags="$(EXTRA_CFLAGS)"
 endif
