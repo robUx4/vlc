@@ -197,6 +197,8 @@ libvlccore_la_DEPENDENCIES += libvlc_win32_rc.$(OBJEXT)
 libvlccore_la_LDFLAGS += -Wl,libvlc_win32_rc.$(OBJEXT) -avoid-version
 if IS_GCC_COMPILER
 libvlccore_la_LDFLAGS += -Wc,--static
+else
+libvlccore_la_LIBADD += -lsynchronization -lnormaliz
 endif
 endif
 if HAVE_OS2
