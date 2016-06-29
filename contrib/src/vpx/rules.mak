@@ -101,6 +101,9 @@ endif
 ifndef HAVE_WIN32
 VPX_CONF += --enable-pic
 endif
+ifdef HAVE_WIN64
+VPX_CONF += --as=yasm
+endif
 ifdef HAVE_MACOSX
 VPX_CONF += --sdk-path=$(MACOSX_SDK)
 endif
