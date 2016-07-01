@@ -1,0 +1,11 @@
+--- harfbuzz/src/hb-atomic-private.hh	2016-07-01 10:42:06.657067800 +0200
++++ harfbuzz/src/hb-atomic-private.hh.intrin	2016-07-01 10:39:57.204991000 +0200
+@@ -32,6 +32,8 @@
+ #ifndef HB_ATOMIC_PRIVATE_HH
+ #define HB_ATOMIC_PRIVATE_HH
+ 
++#include <intrin.h>
++
+ #include "hb-private.hh"
+ 
+ 
