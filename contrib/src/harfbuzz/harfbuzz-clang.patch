@@ -15,3 +15,14 @@
  fi
  
  AM_CONDITIONAL(HAVE_GCC, test "x$GCC" = "xyes")
+--- harfbuzz/src/hb-private.hh	2016-07-01 10:33:10.072811100 +0200
++++ harfbuzz/src/hb-private.hh.clang	2016-07-01 10:33:52.207363000 +0200
+@@ -83,7 +83,7 @@ extern "C" void  hb_free_impl(void *ptr)
+ #define unlikely(expr) (expr)
+ #endif
+ 
+-#ifndef __GNUC__
++#if !defined(__GNUC__) && !defined(__clang__)
+ #undef __attribute__
+ #define __attribute__(x)
+ #endif
