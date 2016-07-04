@@ -14,7 +14,7 @@
  
  $(LUA_T): $(LUA_O) $(LUA_A)
 -	$(CC) -o $@ $(LDFLAGS) $(LUA_O) $(LUA_A) $(LIBS)
-+	$(CC) -o $@ $(LDFLAGS) $(LUA_O) lapi.lib $(LIBS)
++	$(CC) -o $@ $(LDFLAGS) $(LUA_O) $(LUA_IMP) $(LIBS)
  
  $(LUAC_T): $(LUAC_O) $(LUA_A)
 -	$(CC) -o $@ $(LDFLAGS) $(LUAC_O) $(LUA_A) $(LIBS)
@@ -27,7 +27,7 @@
  mingw:
  	$(MAKE) "LUA_A=lua53.dll" "LUA_T=lua.exe" \
 -	"AR=$(CC) -shared -o" "RANLIB=strip --strip-unneeded" \
-+	"AR=$(CC) -shared -o" \
++	"AR=$(CC) -shared -o" "LUA_IMP=lua53.lib" \
  	"SYSCFLAGS=-DLUA_BUILD_AS_DLL" "SYSLIBS=" "SYSLDFLAGS=-s" lua.exe
  	$(MAKE) "LUAC_T=luac.exe" luac.exe
  
