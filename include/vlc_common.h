@@ -630,7 +630,7 @@ static inline uint16_t (bswap16)(uint16_t x)
 VLC_USED
 static inline uint32_t (bswap32)(uint32_t x)
 {
-#if defined (__GNUC__) || defined(__clang__)
+#if defined (__GNUC__) || (defined(__clang__) && !defined(_MSC_VER))
     return __builtin_bswap32 (x);
 #else
     return ((x & 0x000000FF) << 24)
@@ -644,7 +644,7 @@ static inline uint32_t (bswap32)(uint32_t x)
 VLC_USED
 static inline uint64_t (bswap64)(uint64_t x)
 {
-#if defined (__GNUC__) || defined(__clang__)
+#if defined (__GNUC__) || (defined(__clang__) && !defined(_MSC_VER))
     return __builtin_bswap64 (x);
 #elif !defined (__cplusplus)
     return ((x & 0x00000000000000FF) << 56)
