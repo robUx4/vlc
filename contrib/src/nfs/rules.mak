@@ -20,6 +20,7 @@ ifdef HAVE_VISUALSTUDIO
 	$(APPLY) $(SRC)/nfs/non-gcc.patch
 	$(APPLY) $(SRC)/nfs/msvc.patch
 endif
+	$(APPLY) $(SRC)/nfs/clang.patch
 	$(UPDATE_AUTOCONFIG)
 	$(MOVE)
 
