@@ -1,0 +1,83 @@
+--- libgcrypt/src/gcrypt.h.in	2016-09-20 15:12:35.634350900 +0200
++++ libgcrypt/src/gcrypt.h.in.clang	2016-09-21 13:16:35.232776400 +0200
+@@ -189,7 +189,7 @@ int gcry_err_code_to_errno (gcry_err_cod
+ gcry_error_t gcry_err_make_from_errno (gcry_err_source_t source, int err);
+ 
+ /* Return an error value with the system error ERR.  */
+-gcry_err_code_t gcry_error_from_errno (int err);
++gcry_error_t gcry_error_from_errno (int err);
+ 
+ 
+ /* NOTE: Since Libgcrypt 1.6 the thread callbacks are not anymore
+--- libgcrypt/src/global.c	2016-09-22 16:59:27.955105500 +0200
++++ libgcrypt/src/global.c.clang	2016-09-22 16:58:35.242967800 +0200
+@@ -334,7 +334,7 @@ print_config ( int (*fnc)(FILE *fp, cons
+ 
+ /* Command dispatcher function, acting as general control
+    function.  */
+-gcry_err_code_t
++gcry_error_t
+ _gcry_vcontrol (enum gcry_ctl_cmds cmd, va_list arg_ptr)
+ {
+   static int init_finished = 0;
+--- libgcrypt-1.7.3/cipher/rijndael-internal.h	2016-09-21 11:11:01.281231700 +0200
++++ libgcrypt-1.7.3/cipher/rijndael-internal.h.clang	2016-09-21 11:08:04.288577800 +0200
+@@ -55,7 +55,7 @@
+ #undef USE_ARM_ASM
+ #if defined(__ARMEL__)
+ # ifdef HAVE_COMPATIBLE_GCC_ARM_PLATFORM_AS
+-#  define USE_ARM_ASM 1
++#  define USE_ARM_ASM defined(_MSC_VER)
+ # endif
+ #endif
+ 
+--- libgcrypt-1.7.3/src/g10lib.h	2016-09-21 11:10:15.239860200 +0200
++++ libgcrypt-1.7.3/src/g10lib.h.clang	2016-09-21 11:08:08.664777200 +0200
+@@ -92,7 +92,7 @@
+ 
+ /*-- src/global.c -*/
+ int _gcry_global_is_operational (void);
+-gcry_err_code_t _gcry_vcontrol (enum gcry_ctl_cmds cmd, va_list arg_ptr);
++gcry_error_t _gcry_vcontrol (enum gcry_ctl_cmds cmd, va_list arg_ptr);
+ void  _gcry_check_heap (const void *a);
+ int _gcry_get_debug_flag (unsigned int mask);
+ 
+--- libgcrypt/cipher/md.c	2016-07-14 11:19:17.000000000 +0200
++++ libgcrypt/cipher/md.c.clang	2016-09-21 12:45:39.572007600 +0200
+@@ -908,7 +908,7 @@ md_extract(gcry_md_hd_t a, int algo, voi
+  * Expand the output from XOF class digest, this function implictly finalizes
+  * the hash.
+  */
+-gcry_err_code_t
++gpg_error_t
+ _gcry_md_extract (gcry_md_hd_t hd, int algo, void *out, size_t outlen)
+ {
+   _gcry_md_ctl (hd, GCRYCTL_FINALIZE, NULL, 0);
+--- libgcrypt/random/random-csprng.c	2016-08-17 13:21:22.000000000 +0200
++++ libgcrypt/random/random-csprng.c.clang	2016-09-21 12:50:40.770678000 +0200
+@@ -61,6 +61,10 @@
+ #include "cipher.h"         /* _gcry_sha1_hash_buffer  */
+ #include "../cipher/sha1.h" /* _gcry_sha1_mixblock     */
+ 
++#if defined(_MSC_VER) && defined(__clang__)
++#define stat _stat
++#endif
++
+ #ifndef RAND_MAX   /* For SunOS. */
+ #define RAND_MAX 32767
+ #endif
+--- libgcrypt/src/visibility.c	2016-03-23 12:59:34.000000000 +0100
++++ libgcrypt/src/visibility.c.clang	2016-09-21 13:06:17.763830000 +0200
+@@ -1174,10 +1174,10 @@ gcry_md_read (gcry_md_hd_t hd, int algo)
+   return _gcry_md_read (hd, algo);
+ }
+ 
+-gcry_err_code_t
++gpg_error_t
+ gcry_md_extract (gcry_md_hd_t hd, int algo, void *buffer, size_t length)
+ {
+-  return _gcry_md_extract(hd, algo, buffer, length);
++  return gpg_error (_gcry_md_extract(hd, algo, buffer, length));
+ }
+ 
+ void
