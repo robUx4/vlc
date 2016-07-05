@@ -2,7 +2,7 @@
 
 #Uncomment the one you want
 #USE_LIBAV ?= 1
-#USE_FFMPEG ?= 1
+USE_FFMPEG ?= 1
 
 ifdef USE_FFMPEG
 FFMPEG_HASH=a82468514048fb87d9bf38689866bc3b9aaccd02
@@ -74,11 +74,7 @@ FFMPEGCONF += --enable-thumb
 endif
 endif
 else
-ifdef HAVE_VISUALSTUDIO
-FFMPEGCONF += --optflags=-O1
-else
 FFMPEGCONF += --optflags=-O0
-endif
 endif
 
 ifdef HAVE_CROSS_COMPILE
@@ -102,6 +98,7 @@ FFMPEGCONF += --cpu=armv6 --disable-neon
 endif
 ifdef HAVE_VISUALSTUDIO
 FFMPEGCONF += --cpu=armv7-a --extra-cflags=' -D__ARM_PCS_VFP' --as=armasm
+FFMPEGCONF += --disable-decoder=mpegvideo
 endif
 endif
 
@@ -239,6 +236,7 @@ ffmpeg: ffmpeg-$(FFMPEG_BASENAME).tar.xz .sum-ffmpeg
 ifdef USE_FFMPEG
 	$(APPLY) $(SRC)/ffmpeg/force-unicode.patch
 endif
+	$(APPLY) $(SRC)/ffmpeg/clang.patch
 ifdef HAVE_VISUALSTUDIO
 	$(APPLY) $(SRC)/ffmpeg/msvc.patch$(PATCH_SUFFIX)
 	$(APPLY) $(SRC)/ffmpeg/near_field.patch$(PATCH_SUFFIX)
