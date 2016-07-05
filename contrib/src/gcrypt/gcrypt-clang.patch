@@ -1,0 +1,69 @@
+--- libgcrypt/src/gcrypt-int.h	2016-07-04 17:45:29.241749400 +0200
++++ libgcrypt/src/gcrypt-int.h.clang	2016-07-04 17:34:05.565286300 +0200
+@@ -415,14 +415,14 @@ gcry_mpi_point_t _gcry_mpi_point_set (gc
+ gcry_mpi_point_t _gcry_mpi_point_snatch_set (gcry_mpi_point_t point,
+                                             gcry_mpi_t x, gcry_mpi_t y,
+                                             gcry_mpi_t z);
+-gpg_error_t _gcry_mpi_ec_new (gcry_ctx_t *r_ctx,
++gpg_err_code_t _gcry_mpi_ec_new (gcry_ctx_t *r_ctx,
+                              gcry_sexp_t keyparam, const char *curvename);
+ gcry_mpi_t _gcry_mpi_ec_get_mpi (const char *name, gcry_ctx_t ctx, int copy);
+ gcry_mpi_point_t _gcry_mpi_ec_get_point (const char *name,
+                                         gcry_ctx_t ctx, int copy);
+-gpg_error_t _gcry_mpi_ec_set_mpi (const char *name, gcry_mpi_t newvalue,
++gpg_err_code_t _gcry_mpi_ec_set_mpi (const char *name, gcry_mpi_t newvalue,
+                                  gcry_ctx_t ctx);
+-gpg_error_t _gcry_mpi_ec_set_point (const char *name, gcry_mpi_point_t newvalue,
++gpg_err_code_t _gcry_mpi_ec_set_point (const char *name, gcry_mpi_point_t newvalue,
+                                    gcry_ctx_t ctx);
+ int _gcry_mpi_ec_get_affine (gcry_mpi_t x, gcry_mpi_t y, gcry_mpi_point_t point,
+                              mpi_ec_t ctx);
+--- libgcrypt/src/global.c	2016-07-04 17:46:04.132660700 +0200
++++ libgcrypt/src/global.c.clang	2016-07-04 17:42:44.500010000 +0200
+@@ -339,7 +339,7 @@ print_config ( int (*fnc)(FILE *fp, cons
+ 
+ /* Command dispatcher function, acting as general control
+    function.  */
+-gcry_err_code_t
++gcry_error_t
+ _gcry_vcontrol (enum gcry_ctl_cmds cmd, va_list arg_ptr)
+ {
+   static int init_finished = 0;
+@@ -685,7 +685,7 @@ _gcry_vcontrol (enum gcry_ctl_cmds cmd,
+       rc = GPG_ERR_INV_OP;
+     }
+ 
+-  return rc;
++  return gpg_error(rc);
+ }
+ 
+ 
+--- libgcrypt/src/sexp.c	2016-07-04 17:46:48.768896100 +0200
++++ libgcrypt/src/sexp.c.clang	2016-07-04 17:41:59.922698500 +0200
+@@ -2423,7 +2423,7 @@ _gcry_sexp_vextract_param (gcry_sexp_t s
+   return rc;
+ }
+ 
+-gpg_error_t
++gcry_err_code_t
+ _gcry_sexp_extract_param (gcry_sexp_t sexp, const char *path,
+                           const char *list, ...)
+ {
+@@ -2433,5 +2433,5 @@ _gcry_sexp_extract_param (gcry_sexp_t se
+   va_start (arg_ptr, list);
+   rc = _gcry_sexp_vextract_param (sexp, path, list, arg_ptr);
+   va_end (arg_ptr);
+-  return gpg_error (rc);
++  return rc;
+ }
+--- libgcrypt/cipher/rijndael.c	2016-07-05 10:09:25.926065800 +0200
++++ libgcrypt/cipher/rijndael.c.clang	2016-07-05 10:04:46.784832800 +0200
+@@ -71,7 +71,7 @@
+ #undef USE_ARM_ASM
+ #if defined(__ARMEL__)
+ # ifdef HAVE_COMPATIBLE_GCC_ARM_PLATFORM_AS
+-#  define USE_ARM_ASM 1
++#  define USE_ARM_ASM defined(_MSC_VER)
+ # endif
+ #endif
+ 
