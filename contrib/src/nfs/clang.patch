@@ -1,0 +1,32 @@
+--- nfs/win32/win32_compat.c	2016-02-01 01:06:44.000000000 +0100
++++ nfs/win32/win32_compat.c.clang	2016-07-04 14:01:26.872414200 +0200
+@@ -157,11 +157,13 @@ int win32_poll(struct pollfd *fds, unsig
+ #endif
+  
+ #ifndef __MINGW32__
++#ifndef __clang__
+ struct timezone 
+ {
+   int  tz_minuteswest; /* minutes W of Greenwich */
+   int  tz_dsttime;     /* type of dst correction */
+ };
++#endif /* __clang__ */
+  
+ int win32_gettimeofday(struct timeval *tv, struct timezone *tz)
+ {
+--- nfs/win32/win32_compat.h	2016-07-04 12:40:42.810323200 +0200
++++ nfs/win32/win32_compat.h.clang	2016-07-05 12:38:32.285173000 +0200
+@@ -102,6 +102,13 @@ struct pollfd {
+ #define close closesocket
+ #define ioctl ioctlsocket
+ 
++#ifdef __clang__
++struct timezone {
++  int  tz_minuteswest; /* minutes W of Greenwich */
++  int  tz_dsttime;     /* type of dst correction */
++};
++#endif
++
+ /* Wrapper macros to call misc. functions win32 is missing */
+ #ifndef HAVE_POLL_H
+ #define poll(x, y, z)        win32_poll(x, y, z)
