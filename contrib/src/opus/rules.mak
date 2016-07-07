@@ -24,6 +24,13 @@ OPUS_CONF= --disable-extra-programs --disable-doc
 ifndef HAVE_FPU
 OPUS_CONF += --enable-fixed-point
 endif
+ifeq ($(ARCH),arm)
+OPUS_CONF += --disable-asm
+OPUS_CFLAGS+= -fno-fast-math
+ifdef HAVE_VISUALSTUDIO
+OPUS_CONF += --disable-intrinsics
+endif
+endif
 
 ifdef HAVE_VISUALSTUDIO
 OPUS_CFLAGS+= -DUSE_ALLOCA
