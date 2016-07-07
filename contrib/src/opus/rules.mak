@@ -19,13 +19,14 @@ opus: opus-$(OPUS_VERSION).tar.gz .sum-opus
 	$(UPDATE_AUTOCONFIG)
 	$(MOVE)
 
+OPUS_CFLAGS=$(CFLAGS)
 OPUS_CONF= --disable-extra-programs --disable-doc
 ifndef HAVE_FPU
 OPUS_CONF += --enable-fixed-point
 endif
 
 ifdef HAVE_VISUALSTUDIO
-OPUS_CFLAGS=-DUSE_ALLOCA
+OPUS_CFLAGS+= -DUSE_ALLOCA
 endif
 
 .opus: opus
