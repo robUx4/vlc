@@ -45,11 +45,11 @@ typedef struct _GUID
 
 typedef GUID guid_t;
 
-#ifdef HAVE_ATTRIBUTE_PACKED
-#   define ATTR_PACKED __attribute__((__packed__))
-#elif defined(__SUNPRO_C) || defined(_MSC_VER)
+#if defined(__SUNPRO_C) || (defined(_MSC_VER) && !defined(__clang__))
 #   pragma pack(1)
 #   define ATTR_PACKED
+#elif defined(HAVE_ATTRIBUTE_PACKED)
+#   define ATTR_PACKED __attribute__((__packed__))
 #elif defined(__APPLE__)
 #   pragma pack(push, 1)
 #   define ATTR_PACKED
@@ -178,7 +178,7 @@ ATTR_PACKED
 } VIDEOINFOHEADER;
 #endif
 
-#if defined(__SUNPRO_C) || defined(_MSC_VER)
+#if defined(__SUNPRO_C) || (defined(_MSC_VER) && !defined(__clang__))
 #   pragma pack()
 #elif defined(__APPLE__) && !HAVE_ATTRIBUTE_PACKED
 #   pragma pack(pop)
