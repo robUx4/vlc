@@ -8,6 +8,11 @@ ifeq ($(call need_pkg,"libdvbpsi >= 1.2.0"),)
 PKGS_FOUND += dvbpsi
 endif
 
+DVBPSI_CONF=$(HOSTCONF)
+ifdef HAVE_VISUALSTUDIO
+DVBPSI_CONF+= --disable-debug
+endif
+
 $(TARBALLS)/libdvbpsi-$(DVBPSI_VERSION).tar.bz2:
 	$(call download,$(DVBPSI_URL))
 
@@ -24,6 +29,6 @@ endif
 	$(MOVE)
 
 .dvbpsi: libdvbpsi
-	cd $< && $(HOSTVARS) ./configure $(HOSTCONF)
+	cd $< && $(HOSTVARS) ./configure $(DVBPSI_CONF)
 	cd $< && $(MAKE) install
 	touch $@
