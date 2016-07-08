@@ -148,17 +148,6 @@
  endif
  
  noinst_LTLIBRARIES = libgnutls_extras.la
---- gnutls/lib/gnutls_cipher.c	2014-08-10 13:50:46.000000000 +0200
-+++ gnutls/lib/gnutls_cipher.c.msvc	2015-08-19 10:34:17.940120000 +0200
-@@ -737,7 +737,7 @@
- 		if (explicit_iv
- 		    && _gnutls_auth_cipher_is_aead(&params->read.
- 						   cipher_state)) {
--			uint8_t nonce[blocksize];
-+			uint8_t *nonce = alloca(blocksize);
- 			/* Values in AEAD are pretty fixed in TLS 1.2 for 128-bit block
- 			 */
- 			if (unlikely
 --- gnutls/lib/gnutls_x509.c	2014-11-24 18:56:27.000000000 +0100
 +++ gnutls/lib/gnutls_x509.c.msvc	2015-08-19 10:56:26.643347600 +0200
 @@ -1743,7 +1743,7 @@
