@@ -107,6 +107,11 @@ typedef struct
 # include <sys/types.h> /* ssize_t, pid_t */
 #endif
 
+#if defined(_MSC_VER) && !defined(__clang__)
+#undef restrict
+#define restrict
+#endif
+
 #if !defined (HAVE_DIRFD) || \
     !defined (HAVE_FDOPENDIR)
 # include <dirent.h>
