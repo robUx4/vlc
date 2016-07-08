@@ -133,7 +133,7 @@ endif
 endif
 
 ifndef WITH_OPTIMIZATION
-VPX_CONF += --enable-debug --disable-optimizations
+VPX_CONF += --disable-optimizations
 endif
 
 .vpx: libvpx
