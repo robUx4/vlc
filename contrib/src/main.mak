@@ -288,6 +288,8 @@ PIC := -fPIC
 endif
 ifdef WITH_OPTIMIZATION
 HOSTCONF += --disable-dependency-tracking
+else
+HOSTCONF += --enable-debug
 endif
 
 HOSTTOOLS := \
