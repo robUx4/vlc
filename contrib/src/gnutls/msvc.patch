@@ -282,3 +282,14 @@
  # include <arpa/inet.h>
  #endif
  
+--- gnutls/lib/algorithms/ciphersuites.c	2016-07-08 17:57:43.324924100 +0200
++++ gnutls/lib/algorithms/ciphersuites.c.alloca	2016-07-08 17:57:12.036441000 +0200
+@@ -1323,7 +1323,7 @@ _gnutls_remove_unwanted_ciphersuites(gnu
+ 	    session->security_parameters.entity == GNUTLS_SERVER ? 1 : 0;
+ 	gnutls_kx_algorithm_t alg[MAX_ALGOS];
+ 	int alg_size = MAX_ALGOS;
+-	uint8_t new_list[cipher_suites_size]; /* it's safe to use that size because it's provided by _gnutls_supported_ciphersuites() */
++	uint8_t *new_list=alloca(cipher_suites_size); /* it's safe to use that size because it's provided by _gnutls_supported_ciphersuites() */
+ 	int i, new_list_size = 0;
+ 	const gnutls_cipher_suite_entry_st *entry;
+ 	const uint8_t *cp;
