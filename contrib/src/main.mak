@@ -277,7 +277,7 @@ HOSTCONF += --libdir="$(PREFIX)/lib"
 HOSTCONF += --build="$(BUILD)" --host="$(HOST)" --target="$(HOST)"
 HOSTCONF += --program-prefix=""
 # libtool stuff:
-HOSTCONF += --enable-static --disable-shared --disable-dependency-tracking
+HOSTCONF += --enable-static --disable-shared
 ifdef HAVE_WIN32
 HOSTCONF += --without-pic
 PIC :=
