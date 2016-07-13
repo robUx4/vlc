@@ -209,16 +209,19 @@ int poll(struct pollfd *fds, unsigned nfds, int timeout)
             ret = WSA_WAIT_EVENT_0 + i;
     }
 
-    if (ret == WSA_WAIT_FAILED)
+    if (ret == WSA_WAIT_FAILED && to > 0)
+    {
         ret = WSAWaitForMultipleEvents(nfds, evts, FALSE, to, TRUE);
 
-    unsigned count = 0;
     for (unsigned i = 0; i < nfds; i++)
     {
         WSANETWORKEVENTS ne;
 
-        if (WSAEnumNetworkEvents(fds[i].fd, evts[i], &ne))
-            memset(&ne, 0, sizeof (ne));
+            if (ret != WSA_WAIT_EVENT_0 + i)
+                continue; /* don't read events for other sockets than the first found */
+
+            if (WSAEnumNetworkEvents(fds[i].fd, evts[i], &ne))
+                continue;
         WSAEventSelect(fds[i].fd, evts[i], 0);
 
         if (ne.lNetworkEvents & FD_CONNECT)
@@ -257,6 +260,18 @@ int poll(struct pollfd *fds, unsigned nfds, int timeout)
             if (ne.iErrorCode[FD_WRITE_BIT] != 0)
                 fds[i].revents |= POLLERR;
         }
+    }
+    }
+
+    unsigned count = 0;
+    for (unsigned i = 0; i < nfds; i++)
+    {
+        /* events already found with select */
+        //WSAEventSelect(fds[i].fd, evts[i], 0);
+
+        /* only report the events requested, plus the special ones */
+        fds[i].revents &= fds[i].events | POLLERR | POLLHUP | POLLNVAL;
+
         count += fds[i].revents != 0;
     }
 
