@@ -284,6 +284,7 @@ typedef enum video_chroma_location_t
 struct video_format_t
 {
     vlc_fourcc_t i_chroma;                               /**< picture chroma */
+    const vlc_chroma_description_t *p_chroma; /**< hint for opaque hw chroma */
 
     unsigned int i_width;                                 /**< picture width */
     unsigned int i_height;                               /**< picture height */
