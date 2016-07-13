@@ -185,6 +185,9 @@ int transcode_video_new( sout_stream_t *p_stream, sout_stream_id_sys_t *id )
           : id->p_decoder->fmt_in.video.i_visible_height
             ? id->p_decoder->fmt_in.video.i_visible_height : id->p_encoder->fmt_in.video.i_height;
 
+    id->p_encoder->fmt_in.video.i_visible_width  = id->p_encoder->fmt_in.video.i_visible_width & ~1;
+    id->p_encoder->fmt_in.video.i_visible_height = id->p_encoder->fmt_in.video.i_visible_height & ~1;
+
     id->p_encoder->i_threads = p_sys->i_threads;
     id->p_encoder->p_cfg = p_sys->p_video_cfg;
 
