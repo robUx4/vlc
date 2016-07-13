@@ -217,8 +217,17 @@ int poll(struct pollfd *fds, unsigned nfds, int timeout)
         {
             WSANETWORKEVENTS ne;
 
+            if (ret != WSA_WAIT_EVENT_0 + i)
+                continue; /* don't read events for other sockets than the first found */
+
             if (WSAEnumNetworkEvents(fds[i].fd, evts[i], &ne))
-                memset(&ne, 0, sizeof (ne));
+            {
+                /* unhook the event before we close it, otherwise the socket may fail */
+                WSAEventSelect(fds[i].fd, evts[i], 0);
+                continue;
+            }
+
+            /* unhook the event before we close it, otherwise the socket may fail */
             WSAEventSelect(fds[i].fd, evts[i], 0);
 
             if (ne.lNetworkEvents & FD_CONNECT)
