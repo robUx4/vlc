@@ -25,6 +25,14 @@
 #include <vlc_common.h>
 #include <vlc_network.h>
 
+#include "../../compat/poll.h"
+
+int vlc_net_close( int fd )
+{
+    win32_close_socket_event(fd);
+    return closesocket((SOCKET)fd);
+}
+
 #if 0
 ssize_t vlc_sendmsg (int s, struct msghdr *hdr, int flags)
 {

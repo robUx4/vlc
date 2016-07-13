@@ -290,6 +290,7 @@ net_Read
 net_SetCSCov
 net_vaPrintf
 net_Write
+vlc_net_close
 NTPtime64
 picture_BlendSubpicture
 picture_CopyPixels

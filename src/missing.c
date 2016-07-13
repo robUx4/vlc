@@ -38,6 +38,15 @@
 #include <vlc_common.h>
 #include <assert.h>
 
+#ifndef _WIN32
+# include <vlc_network.h>
+int vlc_net_close( int fd )
+{
+    (void) fd;
+    vlc_assert_unreachable ();
+}
+#endif
+
 #ifndef ENABLE_HTTPD
 # include <vlc_httpd.h>
 
