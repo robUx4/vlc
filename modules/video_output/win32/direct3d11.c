@@ -904,7 +904,7 @@ static int Direct3D11Open(vout_display_t *vd, video_format_t *fmt)
     scd.SampleDesc.Quality = 0;
     scd.Width = fmt->i_visible_width;
     scd.Height = fmt->i_visible_height;
-    scd.Format = DXGI_FORMAT_R8G8B8A8_UNORM; /* TODO: use DXGI_FORMAT_NV12 */
+    scd.Format = fmt->p_chroma && fmt->p_chroma->pixel_bits > 8 ? DXGI_FORMAT_R10G10B10A2_UNORM : DXGI_FORMAT_R8G8B8A8_UNORM; /* TODO: use DXGI_FORMAT_NV12 */
     //scd.Flags = 512; // DXGI_SWAP_CHAIN_FLAG_YUV_VIDEO;
     scd.SwapEffect = DXGI_SWAP_EFFECT_FLIP_SEQUENTIAL;
 
@@ -1038,7 +1038,8 @@ static int Direct3D11Open(vout_display_t *vd, video_format_t *fmt)
     for (const d3d_format_t *output_format = GetRenderFormatList();
          output_format->name != NULL; ++output_format)
     {
-        if( i_src_chroma == output_format->fourcc)
+        if( i_src_chroma == output_format->fourcc &&
+            ( fmt->p_chroma== NULL || fmt->p_chroma->pixel_bits <= output_format->bitsPerChannel ))
         {
             if( SUCCEEDED( ID3D11Device_CheckFormatSupport(sys->d3ddevice,
                                                            output_format->formatTexture,
@@ -1053,6 +1054,33 @@ static int Direct3D11Open(vout_display_t *vd, video_format_t *fmt)
                 sys->picQuadConfig.resourceFormatYRGB = output_format->formatY;
                 sys->picQuadConfig.resourceFormatUV   = output_format->formatUV;
                 break;
+            }
+        }
+    }
+
+    // look for any pixel format that we can handle with enough pixels per channel
+    if ( !fmt->i_chroma )
+    {
+        for (const d3d_format_t *output_format = GetRenderFormatList();
+             output_format->name != NULL; ++output_format)
+        {
+            if( i_src_chroma == output_format->fourcc &&
+                ( fmt->p_chroma== NULL || fmt->p_chroma->pixel_bits <= output_format->bitsPerChannel ))
+            {
+                if( SUCCEEDED( ID3D11Device_CheckFormatSupport(sys->d3ddevice,
+                                                               output_format->formatTexture,
+                                                               &i_formatSupport)) &&
+                        ( i_formatSupport & i_quadSupportFlags ) == i_quadSupportFlags )
+                {
+                    msg_Dbg( vd, "Using pixel format %s for chroma %4.4s", output_format->name,
+                                 (char *)&i_src_chroma );
+                    fmt->i_chroma = output_format->fourcc;
+                    DxgiFormatMask( output_format->formatTexture, fmt );
+                    sys->picQuadConfig.textureFormat      = output_format->formatTexture;
+                    sys->picQuadConfig.resourceFormatYRGB = output_format->formatY;
+                    sys->picQuadConfig.resourceFormatUV   = output_format->formatUV;
+                    break;
+                }
             }
         }
     }
@@ -1105,7 +1133,8 @@ static int Direct3D11Open(vout_display_t *vd, video_format_t *fmt)
         sys->d3dregion_format = DXGI_FORMAT_UNKNOWN;
     }
 
-    if (sys->picQuadConfig.resourceFormatYRGB == DXGI_FORMAT_R8_UNORM)
+    if (sys->picQuadConfig.resourceFormatYRGB == DXGI_FORMAT_R8_UNORM ||
+        sys->picQuadConfig.resourceFormatYRGB == DXGI_FORMAT_R16_UNORM)
     {
         if( fmt->i_height > 576 )
             sys->d3dPxShader = globPixelShaderBiplanarYUV_BT709_2RGB;
