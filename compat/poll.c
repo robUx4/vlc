@@ -128,6 +128,18 @@ void win32_close_socket_event(int fd)
     }
 }
 
+#ifndef NDEBUG
+static void Debug( const wchar_t *fmt, ... )
+{
+    wchar_t buf[255];
+    va_list args;
+    va_start( args, fmt );
+    vswprintf_s( buf, 255, fmt, args );
+    va_end( args );
+    OutputDebugStringW( buf );
+}
+#endif
+
 int poll(struct pollfd *fds, unsigned nfds, int timeout)
 {
     DWORD to = (timeout >= 0) ? (DWORD)timeout : INFINITE;
@@ -187,6 +199,9 @@ int poll(struct pollfd *fds, unsigned nfds, int timeout)
          && WSAGetLastError() == WSAENOTSOCK)
             fds[i].revents |= POLLNVAL;
 
+#ifndef NDEBUG
+        Debug( L"[%x] select fd=%d %d/%d sockets", GetCurrentThreadId(), fd, i+1, nfds );
+#endif
         struct timeval tv = { 0, 0 };
         /* By its horrible design, WSAEnumNetworkEvents() only enumerates
          * events that were not already signaled (i.e. it is edge-triggered).
@@ -195,72 +210,105 @@ int poll(struct pollfd *fds, unsigned nfds, int timeout)
          * events. */
         if (select(0, &rdset, &wrset, &exset, &tv) > 0)
         {
+#ifndef NDEBUG
+        Debug( L" got r:%d w:%d err:%d", FD_ISSET(fd, &rdset), FD_ISSET(fd, &wrset), FD_ISSET(fd, &exset) );
+#endif
             if (FD_ISSET(fd, &rdset))
-                fds[i].revents |= fds[i].events & POLLRDNORM;
+                fds[i].revents |= POLLRDNORM;
             if (FD_ISSET(fd, &wrset))
-                fds[i].revents |= fds[i].events & POLLWRNORM;
+                fds[i].revents |= POLLWRNORM;
             if (FD_ISSET(fd, &exset))
                 /* To add pain to injury, POLLERR and POLLPRI cannot be
                  * distinguished here. */
-                fds[i].revents |= POLLERR | (fds[i].events & POLLPRI);
+                fds[i].revents |= POLLPRI | POLLERR;
         }
+#ifndef NDEBUG
+        Debug( L"\n" );
+#endif
 
-        if (fds[i].revents != 0 && ret == WSA_WAIT_FAILED)
+        /* only report the events requested, plus the special ones */
+        if (fds[i].revents & (fds[i].events | POLLERR | POLLNVAL) && ret == WSA_WAIT_FAILED)
             ret = WSA_WAIT_EVENT_0 + i;
     }
 
     if (ret == WSA_WAIT_FAILED && to > 0)
     {
+#ifndef NDEBUG
+        Debug( L"[%x] wait 0x%x ms on %d socket events\n", GetCurrentThreadId(), to, nfds );
+#endif
         ret = WSAWaitForMultipleEvents(nfds, evts, FALSE, to, TRUE);
+#ifndef NDEBUG
+        Debug( L"[%x]   wait done %x\n", GetCurrentThreadId(), ret );
+#endif
 
-    for (unsigned i = 0; i < nfds; i++)
-    {
-        WSANETWORKEVENTS ne;
+        for (unsigned i = 0; i < nfds; i++)
+        {
+            WSANETWORKEVENTS ne;
 
             if (ret != WSA_WAIT_EVENT_0 + i)
                 continue; /* don't read events for other sockets than the first found */
 
             if (WSAEnumNetworkEvents(fds[i].fd, evts[i], &ne))
                 continue;
-        WSAEventSelect(fds[i].fd, evts[i], 0);
 
-        if (ne.lNetworkEvents & FD_CONNECT)
-        {
-            fds[i].revents |= POLLWRNORM;
-            if (ne.iErrorCode[FD_CONNECT_BIT] != 0)
-                fds[i].revents |= POLLERR;
+            /* unhook the event before we close it, otherwise the socket may fail */
+            WSAEventSelect(fds[i].fd, evts[i], 0);
+
+            if (ne.lNetworkEvents & FD_CONNECT)
+            {
+#ifndef NDEBUG
+        Debug( L"[%x] socket %d has CONNECT\n", GetCurrentThreadId(), i );
+#endif
+                fds[i].revents |= POLLWRNORM;
+                if (ne.iErrorCode[FD_CONNECT_BIT] != 0)
+                    fds[i].revents |= POLLERR;
+            }
+            if (ne.lNetworkEvents & FD_CLOSE)
+            {
+#ifndef NDEBUG
+        Debug( L"[%x] socket %d has CLOSE\n", GetCurrentThreadId(), i );
+#endif
+                fds[i].revents |= POLLRDNORM | POLLHUP;
+                if (ne.iErrorCode[FD_CLOSE_BIT] != 0)
+                    fds[i].revents |= POLLERR;
+            }
+            if (ne.lNetworkEvents & FD_ACCEPT)
+            {
+#ifndef NDEBUG
+        Debug( L"[%x] socket %d has ACCEPT\n", GetCurrentThreadId(), i );
+#endif
+                fds[i].revents |= POLLRDNORM;
+                if (ne.iErrorCode[FD_ACCEPT_BIT] != 0)
+                    fds[i].revents |= POLLERR;
+            }
+            if (ne.lNetworkEvents & FD_OOB)
+            {
+#ifndef NDEBUG
+        Debug( L"[%x] socket %d has OOB\n", GetCurrentThreadId(), i );
+#endif
+                fds[i].revents |= POLLPRI;
+                if (ne.iErrorCode[FD_OOB_BIT] != 0)
+                    fds[i].revents |= POLLERR;
+            }
+            if (ne.lNetworkEvents & FD_READ)
+            {
+#ifndef NDEBUG
+        Debug( L"[%x] socket %d has READ\n", GetCurrentThreadId(), i );
+#endif
+                fds[i].revents |= POLLRDNORM;
+                if (ne.iErrorCode[FD_READ_BIT] != 0)
+                    fds[i].revents |= POLLERR;
+            }
+            if (ne.lNetworkEvents & FD_WRITE)
+            {
+#ifndef NDEBUG
+        Debug( L"[%x] socket %d has WRITE\n", GetCurrentThreadId(), i );
+#endif
+                fds[i].revents |= POLLWRNORM;
+                if (ne.iErrorCode[FD_WRITE_BIT] != 0)
+                    fds[i].revents |= POLLERR;
+            }
         }
-        if (ne.lNetworkEvents & FD_CLOSE)
-        {
-            fds[i].revents |= (fds[i].events & POLLRDNORM) | POLLHUP;
-            if (ne.iErrorCode[FD_CLOSE_BIT] != 0)
-                fds[i].revents |= POLLERR;
-        }
-        if (ne.lNetworkEvents & FD_ACCEPT)
-        {
-            fds[i].revents |= POLLRDNORM;
-            if (ne.iErrorCode[FD_ACCEPT_BIT] != 0)
-                fds[i].revents |= POLLERR;
-        }
-        if (ne.lNetworkEvents & FD_OOB)
-        {
-            fds[i].revents |= POLLPRI;
-            if (ne.iErrorCode[FD_OOB_BIT] != 0)
-                fds[i].revents |= POLLERR;
-        }
-        if (ne.lNetworkEvents & FD_READ)
-        {
-            fds[i].revents |= POLLRDNORM;
-            if (ne.iErrorCode[FD_READ_BIT] != 0)
-                fds[i].revents |= POLLERR;
-        }
-        if (ne.lNetworkEvents & FD_WRITE)
-        {
-            fds[i].revents |= POLLWRNORM;
-            if (ne.iErrorCode[FD_WRITE_BIT] != 0)
-                fds[i].revents |= POLLERR;
-        }
-    }
     }
 
     unsigned count = 0;
