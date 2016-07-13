@@ -149,6 +149,7 @@ static int lavc_GetVideoFormat(decoder_t *dec, video_format_t *restrict fmt,
         return -1; /* invalid display size */
     }
 
+    fmt->p_chroma = vlc_fourcc_GetChromaDescription( FindVlcChroma(sw_pix_fmt) );
     fmt->i_width = width;
     fmt->i_height = height;
     fmt->i_visible_width = ctx->width;
