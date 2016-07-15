@@ -295,7 +295,8 @@ int sout_stream_sys_t::UpdateOutput( sout_stream_t *p_stream )
         else
             mime = default_mime;
 
-        ssout << "http{dst=:" << i_port << "/stream"
+        ssout << "cc_preload:"
+              << "http{dst=:" << i_port << "/stream"
               << ",mux=" << default_muxer
               << ",access=http{mime=" << mime << "}}";
 
