@@ -25,7 +25,7 @@
 #include <vlc_common.h>
 #include <vlc_network.h>
 
-#include "../../compat/poll.h"
+extern void win32_close_socket_event(int fd);
 
 int vlc_net_close( int fd )
 {

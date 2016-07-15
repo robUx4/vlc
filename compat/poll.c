@@ -108,12 +108,22 @@ int (poll) (struct pollfd *fds, unsigned nfds, int timeout)
 #else
 # include <windows.h>
 # include <winsock2.h>
-# include "poll.h"
 
-static WSAEVENT opened_events[4096] = {};
+extern void win32_close_socket_event(int fd);
 
-WSAEVENT *win32_get_socket_event(int fd)
+static WSAEVENT *opened_events = NULL;
+static int i_opened_events = 0;
+
+static WSAEVENT win32_get_socket_event(int fd)
 {
+    if ( i_opened_events <= fd )
+    {
+        opened_events = realloc(opened_events, (fd+1) * sizeof(WSAEVENT));
+        if ( opened_events == NULL )
+            return WSA_INVALID_EVENT;
+        memset(&opened_events[i_opened_events], 0, (fd+1-i_opened_events) * sizeof(WSAEVENT)  );
+        i_opened_events = fd+1;
+    }
     if (opened_events[fd] == 0)
         opened_events[fd] = WSACreateEvent();
     return opened_events[fd];
@@ -121,7 +131,7 @@ WSAEVENT *win32_get_socket_event(int fd)
 
 void win32_close_socket_event(int fd)
 {
-    if (opened_events[fd] != 0)
+    if ( i_opened_events > fd && opened_events[fd] != 0 )
     {
         WSACloseEvent(opened_events[fd]);
         opened_events[fd] = 0;
