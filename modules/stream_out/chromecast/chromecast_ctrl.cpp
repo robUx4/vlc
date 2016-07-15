@@ -813,7 +813,7 @@ void intf_sys_t::msgPlayerLoad()
     std::stringstream ss;
     ss << "{\"type\":\"LOAD\","
        <<  "\"media\":{" << GetMedia() << "},"
-       <<  "\"autoplay\":\"false\","
+       <<  "\"autoplay\":\"true\","
        <<  "\"requestId\":" << i_requestId++
        << "}";
 
