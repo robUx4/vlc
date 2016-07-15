@@ -111,30 +111,39 @@ int (poll) (struct pollfd *fds, unsigned nfds, int timeout)
 
 extern void win32_close_socket_event(int fd);
 
-static WSAEVENT *opened_events = NULL;
+typedef struct
+{
+    WSAEVENT evt;
+    long     mask;
+} socket_evt;
+
+static socket_evt *opened_events = NULL;
 static int i_opened_events = 0;
 
-static WSAEVENT win32_get_socket_event(int fd)
+static socket_evt *win32_get_socket_event(int fd)
 {
     if ( i_opened_events <= fd )
     {
-        opened_events = realloc(opened_events, (fd+1) * sizeof(WSAEVENT));
+        opened_events = realloc(opened_events, (fd+1) * sizeof(socket_evt));
         if ( opened_events == NULL )
-            return WSA_INVALID_EVENT;
-        memset(&opened_events[i_opened_events], 0, (fd+1-i_opened_events) * sizeof(WSAEVENT)  );
+            return NULL;
+        memset(&opened_events[i_opened_events], 0, (fd+1-i_opened_events) * sizeof(socket_evt) );
         i_opened_events = fd+1;
     }
-    if (opened_events[fd] == 0)
-        opened_events[fd] = WSACreateEvent();
-    return opened_events[fd];
+    if (opened_events[fd].evt == 0)
+    {
+        opened_events[fd].evt  = WSACreateEvent();
+        opened_events[fd].mask = 0;
+    }
+    return &opened_events[fd];
 }
 
 void win32_close_socket_event(int fd)
 {
-    if ( i_opened_events > fd && opened_events[fd] != 0 )
+    if ( i_opened_events > fd && opened_events[fd].evt != 0 )
     {
-        WSACloseEvent(opened_events[fd]);
-        opened_events[fd] = 0;
+        WSACloseEvent(opened_events[fd].evt);
+        opened_events[fd].evt = 0;
     }
 }
 
@@ -152,15 +161,10 @@ int poll(struct pollfd *fds, unsigned nfds, int timeout)
         return 0;
     }
 
-    WSAEVENT *evts = malloc(nfds * sizeof (WSAEVENT));
-    if (evts == NULL)
-        return -1; /* ENOMEM */
-
     DWORD ret = WSA_WAIT_FAILED;
     for (unsigned i = 0; i < nfds; i++)
     {
         SOCKET fd = fds[i].fd;
-        long mask = FD_CLOSE;
         fd_set rdset, wrset, exset;
 
         FD_ZERO(&rdset);
@@ -169,33 +173,11 @@ int poll(struct pollfd *fds, unsigned nfds, int timeout)
         FD_SET(fd, &exset);
 
         if (fds[i].events & POLLRDNORM)
-        {
-            mask |= FD_READ | FD_ACCEPT;
             FD_SET(fd, &rdset);
-        }
         if (fds[i].events & POLLWRNORM)
-        {
-            mask |= FD_WRITE | FD_CONNECT;
             FD_SET(fd, &wrset);
-        }
-        if (fds[i].events & POLLPRI)
-            mask |= FD_OOB;
 
         fds[i].revents = 0;
-
-        evts[i] = win32_get_socket_event(fd);
-        if (evts[i] == WSA_INVALID_EVENT)
-        {
-            while (i > 0)
-                WSACloseEvent(evts[--i]);
-            free(evts);
-            errno = ENOMEM;
-            return -1;
-        }
-
-        if (WSAEventSelect(fds[i].fd, evts[i], mask)
-         && WSAGetLastError() == WSAENOTSOCK)
-            fds[i].revents |= POLLNVAL;
 
         struct timeval tv = { 0, 0 };
         /* By its horrible design, WSAEnumNetworkEvents() only enumerates
@@ -206,77 +188,177 @@ int poll(struct pollfd *fds, unsigned nfds, int timeout)
         if (select(0, &rdset, &wrset, &exset, &tv) > 0)
         {
             if (FD_ISSET(fd, &rdset))
-                fds[i].revents |= fds[i].events & POLLRDNORM;
+                fds[i].revents |= POLLRDNORM;
             if (FD_ISSET(fd, &wrset))
-                fds[i].revents |= fds[i].events & POLLWRNORM;
+                fds[i].revents |= POLLWRNORM;
             if (FD_ISSET(fd, &exset))
                 /* To add pain to injury, POLLERR and POLLPRI cannot be
                  * distinguished here. */
-                fds[i].revents |= POLLERR | (fds[i].events & POLLPRI);
+                fds[i].revents |= POLLPRI | POLLERR;
         }
 
-        if (fds[i].revents != 0 && ret == WSA_WAIT_FAILED)
+        /* only report the events requested, plus the special ones */
+        if (fds[i].revents & (fds[i].events | POLLERR | POLLNVAL) && ret == WSA_WAIT_FAILED)
             ret = WSA_WAIT_EVENT_0 + i;
     }
 
     if (ret == WSA_WAIT_FAILED && to > 0)
     {
-        ret = WSAWaitForMultipleEvents(nfds, evts, FALSE, to, TRUE);
+        WSAEVENT *evts = malloc(nfds * sizeof (WSAEVENT));
+        if (evts == NULL)
+            return -1; /* ENOMEM */
+
+#ifndef NDEBUG
+        //Debug( L"[%d] need to wait for %d sockets\n", GetCurrentThreadId(), nfds );
+#endif
 
         for (unsigned i = 0; i < nfds; i++)
         {
-            WSANETWORKEVENTS ne;
+            socket_evt *sevt = win32_get_socket_event(fds[i].fd);
+            if (sevt == NULL)
+            {
+                free(evts);
+                errno = ENOMEM;
+#ifndef NDEBUG
+          Debug( L"[%d] ERROR on event %d/%d\n", GetCurrentThreadId(), i, nfds );
+#endif
+                return -1;
+            }
+            evts[i] = sevt->evt;
+        }
 
-            if (ret != WSA_WAIT_EVENT_0 + i)
-                continue; /* don't read events for other sockets than the first found */
+        for (unsigned i = 0; i < nfds && ret == WSA_WAIT_FAILED; i++)
+        {
+            SOCKET fd = fds[i].fd;
+            long mask = FD_CLOSE;
 
-            if (WSAEnumNetworkEvents(fds[i].fd, evts[i], &ne))
+            if (fds[i].events & POLLRDNORM)
             {
-                /* unhook the event before we close it, otherwise the socket may fail */
-                WSAEventSelect(fds[i].fd, evts[i], 0);
-                continue;
+#ifndef NDEBUG
+                Debug( L"[%d] check reading on %d (%d/%d)\n", GetCurrentThreadId(), fds[i].fd, i, nfds );
+#endif
+                mask |= FD_READ | FD_ACCEPT;
+            }
+            if (fds[i].events & POLLWRNORM)
+            {
+#ifndef NDEBUG
+                Debug( L"[%d] check writing on %d (%d/%d)\n", GetCurrentThreadId(), fds[i].fd, i, nfds );
+#endif
+                mask |= FD_WRITE | FD_CONNECT;
+            }
+            if (fds[i].events & POLLPRI)
+            {
+#ifndef NDEBUG
+                Debug( L"[%d] check priority on %d (%d/%d)\n", GetCurrentThreadId(), fds[i].fd, i, nfds );
+#endif
+                mask |= FD_OOB;
             }
 
-            /* unhook the event before we close it, otherwise the socket may fail */
-            WSAEventSelect(fds[i].fd, evts[i], 0);
+            socket_evt *sevt = win32_get_socket_event(fds[i].fd);
+            sevt->mask = mask;
 
-            if (ne.lNetworkEvents & FD_CONNECT)
+            if (WSAEventSelect(fd, evts[i], mask) && WSAGetLastError() == WSAENOTSOCK)
             {
-                fds[i].revents |= POLLWRNORM;
-                if (ne.iErrorCode[FD_CONNECT_BIT] != 0)
-                    fds[i].revents |= POLLERR;
-            }
-            if (ne.lNetworkEvents & FD_CLOSE)
-            {
-                fds[i].revents |= POLLRDNORM | POLLHUP;
-                if (ne.iErrorCode[FD_CLOSE_BIT] != 0)
-                    fds[i].revents |= POLLERR;
-            }
-            if (ne.lNetworkEvents & FD_ACCEPT)
-            {
-                fds[i].revents |= POLLRDNORM;
-                if (ne.iErrorCode[FD_ACCEPT_BIT] != 0)
-                    fds[i].revents |= POLLERR;
-            }
-            if (ne.lNetworkEvents & FD_OOB)
-            {
-                fds[i].revents |= POLLPRI;
-                if (ne.iErrorCode[FD_OOB_BIT] != 0)
-                    fds[i].revents |= POLLERR;
-            }
-            if (ne.lNetworkEvents & FD_READ)
-            {
-                fds[i].revents |= POLLRDNORM;
-                if (ne.iErrorCode[FD_READ_BIT] != 0)
-                    fds[i].revents |= POLLERR;
-            }
-            if (ne.lNetworkEvents & FD_WRITE)
-            {
-                fds[i].revents |= POLLWRNORM;
-                if (ne.iErrorCode[FD_WRITE_BIT] != 0)
-                    fds[i].revents |= POLLERR;
+                fds[i].revents |= POLLNVAL;
+                ret = WSA_WAIT_EVENT_0 + i;
+#ifndef NDEBUG
+                Debug( L"[%d] select on dead socket %d (%d/%d)\n", GetCurrentThreadId(), fds[i].fd, i, nfds );
+#endif
             }
         }
+
+        if ( ret == WSA_WAIT_FAILED )
+        {
+#ifndef NDEBUG
+            Debug( L"[%d] waiting on %d socket(s) for 0x%x ms\n", GetCurrentThreadId(), nfds, to );
+#endif
+            ret = WSAWaitForMultipleEvents(nfds, evts, FALSE, to, TRUE);
+#ifndef NDEBUG
+            Debug( L"[%d]  done waiting ret=%x\n", GetCurrentThreadId(), nfds, ret );
+#endif
+
+            for (unsigned i = 0; i < nfds; i++)
+            {
+                WSANETWORKEVENTS ne;
+
+                if (ret < WSA_WAIT_EVENT_0 + i)
+                    continue; /* don't read events for sockets not found */
+
+                if (WSAEnumNetworkEvents(fds[i].fd, evts[i], &ne))
+                {
+                    continue;
+#ifndef NDEBUG
+                    Debug( L"[%d]  %d WSAEnumNetworkEvents failed! %d/%d\n", GetCurrentThreadId(), fds[i].fd, i, nfds );
+#endif
+                }
+
+#ifndef NDEBUG
+                socket_evt *sevt = win32_get_socket_event(fds[i].fd);
+                Debug( L"[%d]  %d events got=%x mask=%x %d/%d\n", GetCurrentThreadId(), fds[i].fd, ne.lNetworkEvents & FD_ALL_EVENTS, sevt->mask, i, nfds );
+#endif
+                if (ne.lNetworkEvents & FD_CONNECT)
+                {
+#ifndef NDEBUG
+                Debug( L"[%d]  %d got CONNECT on %d/%d\n", GetCurrentThreadId(), fds[i].fd, i, nfds );
+#endif
+                    fds[i].revents |= POLLWRNORM;
+                    if (ne.iErrorCode[FD_CONNECT_BIT] != 0)
+                        fds[i].revents |= POLLERR;
+                }
+                if (ne.lNetworkEvents & FD_CLOSE)
+                {
+#ifndef NDEBUG
+                Debug( L"[%d]  %d got CLOSE on %d/%d\n", GetCurrentThreadId(), fds[i].fd, i, nfds );
+#endif
+                    fds[i].revents |= POLLRDNORM | POLLHUP;
+                    if (ne.iErrorCode[FD_CLOSE_BIT] != 0)
+                        fds[i].revents |= POLLERR;
+                }
+                if (ne.lNetworkEvents & FD_ACCEPT)
+                {
+#ifndef NDEBUG
+                Debug( L"[%d]  %d got ACCEPT on %d/%d\n", GetCurrentThreadId(), fds[i].fd, i, nfds );
+#endif
+                    fds[i].revents |= POLLRDNORM;
+                    if (ne.iErrorCode[FD_ACCEPT_BIT] != 0)
+                        fds[i].revents |= POLLERR;
+                }
+                if (ne.lNetworkEvents & FD_OOB)
+                {
+#ifndef NDEBUG
+                Debug( L"[%d]  %d got OOB on %d/%d\n", GetCurrentThreadId(), fds[i].fd, i, nfds );
+#endif
+                    fds[i].revents |= POLLPRI;
+                    if (ne.iErrorCode[FD_OOB_BIT] != 0)
+                        fds[i].revents |= POLLERR;
+                }
+                if (ne.lNetworkEvents & FD_READ)
+                {
+#ifndef NDEBUG
+                Debug( L"[%d]  %d got READ on %d/%d\n", GetCurrentThreadId(), fds[i].fd, i, nfds );
+#endif
+                    fds[i].revents |= POLLRDNORM;
+                    if (ne.iErrorCode[FD_READ_BIT] != 0)
+                        fds[i].revents |= POLLERR;
+                }
+                if (ne.lNetworkEvents & FD_WRITE)
+                {
+#ifndef NDEBUG
+                Debug( L"[%d]  %d got WRITE on %d/%d\n", GetCurrentThreadId(), fds[i].fd, i, nfds );
+#endif
+                    fds[i].revents |= POLLWRNORM;
+                    if (ne.iErrorCode[FD_WRITE_BIT] != 0)
+                        fds[i].revents |= POLLERR;
+                }
+            }
+        }
+
+        for (unsigned i = 0; i < nfds; i++)
+        {
+            /* unhook the event before we close it, otherwise the socket may fail */
+            WSAEventSelect(fds[i].fd, evts[i], 0);
+        }
+        free(evts);
     }
 
     unsigned count = 0;
@@ -287,8 +369,6 @@ int poll(struct pollfd *fds, unsigned nfds, int timeout)
 
         count += fds[i].revents != 0;
     }
-
-    free(evts);
 
     if (count == 0 && ret == WSA_WAIT_IO_COMPLETION)
     {
