@@ -71,6 +71,11 @@ static void Del(sout_stream_t *p_stream, sout_stream_id_sys_t *id)
 static int Send(sout_stream_t *p_stream, sout_stream_id_sys_t *id,
                 block_t *p_buffer)
 {
+    /* TODO don't send the LOAD command until this has been called once */
+    /* just notify the chromecast_ctrl that sending is happening, it will handle
+     *  its internal state for new files/restart/etc */
+    /* TODO only start sending when the Chromecast starts to load */
+    /* TODO we need to pass the header block at first */
     msg_Dbg( p_stream, "sending data" );
     return sout_StreamIdSend( p_stream->p_next, id, p_buffer );
 }
