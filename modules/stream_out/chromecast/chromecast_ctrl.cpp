@@ -586,8 +586,8 @@ void intf_sys_t::processMessage(const castchannel::CastMessage &msg)
                     m_time_playback_started = VLC_TS_INVALID;
                     if (!mediaSessionId.empty())
                     {
-                        msgPlayerSetMute( var_InheritBool( p_module, "mute" ) );
-                        msgPlayerSetVolume( var_InheritFloat( p_module, "volume" ) );
+                        //msgPlayerSetMute( var_InheritBool( p_module, "mute" ) );
+                        //msgPlayerSetVolume( var_InheritFloat( p_module, "volume" ) );
                     }
                     break;
 
@@ -607,8 +607,8 @@ void intf_sys_t::processMessage(const castchannel::CastMessage &msg)
                 case RECEIVER_PAUSED:
                     if (!mediaSessionId.empty())
                     {
-                        msgPlayerSetMute( var_InheritBool( p_module, "mute" ) );
-                        msgPlayerSetVolume( var_InheritFloat( p_module, "volume" ) );
+                        //msgPlayerSetMute( var_InheritBool( p_module, "mute" ) );
+                        //msgPlayerSetVolume( var_InheritFloat( p_module, "volume" ) );
                     }
 
                     m_chromecast_start_time = (1 + mtime_t( double( status[0]["currentTime"] ) ) ) * 1000000L;
