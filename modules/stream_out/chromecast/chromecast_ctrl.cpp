@@ -106,6 +106,7 @@ intf_sys_t::intf_sys_t(vlc_object_t * const p_this, int port, std::string device
  , requested_seek(false)
  , conn_status(CHROMECAST_DISCONNECTED)
  , cmd_status(NO_CMD_PENDING)
+ , is_paused(false)
  , i_receiver_requestId(0)
  , i_requestId(0)
  , has_input(false)
@@ -609,6 +610,11 @@ void intf_sys_t::processMessage(const castchannel::CastMessage &msg)
                     {
                         //msgPlayerSetMute( var_InheritBool( p_module, "mute" ) );
                         //msgPlayerSetVolume( var_InheritFloat( p_module, "volume" ) );
+                        if (!is_paused)
+                        {
+                            msgPlayerPlay();
+                            setPlayerStatus(CMD_PLAYBACK_SENT);
+                        }
                     }
 
                     m_chromecast_start_time = (1 + mtime_t( double( status[0]["currentTime"] ) ) ) * 1000000L;
@@ -1078,6 +1084,7 @@ void intf_sys_t::setPauseState(bool paused)
             setPlayerStatus(CMD_PLAYBACK_SENT);
         }
     }
+    this->is_paused = paused;
 }
 
 void intf_sys_t::waitAppStarted()

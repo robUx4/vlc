@@ -196,6 +196,7 @@ private:
 
     enum connection_status conn_status;
     enum command_status    cmd_status;
+    bool                   is_paused;
 
     unsigned i_receiver_requestId;
     unsigned i_requestId;
