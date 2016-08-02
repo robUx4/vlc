@@ -204,8 +204,8 @@ int config_LoadCmdLine( vlc_object_t *p_this, int i_argc,
                 /* Check if the option is deprecated */
                 if( p_conf->b_removed )
                 {
-                    fprintf(stderr,
-                            "Warning: option --%s no longer exists.\n",
+                    msg_Warn(p_this,
+                            "Warning: option --%s no longer exists.",
                             psz_name);
                     continue;
                 }
@@ -275,17 +275,17 @@ int config_LoadCmdLine( vlc_object_t *p_this, int i_argc,
         /* Internal error: unknown option */
         if( !b_ignore_errors )
         {
-            fputs( "vlc: unknown option"
-                     " or missing mandatory argument ", stderr );
             if( state.opt )
             {
-                fprintf( stderr, "`-%c'\n", state.opt );
+                msg_Err( p_this, "vlc: unknown option"
+                         " or missing mandatory argument `-%c'", state.opt );
             }
             else
             {
-                fprintf( stderr, "`%s'\n", ppsz_argv[state.ind-1] );
+                msg_Err( p_this, "vlc: unknown option"
+                         " or missing mandatory argument `-%s'", ppsz_argv[state.ind-1] );
             }
-            fputs( "Try `vlc --help' for more information.\n", stderr );
+            msg_Err( p_this, "Try `vlc --help' for more information." );
             goto out;
         }
     }
