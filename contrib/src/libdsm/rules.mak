@@ -20,11 +20,7 @@ endif
 
 libdsm: libdsm-$(LIBDSM_VERSION).tar.gz .sum-libdsm
 	$(UNPACK)
-	$(APPLY) $(SRC)/libdsm/0001-do-not-add-pointer-increments-on-a-void-use-uint8_t.patch
 	$(APPLY) $(SRC)/libdsm/winstore.patch
-ifdef HAVE_VISUALSTUDIO
-	$(APPLY) $(SRC)/libdsm/0001-fix-struct-packing-when-building-with-MSVC.patch
-endif
 	$(MOVE)
 
 DEPS_libdsm = libtasn1 iconv
