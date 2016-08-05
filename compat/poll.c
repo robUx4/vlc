@@ -231,7 +231,6 @@ int poll(struct pollfd *fds, unsigned nfds, int timeout)
     if (ret == WSA_WAIT_FAILED)
         ret = WSAWaitForMultipleEvents(nfds, evts, FALSE, to, TRUE);
 
-    unsigned count = 0;
     for (unsigned i = 0; i < nfds; i++)
     {
         WSANETWORKEVENTS ne;
@@ -276,10 +275,18 @@ int poll(struct pollfd *fds, unsigned nfds, int timeout)
             if (ne.iErrorCode[FD_WRITE_BIT] != 0)
                 fds[i].revents |= POLLERR;
         }
-        count += fds[i].revents != 0;
     }
 
     free(evts);
+
+    unsigned count = 0;
+    for (unsigned i = 0; i < nfds; i++)
+    {
+        /* only report the events requested, plus the special ones */
+        fds[i].revents &= fds[i].events | POLLERR | POLLHUP | POLLNVAL;
+
+        count += fds[i].revents != 0;
+    }
 
     if (count == 0 && ret == WSA_WAIT_IO_COMPLETION)
     {
