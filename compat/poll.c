@@ -235,9 +235,11 @@ int poll(struct pollfd *fds, unsigned nfds, int timeout)
     {
         WSANETWORKEVENTS ne;
 
+        if (ret < WSA_WAIT_EVENT_0 + i)
+            continue; /* don't read events for sockets not found */
+
         if (WSAEnumNetworkEvents(fds[i].fd, evts[i], &ne))
-            memset(&ne, 0, sizeof (ne));
-        WSAEventSelect(fds[i].fd, evts[i], 0);
+            continue;
 
         if (ne.lNetworkEvents & FD_CONNECT)
         {
@@ -277,6 +279,11 @@ int poll(struct pollfd *fds, unsigned nfds, int timeout)
         }
     }
 
+    for (unsigned i = 0; i < nfds; i++)
+    {
+        /* unhook the event before we close it, otherwise the socket may fail */
+        WSAEventSelect(fds[i].fd, evts[i], 0);
+    }
     free(evts);
 
     unsigned count = 0;
