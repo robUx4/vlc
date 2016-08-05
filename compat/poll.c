@@ -209,9 +209,23 @@ int poll(struct pollfd *fds, unsigned nfds, int timeout)
         if (evts == NULL)
             return -1; /* ENOMEM */
 
+        vlc_mutex_lock(&opened_events_mutex);
         for (unsigned i = 0; i < nfds; i++)
         {
-            SOCKET fd = fds[i].fd;
+            WSAEVENT sevt = get_socket_event(fds[i].fd);
+            if (sevt == WSA_INVALID_EVENT)
+            {
+                free(evts);
+                errno = ENOMEM;
+                vlc_mutex_unlock(&opened_events_mutex);
+                return -1;
+            }
+            evts[i] = sevt;
+        }
+        vlc_mutex_unlock(&opened_events_mutex);
+
+        for (unsigned i = 0; i < nfds; i++)
+        {
             long mask = FD_CLOSE;
 
             if (fds[i].events & POLLRDNORM)
@@ -221,21 +235,9 @@ int poll(struct pollfd *fds, unsigned nfds, int timeout)
             if (fds[i].events & POLLPRI)
                 mask |= FD_OOB;
 
-            vlc_mutex_lock(&opened_events_mutex);
-            WSAEVENT sevt = get_socket_event(fd);
-            if (sevt == WSA_INVALID_EVENT)
-            {
-                free(evts);
-                errno = ENOMEM;
-                vlc_mutex_unlock(&opened_events_mutex);
-                return -1;
-            }
-            evts[i] = sevt;
-
             if (WSAEventSelect(fds[i].fd, evts[i], mask)
-             && WSAGetLastError() == WSAENOTSOCK)
+                && WSAGetLastError() == WSAENOTSOCK)
                 fds[i].revents |= POLLNVAL;
-             vlc_mutex_unlock(&opened_events_mutex);
 
             if (fds[i].revents != 0 && ret == WSA_WAIT_FAILED)
                 ret = WSA_WAIT_EVENT_0 + i;
