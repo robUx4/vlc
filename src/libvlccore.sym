@@ -484,6 +484,7 @@ vlc_writev
 vlc_socket
 vlc_socketpair
 vlc_accept
+vlc_net_close
 utf8_vfprintf
 var_AddCallback
 var_AddListCallback

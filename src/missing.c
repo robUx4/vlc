@@ -401,4 +401,11 @@ vlm_t *vlm_New (vlc_object_t *obj)
      msg_Err (obj, "VLM not compiled-in!");
      return NULL;
 }
+
+#ifndef _WIN32
+int vlc_net_close( int fd )
+{
+    return vlc_close( fd );
+}
+#endif
 #endif /* !ENABLE_VLM */

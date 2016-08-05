@@ -25,6 +25,11 @@
 #include <vlc_common.h>
 #include <vlc_network.h>
 
+int vlc_net_close( int fd )
+{
+    return closesocket((SOCKET)fd);
+}
+
 #if 0
 ssize_t vlc_sendmsg (int s, struct msghdr *hdr, int flags)
 {
