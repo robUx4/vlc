@@ -109,6 +109,42 @@ int (poll) (struct pollfd *fds, unsigned nfds, int timeout)
 # include <windows.h>
 # include <winsock2.h>
 
+# include "vlc_common.h"
+# include "vlc_threads.h"
+
+extern void win32_close_socket_event(int fd);
+
+static WSAEVENT *opened_events = NULL;
+static int i_opened_events = 0;
+static vlc_mutex_t opened_events_mutex = VLC_STATIC_MUTEX;
+
+static WSAEVENT get_socket_event(int fd)
+{
+    if ( i_opened_events <= fd )
+    {
+        opened_events = realloc(opened_events, (fd+1) * sizeof(WSAEVENT));
+        if ( opened_events == NULL )
+            return NULL;
+        memset(&opened_events[i_opened_events], 0, (fd+1-i_opened_events) * sizeof(WSAEVENT) );
+        i_opened_events = fd+1;
+    }
+    if (opened_events[fd] == WSA_INVALID_EVENT)
+        opened_events[fd] = WSACreateEvent();
+    return opened_events[fd];
+}
+
+void win32_close_socket_event(int fd)
+{
+    vlc_mutex_lock(&opened_events_mutex);
+    if ( i_opened_events > fd && opened_events[fd] != 0 )
+    {
+        WSACloseEvent(opened_events[fd]);
+        opened_events[fd] = 0;
+    }
+    vlc_mutex_unlock(&opened_events_mutex);
+}
+
+#undef poll
 int poll(struct pollfd *fds, unsigned nfds, int timeout)
 {
     DWORD to = (timeout >= 0) ? (DWORD)timeout : INFINITE;
@@ -154,19 +190,21 @@ int poll(struct pollfd *fds, unsigned nfds, int timeout)
 
         fds[i].revents = 0;
 
-        evts[i] = WSACreateEvent();
-        if (evts[i] == WSA_INVALID_EVENT)
+        vlc_mutex_lock(&opened_events_mutex);
+        WSAEVENT sevt = get_socket_event(fd);
+        if (sevt == WSA_INVALID_EVENT)
         {
-            while (i > 0)
-                WSACloseEvent(evts[--i]);
             free(evts);
             errno = ENOMEM;
+            vlc_mutex_unlock(&opened_events_mutex);
             return -1;
         }
+        evts[i] = sevt;
 
         if (WSAEventSelect(fds[i].fd, evts[i], mask)
          && WSAGetLastError() == WSAENOTSOCK)
             fds[i].revents |= POLLNVAL;
+         vlc_mutex_unlock(&opened_events_mutex);
 
         struct timeval tv = { 0, 0 };
         /* By its horrible design, WSAEnumNetworkEvents() only enumerates
@@ -201,7 +239,6 @@ int poll(struct pollfd *fds, unsigned nfds, int timeout)
         if (WSAEnumNetworkEvents(fds[i].fd, evts[i], &ne))
             memset(&ne, 0, sizeof (ne));
         WSAEventSelect(fds[i].fd, evts[i], 0);
-        WSACloseEvent(evts[i]);
 
         if (ne.lNetworkEvents & FD_CONNECT)
         {

@@ -25,9 +25,13 @@
 #include <vlc_common.h>
 #include <vlc_network.h>
 
+extern void win32_close_socket_event(int fd);
+
 int vlc_net_close( int fd )
 {
-    return closesocket((SOCKET)fd);
+    int res = closesocket((SOCKET)fd);
+    win32_close_socket_event(fd);
+    return res;
 }
 
 #if 0
