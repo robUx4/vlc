@@ -465,6 +465,8 @@ static block_t *DecodeBlock( decoder_t *p_dec, block_t **pp_block )
                 //p_dec->b_error = true;
                 return NULL;
             }
+            if (p_out_buffer)
+                p_out_buffer->i_flags |= BLOCK_FLAG_TYPE_I;
 
             /* Free bitrate only */
             if( p_sys->i_bit_rate == 0 )
