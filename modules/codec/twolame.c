@@ -335,6 +335,7 @@ static block_t *Encode( encoder_t *p_enc, block_t *p_aout_buf )
         p_block->i_length = CLOCK_FREQ *
                 (mtime_t)MPEG_FRAME_SIZE / (mtime_t)p_enc->fmt_out.audio.i_rate;
         p_block->i_dts = p_block->i_pts = p_sys->i_pts;
+        p_block->i_flags = BLOCK_FLAG_TYPE_I;
         p_sys->i_pts += p_block->i_length;
         block_ChainAppend( &p_chain, p_block );
     }
