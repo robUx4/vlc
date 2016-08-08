@@ -227,6 +227,8 @@ int sout_stream_sys_t::UpdateOutput( sout_stream_t *p_stream )
 
         bool canRemux = true;
         vlc_fourcc_t i_codec_video = 0, i_codec_audio = 0;
+        unsigned i_expand_width = 0, i_expand_height = 0;
+        unsigned i_new_width, i_new_height;
 
         for (std::vector<sout_stream_id_sys_t*>::iterator it = streams.begin(); it != streams.end(); ++it)
         {
@@ -247,6 +249,10 @@ int sout_stream_sys_t::UpdateOutput( sout_stream_t *p_stream )
                 {
                     msg_Dbg( p_stream, "can't remux video track %d codec %4.4s", p_es->i_id, (const char*)&p_es->i_codec );
                     canRemux = false;
+                    i_expand_width  = p_es->video.i_visible_width  % 2;
+                    i_expand_height = p_es->video.i_visible_height % 2;
+                    i_new_width  = p_es->video.i_visible_width  + i_expand_width;
+                    i_new_height = p_es->video.i_visible_height + i_expand_height;
                 }
                 else if (i_codec_video == 0)
                     i_codec_video = p_es->i_codec;
@@ -276,7 +282,12 @@ int sout_stream_sys_t::UpdateOutput( sout_stream_t *p_stream )
             ssout << s_fourcc;
             if ( b_has_video )
             {
-                /* TODO: provide maxwidth,maxheight */
+                if (i_expand_width || i_expand_height)
+                {
+                    ssout << ",vfilter=croppadd{paddbottom=" << i_expand_height
+                          << ",paddright="<< i_expand_width << "}"
+                          << ",width=" << i_new_width << ",height=" << i_new_height;
+                }
                 ssout << ",vcodec=";
                 vlc_fourcc_to_char( i_codec_video, s_fourcc );
                 s_fourcc[4] = '\0';
