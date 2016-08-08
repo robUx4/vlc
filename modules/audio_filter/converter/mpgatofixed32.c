@@ -240,6 +240,7 @@ static block_t *Convert( filter_t *p_filter, block_t *p_block )
     p_out->i_dts = p_block->i_dts;
     p_out->i_pts = p_block->i_pts;
     p_out->i_length = p_block->i_length;
+    p_out->i_flags = BLOCK_FLAG_TYPE_I;
 
     DoWork( p_filter, p_block, p_out );
 
