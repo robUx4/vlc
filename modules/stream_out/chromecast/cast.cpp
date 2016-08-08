@@ -288,6 +288,7 @@ int sout_stream_sys_t::UpdateOutput( sout_stream_t *p_stream )
                           << ",paddright="<< i_expand_width << "}"
                           << ",width=" << i_new_width << ",height=" << i_new_height;
                 }
+                ssout << ",maxwidth=1920,maxheight=1080";
                 ssout << ",vcodec=";
                 vlc_fourcc_to_char( i_codec_video, s_fourcc );
                 s_fourcc[4] = '\0';
