@@ -438,13 +438,13 @@ AS_IF([test -n "${CONTRIB_DIR}"], [
 
   AS_IF([test -z "$LUAC"], [
     dnl Old contribs mixed cross-tools and cross-compiled executables
-    AS_IF([test -x "${CONTRIB_DIR}/bin/luac"], [
-      LUAC="${CONTRIB_DIR}/bin/luac"
+    AS_IF([test -x "${CONTRIB_DIR}/bin/luac$ac_executable_extensions"], [
+      LUAC="${CONTRIB_DIR}/bin/luac$ac_executable_extensions"
     ])
 
     dnl Newer contribs follow usual name space rules
-    AS_IF([test -x "${CONTRIB_DIR}/../bin/${host_alias}-luac"], [
-      LUAC="${CONTRIB_DIR}/../bin/${host_alias}-luac"
+    AS_IF([test -x "${CONTRIB_DIR}/../bin/${host_alias}-luac$ac_executable_extensions"], [
+      LUAC="${CONTRIB_DIR}/../bin/${host_alias}-luac$ac_executable_extensions"
     ])
   ])
 
