@@ -28,6 +28,9 @@ ifeq ($(ARCH),arm)
 OPUS_CONF += --disable-asm
 OPUS_CFLAGS+= -fno-fast-math
 endif
+ifdef HAVE_VISUALSTUDIO
+OPUS_CONF += --disable-rtcd
+endif
 
 ifdef HAVE_VISUALSTUDIO
 OPUS_CFLAGS+= -DUSE_ALLOCA
