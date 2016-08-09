@@ -31,6 +31,9 @@ ifdef HAVE_VISUALSTUDIO
 OPUS_CONF += --disable-intrinsics
 endif
 endif
+ifdef HAVE_VISUALSTUDIO
+OPUS_CONF += --disable-rtcd
+endif
 
 ifdef HAVE_VISUALSTUDIO
 OPUS_CFLAGS+= -DUSE_ALLOCA
