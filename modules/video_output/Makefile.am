@@ -199,7 +199,6 @@ libdirect3d11_plugin_la_SOURCES += video_output/win32/events.c \
 libdirect3d11_plugin_la_LIBADD = -lgdi32 $(LIBCOM) -luuid
 else
 libdirect3d11_plugin_la_LIBADD = $(LIBCOM) -luuid
-libdirect3d11_plugin_la_LIBADD = -lole32 -luuid
 if IS_GCC_COMPILER
 libdirect3d11_plugin_la_LIBADD += -ld3dcompiler_47
 else
