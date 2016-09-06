@@ -213,32 +213,34 @@ static picture_t *video_new_buffer(filter_t *p_filter)
     return p_filter->owner.sys;
 }
 
-static filter_t *CreateFilter( vlc_object_t *p_this, const es_format_t *p_fmt_in,
+static vlc_fourcc_t OutputChroma(vlc_va_t *va)
+{
+    switch (va->sys->i_chroma)
+    {
+    case VLC_CODEC_D3D11_OPAQUE_10B:
+        return VLC_CODEC_P010;
+    case VLC_CODEC_D3D11_OPAQUE:
+        return VLC_CODEC_YV12;
+    default:
+        return va->sys->i_chroma;
+    }
+}
+
+static filter_t *CreateFilter( vlc_va_t *va, const es_format_t *p_fmt_in,
                                vlc_fourcc_t src_chroma )
 {
     filter_t *p_filter;
 
-    p_filter = vlc_object_create( p_this, sizeof(filter_t) );
+    p_filter = vlc_object_create( VLC_OBJECT(va), sizeof(filter_t) );
     if (unlikely(p_filter == NULL))
         return NULL;
-
-    vlc_fourcc_t fmt_out;
-    switch (src_chroma)
-    {
-    case VLC_CODEC_D3D11_OPAQUE_10B:
-        fmt_out = VLC_CODEC_P010;
-        break;
-    case VLC_CODEC_D3D11_OPAQUE:
-        fmt_out = VLC_CODEC_YV12;
-        break;
-    }
 
     p_filter->owner.video.buffer_new = (picture_t *(*)(filter_t *))video_new_buffer;
 
     es_format_InitFromVideo( &p_filter->fmt_in,  &p_fmt_in->video );
     es_format_InitFromVideo( &p_filter->fmt_out, &p_fmt_in->video );
     p_filter->fmt_in.i_codec  = p_filter->fmt_in.video.i_chroma  = src_chroma;
-    p_filter->fmt_out.i_codec = p_filter->fmt_out.video.i_chroma = fmt_out;
+    p_filter->fmt_out.i_codec = p_filter->fmt_out.video.i_chroma = OutputChroma(va);
     p_filter->p_module = module_need( p_filter, "video filter", NULL, false );
 
     if( !p_filter->p_module )
@@ -497,9 +499,9 @@ static int Open(vlc_va_t *va, AVCodecContext *ctx, enum PixelFormat pix_fmt,
     if (err!=VLC_SUCCESS)
         goto error;
 
-    if (p_sys == NULL && sys->videoProcessor == NULL)
+    if (p_sys == NULL && sys->videoProcessor == NULL && sys->i_chroma != OutputChroma(va))
     {
-        sys->filter = CreateFilter( VLC_OBJECT(va), fmt, sys->i_chroma);
+        sys->filter = CreateFilter(va, fmt, sys->i_chroma);
         if (sys->filter == NULL)
         {
             err = VLC_EGENERIC;
