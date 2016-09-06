@@ -172,7 +172,13 @@ static void Setup(vlc_va_t *va, vlc_fourcc_t *chroma)
 {
     vlc_va_sys_t *sys = va->sys;
 
-    *chroma = sys->filter == NULL ? sys->i_chroma : VLC_CODEC_YV12;
+    if (sys->videoProcessor != NULL)
+        *chroma = DxgiFormatFourcc(sys->processorFormat);
+    else if (sys->filter != NULL)
+        *chroma = VLC_CODEC_YV12;
+    else
+        *chroma = sys->i_chroma;
+
 }
 
 void SetupAVCodecContext(vlc_va_t *va)
@@ -950,7 +956,11 @@ static int DxSetupOutput(vlc_va_t *va, const GUID *input, const video_format_t *
         }
 
         msg_Dbg(va, "Using output format %s for decoder %s", DxgiFormatToStr(processorInput[idx]), psz_decoder_name);
-        va->sys->render = processorInput[idx];
+        if (va->sys->render != processorInput[idx])
+        {
+            va->sys->render = processorInput[idx];
+            va->sys->i_chroma = DxgiFormatFourcc(processorInput[idx]);
+        }
         free(psz_decoder_name);
         return VLC_SUCCESS;
     }
