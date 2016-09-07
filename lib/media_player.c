@@ -719,6 +719,16 @@ libvlc_media_player_new( libvlc_instance_t *instance )
     if( aout != NULL )
         input_resource_PutAout(mp->input.p_resource, aout);
 
+    char *psz_viewpoint = var_InheritString(mp, "viewpoint" );
+    if ( psz_viewpoint == NULL ||
+         sscanf( psz_viewpoint, "%f:%f:%f",
+                 &mp->viewpoint.f_yaw, &mp->viewpoint.f_pitch, &mp->viewpoint.f_roll) != 3) {
+        mp->viewpoint.f_yaw = mp->viewpoint.f_pitch = mp->viewpoint.f_roll = 0.0f;
+    }
+    free(psz_viewpoint);
+
+    var_Create (mp, "viewpoint", VLC_VAR_ADDRESS);
+    var_SetAddress( mp, "viewpoint", &mp->viewpoint );
     vlc_mutex_init (&mp->input.lock);
     mp->i_refcount = 1;
     mp->p_event_manager = libvlc_event_manager_new(mp);

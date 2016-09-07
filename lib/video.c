@@ -282,6 +282,58 @@ void libvlc_video_set_aspect_ratio( libvlc_media_player_t *p_mi,
     free (pp_vouts);
 }
 
+libvlc_video_viewpoint_t *libvlc_video_new_viewpoint(void)
+{
+    return calloc(1, sizeof(libvlc_video_viewpoint_t));
+}
+
+int libvlc_video_get_viewpoint( libvlc_media_player_t *p_mi,
+                                libvlc_video_viewpoint_t *p_viewpoint )
+{
+    /* read the value from the first vout otherwise keep the local one */
+    size_t n;
+    vout_thread_t **pp_vouts = GetVouts (p_mi, &n);
+    for (size_t i = 0; i < n; i++)
+    {
+        if (i == 0)
+            vout_GetViewpoint(pp_vouts[i], &p_mi->viewpoint);
+        vlc_object_release (pp_vouts[i]);
+    }
+    free (pp_vouts);
+
+    p_viewpoint->f_yaw           = p_mi->viewpoint.f_yaw;
+    p_viewpoint->f_pitch         = p_mi->viewpoint.f_pitch;
+    p_viewpoint->f_roll          = p_mi->viewpoint.f_roll;
+    return 1;
+}
+
+int libvlc_video_set_viewpoint( libvlc_media_player_t *p_mi,
+                                const libvlc_video_viewpoint_t *p_viewpoint )
+{
+    size_t n;
+    if (p_viewpoint == NULL)
+    {
+        p_mi->viewpoint.f_yaw = p_mi->viewpoint.f_pitch = p_mi->viewpoint.f_roll = 0.0f;
+    }
+    else
+    {
+        p_mi->viewpoint.f_yaw   =  p_viewpoint->f_yaw;
+        p_mi->viewpoint.f_pitch =  p_viewpoint->f_pitch;
+        p_mi->viewpoint.f_roll  =  p_viewpoint->f_roll;
+    }
+
+    vout_thread_t **pp_vouts = GetVouts (p_mi, &n);
+    /* write the value from all used vouts */
+    for (size_t i = 0; i < n; i++)
+    {
+        vout_SetViewpoint(pp_vouts[i], &p_mi->viewpoint);
+        vlc_object_release (pp_vouts[i]);
+    }
+    free (pp_vouts);
+
+    return 0;
+}
+
 int libvlc_video_get_spu( libvlc_media_player_t *p_mi )
 {
     input_thread_t *p_input_thread = libvlc_get_input_thread( p_mi );

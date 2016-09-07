@@ -1167,6 +1167,60 @@ LIBVLC_API char *libvlc_video_get_aspect_ratio( libvlc_media_player_t *p_mi );
 LIBVLC_API void libvlc_video_set_aspect_ratio( libvlc_media_player_t *p_mi, const char *psz_aspect );
 
 /**
+ * Viewpoint for video outputs
+ *
+ * \warning allocate using libvlc_video_new_viewpoint()
+ */
+typedef struct libvlc_video_viewpoint_t
+{
+    float f_yaw;           /**< view point yaw in radians */
+    float f_pitch;         /**< view point pitch in radians */
+    float f_roll;          /**< view point roll in radians */
+} libvlc_video_viewpoint_t;
+
+/**
+ * Create a video viewpoint structure.
+ *
+ * \version LibVLC 3.0.0 and later
+ *
+ * \return video viewpoint or NULL
+ *         (the result must be released with free() or libvlc_free()).
+ */
+LIBVLC_API libvlc_video_viewpoint_t *libvlc_video_new_viewpoint(void);
+
+/**
+ * Get current video viewpoint.
+ *
+ * \version LibVLC 3.0.0 and later
+ *
+ * \param p_mi the media player
+ * \param p_viewpoint video viewpoint allocated via libvlc_video_new_viewpoint()
+ *                    that will be filled with the vout value if it is found
+ *                    or the default value for the media player
+ * \return 1 if the structure was filled, 0 if the vout number doesn't match
+ * \warning the call is synchronous and may not return the value used by the vout yet.
+ *
+ * \libvlc_return_bool
+ */
+LIBVLC_API int libvlc_video_get_viewpoint( libvlc_media_player_t *p_mi,
+                                           libvlc_video_viewpoint_t *p_viewpoint );
+
+/**
+ * Set new video viewpoint information.
+ *
+ * \version LibVLC 3.0.0 and later
+ *
+ * \param p_mi the media player
+ * \param p_viewpoint new video viewpoint allocated via libvlc_video_new_viewpoint()
+ *                    or NULL to reset to default.
+ * \return -1 if an error was detected, 0 otherwise.
+ *
+ * \note the values are set asynchronously, it will be used by the next frame displayed.
+ */
+LIBVLC_API int libvlc_video_set_viewpoint( libvlc_media_player_t *p_mi,
+                                           const libvlc_video_viewpoint_t *p_viewpoint );
+
+/**
  * Get current video subtitle.
  *
  * \param p_mi the media player

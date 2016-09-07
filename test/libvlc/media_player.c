@@ -23,6 +23,9 @@
 
 #include "test.h"
 
+#include <vlc_common.h>
+#include <vlc_threads.h> /* for msleep */
+
 static void wait_playing(libvlc_media_player_t *mp)
 {
     libvlc_state_t state;
@@ -190,6 +193,96 @@ static void test_media_player_pause_stop(const char** argv, int argc)
     libvlc_release (vlc);
 }
 
+static void
+player_has_es(const struct libvlc_event_t *p_ev, void *p_data)
+{
+    (void) p_ev;
+    vlc_sem_t *p_sem = p_data;
+    vlc_sem_post(p_sem);
+}
+
+static void wait_done(void *p_data)
+{
+    vlc_sem_t *p_sem = p_data;
+    vlc_sem_post(p_sem);
+}
+
+static void test_media_player_viewpoint(const char** argv, int argc)
+{
+    libvlc_instance_t *vlc;
+    libvlc_media_t *md;
+    libvlc_media_player_t *mi;
+    const char * file = test_default_video;
+
+    log ("Testing viewpoint for %s\n", file);
+
+    vlc = libvlc_new (argc, argv);
+    assert (vlc != NULL);
+
+    md = libvlc_media_new_path (vlc, file);
+    assert (md != NULL);
+
+    mi = libvlc_media_player_new_from_media (md);
+    assert (mi != NULL);
+
+    libvlc_media_release (md);
+
+    libvlc_video_viewpoint_t *p_viewpoint = libvlc_video_new_viewpoint();
+    assert(p_viewpoint != NULL);
+
+    /* test without the file loaded */
+    assert(libvlc_video_get_viewpoint(mi, p_viewpoint));
+
+    p_viewpoint->f_yaw = 1.57f;
+    assert(!libvlc_video_set_viewpoint(mi, p_viewpoint));
+    assert(p_viewpoint->f_yaw == 1.57f);
+
+    libvlc_free(p_viewpoint);
+    p_viewpoint = libvlc_video_new_viewpoint();
+    assert(p_viewpoint != NULL);
+
+    assert(libvlc_video_get_viewpoint(mi, p_viewpoint));
+    assert(p_viewpoint->f_yaw == 1.57f);
+
+    libvlc_media_player_play (mi);
+
+    vlc_sem_t es_selected;
+    vlc_sem_init(&es_selected, 0);
+
+    libvlc_event_manager_t * em = libvlc_media_player_event_manager(mi);
+    int val = libvlc_event_attach(em, libvlc_MediaPlayerVout, player_has_es, &es_selected);
+    assert(val == 0);
+
+    log ("Waiting for Vout\n");
+    vlc_sem_wait(&es_selected);
+    log ("Vout found\n");
+
+    libvlc_event_detach(em, libvlc_MediaPlayerVout, player_has_es, &es_selected);
+
+    assert(libvlc_video_get_viewpoint(mi, p_viewpoint));
+    assert(p_viewpoint->f_yaw == 1.57f);
+
+    p_viewpoint->f_yaw = 0.57f;
+    assert(!libvlc_video_set_viewpoint(mi, p_viewpoint));
+
+    /* let the value propagate */
+    vlc_timer_t done_timer;
+    int ret = vlc_timer_create( &done_timer, wait_done, &es_selected );
+    assert(!ret);
+    vlc_timer_schedule( done_timer, false, 1, CLOCK_FREQ / 5 );
+    vlc_sem_wait(&es_selected);
+    vlc_timer_destroy( done_timer );
+    vlc_sem_destroy(&es_selected);
+
+    assert(libvlc_video_get_viewpoint(mi, p_viewpoint));
+    assert(p_viewpoint->f_yaw == 0.57f);
+
+    libvlc_free(p_viewpoint);
+
+    libvlc_media_player_stop (mi);
+    libvlc_media_player_release (mi);
+    libvlc_release (vlc);
+}
 
 int main (void)
 {
@@ -198,6 +291,7 @@ int main (void)
     test_media_player_set_media (test_defaults_args, test_defaults_nargs);
     test_media_player_play_stop (test_defaults_args, test_defaults_nargs);
     test_media_player_pause_stop (test_defaults_args, test_defaults_nargs);
+    test_media_player_viewpoint (test_defaults_args, test_defaults_nargs);
 
     return 0;
 }
