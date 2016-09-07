@@ -433,6 +433,11 @@ static const char *const ppsz_pos_descriptions[] =
     "aspect, or a float value (1.25, 1.3333, etc.) expressing pixel " \
     "squareness.")
 
+#define VIEWPOINT_TEXT N_("Viewpoint")
+#define VIEWPOINT_LONGTEXT N_( \
+    "This forces the viewpoint for the displayed video. " \
+    "Accepted formats are yaw:pitch:roll expressing the user viewpoint.")
+
 #define AUTOSCALE_TEXT N_("Video Auto Scaling")
 #define AUTOSCALE_LONGTEXT N_( \
     "Let the video scale to fit a given window or fullscreen.")
@@ -1257,13 +1262,13 @@ static const char *const mouse_wheel_texts[] = {
 #define QUIT_KEY_TEXT N_("Quit")
 #define QUIT_KEY_LONGTEXT N_("Select the hotkey to quit the application.")
 #define NAV_UP_KEY_TEXT N_("Navigate up")
-#define NAV_UP_KEY_LONGTEXT N_("Select the key to move the selector up in DVD menus.")
+#define NAV_UP_KEY_LONGTEXT N_("Select the key to move the selector up in DVD menus / Move viewpoint to up (pitch).")
 #define NAV_DOWN_KEY_TEXT N_("Navigate down")
-#define NAV_DOWN_KEY_LONGTEXT N_("Select the key to move the selector down in DVD menus.")
+#define NAV_DOWN_KEY_LONGTEXT N_("Select the key to move the selector down in DVD menus / Move viewpoint to down (pitch).")
 #define NAV_LEFT_KEY_TEXT N_("Navigate left")
-#define NAV_LEFT_KEY_LONGTEXT N_("Select the key to move the selector left in DVD menus.")
+#define NAV_LEFT_KEY_LONGTEXT N_("Select the key to move the selector left in DVD menus / Move viewpoint to left (yaw).")
 #define NAV_RIGHT_KEY_TEXT N_("Navigate right")
-#define NAV_RIGHT_KEY_LONGTEXT N_("Select the key to move the selector right in DVD menus.")
+#define NAV_RIGHT_KEY_LONGTEXT N_("Select the key to move the selector right in DVD menus / Move viewpoint to left (yaw).")
 #define NAV_ACTIVATE_KEY_TEXT N_("Activate")
 #define NAV_ACTIVATE_KEY_LONGTEXT N_("Select the key to activate selected item in DVD menus.")
 #define DISC_MENU_TEXT N_("Go to the DVD menu")
@@ -1416,6 +1421,12 @@ static const char *const mouse_wheel_texts[] = {
 #define CROP_RIGHT_KEY_LONGTEXT N_("Crop one pixel from the right of the video")
 #define UNCROP_RIGHT_KEY_TEXT N_("Uncrop one pixel from the right of the video")
 #define UNCROP_RIGHT_KEY_LONGTEXT N_("Uncrop one pixel from the right of the video")
+
+/* 360° Viewpoint */
+#define VIEWPOINT_ROLL_KEY_TEXT N_("Roll the viewpoint clockwise")
+#define VIEWPOINT_ROLL_KEY_LONGTEXT N_("Roll the viewpoint clockwise (roll)")
+#define VIEWPOINT_UNROLL_KEY_TEXT N_("Roll the viewpoint anti-clockwise")
+#define VIEWPOINT_UNROLL_KEY_LONGTEXT N_("Roll the viewpoint anti-clockwise (roll)")
 
 #define WALLPAPER_KEY_TEXT N_("Toggle wallpaper mode in video output")
 #define WALLPAPER_KEY_LONGTEXT N_( \
@@ -1583,6 +1594,9 @@ vlc_module_begin ()
                 CUSTOM_CROP_RATIOS_LONGTEXT, false )
     add_string( "aspect-ratio", NULL,
                 ASPECT_RATIO_TEXT, ASPECT_RATIO_LONGTEXT, false )
+        change_safe ()
+    add_string( "viewpoint", NULL,
+                VIEWPOINT_TEXT, VIEWPOINT_LONGTEXT, false )
         change_safe ()
     add_bool( "autoscale", true, AUTOSCALE_TEXT, AUTOSCALE_LONGTEXT, false )
         change_safe ()
@@ -2217,6 +2231,9 @@ vlc_module_begin ()
 #   define KEY_CROP_RIGHT         "Alt+l"
 #   define KEY_UNCROP_RIGHT       "Alt+Shift+l"
 
+#   define KEY_VIEWPOINT_ROLL     "Page Up"
+#   define KEY_VIEWPOINT_UNROLL   "Page Down"
+
 /* the macosx-interface already has bindings */
 #   define KEY_ZOOM_QUARTER       NULL
 #   define KEY_ZOOM_HALF          "Command+0"
@@ -2359,6 +2376,10 @@ vlc_module_begin ()
 #   define KEY_UNCROP_BOTTOM      "Alt+Shift+c"
 #   define KEY_CROP_RIGHT         "Alt+f"
 #   define KEY_UNCROP_RIGHT       "Alt+Shift+f"
+
+/* 360° Viewpoint */
+#   define KEY_VIEWPOINT_ROLL     "Page Up"
+#   define KEY_VIEWPOINT_UNROLL   "Page Down"
 
 /* Zooming */
 #   define KEY_ZOOM_QUARTER       "Alt+1"
@@ -2552,6 +2573,11 @@ vlc_module_begin ()
              RANDOM_KEY_TEXT, RANDOM_KEY_LONGTEXT, false )
     add_key( "key-loop", KEY_LOOP,
              LOOP_KEY_TEXT, LOOP_KEY_LONGTEXT, false )
+
+    add_key( "key-viewpoint-roll-clock", KEY_VIEWPOINT_ROLL,
+             VIEWPOINT_ROLL_KEY_TEXT, VIEWPOINT_ROLL_KEY_LONGTEXT, true )
+    add_key( "key-viewpoint-roll-anticlock", KEY_VIEWPOINT_UNROLL,
+             VIEWPOINT_UNROLL_KEY_TEXT, VIEWPOINT_UNROLL_KEY_LONGTEXT, true )
 
     set_section ( N_("Zoom" ), NULL )
     add_key( "key-zoom-quarter",  KEY_ZOOM_QUARTER,

@@ -368,6 +368,8 @@ static const struct action actions[] =
     { "uncrop-right", ACTIONID_UNCROP_RIGHT, },
     { "uncrop-top", ACTIONID_UNCROP_TOP, },
     { "unzoom", ACTIONID_UNZOOM, },
+    { "viewpoint-roll-anticlock", ACTIONID_ROLL_ANTICLOCK, },
+    { "viewpoint-roll-clock", ACTIONID_ROLL_CLOCK, },
     { "vol-down", ACTIONID_VOL_DOWN, },
     { "vol-mute", ACTIONID_VOL_MUTE, },
     { "vol-up", ACTIONID_VOL_UP, },

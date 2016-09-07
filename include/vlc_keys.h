@@ -227,6 +227,9 @@ typedef enum vlc_action {
     ACTIONID_PROGRAM_SID_NEXT,
     ACTIONID_PROGRAM_SID_PREV,
     ACTIONID_INTF_POPUP_MENU,
+    /* Viewpoint */
+    ACTIONID_ROLL_CLOCK,
+    ACTIONID_ROLL_ANTICLOCK,
 
 } vlc_action_t;
 
