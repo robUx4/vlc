@@ -32,6 +32,7 @@
 #include <vlc_common.h>
 #include <vlc_picture_pool.h>
 #include <vlc_opengl.h>
+#include <vlc_vout.h>
 
 /* Change USE_OPENGL_ES value to set the OpenGL ES version (1, 2) you want to use
  * A value of 0 will activate normal OpenGL */
@@ -95,6 +96,8 @@ vout_display_opengl_t *vout_display_opengl_New(video_format_t *fmt,
 void vout_display_opengl_Delete(vout_display_opengl_t *vgl);
 
 picture_pool_t *vout_display_opengl_GetPool(vout_display_opengl_t *vgl, unsigned);
+
+void vout_display_opengl_SetViewpoint(vout_display_opengl_t *vgl, const vlc_viewpoint_t*);
 
 int vout_display_opengl_Prepare(vout_display_opengl_t *vgl,
                                 picture_t *picture, subpicture_t *subpicture);

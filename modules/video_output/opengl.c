@@ -205,6 +205,7 @@ struct vout_display_opengl_t {
     /* View point */
     float f_teta;
     float f_phi;
+    float f_roll;
     float f_zoom;
 };
 
@@ -692,9 +693,12 @@ vout_display_opengl_t *vout_display_opengl_New(video_format_t *fmt,
     if (vgl->fmt.projection_mode == PROJECTION_MODE_EQUIRECTANGULAR
         || vgl->fmt.projection_mode == PROJECTION_MODE_CUBEMAP_LAYOUT_STANDARD)
     {
-        vgl->f_teta = vgl->fmt.f_pose_roll_degrees / 180. * M_PI;
-        vgl->f_phi  = vgl->fmt.f_pose_yaw_degrees  / 180. * M_PI;
-        vgl->f_teta -= M_PI/2;
+        vlc_viewpoint_t viewpoint = {
+            .f_yaw   = (float) vgl->fmt.f_pose_yaw_degrees   / 180. * M_PI,
+            .f_pitch = (float) vgl->fmt.f_pose_pitch_degrees / 180. * M_PI,
+            .f_roll  = (float) vgl->fmt.f_pose_roll_degrees  / 180. * M_PI,
+        };
+        vout_display_opengl_SetViewpoint( vgl, &viewpoint );
     }
 
     /* */
@@ -775,6 +779,21 @@ void vout_display_opengl_Delete(vout_display_opengl_t *vgl)
     if (vgl->pool)
         picture_pool_Release(vgl->pool);
     free(vgl);
+}
+
+void vout_display_opengl_SetViewpoint(vout_display_opengl_t *vgl, const vlc_viewpoint_t *p_viewpoint)
+{
+    const projection_mode proj_mode = vout_display_projection(vgl);
+
+    vgl->f_teta = p_viewpoint->f_yaw - M_PI / 2;
+    if (vgl->f_teta < -M_PI)
+        vgl->f_teta = M_PI;
+    vgl->f_phi = p_viewpoint->f_pitch;
+    if (vgl->f_phi < -M_PI / 2)
+        vgl->f_phi = -M_PI / 2;
+    vgl->f_roll = p_viewpoint->f_roll;
+    if (vgl->f_roll < -M_PI / 2)
+        vgl->f_roll = -M_PI / 2;
 }
 
 picture_pool_t *vout_display_opengl_GetPool(vout_display_opengl_t *vgl, unsigned requested_count)
