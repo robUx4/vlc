@@ -540,12 +540,29 @@ void vout_ControlChangeSubMargin(vout_thread_t *vout, int margin)
                              margin);
 }
 
+void vout_GetViewpoint( vout_thread_t *vout, vlc_viewpoint_t *p_viewpoint )
+{
+    vout_GetDisplayViewpoint(vout->p->display.vd, p_viewpoint);
+}
+
+void vout_SetViewpoint(vout_thread_t *vout, const vlc_viewpoint_t *p_viewpoint)
+{
+    vout_control_cmd_t cmd;
+    vout_control_cmd_Init(&cmd, VOUT_CONTROL_VIEWPOINT);
+    cmd.u.viewpoint = *p_viewpoint;
+
+    vout_control_Push(&vout->p->control, &cmd);
+}
+
 /* */
 static void VoutGetDisplayCfg(vout_thread_t *vout, vout_display_cfg_t *cfg, const char *title)
 {
     /* Load configuration */
     cfg->is_fullscreen = var_CreateGetBool(vout, "fullscreen")
                          || var_InheritBool(vout, "video-wallpaper");
+    cfg->viewpoint.f_yaw   = 0.0f;
+    cfg->viewpoint.f_pitch = 0.0f;
+    cfg->viewpoint.f_roll  = 0.0f;
     cfg->display.title = title;
     const int display_width = var_CreateGetInteger(vout, "width");
     const int display_height = var_CreateGetInteger(vout, "height");
@@ -1289,6 +1306,12 @@ static void ThreadExecuteCropRatio(vout_thread_t *vout,
                         0, 0, 0, 0);
 }
 
+static void ThreadExecuteViewpoint(vout_thread_t *vout, const vlc_viewpoint_t *p_viewpoint)
+{
+    msg_Dbg(vout, "ThreadExecuteViewpoint %f %f %f", p_viewpoint->f_yaw, p_viewpoint->f_pitch, p_viewpoint->f_roll);
+    vout_SetDisplayViewpoint(vout->p->display.vd, p_viewpoint);
+}
+
 static int ThreadStart(vout_thread_t *vout, vout_display_state_t *state)
 {
     vlc_mouse_Init(&vout->p->mouse);
@@ -1547,6 +1570,9 @@ static int ThreadControl(vout_thread_t *vout, vout_control_cmd_t cmd)
         ThreadExecuteCropBorder(vout,
                 cmd.u.border.left,  cmd.u.border.top,
                 cmd.u.border.right, cmd.u.border.bottom);
+        break;
+    case VOUT_CONTROL_VIEWPOINT:
+        ThreadExecuteViewpoint(vout, &cmd.u.viewpoint);
         break;
     default:
         break;

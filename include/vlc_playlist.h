@@ -382,6 +382,13 @@ VLC_API playlist_item_t * playlist_GetPrevLeaf( playlist_t *p_playlist, playlist
 
 VLC_API audio_output_t *playlist_GetAout( playlist_t * );
 
+/*************************
+ * Viewpoint management
+ *************************/
+VLC_API void playlist_GetViewpoint( playlist_t *, vlc_viewpoint_t *p_viewpoint );
+VLC_API void playlist_SetViewpoint( playlist_t *, const vlc_viewpoint_t *p_viewpoint );
+
+
 #define AOUT_VOLUME_DEFAULT             256
 #define AOUT_VOLUME_MAX                 512
 

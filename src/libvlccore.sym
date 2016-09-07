@@ -373,6 +373,8 @@ playlist_VolumeSet
 playlist_VolumeUp
 playlist_MuteSet
 playlist_MuteGet
+playlist_GetViewpoint
+playlist_SetViewpoint
 sdp_AddAttribute
 sdp_AddMedia
 secstotimestr
@@ -734,6 +736,8 @@ vout_window_Delete
 vout_display_GetDefaultDisplaySize
 vout_display_PlacePicture
 vout_display_SendMouseMovedDisplayCoordinates
+vout_GetViewpoint
+vout_SetViewpoint
 xml_Create
 text_style_Copy
 text_style_Create

@@ -57,6 +57,8 @@ static int AutoScaleCallback( vlc_object_t *, char const *,
                               vlc_value_t, vlc_value_t, void * );
 static int ZoomCallback( vlc_object_t *, char const *,
                          vlc_value_t, vlc_value_t, void * );
+static int ViewpointCallback( vlc_object_t *, char const *,
+                              vlc_value_t, vlc_value_t, void * );
 static int AboveCallback( vlc_object_t *, char const *,
                           vlc_value_t, vlc_value_t, void * );
 static int WallPaperCallback( vlc_object_t *, char const *,
@@ -252,6 +254,10 @@ void vout_IntfInit( vout_thread_t *p_vout )
     var_Change( p_vout, "video-on-top", VLC_VAR_SETTEXT, &text, NULL );
     var_AddCallback( p_vout, "video-on-top", AboveCallback, NULL );
 
+    /* Add a variable to indicate if the viewpoint to use to display the video */
+    var_Create( p_vout, "viewpoint", VLC_VAR_ADDRESS | VLC_VAR_DOINHERIT );
+    var_AddCallback( p_vout, "viewpoint", ViewpointCallback, NULL );
+
     /* Add a variable to indicate if the window should be below all others */
     var_Create( p_vout, "video-wallpaper", VLC_VAR_BOOL | VLC_VAR_DOINHERIT );
     var_AddCallback( p_vout, "video-wallpaper", WallPaperCallback,
@@ -309,6 +315,7 @@ void vout_IntfReinit( vout_thread_t *p_vout )
     var_TriggerCallback( p_vout, "zoom" );
     var_TriggerCallback( p_vout, "crop" );
     var_TriggerCallback( p_vout, "aspect-ratio" );
+    var_TriggerCallback( p_vout, "viewpoint" );
 
     var_TriggerCallback( p_vout, "video-on-top" );
     var_TriggerCallback( p_vout, "video-wallpaper" );
@@ -599,6 +606,15 @@ static int ZoomCallback( vlc_object_t *obj, char const *name,
 
     (void) name; (void) prev; (void) data;
     vout_ControlChangeZoom( p_vout, 1000 * cur.f_float, 1000 );
+    return VLC_SUCCESS;
+}
+
+static int ViewpointCallback(vlc_object_t *obj, char const *cmd,
+                             vlc_value_t oldval, vlc_value_t newval, void *data)
+{
+    vout_SetViewpoint((vout_thread_t *)obj, newval.p_address);
+
+    VLC_UNUSED(cmd); VLC_UNUSED(oldval); VLC_UNUSED(data);
     return VLC_SUCCESS;
 }
 

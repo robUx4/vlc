@@ -479,6 +479,18 @@ static void VariablesInit( playlist_t *p_playlist )
     var_Create( p_playlist, "mute", VLC_VAR_BOOL );
     var_Create( p_playlist, "volume", VLC_VAR_FLOAT );
     var_SetFloat( p_playlist, "volume", -1.f );
+
+    char *psz_viewpoint = var_InheritString(p_playlist, "viewpoint" );
+    vlc_viewpoint_t *p_vp = &pl_priv(p_playlist)->viewpoint;
+    if ( psz_viewpoint == NULL ||
+         sscanf( psz_viewpoint, "%f:%f:%f:%f:%f",
+                 &p_vp->f_yaw, &p_vp->f_pitch, &p_vp->f_roll) != 3) {
+        p_vp->f_yaw = p_vp->f_pitch = p_vp->f_roll = 0.0f;
+    }
+    free(psz_viewpoint);
+
+    var_Create( p_playlist, "viewpoint", VLC_VAR_ADDRESS );
+    var_SetAddress( p_playlist, "viewpoint", p_vp );
 }
 
 playlist_item_t * playlist_CurrentPlayingItem( playlist_t * p_playlist )
@@ -500,4 +512,35 @@ int playlist_Status( playlist_t * p_playlist )
         return PLAYLIST_PAUSED;
     return PLAYLIST_RUNNING;
 }
+
+void playlist_GetViewpoint( playlist_t *p_playlist, vlc_viewpoint_t *p_viewpoint )
+{
+    input_thread_t *p_input = pl_priv(p_playlist)->p_input;
+    vout_thread_t *p_vout = !p_input ? NULL : input_GetVout( p_input );
+
+    PL_LOCK;
+    if( p_vout )
+    {
+        vout_GetViewpoint( p_vout, &pl_priv(p_playlist)->viewpoint );
+        vlc_object_release( (vlc_object_t *)p_vout );
+    }
+    *p_viewpoint = pl_priv(p_playlist)->viewpoint;
+    PL_UNLOCK;
+}
+
+void playlist_SetViewpoint(playlist_t *p_playlist, const vlc_viewpoint_t *p_viewpoint)
+{
+    input_thread_t *p_input = pl_priv(p_playlist)->p_input;
+    vout_thread_t *p_vout = !p_input ? NULL : input_GetVout( p_input );
+
+    PL_LOCK;
+    pl_priv(p_playlist)->viewpoint = *p_viewpoint;
+    if (p_vout)
+    {
+        vout_SetViewpoint( p_vout, &pl_priv(p_playlist)->viewpoint );
+        vlc_object_release( (vlc_object_t *)p_vout );
+    }
+    PL_UNLOCK;
+}
+
 

@@ -82,6 +82,12 @@ struct vout_thread_t {
 #define VOUT_ALIGN_BOTTOM       0x0008
 #define VOUT_ALIGN_VMASK        0x000C
 
+struct vlc_viewpoint_t {
+    float f_yaw;
+    float f_pitch;
+    float f_roll;
+};
+
 /*****************************************************************************
  * Prototypes
  *****************************************************************************/
@@ -155,6 +161,9 @@ VLC_API int vout_RegisterSubpictureChannel( vout_thread_t * );
 VLC_API void vout_FlushSubpictureChannel( vout_thread_t *, int );
 
 VLC_API void vout_EnableFilter( vout_thread_t *, const char *,bool , bool  );
+
+VLC_API void vout_GetViewpoint( vout_thread_t *, vlc_viewpoint_t *p_viewpoint );
+VLC_API void vout_SetViewpoint( vout_thread_t *, const vlc_viewpoint_t *p_viewpoint );
 
 /**@}*/
 

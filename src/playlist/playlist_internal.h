@@ -35,6 +35,7 @@
  */
 
 #include "input/input_interface.h"
+#include "vlc_vout.h"
 #include <assert.h>
 
 #include "art.h"
@@ -87,6 +88,8 @@ typedef struct playlist_private_t
 
     bool     b_tree; /**< Display as a tree */
     bool     b_preparse; /**< Preparse items */
+
+    vlc_viewpoint_t  viewpoint; /**< playback viewpoint */
 } playlist_private_t;
 
 #define pl_priv( pl ) ((playlist_private_t *)(pl))

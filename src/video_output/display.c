@@ -373,6 +373,10 @@ struct vout_display_owner_sys_t {
         unsigned den;
     } crop;
 
+    bool ch_viewpoint;
+    vlc_viewpoint_t viewpoint;
+    vlc_mutex_t viewpoint_lock;
+
     /* */
     video_format_t source;
     filter_chain_t *filters;
@@ -850,7 +854,8 @@ bool vout_ManageDisplay(vout_display_t *vd, bool allow_reset_pictures)
             !ch_wm_state &&
 #endif
             !osys->ch_sar &&
-            !osys->ch_crop) {
+            !osys->ch_crop &&
+            !osys->ch_viewpoint) {
 
             if (!osys->cfg.is_fullscreen && osys->fit_window != 0) {
                 VoutDisplayFitWindow(vd, osys->fit_window == -1);
@@ -1034,6 +1039,20 @@ bool vout_ManageDisplay(vout_display_t *vd, bool allow_reset_pictures)
             osys->crop.den    = crop_den;
             osys->ch_crop = false;
         }
+        if (osys->ch_viewpoint) {
+            vout_display_cfg_t cfg = osys->cfg;
+
+            vlc_mutex_lock(&osys->viewpoint_lock);
+            cfg.viewpoint = osys->viewpoint;
+
+            if (vout_display_Control(vd, VOUT_DISPLAY_CHANGE_VIEWPOINT, &cfg)) {
+                msg_Err(vd, "Failed to change Viewpoint");
+                osys->viewpoint = cfg.viewpoint;
+            }
+            osys->cfg.viewpoint = osys->viewpoint;
+            osys->ch_viewpoint  = false;
+            vlc_mutex_unlock(&osys->viewpoint_lock);
+        }
 
         /* */
         if (reset_pictures) {
@@ -1193,6 +1212,30 @@ void vout_SetDisplayCrop(vout_display_t *vd,
     }
 }
 
+void vout_GetDisplayViewpoint(vout_display_t *vd, vlc_viewpoint_t *p_viewpoint)
+{
+    vout_display_owner_sys_t *osys = vd->owner.sys;
+
+    vlc_mutex_lock(&osys->viewpoint_lock);
+    *p_viewpoint = osys->viewpoint;
+    vlc_mutex_unlock(&osys->viewpoint_lock);
+}
+
+void vout_SetDisplayViewpoint(vout_display_t *vd, const vlc_viewpoint_t *p_viewpoint)
+{
+    vout_display_owner_sys_t *osys = vd->owner.sys;
+
+    vlc_mutex_lock(&osys->viewpoint_lock);
+    if (osys->viewpoint.f_yaw   != p_viewpoint->f_yaw ||
+        osys->viewpoint.f_pitch != p_viewpoint->f_pitch ||
+        osys->viewpoint.f_roll  != p_viewpoint->f_roll) {
+        osys->viewpoint = *p_viewpoint;
+
+        osys->ch_viewpoint = true;
+    }
+    vlc_mutex_unlock(&osys->viewpoint_lock);
+}
+
 static vout_display_t *DisplayNew(vout_thread_t *vout,
                                   const video_format_t *source,
                                   const vout_display_state_t *state,
@@ -1217,6 +1260,8 @@ static vout_display_t *DisplayNew(vout_thread_t *vout,
     osys->wrapper = wrapper;
 
     vlc_mutex_init(&osys->lock);
+
+    vlc_mutex_init(&osys->viewpoint_lock);
 
     vlc_mouse_Init(&osys->mouse.state);
     osys->mouse.last_moved = mdate();
@@ -1289,6 +1334,7 @@ static vout_display_t *DisplayNew(vout_thread_t *vout,
 
     return p_display;
 error:
+    vlc_mutex_destroy(&osys->viewpoint_lock);
     vlc_mutex_destroy(&osys->lock);
     free(osys);
     return NULL;
@@ -1317,6 +1363,7 @@ void vout_DeleteDisplay(vout_display_t *vd, vout_display_state_t *state)
         vlc_join(osys->event.thread, NULL);
         block_FifoRelease(osys->event.fifo);
     }
+    vlc_mutex_destroy(&osys->viewpoint_lock);
     vlc_mutex_destroy(&osys->lock);
     free(osys);
 }
