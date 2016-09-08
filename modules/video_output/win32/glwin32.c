@@ -147,6 +147,20 @@ static void DestroyGPUAffinityDC(vout_display_t *vd) {
     fncDeleteDCNV(vd->sys->affinityHDC);
 }
 
+static int Control(vout_display_t *vd, int query, va_list args)
+{
+    vout_display_sys_t *sys = vd->sys;
+
+    if (query == VOUT_DISPLAY_CHANGE_VIEWPOINT)
+    {
+      const vout_display_cfg_t *p_cfg = va_arg (args, const vout_display_cfg_t *);
+      vout_display_opengl_SetViewpoint(sys->vgl, &p_cfg->viewpoint);
+      return VLC_SUCCESS;
+    }
+
+    return CommonControl(vd, query, args);
+}
+
 /**
  * It creates an OpenGL vout display.
  */
@@ -227,7 +241,7 @@ static int Open(vlc_object_t *object)
     vd->pool    = Pool;
     vd->prepare = Prepare;
     vd->display = Display;
-    vd->control = CommonControl;
+    vd->control = Control;
     vd->manage  = Manage;
 
     return VLC_SUCCESS;
