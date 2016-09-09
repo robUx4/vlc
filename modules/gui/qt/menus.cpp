@@ -248,6 +248,7 @@ static int VideoAutoMenuBuilder( playlist_t *pl, input_thread_t *p_input,
     PUSH_VAR( "crop" );
     PUSH_VAR( "deinterlace" );
     PUSH_VAR( "deinterlace-mode" );
+    PUSH_VAR( "projection" );
 
     VLCMenuBar::ppMenu->setEnabled( p_object != NULL );
 
@@ -696,6 +697,10 @@ QMenu *VLCMenuBar::VideoMenu( intf_thread_t *p_intf, QMenu *current )
         current->addSeparator();
         /* Other actions */
         addAction( current, "video-snapshot", qtr( "Take &Snapshot" ) );
+
+        current->addSeparator();
+        /* Projection modifiers */
+        addActionWithSubmenu( current, "projection", qtr( "&Projection mode" ) );
     }
 
     p_input = THEMIM->getInput();
