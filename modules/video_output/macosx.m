@@ -432,7 +432,14 @@ static int Control (vout_display_t *vd, int query, va_list ap)
                 [NSCursor setHiddenUntilMouseMoves: YES];
                 return VLC_SUCCESS;
             }
-                
+
+            case VOUT_DISPLAY_CHANGE_VIEWPOINT:
+            {
+                const vout_display_cfg_t *p_cfg = va_arg (ap, const vout_display_cfg_t *);
+                vout_display_opengl_SetViewpoint(sys->vgl, &p_cfg->viewpoint);
+                return VLC_SUCCESS;
+            }
+
             case VOUT_DISPLAY_RESET_PICTURES:
                 vlc_assert_unreachable ();
             default:
