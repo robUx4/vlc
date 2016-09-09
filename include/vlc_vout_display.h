@@ -118,6 +118,8 @@ typedef struct {
 
     vlc_viewpoint_t viewpoint;
 
+    projection_mode projection;
+
 } vout_display_cfg_t;
 
 /**
@@ -182,6 +184,8 @@ enum {
     /* Ask the module to acknowledge/refuse VR/360° viewing direction after
      * being requested externally */
     VOUT_DISPLAY_CHANGE_VIEWPOINT,   /* const vout_display_cfg_t *p_cfg */
+
+    VOUT_DISPLAY_CHANGE_PROJECTION, /* const vout_display_cfg_t *p_cfg */
 };
 
 /**

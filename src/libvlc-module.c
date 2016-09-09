@@ -438,6 +438,15 @@ static const char *const ppsz_pos_descriptions[] =
     "This forces the viewpoint for the displayed video. " \
     "Accepted formats are yaw:pitch:roll expressing the user viewpoint.")
 
+#define PROJECTION_TEXT N_("Projection")
+#define PROJECTION_LONGTEXT N_( \
+    "Change the way the video is displayed.")
+static const int pi_projection_values[] = { 0, 1, 2, 3, 4, 5, 6 };
+static const char *const ppsz_projection_descriptions[] =
+{ N_("Automatic"), N_("Flat/2D"), N_("360° Sphere"),
+  N_("360° Cubemap"), N_("Little Planet"), N_("360° Cardboard"),
+  N_("Side By Side 2D") };
+
 #define AUTOSCALE_TEXT N_("Video Auto Scaling")
 #define AUTOSCALE_LONGTEXT N_( \
     "Let the video scale to fit a given window or fullscreen.")
@@ -1598,6 +1607,8 @@ vlc_module_begin ()
     add_string( "viewpoint", NULL,
                 VIEWPOINT_TEXT, VIEWPOINT_LONGTEXT, false )
         change_safe ()
+    add_integer( "projection", 0, PROJECTION_TEXT, PROJECTION_LONGTEXT, false )
+        change_integer_list( pi_projection_values, ppsz_projection_descriptions )
     add_bool( "autoscale", true, AUTOSCALE_TEXT, AUTOSCALE_LONGTEXT, false )
         change_safe ()
     add_obsolete_float( "scale" ) /* since 3.0.0 */

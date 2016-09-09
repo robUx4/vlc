@@ -377,6 +377,9 @@ struct vout_display_owner_sys_t {
     vlc_viewpoint_t viewpoint;
     vlc_mutex_t viewpoint_lock;
 
+    bool ch_projection;
+    projection_mode proj_mode;
+
     /* */
     video_format_t source;
     filter_chain_t *filters;
@@ -855,7 +858,8 @@ bool vout_ManageDisplay(vout_display_t *vd, bool allow_reset_pictures)
 #endif
             !osys->ch_sar &&
             !osys->ch_crop &&
-            !osys->ch_viewpoint) {
+            !osys->ch_viewpoint &&
+            !osys->ch_projection) {
 
             if (!osys->cfg.is_fullscreen && osys->fit_window != 0) {
                 VoutDisplayFitWindow(vd, osys->fit_window == -1);
@@ -1038,6 +1042,18 @@ bool vout_ManageDisplay(vout_display_t *vd, bool allow_reset_pictures)
             osys->crop.num    = crop_num;
             osys->crop.den    = crop_den;
             osys->ch_crop = false;
+        }
+        if (osys->ch_projection) {
+            vout_display_cfg_t cfg = osys->cfg;
+
+            cfg.projection = osys->proj_mode;
+
+            if (vout_display_Control(vd, VOUT_DISPLAY_CHANGE_PROJECTION, &cfg)) {
+                msg_Err(vd, "Failed to change Viewpoint");
+                osys->proj_mode = osys->cfg.projection;
+            }
+            osys->cfg.projection = osys->proj_mode;
+            osys->ch_projection = false;
         }
         if (osys->ch_viewpoint) {
             vout_display_cfg_t cfg = osys->cfg;
@@ -1234,6 +1250,16 @@ void vout_SetDisplayViewpoint(vout_display_t *vd, const vlc_viewpoint_t *p_viewp
         osys->ch_viewpoint = true;
     }
     vlc_mutex_unlock(&osys->viewpoint_lock);
+}
+
+void vout_SetDisplayProjection(vout_display_t *vd, projection_mode proj)
+{
+    vout_display_owner_sys_t *osys = vd->owner.sys;
+
+    if (osys->proj_mode != proj) {
+        osys->proj_mode = proj;
+        osys->ch_projection = true;
+    }
 }
 
 static vout_display_t *DisplayNew(vout_thread_t *vout,

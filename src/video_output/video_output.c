@@ -553,6 +553,11 @@ void vout_SetViewpoint(vout_thread_t *vout, const vlc_viewpoint_t *p_viewpoint)
 
     vout_control_Push(&vout->p->control, &cmd);
 }
+void vout_ControlChangeProjection(vout_thread_t *vout, projection_mode proj)
+{
+    vout_control_PushInteger(&vout->p->control, VOUT_CONTROL_PROJECTION,
+                             proj);
+}
 
 /* */
 static void VoutGetDisplayCfg(vout_thread_t *vout, vout_display_cfg_t *cfg, const char *title)
@@ -560,6 +565,7 @@ static void VoutGetDisplayCfg(vout_thread_t *vout, vout_display_cfg_t *cfg, cons
     /* Load configuration */
     cfg->is_fullscreen = var_CreateGetBool(vout, "fullscreen")
                          || var_InheritBool(vout, "video-wallpaper");
+    cfg->projection = var_CreateGetInteger(vout, "projection");
     cfg->viewpoint.f_yaw   = 0.0f;
     cfg->viewpoint.f_pitch = 0.0f;
     cfg->viewpoint.f_roll  = 0.0f;
@@ -1312,6 +1318,12 @@ static void ThreadExecuteViewpoint(vout_thread_t *vout, const vlc_viewpoint_t *p
     vout_SetDisplayViewpoint(vout->p->display.vd, p_viewpoint);
 }
 
+static void ThreadExecuteProjection(vout_thread_t *vout, projection_mode proj)
+{
+    msg_Dbg(vout, "ThreadExecuteProjection %d", proj);
+    vout_SetDisplayProjection(vout->p->display.vd, proj);
+}
+
 static int ThreadStart(vout_thread_t *vout, vout_display_state_t *state)
 {
     vlc_mouse_Init(&vout->p->mouse);
@@ -1573,6 +1585,9 @@ static int ThreadControl(vout_thread_t *vout, vout_control_cmd_t cmd)
         break;
     case VOUT_CONTROL_VIEWPOINT:
         ThreadExecuteViewpoint(vout, &cmd.u.viewpoint);
+        break;
+    case VOUT_CONTROL_PROJECTION:
+        ThreadExecuteProjection(vout, (projection_mode) cmd.u.integer);
         break;
     default:
         break;

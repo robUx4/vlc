@@ -95,6 +95,7 @@ void vout_SetDisplayCrop(vout_display_t *, unsigned num, unsigned den,
                          unsigned left, unsigned top, int right, int bottom);
 void vout_GetDisplayViewpoint(vout_display_t *, vlc_viewpoint_t *p_viewpoint);
 void vout_SetDisplayViewpoint(vout_display_t *, const vlc_viewpoint_t *p_viewpoint);
+void vout_SetDisplayProjection(vout_display_t *, projection_mode);
 
 #endif /* VLC_VOUT_WRAPPER_H */
 

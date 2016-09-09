@@ -82,6 +82,12 @@ struct vout_thread_t {
 #define VOUT_ALIGN_BOTTOM       0x0008
 #define VOUT_ALIGN_VMASK        0x000C
 
+typedef enum {
+    PROJECTION_AUTO, PROJECTION_FLAT, PROJECTION_SPHERE,
+    PROJECTION_CUBEMAP, PROJECTION_LITTLE_PLANET,
+    PROJECTION_CARDBOARD, PROJECTION_SIDEBYSIDE
+} projection_mode;
+
 struct vlc_viewpoint_t {
     float f_yaw;
     float f_pitch;

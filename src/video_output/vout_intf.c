@@ -124,6 +124,20 @@ static const struct
     { "5:4", "5:4" },
 };
 
+static const struct
+{
+    projection_mode value;
+    char psz_label[20];
+} p_projection_values[] = {
+    { PROJECTION_AUTO, N_("Automatic Selection") },
+    { PROJECTION_FLAT, N_("Flat/2D") },
+    { PROJECTION_SPHERE, N_("360° Sphere") },
+    { PROJECTION_CUBEMAP, N_("360° Cubemap") },
+    { PROJECTION_LITTLE_PLANET, N_("Little Planet") },
+    { PROJECTION_CARDBOARD, N_("360° Cardboard") },
+    { PROJECTION_SIDEBYSIDE, N_("Side By Side 2D") },
+};
+
 static void AddCustomRatios( vout_thread_t *p_vout, const char *psz_var,
                              char *psz_list )
 {
@@ -145,6 +159,14 @@ static void AddCustomRatios( vout_thread_t *p_vout, const char *psz_var,
         var_Change( p_vout, psz_var, VLC_VAR_ADDCHOICE, &val, &text);
         psz_cur = psz_next;
     }
+}
+
+static int ProjectionCallback(vlc_object_t *obj, char const *cmd,
+                              vlc_value_t oldval, vlc_value_t newval, void *data)
+{
+    vout_ControlChangeProjection((vout_thread_t *)obj, (projection_mode) newval.i_int);
+    VLC_UNUSED(cmd); VLC_UNUSED(oldval); VLC_UNUSED(data);
+    return VLC_SUCCESS;
 }
 
 void vout_IntfInit( vout_thread_t *p_vout )
@@ -258,6 +280,20 @@ void vout_IntfInit( vout_thread_t *p_vout )
     var_Create( p_vout, "viewpoint", VLC_VAR_ADDRESS | VLC_VAR_DOINHERIT );
     var_AddCallback( p_vout, "viewpoint", ViewpointCallback, NULL );
 
+    var_Create( p_vout, "projection", VLC_VAR_INTEGER | VLC_VAR_DOINHERIT
+                | VLC_VAR_ISCOMMAND );
+    text.psz_string = _("Projection");
+    var_Change( p_vout, "projection", VLC_VAR_SETTEXT, &text, NULL );
+
+    for( size_t i = 0; i < ARRAY_SIZE(p_projection_values); i++ )
+    {
+        val.i_int = p_projection_values[i].value;
+        text.psz_string = _( p_projection_values[i].psz_label );
+        var_Change( p_vout, "projection", VLC_VAR_ADDCHOICE, &val, &text );
+    }
+
+    var_AddCallback( p_vout, "projection", ProjectionCallback, NULL );
+
     /* Add a variable to indicate if the window should be below all others */
     var_Create( p_vout, "video-wallpaper", VLC_VAR_BOOL | VLC_VAR_DOINHERIT );
     var_AddCallback( p_vout, "video-wallpaper", WallPaperCallback,
@@ -316,6 +352,7 @@ void vout_IntfReinit( vout_thread_t *p_vout )
     var_TriggerCallback( p_vout, "crop" );
     var_TriggerCallback( p_vout, "aspect-ratio" );
     var_TriggerCallback( p_vout, "viewpoint" );
+    var_TriggerCallback( p_vout, "projection" );
 
     var_TriggerCallback( p_vout, "video-on-top" );
     var_TriggerCallback( p_vout, "video-wallpaper" );
