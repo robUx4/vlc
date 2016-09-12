@@ -304,6 +304,8 @@ int libvlc_video_get_viewpoint( libvlc_media_player_t *p_mi,
     p_viewpoint->f_yaw           = p_mi->viewpoint.f_yaw;
     p_viewpoint->f_pitch         = p_mi->viewpoint.f_pitch;
     p_viewpoint->f_roll          = p_mi->viewpoint.f_roll;
+    p_viewpoint->f_zoom          = p_mi->viewpoint.f_zoom;
+    p_viewpoint->f_field_of_view = p_mi->viewpoint.f_fov;
     return 1;
 }
 
@@ -314,12 +316,15 @@ int libvlc_video_set_viewpoint( libvlc_media_player_t *p_mi,
     if (p_viewpoint == NULL)
     {
         p_mi->viewpoint.f_yaw = p_mi->viewpoint.f_pitch = p_mi->viewpoint.f_roll = 0.0f;
+        p_mi->viewpoint.f_zoom = p_mi->viewpoint.f_fov = 0.0f;
     }
     else
     {
         p_mi->viewpoint.f_yaw   =  p_viewpoint->f_yaw;
         p_mi->viewpoint.f_pitch =  p_viewpoint->f_pitch;
         p_mi->viewpoint.f_roll  =  p_viewpoint->f_roll;
+        p_mi->viewpoint.f_zoom  =  p_viewpoint->f_zoom;
+        p_mi->viewpoint.f_fov   =  p_viewpoint->f_field_of_view;
     }
 
     vout_thread_t **pp_vouts = GetVouts (p_mi, &n);

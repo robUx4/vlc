@@ -1244,7 +1244,9 @@ void vout_SetDisplayViewpoint(vout_display_t *vd, const vlc_viewpoint_t *p_viewp
     vlc_mutex_lock(&osys->viewpoint_lock);
     if (osys->viewpoint.f_yaw   != p_viewpoint->f_yaw ||
         osys->viewpoint.f_pitch != p_viewpoint->f_pitch ||
-        osys->viewpoint.f_roll  != p_viewpoint->f_roll) {
+        osys->viewpoint.f_roll  != p_viewpoint->f_roll ||
+        osys->viewpoint.f_zoom  != p_viewpoint->f_zoom ||
+        osys->viewpoint.f_fov   != p_viewpoint->f_fov) {
         osys->viewpoint = *p_viewpoint;
 
         osys->ch_viewpoint = true;

@@ -208,6 +208,7 @@ struct vout_display_opengl_t {
     float f_teta;
     float f_phi;
     float f_roll;
+    float f_fov;
     float f_zoom;
 };
 
@@ -807,6 +808,10 @@ void vout_display_opengl_SetViewpoint(vout_display_opengl_t *vgl, const vlc_view
     vgl->f_teta = p_viewpoint->f_yaw - M_PI / 2;
     vgl->f_phi = p_viewpoint->f_pitch;
     vgl->f_roll = p_viewpoint->f_roll;
+
+    vgl->f_fov = p_viewpoint->f_fov + 1.14f;
+
+    vgl->f_zoom = p_viewpoint->f_zoom;
 }
 
 int vout_display_opengl_SetProjection(vout_display_opengl_t *vgl, projection_mode proj_mode, int projection_slices)
@@ -1125,12 +1130,11 @@ static void getZoomMatrix(float zoom, GLfloat matrix[static 16]) {
     memcpy(matrix, m, sizeof(m));
 }
 
-static void getProjectionMatrix(float sar, GLfloat matrix[static 16]) {
+static void getProjectionMatrix(float sar, float fovy, GLfloat matrix[static 16]) {
 
     float f = 3;
     float n = 0.1;
 
-    float fovy = M_PI / 3;
     float d = 1 / tan(fovy / 2);
 
     const GLfloat m[] = {
@@ -1589,7 +1593,7 @@ static void DrawWithShaders(vout_display_opengl_t *vgl,
     if (projection == PROJECTION_SPHERE || projection == PROJECTION_CUBEMAP)
     {
         float sar = (float) vgl->fmt.i_visible_width / vgl->fmt.i_visible_height;
-        getProjectionMatrix(sar, projectionMatrix);
+        getProjectionMatrix(sar, vgl->f_fov, projectionMatrix);
         getViewMatrix(viewMatrix);
         getYRotMatrix(vgl->f_teta, yRotMatrix);
         getXRotMatrix(vgl->f_phi, xRotMatrix);

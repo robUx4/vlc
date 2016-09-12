@@ -92,6 +92,8 @@ struct vlc_viewpoint_t {
     float f_yaw;
     float f_pitch;
     float f_roll;
+    float f_zoom;
+    float f_fov;
 };
 
 /*****************************************************************************

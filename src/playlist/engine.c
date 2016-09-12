@@ -484,8 +484,11 @@ static void VariablesInit( playlist_t *p_playlist )
     vlc_viewpoint_t *p_vp = &pl_priv(p_playlist)->viewpoint;
     if ( psz_viewpoint == NULL ||
          sscanf( psz_viewpoint, "%f:%f:%f:%f:%f",
-                 &p_vp->f_yaw, &p_vp->f_pitch, &p_vp->f_roll) != 3) {
+                 &p_vp->f_yaw, &p_vp->f_pitch, &p_vp->f_roll,
+                 &p_vp->f_zoom, &p_vp->f_fov) != 5) {
         p_vp->f_yaw = p_vp->f_pitch = p_vp->f_roll = 0.0f;
+        p_vp->f_zoom = 0.0f;
+        p_vp->f_fov = 0.0f;
     }
     free(psz_viewpoint);
 

@@ -721,9 +721,12 @@ libvlc_media_player_new( libvlc_instance_t *instance )
 
     char *psz_viewpoint = var_InheritString(mp, "viewpoint" );
     if ( psz_viewpoint == NULL ||
-         sscanf( psz_viewpoint, "%f:%f:%f",
-                 &mp->viewpoint.f_yaw, &mp->viewpoint.f_pitch, &mp->viewpoint.f_roll) != 3) {
+         sscanf( psz_viewpoint, "%f:%f:%f:%f:%f",
+                 &mp->viewpoint.f_yaw, &mp->viewpoint.f_pitch, &mp->viewpoint.f_roll,
+                 &mp->viewpoint.f_zoom, &mp->viewpoint.f_fov) != 5) {
         mp->viewpoint.f_yaw = mp->viewpoint.f_pitch = mp->viewpoint.f_roll = 0.0f;
+        mp->viewpoint.f_zoom = 0.0f;
+        mp->viewpoint.f_fov = 0.0f;
     }
     free(psz_viewpoint);
 

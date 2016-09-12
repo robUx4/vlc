@@ -436,7 +436,7 @@ static const char *const ppsz_pos_descriptions[] =
 #define VIEWPOINT_TEXT N_("Viewpoint")
 #define VIEWPOINT_LONGTEXT N_( \
     "This forces the viewpoint for the displayed video. " \
-    "Accepted formats are yaw:pitch:roll expressing the user viewpoint.")
+    "Accepted formats are yaw:pitch:roll:zoom:fov expressing the user viewpoint.")
 
 #define PROJECTION_TEXT N_("Projection")
 #define PROJECTION_LONGTEXT N_( \

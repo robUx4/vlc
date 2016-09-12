@@ -569,6 +569,7 @@ static void VoutGetDisplayCfg(vout_thread_t *vout, vout_display_cfg_t *cfg, cons
     cfg->viewpoint.f_yaw   = 0.0f;
     cfg->viewpoint.f_pitch = 0.0f;
     cfg->viewpoint.f_roll  = 0.0f;
+    cfg->viewpoint.f_zoom  = 0.0f;
     cfg->display.title = title;
     const int display_width = var_CreateGetInteger(vout, "width");
     const int display_height = var_CreateGetInteger(vout, "height");
@@ -1314,7 +1315,7 @@ static void ThreadExecuteCropRatio(vout_thread_t *vout,
 
 static void ThreadExecuteViewpoint(vout_thread_t *vout, const vlc_viewpoint_t *p_viewpoint)
 {
-    msg_Dbg(vout, "ThreadExecuteViewpoint %f %f %f", p_viewpoint->f_yaw, p_viewpoint->f_pitch, p_viewpoint->f_roll);
+    //msg_Dbg(vout, "ThreadExecuteViewpoint %f %f %f zoom:%f fov:%f", p_viewpoint->f_yaw, p_viewpoint->f_pitch, p_viewpoint->f_roll, p_viewpoint->f_zoom, p_viewpoint->f_fov);
     vout_SetDisplayViewpoint(vout->p->display.vd, p_viewpoint);
 }
 
