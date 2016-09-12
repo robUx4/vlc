@@ -98,6 +98,7 @@ void vout_display_opengl_Delete(vout_display_opengl_t *vgl);
 picture_pool_t *vout_display_opengl_GetPool(vout_display_opengl_t *vgl, unsigned);
 
 void vout_display_opengl_SetViewpoint(vout_display_opengl_t *vgl, const vlc_viewpoint_t*);
+int vout_display_opengl_SetProjection(vout_display_opengl_t *vgl, projection_mode);
 
 int vout_display_opengl_Prepare(vout_display_opengl_t *vgl,
                                 picture_t *picture, subpicture_t *subpicture);

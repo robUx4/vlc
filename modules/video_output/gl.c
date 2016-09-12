@@ -255,6 +255,15 @@ static int Control (vout_display_t *vd, int query, va_list ap)
         vout_display_opengl_SetViewpoint(sys->vgl, &p_cfg->viewpoint);
         return VLC_SUCCESS;
       }
+      case VOUT_DISPLAY_CHANGE_PROJECTION:
+      {
+          const vout_display_cfg_t *p_cfg = va_arg (ap, const vout_display_cfg_t *);
+          int res = vout_display_opengl_SetProjection(sys->vgl, p_cfg->projection);
+
+          if (res != VLC_SUCCESS )
+              msg_Warn(vd, "Failed to set the projection type %d", p_cfg->projection);
+          return res;
+      }
       default:
         msg_Err (vd, "Unknown request %d", query);
     }

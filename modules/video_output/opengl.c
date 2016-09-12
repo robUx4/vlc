@@ -120,6 +120,7 @@ struct vout_display_opengl_t {
 
     video_format_t fmt;
     const vlc_chroma_description_t *chroma;
+    projection_mode projection;
 
     int        tex_target;
     int        tex_format;
@@ -781,11 +782,47 @@ void vout_display_opengl_Delete(vout_display_opengl_t *vgl)
     free(vgl);
 }
 
+static projection_mode vout_display_projection(vout_display_opengl_t *vgl)
+{
+    if (vgl->projection == PROJECTION_AUTO)
+    {
+        switch (vgl->fmt.projection_mode)
+        {
+        case PROJECTION_MODE_RECTANGULAR:
+            return PROJECTION_FLAT;
+        case PROJECTION_MODE_EQUIRECTANGULAR:
+            return PROJECTION_SPHERE;
+        case PROJECTION_MODE_CUBEMAP_LAYOUT_STANDARD:
+            return PROJECTION_CUBEMAP;
+        default:
+            break;
+        }
+    }
+    return vgl->projection;
+}
+
 void vout_display_opengl_SetViewpoint(vout_display_opengl_t *vgl, const vlc_viewpoint_t *p_viewpoint)
 {
     vgl->f_teta = p_viewpoint->f_yaw - M_PI / 2;
     vgl->f_phi = p_viewpoint->f_pitch;
     vgl->f_roll = p_viewpoint->f_roll;
+}
+
+int vout_display_opengl_SetProjection(vout_display_opengl_t *vgl, projection_mode proj_mode)
+{
+    switch (proj_mode)
+    {
+    case PROJECTION_AUTO:
+    case PROJECTION_FLAT:
+    case PROJECTION_SPHERE:
+    case PROJECTION_CUBEMAP:
+        vgl->projection = proj_mode;
+        vlc_viewpoint_t viewpoint = {};
+        vout_display_opengl_SetViewpoint( vgl, &viewpoint );
+        return VLC_SUCCESS;
+    default:
+        return VLC_EBADVAR;
+    }
 }
 
 picture_pool_t *vout_display_opengl_GetPool(vout_display_opengl_t *vgl, unsigned requested_count)
@@ -1505,21 +1542,22 @@ static void DrawWithShaders(vout_display_opengl_t *vgl,
     unsigned nbVertices, nbIndices;
 
     int i_ret;
-    switch (vgl->fmt.projection_mode)
+    const projection_mode projection = vout_display_projection(vgl);
+    switch (projection)
     {
-    case PROJECTION_MODE_RECTANGULAR:
+    case PROJECTION_FLAT:
         i_ret = BuildRectangle(vgl->chroma->plane_count,
                                &vertexCoord, &textureCoord, &nbVertices,
                                &indices, &nbIndices,
                                left, top, right, bottom);
         break;
-    case PROJECTION_MODE_EQUIRECTANGULAR:
+    case PROJECTION_SPHERE:
         i_ret = BuildSphere(vgl->chroma->plane_count,
                             &vertexCoord, &textureCoord, &nbVertices,
                             &indices, &nbIndices,
                             left, top, right, bottom);
         break;
-    case PROJECTION_MODE_CUBEMAP_LAYOUT_STANDARD:
+    case PROJECTION_CUBEMAP:
         i_ret = BuildCube(vgl->chroma->plane_count,
                           (float)vgl->fmt.i_cubemap_padding / vgl->fmt.i_width,
                           (float)vgl->fmt.i_cubemap_padding / vgl->fmt.i_height,
@@ -1541,8 +1579,7 @@ static void DrawWithShaders(vout_display_opengl_t *vgl,
 
     orientationTransformMatrix(orientationMatrix, vgl->fmt.orientation);
 
-    if (vgl->fmt.projection_mode == PROJECTION_MODE_EQUIRECTANGULAR
-        || vgl->fmt.projection_mode == PROJECTION_MODE_CUBEMAP_LAYOUT_STANDARD)
+    if (projection == PROJECTION_SPHERE || projection == PROJECTION_CUBEMAP)
     {
         float sar = (float) vgl->fmt.i_visible_width / vgl->fmt.i_visible_height;
         getProjectionMatrix(sar, projectionMatrix);
