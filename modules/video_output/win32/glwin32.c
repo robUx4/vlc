@@ -55,6 +55,8 @@ vlc_module_begin()
     set_capability("vout display", 220)
     add_shortcut("glwin32", "opengl")
     set_callbacks(Open, Close)
+
+    add_integer("gl-projection-slices", 0, GL_PROJECTION_SLICES_TEXT, GL_PROJECTION_SLICES_LONGTEXT, true)
 vlc_module_end()
 
 /*****************************************************************************
@@ -160,7 +162,8 @@ static int Control(vout_display_t *vd, int query, va_list args)
     else if (query == VOUT_DISPLAY_CHANGE_PROJECTION)
     {
         const vout_display_cfg_t *p_cfg = va_arg (args, const vout_display_cfg_t *);
-        int res = vout_display_opengl_SetProjection(sys->vgl, p_cfg->projection);
+        int res = vout_display_opengl_SetProjection(sys->vgl, p_cfg->projection,
+                                                    var_InheritInteger(vd, "gl-projection-slices"));
 
         if (res != VLC_SUCCESS )
             msg_Warn(vd, "Failed to set the projection type %d", p_cfg->projection);

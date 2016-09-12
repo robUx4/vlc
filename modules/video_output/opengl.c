@@ -121,6 +121,7 @@ struct vout_display_opengl_t {
     video_format_t fmt;
     const vlc_chroma_description_t *chroma;
     projection_mode projection;
+    int projection_slices;
 
     int        tex_target;
     int        tex_format;
@@ -808,7 +809,7 @@ void vout_display_opengl_SetViewpoint(vout_display_opengl_t *vgl, const vlc_view
     vgl->f_roll = p_viewpoint->f_roll;
 }
 
-int vout_display_opengl_SetProjection(vout_display_opengl_t *vgl, projection_mode proj_mode)
+int vout_display_opengl_SetProjection(vout_display_opengl_t *vgl, projection_mode proj_mode, int projection_slices)
 {
     switch (proj_mode)
     {
@@ -817,6 +818,7 @@ int vout_display_opengl_SetProjection(vout_display_opengl_t *vgl, projection_mod
     case PROJECTION_SPHERE:
     case PROJECTION_CUBEMAP:
         vgl->projection = proj_mode;
+        vgl->projection_slices = projection_slices;
         vlc_viewpoint_t viewpoint = {};
         vout_display_opengl_SetViewpoint( vgl, &viewpoint );
         return VLC_SUCCESS;
@@ -1256,11 +1258,15 @@ static void DrawWithoutShaders(vout_display_opengl_t *vgl,
 static int BuildSphere(unsigned nbPlanes,
                         GLfloat **vertexCoord, GLfloat **textureCoord, unsigned *nbVertices,
                         GLushort **indices, unsigned *nbIndices,
-                        float *left, float *top, float *right, float *bottom)
+                        float *left, float *top, float *right, float *bottom,
+                        unsigned nbLatBands, unsigned nbLonBands)
 {
     float radius = 1;
-    unsigned nbLatBands = 128;
-    unsigned nbLonBands = 128;
+
+    if (nbLatBands == 0)
+        nbLatBands = 50;
+    if (nbLonBands == 0)
+        nbLonBands = 50;
 
     *nbVertices = (nbLatBands + 1) * (nbLonBands + 1);
     *nbIndices = nbLatBands * nbLonBands * 3 * 2;
@@ -1555,7 +1561,8 @@ static void DrawWithShaders(vout_display_opengl_t *vgl,
         i_ret = BuildSphere(vgl->chroma->plane_count,
                             &vertexCoord, &textureCoord, &nbVertices,
                             &indices, &nbIndices,
-                            left, top, right, bottom);
+                            left, top, right, bottom,
+                            vgl->projection_slices, vgl->projection_slices);
         break;
     case PROJECTION_CUBEMAP:
         i_ret = BuildCube(vgl->chroma->plane_count,
