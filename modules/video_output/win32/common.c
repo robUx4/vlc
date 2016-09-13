@@ -206,6 +206,12 @@ void UpdateRects(vout_display_t *vd,
     place_cfg.display.width = rect.right;
     place_cfg.display.height = rect.bottom;
 
+    if (place_cfg.projection == PROJECTION_FLAT && place_cfg.viewpoint.f_zoom != 0.0f)
+    {
+        place_cfg.zoom.num *= 1000;
+        place_cfg.zoom.den *= 1000 * (1.0f - place_cfg.viewpoint.f_zoom);
+    }
+
     vout_display_place_t place;
     vout_display_PlacePicture(&place, source, &place_cfg, false);
 

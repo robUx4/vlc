@@ -228,9 +228,16 @@ static int Control (vout_display_t *vd, int query, va_list ap)
       {
         const vout_display_cfg_t *c = va_arg (ap, const vout_display_cfg_t *);
         const video_format_t *src = &vd->source;
+        vout_display_cfg_t place_cfg = *c;
         vout_display_place_t place;
 
-        vout_display_PlacePicture (&place, src, c, false);
+        if (place_cfg.projection == PROJECTION_FLAT && place_cfg.viewpoint.f_zoom != 0.0f)
+        {
+            place_cfg.zoom.num *= 1000;
+            place_cfg.zoom.den *= 1000 * (1.0f - place_cfg.viewpoint.f_zoom);
+        }
+
+        vout_display_PlacePicture (&place, src, &place_cfg, false);
         vlc_gl_Resize (sys->gl, place.width, place.height);
         vlc_gl_MakeCurrent (sys->gl);
         glViewport (place.x, place.y, place.width, place.height);
@@ -244,8 +251,15 @@ static int Control (vout_display_t *vd, int query, va_list ap)
         const vout_display_cfg_t *cfg = vd->cfg;
         const video_format_t *src = va_arg (ap, const video_format_t *);
         vout_display_place_t place;
+        vout_display_cfg_t place_cfg = *cfg;
 
-        vout_display_PlacePicture (&place, src, cfg, false);
+        if (place_cfg.projection == PROJECTION_FLAT && place_cfg.viewpoint.f_zoom != 0.0f)
+        {
+            place_cfg.zoom.num *= 1000;
+            place_cfg.zoom.den *= 1000 * (1.0f - place_cfg.viewpoint.f_zoom);
+        }
+
+        vout_display_PlacePicture (&place, src, &place_cfg, false);
         vlc_gl_MakeCurrent (sys->gl);
         glViewport (place.x, place.y, place.width, place.height);
         vlc_gl_ReleaseCurrent (sys->gl);

@@ -414,6 +414,11 @@ static int Control (vout_display_t *vd, int query, va_list ap)
                 cfg_tmp.display.width = bounds.size.width;
                 cfg_tmp.display.height = bounds.size.height;
 
+                if (cfg_tmp.projection == PROJECTION_FLAT && cfg_tmp.viewpoint.f_zoom != 0.0f) {
+                    cfg_tmp.zoom.num *= 1000;
+                    cfg_tmp.zoom.den *= 1000 * (1.0f - cfg_tmp.viewpoint.f_zoom);
+                }
+
                 vout_display_place_t place;
                 vout_display_PlacePicture (&place, source, &cfg_tmp, false);
                 @synchronized (sys->glView) {
@@ -681,6 +686,11 @@ static void OpenglSwap (vlc_gl_t *gl)
             vout_display_cfg_t cfg_tmp = *(vd->cfg);
             cfg_tmp.display.width  = bounds.size.width;
             cfg_tmp.display.height = bounds.size.height;
+
+            if (cfg_tmp.projection == PROJECTION_FLAT && cfg_tmp.viewpoint.f_zoom != 0.0f) {
+                cfg_tmp.zoom.num *= 1000;
+                cfg_tmp.zoom.den *= 1000 * (1.0f - cfg_tmp.viewpoint.f_zoom);
+            }
 
             vout_display_PlacePicture (&place, &vd->source, &cfg_tmp, false);
             vd->sys->place = place;

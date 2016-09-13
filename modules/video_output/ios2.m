@@ -414,6 +414,11 @@ static int Control(vout_display_t *vd, int query, va_list ap)
                 cfg_tmp.display.width = viewSize.width * scaleFactor;
                 cfg_tmp.display.height = viewSize.height * scaleFactor;
 
+                if (cfg_tmp.projection == PROJECTION_FLAT && cfg_tmp.viewpoint.f_zoom != 0.0f) {
+                    cfg_tmp.zoom.num *= 1000;
+                    cfg_tmp.zoom.den *= 1000 * (1.0f - cfg_tmp.viewpoint.f_zoom);
+                }
+
                 vout_display_place_t place;
                 vout_display_PlacePicture(&place, source, &cfg_tmp, false);
                 @synchronized (sys->glESView) {
@@ -800,6 +805,11 @@ static void ZeroCopyDisplay(vout_display_t *vd, picture_t *pic, subpicture_t *su
 
             cfg_tmp.display.width  = viewSize.width * scaleFactor;
             cfg_tmp.display.height = viewSize.height * scaleFactor;
+
+            if (cfg_tmp.projection == PROJECTION_FLAT && cfg_tmp.viewpoint.f_zoom != 0.0f) {
+                cfg_tmp.zoom.num *= 1000;
+                cfg_tmp.zoom.den *= 1000 * (1.0f - cfg_tmp.viewpoint.f_zoom);
+            }
 
             vout_display_PlacePicture(&place, &_voutDisplay->source, &cfg_tmp, false);
             _voutDisplay->sys->place = place;
