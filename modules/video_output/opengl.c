@@ -1599,6 +1599,15 @@ static void DrawWithShaders(vout_display_opengl_t *vgl,
         getXRotMatrix(vgl->f_phi, xRotMatrix);
         getZoomMatrix(vgl->f_zoom, zoomMatrix);
     }
+    else if (projection == PROJECTION_FLAT &&
+             (vgl->fmt.projection_mode == PROJECTION_MODE_EQUIRECTANGULAR)) /* TODO pan/zoom feature */
+    {
+        memcpy(projectionMatrix, identity, sizeof(identity));
+        memcpy(viewMatrix, identity, sizeof(identity));
+        memcpy(yRotMatrix, identity, sizeof(identity));
+        memcpy(xRotMatrix, identity, sizeof(identity));
+        getZoomMatrix(vgl->f_zoom, zoomMatrix);
+    }
     else
     {
         memcpy(projectionMatrix, identity, sizeof(identity));
