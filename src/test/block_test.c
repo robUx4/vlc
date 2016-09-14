@@ -57,12 +57,14 @@ static void test_block_File(bool write)
     block_t *block = block_File(fileno(stream), write);
     fclose (stream);
 
+#ifndef _WIN32
     assert (block != NULL);
     assert (block->i_buffer == strlen (text));
     assert (!memcmp (block->p_buffer, text, block->i_buffer));
     if (write)
         memset(block->p_buffer, 'A', block->i_buffer);
     block_Release (block);
+#endif
 
     remove ("testfile.txt");
 }
