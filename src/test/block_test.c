@@ -59,10 +59,12 @@ static void test_block_File (void)
     block_t *block = block_File (fd);
     fclose (stream);
 
+#ifndef _WIN32
     assert (block != NULL);
     assert (block->i_buffer == strlen (text));
     assert (!memcmp (block->p_buffer, text, block->i_buffer));
     block_Release (block);
+#endif
 
     remove ("testfile.txt");
 }
