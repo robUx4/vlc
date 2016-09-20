@@ -19,6 +19,7 @@ endif
 	$(APPLY) $(SRC)/gpg-error/no-executable.patch
 	$(APPLY) $(SRC)/gpg-error/win32-unicode.patch
 ifdef HAVE_VISUALSTUDIO
+	$(APPLY) $(SRC)/gpg-error/win32-winsock.patch
 	$(APPLY) $(SRC)/gpg-error/msvc.patch
 endif
 	$(MOVE)
