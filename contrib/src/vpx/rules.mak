@@ -99,6 +99,10 @@ ifndef BUILD_ENCODERS
 VPX_CONF += --disable-vp8-encoder --disable-vp9-encoder
 endif
 
+ifdef HAVE_VISUALSTUDIO
+VPX_CONF += --disable-sse2 --disable-ssse3 --disable-avx2 --disable-neon
+endif
+
 ifndef HAVE_WIN32
 VPX_CONF += --enable-pic
 else
