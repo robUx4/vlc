@@ -26,6 +26,6 @@ endif
 
 .nfs: nfs
 	cd $< && ./bootstrap
-	cd $< && $(HOSTVARS) ./configure --disable-examples --disable-utils --disable-werror $(HOSTCONF)
+	cd $< && $(HOSTVARS) ./configure --disable-examples --disable-utils --disable-werror $(HOSTCONF) --disable-dependency-tracking
 	cd $< && $(MAKE) install
 	touch $@
