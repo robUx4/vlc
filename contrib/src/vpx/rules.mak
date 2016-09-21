@@ -23,6 +23,7 @@ endif
 	$(APPLY) $(SRC)/vpx/windows-pthread.patch
 	$(APPLY) $(SRC)/vpx/libvpx-msvc.patch
 	$(APPLY) $(SRC)/vpx/msvc.patch
+	$(APPLY) $(SRC)/vpx/libvpx-clang.patch
 	$(MOVE)
 
 DEPS_vpx =
