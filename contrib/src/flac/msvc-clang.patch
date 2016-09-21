@@ -21,3 +21,73 @@
  #else
  	return FLAC__clz_soft_uint32(v);
  #endif
+--- flac/include/share/compat.h	2016-09-21 10:27:28.746451600 +0200
++++ flac/include/share/compat.h.msvc	2016-09-21 10:20:51.205195700 +0200
+@@ -152,6 +152,7 @@
+ #define flac_unlink unlink_utf8
+ #define flac_rename rename_utf8
+ #define flac_stat _stat64_utf8
++#define utimbuf __utimbuf64
+ 
+ #else
+ 
+--- flac/include/share/win_utf8_io.h	2016-09-21 10:27:56.666037800 +0200
++++ flac/include/share/win_utf8_io.h.msvc	2016-09-21 10:18:45.182389900 +0200
+@@ -53,7 +53,7 @@ FILE *fopen_utf8(const char *filename, c
+ int stat_utf8(const char *path, struct stat *buffer);
+ int _stat64_utf8(const char *path, struct __stat64 *buffer);
+ int chmod_utf8(const char *filename, int pmode);
+-int utime_utf8(const char *filename, struct utimbuf *times);
++int utime_utf8(const char *filename, struct __utimbuf64 *times);
+ int unlink_utf8(const char *filename);
+ int rename_utf8(const char *oldname, const char *newname);
+ size_t strlen_utf8(const char *str);
+--- flac/src/libFLAC/include/private/cpu.h	2016-09-21 10:29:23.680569100 +0200
++++ flac/src/libFLAC/include/private/cpu.h.msvc	2016-09-21 10:25:57.370977000 +0200
+@@ -71,6 +71,12 @@
+     #define FLAC__AVX2_SUPPORTED 1
+     #define FLAC__FMA_SUPPORTED 1
+   #endif
++  #if defined(__clang__) /* some instructions are missing */
++    #undef FLAC__SSE2_SUPPORTED
++    #undef FLAC__SSSE3_SUPPORTED
++    #undef FLAC__SSE4_1_SUPPORTED
++    #undef FLAC__AVX2_SUPPORTED
++  #endif
+ #elif defined __GNUC__
+   #if (__GNUC__ > 4 || (__GNUC__ == 4 && __GNUC_MINOR__ >= 9)) /* since GCC 4.9 -msse.. compiler options aren't necessary */
+     #define FLAC__SSE_TARGET(x) __attribute__ ((__target__ (x)))
+--- flac/src/share/win_utf8_io/win_utf8_io.c	2016-09-21 10:28:37.257823600 +0200
++++ flac/src/share/win_utf8_io/win_utf8_io.c.msvc	2016-09-21 10:18:49.909934500 +0200
+@@ -317,7 +317,7 @@ int chmod_utf8(const char *filename, int
+ 	return ret;
+ }
+ 
+-int utime_utf8(const char *filename, struct utimbuf *times)
++int utime_utf8(const char *filename, struct __utimbuf64 *times)
+ {
+ 	wchar_t *wname;
+ 	struct __utimbuf64 ut;
+--- flac/src/libFLAC/include/private/bitmath.h	2016-09-22 13:59:02.495578300 +0200
++++ flac/src/libFLAC/include/private/bitmath.h.msvc	2016-09-22 13:58:19.856027300 +0200
+@@ -78,16 +78,16 @@ static inline unsigned int FLAC__clz_uin
+     FLAC__ASSERT(v > 0);
+ #if defined(__INTEL_COMPILER)
+     return _bit_scan_reverse(v) ^ 31U;
+-#elif defined(__GNUC__) && (__GNUC__ >= 4 || (__GNUC__ == 3 && __GNUC_MINOR__ >= 4))
+-/* This will translate either to (bsr ^ 31U), clz , ctlz, cntlz, lzcnt depending on
+- * -march= setting or to a software routine in exotic machines. */
+-    return __builtin_clz(v);
+ #elif defined(_MSC_VER) && (_MSC_VER >= 1400)
+     {
+         unsigned long idx;
+         _BitScanReverse(&idx, v);
+         return idx ^ 31U;
+     }
++#elif defined(__GNUC__) && (__GNUC__ >= 4 || (__GNUC__ == 3 && __GNUC_MINOR__ >= 4))
++/* This will translate either to (bsr ^ 31U), clz , ctlz, cntlz, lzcnt depending on
++ * -march= setting or to a software routine in exotic machines. */
++    return __builtin_clz(v);
+ #else
+     return FLAC__clz_soft_uint32(v);
+ #endif
