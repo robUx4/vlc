@@ -30,6 +30,9 @@ ifeq ($(ANDROID_ABI), x86)
 	cd $(UNPACK_DIR) && sed -i.orig -e s/"#  undef USE_OBSOLETE_SIGCONTEXT_FLAVOR"/"#define USE_OBSOLETE_SIGCONTEXT_FLAVOR"/g src/libFLAC/cpu.c
 endif
 endif
+ifdef HAVE_VISUALSTUDIO
+	$(APPLY) $(SRC)/flac/msvc-clang.patch
+endif
 	$(call pkg_static,"src/libFLAC/flac.pc.in")
 	$(UPDATE_AUTOCONFIG)
 	$(MOVE)
