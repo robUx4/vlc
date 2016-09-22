@@ -47,6 +47,7 @@ ifdef HAVE_WIN32
 endif
 ifdef HAVE_VISUALSTUDIO
 	$(APPLY) $(SRC)/ass/msvc.patch
+	$(APPLY) $(SRC)/ass/ass-msvc-clang.patch
 endif
 	$(UPDATE_AUTOCONFIG)
 	$(MOVE)
