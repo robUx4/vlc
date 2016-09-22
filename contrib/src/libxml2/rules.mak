@@ -41,6 +41,9 @@ libxml2: libxml2-$(LIBXML2_VERSION).tar.gz .sum-libxml2
 ifdef HAVE_WINSTORE
 	$(APPLY) $(SRC)/libxml2/nogetcwd.patch
 endif
+ifdef HAVE_VISUALSTUDIO
+	$(APPLY) $(SRC)/libxml2/msvc-clang.patch
+endif
 	$(MOVE)
 
 .libxml2: libxml2

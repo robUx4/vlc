@@ -1,0 +1,11 @@
+--- libxml2/timsort.h	2016-09-22 18:47:58.260128600 +0200
++++ libxml2/timsort.h.clang	2016-09-22 18:06:48.053548800 +0200
+@@ -48,7 +48,7 @@ typedef unsigned __int64 uint64_t;
+ int compute_minrun(uint64_t);
+ 
+ #ifndef CLZ
+-#if defined(__GNUC__) && ((__GNUC__ == 3 && __GNUC_MINOR__ >= 4) || (__GNUC__ > 3))
++#if defined(__GNUC__) && ((__GNUC__ == 3 && __GNUC_MINOR__ >= 4) || (__GNUC__ > 3)) && !defined(_MSC_VER)
+ #define CLZ __builtin_clzll
+ #else
+ 
