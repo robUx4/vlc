@@ -21,6 +21,7 @@ endif
 ifdef HAVE_VISUALSTUDIO
 	$(APPLY) $(SRC)/gpg-error/win32-winsock.patch
 	$(APPLY) $(SRC)/gpg-error/msvc.patch
+	$(APPLY) $(SRC)/gpg-error/msvc-clang.patch
 endif
 	$(MOVE)
 	cp $@/src/syscfg/lock-obj-pub.arm-unknown-linux-androideabi.h $@/src/syscfg/lock-obj-pub.linux-android.h
@@ -38,7 +39,7 @@ endif
 endif
 
 .gpg-error: libgpg-error
-	$(RECONF)
-	cd $< && $(HOSTVARS) ./configure $(HOSTCONF) --disable-nls --disable-shared --disable-languages --disable-tests
+	#~ $(RECONF)
+	#~ cd $< && $(HOSTVARS) ./configure $(HOSTCONF) --disable-nls --disable-shared --disable-languages --disable-tests
 	cd $< && $(MAKE) install
 	touch $@
