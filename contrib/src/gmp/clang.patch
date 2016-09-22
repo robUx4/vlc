@@ -36,3 +36,14 @@ diff -r db645603dcdb -r 1fab0adc5ff7 mpn/x86_64/k8/redc_1.asm
  #define __GMP_DECLSPEC_EXPORT  __declspec(__dllexport__)
  #define __GMP_DECLSPEC_IMPORT  __declspec(__dllimport__)
  #endif
+--- gmp/mpn/generic/div_qr_1n_pi1.c	2016-09-22 17:12:27.252568200 +0200
++++ gmp/mpn/generic/div_qr_1n_pi1.c.clang	2016-09-22 17:11:45.588705900 +0200
+@@ -49,7 +49,7 @@ see https://www.gnu.org/licenses/.  */
+ 
+ /* FIXME: Duplicated in mod_1_1.c. Move to gmp-impl.h */
+ 
+-#if defined (__GNUC__)
++#if defined (__GNUC__) && !defined(_MSC_VER)
+ 
+ #if HAVE_HOST_CPU_FAMILY_x86 && W_TYPE_SIZE == 32
+ #define add_mssaaaa(m, s1, s0, a1, a0, b1, b0)				\
