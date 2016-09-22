@@ -28,6 +28,9 @@ pthreads: pthreads-w32-$(PTHREADS_W32_VERSION)-release.tar.gz .sum-pthreads
 ifdef HAVE_WINSTORE
 	$(APPLY) $(SRC)/pthreads/winrt.patch
 endif
+ifdef HAVE_VISUALSTUDIO
+	$(APPLY) $(SRC)/pthreads/pthreads-clang.patch
+endif
 	$(MOVE)
 
 ifdef HAVE_CROSS_COMPILE
