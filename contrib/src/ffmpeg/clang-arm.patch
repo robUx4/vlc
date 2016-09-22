@@ -1,0 +1,48 @@
+--- ffmpeg/configure	2016-09-22 14:21:06.048618500 +0200
++++ ffmpeg/configure.clang	2016-09-22 14:21:13.103692100 +0200
+@@ -4286,7 +4286,11 @@ elif enabled arm; then
+     case "$subarch" in
+         armv5t*)    enable fast_clz                ;;
+         armv[6-8]*)
+-            enable fast_clz
++            if [ "$toolchain" != "msvc" ]; then
++                enable fast_clz
++            else
++                disable fast_clz
++            fi
+             disabled fast_unaligned || enable fast_unaligned
+             ;;
+     esac
+--- ffmpeg/libavutil/arm/intreadwrite.h	2016-09-22 14:22:54.869674100 +0200
++++ ffmpeg/libavutil/arm/intreadwrite.h.clang	2016-09-22 13:54:23.436275700 +0200
+@@ -61,7 +61,7 @@ static av_always_inline void AV_WN32(voi
+     __asm__ ("str  %1, %0" : "=m"(*(uint32_t *)p) : "r"(v));
+ }
+ 
+-#if HAVE_ASM_MOD_Q
++#if HAVE_ASM_MOD_Q && 0
+ 
+ #define AV_RN64 AV_RN64
+ static av_always_inline uint64_t AV_RN64(const void *p)
+--- ffmpeg/libavutil/arm/intmath.h	2016-09-22 14:38:28.926405200 +0200
++++ ffmpeg/libavutil/arm/intmath.h.clang	2016-09-22 13:54:29.481613000 +0200
+@@ -96,7 +96,7 @@ static av_always_inline int av_sat_dadd3
+ 
+ #endif /* HAVE_ARMV6_INLINE */
+ 
+-#if HAVE_ASM_MOD_Q
++#if HAVE_ASM_MOD_Q && 0
+ 
+ #define av_clipl_int32 av_clipl_int32_arm
+ static av_always_inline av_const int32_t av_clipl_int32_arm(int64_t a)
+--- ffmpeg/libavutil/intmath.h	2016-09-22 14:38:48.806071200 +0200
++++ ffmpeg/libavutil/intmath.h.clang	2016-09-22 14:38:44.232618200 +0200
+@@ -153,7 +153,7 @@ static av_always_inline av_const unsigne
+ }
+ #endif
+ 
+-#if AV_GCC_VERSION_AT_LEAST(3,4)
++#if AV_GCC_VERSION_AT_LEAST(3,4) && !defined(_MSC_VER)
+ #ifndef av_parity
+ #define av_parity __builtin_parity
+ #endif
