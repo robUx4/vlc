@@ -25,3 +25,25 @@ diff -r db645603dcdb -r 1fab0adc5ff7 mpn/x86_64/k8/redc_1.asm
  L(0m4):
  L(lo0):	mov	(mp,nneg,8), %rax
  	mov	nneg, i
+--- gmp/gmp-h.in	2014-03-24 22:43:07.000000000 +0100
++++ gmp/gmp-h.in.clang	2016-10-24 15:38:57.282875700 +0200
+@@ -101,7 +101,7 @@ see https://www.gnu.org/licenses/.  */
+    "void _export foo();".  Would have to change the __GMP_DECLSPEC syntax to
+    make use of that.  Probably more trouble than it's worth.  */
+ 
+-#if defined (__GNUC__)
++#if defined (__GNUC__) && !defined(_MSC_VER)
+ #define __GMP_DECLSPEC_EXPORT  __declspec(__dllexport__)
+ #define __GMP_DECLSPEC_IMPORT  __declspec(__dllimport__)
+ #endif
+--- gmp/mpn/generic/div_qr_1n_pi1.c	2016-09-22 17:12:27.252568200 +0200
++++ gmp/mpn/generic/div_qr_1n_pi1.c.clang	2016-09-22 17:11:45.588705900 +0200
+@@ -49,7 +49,7 @@ see https://www.gnu.org/licenses/.  */
+ 
+ /* FIXME: Duplicated in mod_1_1.c. Move to gmp-impl.h */
+ 
+-#if defined (__GNUC__)
++#if defined (__GNUC__) && !defined(_MSC_VER)
+ 
+ #if HAVE_HOST_CPU_FAMILY_x86 && W_TYPE_SIZE == 32
+ #define add_mssaaaa(m, s1, s0, a1, a0, b1, b0)				\
