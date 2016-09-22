@@ -20,9 +20,16 @@ freetype: freetype-$(FREETYPE2_VERSION).tar.gz .sum-freetype2
 
 DEPS_freetype2 = zlib $(DEPS_zlib)
 
+FREETYPE_CFLAGS=$(CFLAGS)
+ifdef HAVE_VISUALSTUDIO
+ifeq ($(ARCH),arm)
+FREETYPE_CFLAGS += -DFT_CONFIG_OPTION_NO_ASSEMBLER
+endif
+endif
+
 .freetype2: freetype
 	cd $< && cp builds/unix/install-sh .
 	sed -i.orig s/-ansi// $</builds/unix/configure
-	cd $< && GNUMAKE=$(MAKE) $(HOSTVARS) ./configure --with-harfbuzz=no --with-zlib=yes --without-png --with-bzip2=no $(HOSTCONF)
+	cd $< && GNUMAKE=$(MAKE) $(HOSTVARS) ./configure --with-harfbuzz=no --with-zlib=yes --without-png --with-bzip2=no $(HOSTCONF) CFLAGS="$(FREETYPE_CFLAGS)"
 	cd $< && $(MAKE) && $(MAKE) install
 	touch $@
