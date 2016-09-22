@@ -236,7 +236,6 @@ ffmpeg: ffmpeg-$(FFMPEG_BASENAME).tar.xz .sum-ffmpeg
 ifdef USE_FFMPEG
 	$(APPLY) $(SRC)/ffmpeg/force-unicode.patch
 endif
-	$(APPLY) $(SRC)/ffmpeg/clang.patch
 ifdef HAVE_VISUALSTUDIO
 	$(APPLY) $(SRC)/ffmpeg/msvc.patch$(PATCH_SUFFIX)
 	$(APPLY) $(SRC)/ffmpeg/near_field.patch$(PATCH_SUFFIX)
