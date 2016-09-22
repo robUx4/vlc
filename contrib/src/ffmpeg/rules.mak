@@ -230,6 +230,7 @@ ffmpeg: ffmpeg-$(FFMPEG_HASH).tar.xz .sum-ffmpeg
 ifdef HAVE_VISUALSTUDIO
 	$(APPLY) $(SRC)/ffmpeg/msvc.patch$(PATCH_SUFFIX)
 	$(APPLY) $(SRC)/ffmpeg/near_field.patch$(PATCH_SUFFIX)
+	$(APPLY) $(SRC)/ffmpeg/clang-arm.patch
 endif
 	$(MOVE)
 
