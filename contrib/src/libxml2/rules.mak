@@ -45,6 +45,9 @@ ifdef HAVE_WINSTORE
 	$(APPLY) $(SRC)/libxml2/nogetcwd.patch
 endif
 	$(APPLY) $(SRC)/libxml2/libxml2-lzma.patch
+ifdef HAVE_VISUALSTUDIO
+	$(APPLY) $(SRC)/libxml2/msvc-clang.patch
+endif
 	$(call pkg_static,"libxml-2.0.pc.in")
 	$(MOVE)
 
