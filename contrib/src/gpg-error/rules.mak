@@ -21,6 +21,7 @@ endif
 ifdef HAVE_VISUALSTUDIO
 	$(APPLY) $(SRC)/gpg-error/win32-winsock.patch
 	$(APPLY) $(SRC)/gpg-error/msvc.patch
+	$(APPLY) $(SRC)/gpg-error/msvc-clang.patch
 endif
 	$(MOVE)
 ifdef HAVE_ANDROID

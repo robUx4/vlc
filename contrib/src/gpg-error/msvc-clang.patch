@@ -1,0 +1,11 @@
+--- libgpg-error/src/gpg-error.h.in	2016-09-22 16:21:01.958119300 +0200
++++ libgpg-error/src/gpg-error.h.in.clang	2016-09-22 16:18:57.496388800 +0200
+@@ -148,7 +148,7 @@ typedef unsigned int gpg_error_t;
+ #endif
+ 
+ #undef _GPG_ERR_HAVE_CONSTRUCTOR
+-#if _GPG_ERR_GCC_VERSION > 30100
++#if _GPG_ERR_GCC_VERSION > 30100 && !defined(_MSC_VER)
+ # define _GPG_ERR_CONSTRUCTOR	__attribute__ ((__constructor__))
+ # define _GPG_ERR_HAVE_CONSTRUCTOR
+ #else
