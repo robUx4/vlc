@@ -1,0 +1,27 @@
+--- libass/libass/ass_rasterizer.c	2016-09-22 10:27:23.763819700 +0200
++++ libass/libass/ass_rasterizer.c.msvc	2016-09-22 10:26:03.934024400 +0200
+@@ -23,7 +23,7 @@
+ #include "ass_rasterizer.h"
+ #include <assert.h>
+ 
+-#ifdef _MSC_VER
++#if defined(_MSC_VER) && !defined (__clang__)
+ #include <intrin.h>
+ #pragma intrinsic(_BitScanReverse)
+ #endif
+@@ -32,12 +32,12 @@
+ 
+ static inline int ilog2(uint32_t n)  // XXX: different compilers
+ {
+-#ifdef __GNUC__
+-    return __builtin_clz(n) ^ 31;
+-#elif defined(_MSC_VER)
++#if defined(_MSC_VER)
+     int res;
+     _BitScanReverse(&res, n);
+     return res;
++#elif defined(__GNUC__)
++    return __builtin_clz(n) ^ 31;
+ #else
+     int res = 0;
+     for (int ord = 16; ord; ord /= 2)
