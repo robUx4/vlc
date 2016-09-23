@@ -531,7 +531,7 @@ static inline uint8_t clip_uint8_vlc( int32_t a )
 VLC_USED
 static inline unsigned (clz)(unsigned x)
 {
-#ifdef __GNUC__
+#if defined (__GNUC__) && !defined(_MSC_VER)
     return __builtin_clz (x);
 #else
     unsigned i = sizeof (x) * 8;
@@ -554,7 +554,7 @@ static inline unsigned (clz)(unsigned x)
 VLC_USED
 static inline unsigned (ctz)(unsigned x)
 {
-#ifdef __GNUC__
+#if defined (__GNUC__) && !defined(_MSC_VER)
     return __builtin_ctz (x);
 #else
     unsigned i = sizeof (x) * 8;
@@ -572,7 +572,7 @@ static inline unsigned (ctz)(unsigned x)
 VLC_USED
 static inline unsigned (popcount)(unsigned x)
 {
-#ifdef __GNUC__
+#if defined (__GNUC__) && !defined(_MSC_VER)
     return __builtin_popcount (x);
 #else
     unsigned count = 0;
@@ -589,7 +589,7 @@ static inline unsigned (popcount)(unsigned x)
 VLC_USED
 static inline int (popcountll)(unsigned long long x)
 {
-#ifdef __GNUC__
+#if defined (__GNUC__) && !defined(_MSC_VER)
     return __builtin_popcountll(x);
 #else
     int count = 0;
@@ -605,7 +605,7 @@ static inline int (popcountll)(unsigned long long x)
 VLC_USED
 static inline unsigned (parity)(unsigned x)
 {
-#ifdef __GNUC__
+#if defined (__GNUC__) && !defined(_MSC_VER)
     return __builtin_parity (x);
 #else
     for (unsigned i = 4 * sizeof (x); i > 0; i /= 2)
