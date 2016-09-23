@@ -1,0 +1,32 @@
+--- flac/src/libFLAC/bitreader.c	2016-09-23 16:34:39.723045300 +0200
++++ flac/src/libFLAC/bitreader.c.clang	2016-09-23 16:31:13.589533300 +0200
+@@ -322,17 +322,17 @@ FLAC__uint16 FLAC__bitreader_get_read_cr
+ 	return br->read_crc16;
+ }
+ 
+-inline FLAC__bool FLAC__bitreader_is_consumed_byte_aligned(const FLAC__BitReader *br)
++FLAC__bool FLAC__bitreader_is_consumed_byte_aligned(const FLAC__BitReader *br)
+ {
+ 	return ((br->consumed_bits & 7) == 0);
+ }
+ 
+-inline unsigned FLAC__bitreader_bits_left_for_byte_alignment(const FLAC__BitReader *br)
++unsigned FLAC__bitreader_bits_left_for_byte_alignment(const FLAC__BitReader *br)
+ {
+ 	return 8 - (br->consumed_bits & 7);
+ }
+ 
+-inline unsigned FLAC__bitreader_get_input_bits_unconsumed(const FLAC__BitReader *br)
++unsigned FLAC__bitreader_get_input_bits_unconsumed(const FLAC__BitReader *br)
+ {
+ 	return (br->words-br->consumed_words)*FLAC__BITS_PER_WORD + br->bytes*8 - br->consumed_bits;
+ }
+@@ -448,7 +448,7 @@ FLAC__bool FLAC__bitreader_read_raw_uint
+ 	return true;
+ }
+ 
+-inline FLAC__bool FLAC__bitreader_read_uint32_little_endian(FLAC__BitReader *br, FLAC__uint32 *val)
++FLAC__bool FLAC__bitreader_read_uint32_little_endian(FLAC__BitReader *br, FLAC__uint32 *val)
+ {
+ 	FLAC__uint32 x8, x32 = 0;
+ 
