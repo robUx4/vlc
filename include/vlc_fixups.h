@@ -139,9 +139,9 @@ typedef struct {
   long long ll;
   long double ld;
 } max_align_t;
+#endif
 #ifdef _MSC_VER
 #define alignas(x)  __declspec(align( 32 ))
-#endif
 #endif
 
 /* stdio.h */
@@ -188,7 +188,7 @@ int strcasecmp (const char *, const char *);
 char *strcasestr (const char *, const char *);
 #endif
 
-#if defined(_MSC_VER) && _MSC_VER >= 1900
+#if defined(_MSC_VER) && _MSC_VER >= 1900 && !defined(strdup)
 #define strdup(x) _strdup(x)
 #elif !defined(HAVE_STRDUP)
 char *strdup (const char *);
