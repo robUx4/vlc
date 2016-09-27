@@ -1717,6 +1717,11 @@ static int AllocQuad(vout_display_t *vd, const video_format_t *fmt, d3d_quad_t *
         if ( i_extra )
             texDesc.Height -= p_chroma_desc->p[plane].h.den / p_chroma_desc->p[plane].h.num - i_extra;
     }
+    if (texDesc.Format == DXGI_FORMAT_NV12 || texDesc.Format == DXGI_FORMAT_P010)
+    {
+        texDesc.Width  &= ~1;
+        texDesc.Height &= ~1;
+    }
 
     hr = ID3D11Device_CreateTexture2D(sys->d3ddevice, &texDesc, NULL, &quad->pTexture);
     if (FAILED(hr)) {
