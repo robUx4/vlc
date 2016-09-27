@@ -477,6 +477,10 @@ static bool is_d3d11_opaque(vlc_fourcc_t chroma)
     {
     case VLC_CODEC_D3D11_OPAQUE:
     case VLC_CODEC_D3D11_OPAQUE_10B:
+    case VLC_CODEC_D3D11_OPAQUE_422:
+    case VLC_CODEC_D3D11_OPAQUE_444:
+    case VLC_CODEC_D3D11_OPAQUE_12B_444:
+    case VLC_CODEC_D3D11_OPAQUE_16B_444:
         return true;
     default:
         return false;
@@ -1177,7 +1181,16 @@ static int Direct3D11Open(vout_display_t *vd, video_format_t *fmt)
             bits_per_channel = 8;
             break;
         case VLC_CODEC_D3D11_OPAQUE_10B:
+        case VLC_CODEC_D3D11_OPAQUE_422:
+        case VLC_CODEC_D3D11_OPAQUE_444:
+        case VLC_CODEC_D3D9_OPAQUE_10B:
             bits_per_channel = 10;
+            break;
+        case VLC_CODEC_D3D11_OPAQUE_12B_444:
+            bits_per_channel = 12;
+            break;
+        case VLC_CODEC_D3D11_OPAQUE_16B_444:
+            bits_per_channel = 16;
             break;
         default:
             {

@@ -354,6 +354,10 @@
 /* D3D11VA opaque video surface for use with D3D11 */
 #define VLC_CODEC_D3D11_OPAQUE          VLC_FOURCC('D','X','1','1') /* 4:2:0  8 bpc */
 #define VLC_CODEC_D3D11_OPAQUE_10B      VLC_FOURCC('D','X','1','0') /* 4:2:0 10 bpc */
+#define VLC_CODEC_D3D11_OPAQUE_422      VLC_FOURCC('D','X','2','2') /* 4:2:2 10 bpc */
+#define VLC_CODEC_D3D11_OPAQUE_444      VLC_FOURCC('D','X','4','4') /* 4:4:4 10 bpc */
+#define VLC_CODEC_D3D11_OPAQUE_12B_444  VLC_FOURCC('D','X','4','2') /* 4:4:4 12 bpc */
+#define VLC_CODEC_D3D11_OPAQUE_16B_444  VLC_FOURCC('D','X','4','6') /* 4:4:4 16 bpc */
 
 /* CVPixelBuffer opaque buffer type */
 #define VLC_CODEC_CVPX_OPAQUE     VLC_FOURCC('C','V','P','X')
