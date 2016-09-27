@@ -69,6 +69,15 @@ static inline void test_init (void)
 {
     (void)test_default_sample; /* This one may not be used */
     alarm (10); /* Make sure "make check" does not get stuck */
+#ifdef _WIN32
+    char *psz_modules = realpath( "../modules", NULL );
+    if ( psz_modules != NULL )
+    {
+        setenv( "VLC_PLUGIN_PATH", psz_modules, 1 );
+        free( psz_modules );
+    }
+    else
+#endif
     setenv( "VLC_PLUGIN_PATH", "../modules", 1 );
 }
 
