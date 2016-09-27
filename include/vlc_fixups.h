@@ -377,7 +377,7 @@ struct if_nameindex
     unsigned if_index;
     char    *if_name;
 };
-# ifndef HAVE_IF_NAMETOINDEX
+# if !defined(HAVE_IF_NAMETOINDEX) && (!defined(_WIN32_WINNT) || _WIN32_WINNT < 0x0600)
 #  define if_nametoindex(name)   atoi(name)
 # endif
 # define if_nameindex()         (errno = ENOBUFS, NULL)

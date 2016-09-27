@@ -41,6 +41,9 @@
 #ifdef _WIN32
 #   undef EAFNOSUPPORT
 #   define EAFNOSUPPORT WSAEAFNOSUPPORT
+#   if defined(_WIN32_WINNT) && _WIN32_WINNT >= 0x0600
+#      include <iphlpapi.h>
+#   endif
 #else
 #   include <unistd.h>
 #   ifdef HAVE_NET_IF_H
