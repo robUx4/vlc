@@ -54,8 +54,17 @@ vlc_fourcc_t vlc_va_GetChroma(enum PixelFormat hwfmt, enum PixelFormat swfmt)
         case AV_PIX_FMT_D3D11VA_VLD:
             switch (swfmt)
             {
+                case AV_PIX_FMT_YUVJ444P:
+                case AV_PIX_FMT_YUV444P:
+                    return VLC_CODEC_D3D11_OPAQUE_444;
+                case AV_PIX_FMT_YUVJ422P:
+                case AV_PIX_FMT_YUV422P:
+                    return VLC_CODEC_D3D11_OPAQUE_422;
                 case AV_PIX_FMT_YUV420P10LE:
                     return VLC_CODEC_D3D11_OPAQUE_10B;
+                case AV_PIX_FMT_YUVJ420P:
+                case AV_PIX_FMT_YUV420P:
+                    return VLC_CODEC_D3D11_OPAQUE;
                 default:
                     return VLC_CODEC_D3D11_OPAQUE;
             }

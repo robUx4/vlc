@@ -520,6 +520,24 @@ int CommonUpdatePicture(picture_t *picture, picture_t **fallback,
             picture->p[2].p_pixels = p_tmp;
         }
     }
+    else
+    if (picture->format.i_chroma == VLC_CODEC_I422) {
+
+        for (int n = 1; n < picture->i_planes; n++) {
+            const plane_t *o = &picture->p[n-1];
+            plane_t *p = &picture->p[n];
+
+            p->p_pixels = o->p_pixels + o->i_lines * o->i_pitch;
+            p->i_pitch  = pitch / 2;
+            p->i_lines  = picture->format.i_height / 2;
+        }
+        /* The dx/d3d buffer is always allocated as YV12 */
+        if (vlc_fourcc_AreUVPlanesSwapped(picture->format.i_chroma, VLC_CODEC_YV12)) {
+            uint8_t *p_tmp = picture->p[1].p_pixels;
+            picture->p[1].p_pixels = picture->p[2].p_pixels;
+            picture->p[2].p_pixels = p_tmp;
+        }
+    }
     return VLC_SUCCESS;
 }
 

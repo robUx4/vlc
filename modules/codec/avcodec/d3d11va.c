@@ -256,6 +256,10 @@ static int Extract(vlc_va_t *va, picture_t *output, void *data_context, uint8_t 
     {
     case VLC_CODEC_D3D11_OPAQUE:
     case VLC_CODEC_D3D11_OPAQUE_10B:
+    case VLC_CODEC_D3D11_OPAQUE_422:
+    case VLC_CODEC_D3D11_OPAQUE_444:
+    case VLC_CODEC_D3D11_OPAQUE_12B_444:
+    case VLC_CODEC_D3D11_OPAQUE_16B_444:
     {
         picture_sys_t *p_sys_out = output->p_sys;
         picture_sys_t *p_sys_in = surface->p_pic->p_sys;
@@ -393,12 +397,21 @@ static void Close(vlc_va_t *va, AVCodecContext *ctx)
     free(sys);
 }
 
-vlc_fourcc_t d3d11va_fourcc(enum PixelFormat swfmt)
+static vlc_fourcc_t d3d11va_fourcc(enum PixelFormat swfmt)
 {
     switch (swfmt)
     {
+        case AV_PIX_FMT_YUVJ444P:
+        case AV_PIX_FMT_YUV444P:
+            return VLC_CODEC_D3D11_OPAQUE_444;
+        case AV_PIX_FMT_YUVJ422P:
+        case AV_PIX_FMT_YUV422P:
+            return VLC_CODEC_D3D11_OPAQUE_422;
         case AV_PIX_FMT_YUV420P10LE:
             return VLC_CODEC_D3D11_OPAQUE_10B;
+        case AV_PIX_FMT_YUVJ420P:
+        case AV_PIX_FMT_YUV420P:
+            return VLC_CODEC_D3D11_OPAQUE;
         default:
             return VLC_CODEC_D3D11_OPAQUE;
     }
