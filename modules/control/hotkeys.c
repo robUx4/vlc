@@ -774,7 +774,7 @@ static int PutAction( intf_thread_t *p_intf, int i_action )
             if( p_vout ) {
                 vlc_viewpoint_t viewpoint;
                 playlist_GetViewpoint( p_playlist, &viewpoint );
-                viewpoint.f_pitch -= M_PI / 32;
+                viewpoint.f_fov -= M_PI / 32;
                 vout_SetViewpoint( p_vout, &viewpoint );
             }
             if( p_input )
@@ -784,7 +784,7 @@ static int PutAction( intf_thread_t *p_intf, int i_action )
             if( p_vout ) {
                 vlc_viewpoint_t viewpoint;
                 playlist_GetViewpoint( p_playlist, &viewpoint );
-                viewpoint.f_pitch += M_PI / 32;
+                viewpoint.f_fov += M_PI / 32;
                 vout_SetViewpoint( p_vout, &viewpoint );
             }
             if( p_input )
@@ -794,7 +794,7 @@ static int PutAction( intf_thread_t *p_intf, int i_action )
             if( p_vout ) {
                 vlc_viewpoint_t viewpoint;
                 playlist_GetViewpoint( p_playlist, &viewpoint );
-                viewpoint.f_yaw -= M_PI / 32;
+                viewpoint.f_zoom -= M_PI / 32;
                 vout_SetViewpoint( p_vout, &viewpoint );
             }
             if( p_input )
@@ -804,7 +804,7 @@ static int PutAction( intf_thread_t *p_intf, int i_action )
             if( p_vout ) {
                 vlc_viewpoint_t viewpoint;
                 playlist_GetViewpoint( p_playlist, &viewpoint );
-                viewpoint.f_yaw += M_PI / 32;
+                viewpoint.f_zoom += M_PI / 32;
                 vout_SetViewpoint( p_vout, &viewpoint );
             }
             if( p_input )
