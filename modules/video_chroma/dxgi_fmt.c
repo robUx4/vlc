@@ -48,6 +48,7 @@ static const dxgi_format_t dxgi_formats[] = {
     { "P8",          DXGI_FORMAT_P8,                  0                  },
     { "A8P8",        DXGI_FORMAT_A8P8,                0                  },
     { "B5G6R5",      DXGI_FORMAT_B5G6R5_UNORM,        VLC_CODEC_RGB16    },
+    { "RGB16B",      DXGI_FORMAT_R16G16B16A16_FLOAT,  0                  },
     { "Y416",        DXGI_FORMAT_Y416,                0                  },
     { "P010",        DXGI_FORMAT_P010,                VLC_CODEC_P010     },
     { "Y210",        DXGI_FORMAT_Y210,                VLC_CODEC_YUYV     }, /* AV_PIX_FMT_YUYV422 */
