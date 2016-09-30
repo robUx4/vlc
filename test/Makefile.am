@@ -60,6 +60,9 @@ check_HEADERS = libvlc/test.h libvlc/libvlc_additions.h
 
 TESTS = $(check_PROGRAMS) check_POTFILES.sh
 
+.PHONY: tests
+tests: $(check_PROGRAMS)
+
 DISTCLEANFILES = samples/test.sample samples/meta.sample
 
 # Samples server
