@@ -495,6 +495,9 @@ check_PROGRAMS = \
 
 TESTS = $(check_PROGRAMS) check_symbols
 
+.PHONY: tests
+tests: $(check_PROGRAMS)
+
 test_block_SOURCES = test/block_test.c
 test_block_LDADD = $(LDADD) $(LIBS_libvlccore)
 test_block_DEPENDENCIES =
