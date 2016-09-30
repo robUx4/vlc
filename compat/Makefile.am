@@ -19,3 +19,6 @@ TESTS = $(check_PROGRAMS)
 
 test_strnstr_SOURCES = test/strnstr.c
 test_strnstr_LDADD = libcompat.la
+
+.PHONY: tests
+tests: $(check_PROGRAMS)
