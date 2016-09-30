@@ -68,7 +68,7 @@ static inline void test_init (void)
 {
     (void)test_default_sample; /* This one may not be used */
     alarm (10); /* Make sure "make check" does not get stuck */
-    setenv( "VLC_PLUGIN_PATH", "../modules", 1 );
+    putenv( "VLC_PLUGIN_PATH=../modules" );
 }
 
 #endif /* TEST_H */
