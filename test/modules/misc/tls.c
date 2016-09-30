@@ -127,7 +127,7 @@ int main(void)
     char *alp;
     int val;
 
-    setenv("VLC_PLUGIN_PATH", "../modules", 1);
+    putenv("VLC_PLUGIN_PATH=../modules");
 
     /*** Tests with normal certs database - server cert not acceptable. ***/
     vlc = libvlc_new(0, NULL);
