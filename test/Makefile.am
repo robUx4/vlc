@@ -78,8 +78,11 @@ samples/meta.sample:
 
 AM_CFLAGS = -DSRCDIR=\"$(srcdir)\"
 AM_LDFLAGS = -no-install
-LIBVLCCORE = -L../src/ -lvlccore
-LIBVLC = -L../lib -lvlc
+if HAVE_WIN32
+AM_LDFLAGS += -static
+endif
+LIBVLCCORE = -L$(top_builddir)/src/ -lvlccore
+LIBVLC = -L$(top_builddir)/lib -lvlc
 
 test_libvlc_core_SOURCES = libvlc/core.c
 test_libvlc_core_LDADD = $(LIBVLC)
