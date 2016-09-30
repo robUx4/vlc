@@ -303,7 +303,7 @@ main(int i_argc, char *ppsz_argv[])
     if (!b_test_all)
         alarm(3);
 
-    setenv("VLC_PLUGIN_PATH", "../modules", 1);
+    putenv("VLC_PLUGIN_PATH=../modules");
 
     /* Create a dummy libvlc to initialize module bank, needed by module_exists */
     libvlc_instance_t *p_libvlc = libvlc_new(0, NULL);
