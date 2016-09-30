@@ -158,7 +158,7 @@ int main(void)
 
     assert(!strncmp(homedir, "/tmp/vlc-test-", 14));
     setenv("HOME", homedir, 1);
-    setenv("VLC_PLUGIN_PATH", "../modules", 1);
+    putenv("VLC_PLUGIN_PATH=../modules");
 
     vlc = libvlc_new(0, NULL);
     assert(vlc != NULL);
