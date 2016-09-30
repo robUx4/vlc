@@ -124,15 +124,15 @@ int main( int i_argc, const char *ppsz_argv[] )
 
 #ifndef NDEBUG
     /* Activate malloc checking routines to detect heap corruptions. */
-    setenv ("MALLOC_CHECK_", "2", 1);
+    putenv ("MALLOC_CHECK_=2");
 
     /* Disable the ugly Gnome crash dialog so that we properly segfault */
-    setenv ("GNOME_DISABLE_CRASH_DIALOG", "1", 1);
+    putenv ("GNOME_DISABLE_CRASH_DIALOG=1");
 #endif
 
 #ifdef TOP_BUILDDIR
-    setenv ("VLC_PLUGIN_PATH", TOP_BUILDDIR"/modules", 1);
-    setenv ("VLC_DATA_PATH", TOP_SRCDIR"/share", 1);
+    putenv ("VLC_PLUGIN_PATH="TOP_BUILDDIR"/modules");
+    putenv ("VLC_DATA_PATH="TOP_SRCDIR"/share");
 #endif
 
     /* Clear the X.Org startup notification ID. Otherwise the UI might try to
