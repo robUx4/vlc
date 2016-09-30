@@ -78,6 +78,9 @@ samples/meta.sample:
 
 AM_CFLAGS = -DSRCDIR=\"$(srcdir)\"
 AM_LDFLAGS = -no-install
+if HAVE_WIN32
+AM_LDFLAGS += -static
+endif
 LIBVLCCORE = $(top_builddir)/src/libvlccore.la
 LIBVLC = $(top_builddir)/lib/libvlc.la
 
