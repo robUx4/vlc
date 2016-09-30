@@ -58,3 +58,6 @@ TESTS += hpack_test hpackenc_test \
 if !HAVE_WIN32
 TESTS += h2output_test h2conn_test h1conn_test
 endif
+
+.PHONY: tests
+tests: $(check_PROGRAMS)
