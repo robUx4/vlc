@@ -132,11 +132,14 @@ struct vlc_va_sys_t
 
     /* avcodec internals */
     struct dxva_context hw;
+
+    HANDLE                   context_mutex;
 };
 
 struct picture_sys_t
 {
     LPDIRECT3DSURFACE9 surface;
+    HANDLE             context_mutex;
 };
 
 static picture_t *DxAllocPicture(vlc_va_t *, const video_format_t *, unsigned index);
@@ -232,6 +235,7 @@ void SetupAVCodecContext(vlc_va_t *va)
     sys->hw.cfg = &sys->cfg;
     sys->hw.surface_count = dx_sys->surface_count;
     sys->hw.surface = (LPDIRECT3DSURFACE9*) dx_sys->hw_surface;
+    sys->hw.context_mutex = sys->context_mutex;
 
     if (IsEqualGUID(&dx_sys->input, &DXVA_Intel_H264_NoFGT_ClearVideo))
         sys->hw.workaround |= FF_DXVA2_WORKAROUND_INTEL_CLEARVIDEO;
@@ -261,7 +265,11 @@ static int Extract(vlc_va_t *va, picture_t *picture, uint8_t *data)
         visibleSource.top = 0;
         visibleSource.right = picture->format.i_visible_width;
         visibleSource.bottom = picture->format.i_visible_height;
+        if ( p_sys->context_mutex != INVALID_HANDLE_VALUE )
+            WaitForSingleObjectEx( p_sys->context_mutex, INFINITE, FALSE );
         hr = IDirect3DDevice9_StretchRect( (IDirect3DDevice9*) dx_sys->d3ddev, d3d, &visibleSource, output, &visibleSource, D3DTEXF_NONE);
+        if ( p_sys->context_mutex != INVALID_HANDLE_VALUE )
+            ReleaseMutex( p_sys->context_mutex );
         if (FAILED(hr)) {
             msg_Err(va, "Failed to copy the hw surface to the decoder surface (hr=0x%0lx)", hr );
             return VLC_EGENERIC;
@@ -307,6 +315,9 @@ static void Close(vlc_va_t *va, AVCodecContext *ctx)
 
     (void) ctx;
 
+    if ( sys->context_mutex != INVALID_HANDLE_VALUE )
+        CloseHandle( sys->context_mutex );
+
     if (sys->filter)
     {
         DeleteFilter( sys->filter );
@@ -348,6 +359,7 @@ static int Open(vlc_va_t *va, AVCodecContext *ctx, enum PixelFormat pix_fmt,
     vlc_va_sys_t *sys = calloc(1, sizeof (*sys));
     if (unlikely(sys == NULL))
         return VLC_ENOMEM;
+    sys->context_mutex = INVALID_HANDLE_VALUE;
 
     /* Load dll*/
     sys->hd3d9_dll = LoadLibrary(TEXT("D3D9.DLL"));
@@ -378,6 +390,9 @@ static int Open(vlc_va_t *va, AVCodecContext *ctx, enum PixelFormat pix_fmt,
     dx_sys->d3ddev = NULL;
     if (p_sys!=NULL)
         IDirect3DSurface9_GetDevice(p_sys->surface, (IDirect3DDevice9**) &dx_sys->d3ddev );
+    sys->context_mutex = CreateMutex( NULL, FALSE, NULL );
+    if ( sys->context_mutex == INVALID_HANDLE_VALUE )
+        goto error;
 
     sys->i_chroma = d3d9va_fourcc(ctx->sw_pix_fmt);
 
@@ -851,6 +866,7 @@ static picture_t *DxAllocPicture(vlc_va_t *va, const video_format_t *fmt, unsign
     if (unlikely(pic_sys == NULL))
         return NULL;
     pic_sys->surface = (LPDIRECT3DSURFACE9) va->sys->dx_sys.hw_surface[index];
+    pic_sys->context_mutex = va->sys->context_mutex;
 
     picture_resource_t res = {
         .p_sys = pic_sys,
