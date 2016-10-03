@@ -1034,6 +1034,7 @@ static int Direct3D11Open(vout_display_t *vd, video_format_t *fmt)
     switch(fmt->i_chroma)
     {
     case VLC_CODEC_D3D11_OPAQUE_10B:
+    case VLC_CODEC_D3D9_OPAQUE_10B:
         scd.Format = DXGI_FORMAT_R10G10B10A2_UNORM;
         break;
     default:
@@ -1199,6 +1200,7 @@ static int Direct3D11Open(vout_display_t *vd, video_format_t *fmt)
         switch (i_src_chroma)
         {
         case VLC_CODEC_D3D11_OPAQUE:
+        case VLC_CODEC_D3D9_OPAQUE:
             bits_per_channel = 8;
             break;
         case VLC_CODEC_D3D11_OPAQUE_10B:
