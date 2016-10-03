@@ -45,6 +45,7 @@
 # include <windows.ui.xaml.media.dxinterop.h> */
 
 #include "common.h"
+#include <dxgi1_4.h>
 
 #include "../../video_chroma/dxgi_fmt.h"
 
@@ -725,6 +726,26 @@ static HRESULT UpdateBackBuffer(vout_display_t *vd)
        msg_Err(vd, "Could not get the backbuffer for the Swapchain. (hr=0x%lX)", hr);
        return hr;
     }
+
+#if 0
+    IDXGISwapChain3 *swapChain3;
+    hr = ID3D11Device_QueryInterface(sys->dxgiswapChain, &IID_IDXGISwapChain3, (void **)&swapChain3);
+    if (!FAILED(hr))
+    {
+        for (DXGI_COLOR_SPACE_TYPE i=DXGI_COLOR_SPACE_RGB_FULL_G22_NONE_P709; i<=DXGI_COLOR_SPACE_RGB_FULL_G22_NONE_P2020;i++)
+        {
+            UINT supported;
+            hr = IDXGISwapChain3_CheckColorSpaceSupport(swapChain3, i, &supported);
+            if (!FAILED(hr) && (supported & DXGI_SWAP_CHAIN_COLOR_SPACE_SUPPORT_FLAG_PRESENT))
+                msg_Dbg(vd, "colorspace %d supported", i);
+            if (!FAILED(hr) && (supported & DXGI_SWAP_CHAIN_COLOR_SPACE_SUPPORT_FLAG_OVERLAY_PRESENT))
+                msg_Dbg(vd, "colorspace %d overlay supported", i);
+        }
+        hr = IDXGISwapChain3_SetColorSpace1(swapChain3, DXGI_COLOR_SPACE_RGB_FULL_G22_NONE_P709);
+        if (FAILED(hr))
+            msg_Dbg(vd, "Failed to set the colorspace");
+    }
+#endif
 
     hr = ID3D11Device_CreateRenderTargetView(sys->d3ddevice, (ID3D11Resource *)pBackBuffer, NULL, &sys->d3drenderTargetView);
     ID3D11Texture2D_Release(pBackBuffer);
