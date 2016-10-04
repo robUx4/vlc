@@ -1007,6 +1007,7 @@ static int DxCreateDecoderSurfaces(vlc_va_t *va, int codec_id, const video_forma
             assert(texDesc.Format == sys->render);
             assert(texDesc.BindFlags & D3D11_BIND_DECODER);
 
+#if !LIBAVCODEC_VERSION_CHECK( 57, 28 ,0, 61 ,100 )
             if (pic->p_sys->slice_index != surface_idx)
             {
                 msg_Warn(va, "d3d11va requires decoding slices to be the first in the texture (%d/%d)",
@@ -1014,6 +1015,7 @@ static int DxCreateDecoderSurfaces(vlc_va_t *va, int codec_id, const video_forma
                 sys->b_extern_pool = false;
                 break;
             }
+#endif
 
             viewDesc.Texture2D.ArraySlice = pic->p_sys->slice_index;
             hr = ID3D11VideoDevice_CreateVideoDecoderOutputView( (ID3D11VideoDevice*) dx_sys->d3ddec,

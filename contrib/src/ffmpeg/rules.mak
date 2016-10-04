@@ -8,6 +8,7 @@ ifdef USE_FFMPEG
 FFMPEG_HASH=HEAD
 FFMPEG_SNAPURL := http://git.videolan.org/?p=ffmpeg.git;a=snapshot;h=$(FFMPEG_HASH);sf=tgz
 FFMPEG_GITURL := git://git.videolan.org/ffmpeg.git
+PATCH_SUFFIX =.ffmpeg
 else
 FFMPEG_HASH=HEAD
 FFMPEG_SNAPURL := http://git.libav.org/?p=libav.git;a=snapshot;h=$(FFMPEG_HASH);sf=tgz
@@ -216,6 +217,7 @@ ffmpeg: ffmpeg-$(FFMPEG_HASH).tar.xz .sum-ffmpeg
 	rm -Rf $@ $@-$(FFMPEG_HASH)
 	mkdir -p $@-$(FFMPEG_HASH)
 	$(XZCAT) "$<" | (cd $@-$(FFMPEG_HASH) && tar xv --strip-components=1)
+	$(APPLY) $(SRC)/ffmpeg/0001-d3d11va-use-the-proper-slice-index.patch$(PATCH_SUFFIX)
 	$(MOVE)
 
 .ffmpeg: ffmpeg
