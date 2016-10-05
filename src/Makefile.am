@@ -471,6 +471,8 @@ if IS_GCC_COMPILER
 libvlccore_la_LDFLAGS += -Wc,-static
 else
 libvlccore_la_LIBADD += -lsynchronization -lnormaliz
+else
+libvlccore_la_LIBADD += -lsynchronization -lnormaliz
 endif
 endif
 if HAVE_OS2
