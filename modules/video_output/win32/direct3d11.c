@@ -886,14 +886,26 @@ static void Prepare(vout_display_t *vd, picture_t *picture, subpicture_t *subpic
             WaitForSingleObjectEx( sys->context_lock, INFINITE, FALSE );
         }
         D3D11_BOX box;
-        box.left   = picture->format.i_x_offset;
-        box.right  = picture->format.i_x_offset + picture->format.i_visible_width;
-        box.top    = picture->format.i_y_offset;
-        box.bottom = picture->format.i_y_offset + picture->format.i_visible_height;
+        picture_sys_t *p_sys = picture->p_sys;
+        D3D11_TEXTURE2D_DESC texDesc;
+        ID3D11Texture2D_GetDesc( p_sys->texture, &texDesc );
+        if (texDesc.Format == DXGI_FORMAT_NV12 || texDesc.Format == DXGI_FORMAT_P010)
+        {
+            box.left   = (picture->format.i_x_offset + 1) & ~1;
+            box.right  = (picture->format.i_x_offset + picture->format.i_visible_width) & ~1;
+            box.top    = (picture->format.i_y_offset + 1) & ~1;
+            box.bottom = (picture->format.i_y_offset + picture->format.i_visible_height) & ~1;
+        }
+        else
+        {
+            box.left   = picture->format.i_x_offset;
+            box.right  = picture->format.i_x_offset + picture->format.i_visible_width;
+            box.top    = picture->format.i_y_offset;
+            box.bottom = picture->format.i_y_offset + picture->format.i_visible_height;
+        }
         box.back = 1;
         box.front = 0;
 
-        picture_sys_t *p_sys = picture->p_sys;
         ID3D11DeviceContext_CopySubresourceRegion(sys->d3dcontext,
                                                   (ID3D11Resource*) sys->picQuad.pTexture,
                                                   0, 0, 0, 0,
