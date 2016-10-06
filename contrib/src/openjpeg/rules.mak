@@ -14,6 +14,7 @@ ifdef HAVE_VISUALSTUDIO
 	$(APPLY) $(SRC)/openjpeg/msvc.patch
 endif
 	$(APPLY) $(SRC)/openjpeg/restrict.patch
+	$(APPLY) $(SRC)/openjpeg/pkgconfig.patch
 	$(UPDATE_AUTOCONFIG)
 	$(MOVE)
 
