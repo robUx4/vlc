@@ -1,0 +1,20 @@
+--- openjpeg/libopenjpeg/Makefile.am	2016-09-22 11:30:56.139550400 +0200
++++ openjpeg/libopenjpeg/Makefile.am.pkg	2016-09-22 11:31:15.531090100 +0200
+@@ -72,6 +72,9 @@ cidx_manager.h
+ EXTRA_DIST = \
+ CMakeLists.txt
+ 
++pkgconfigdir = $(libdir)/pkgconfig
++pkgconfig_DATA = ../libopenjpeg1.pc
++
+ install-data-hook:
+ 	cd $(DESTDIR)$(includedir) && \
+ 	  rm -f openjpeg.h && \
+--- openjpeg/libopenjpeg1.pc.in	2016-09-22 11:30:48.736364300 +0200
++++ openjpeg/libopenjpeg1.pc.in.pkg	2016-09-22 11:26:57.362547200 +0200
+@@ -10,4 +10,4 @@ Version: @VERSION@
+ @pkgconfig_requires_private@: @requirements@
+ Libs: -L${libdir} -lopenjpeg
+ Libs.private: -lm
+-Cflags: -I${includedir}
++Cflags: -I${includedir} -DOPJ_STATIC
