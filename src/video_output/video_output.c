@@ -798,9 +798,13 @@ static int ThreadDisplayPreparePicture(vout_thread_t *vout, bool reuse, bool fra
             decoded = picture_fifo_Pop(vout->p->decoder_fifo);
             if (decoded) {
                 if (is_late_dropped && !decoded->b_force) {
+                    picture_t *p_last = picture_fifo_Peek(vout->p->decoder_fifo);
+                    if (p_last)
+                        picture_Release(p_last);
+                    const bool is_last = p_last == NULL;
                     const mtime_t predicted = mdate() + 0; /* TODO improve */
                     const mtime_t late = predicted - decoded->date;
-                    if (late > VOUT_DISPLAY_LATE_THRESHOLD) {
+                    if (!is_last && late > VOUT_DISPLAY_LATE_THRESHOLD) {
                         msg_Warn(vout, "picture is too late to be displayed (missing %"PRId64" ms)", late/1000);
                         picture_Release(decoded);
                         vout_statistic_AddLost(&vout->p->statistic, 1);
