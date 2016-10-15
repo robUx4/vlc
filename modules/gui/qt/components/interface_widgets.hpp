@@ -82,6 +82,9 @@ private:
 
     QWidget *stable;
     QLayout *layout;
+
+    void reportSize();
+
 signals:
     void sizeChanged( int, int );
 
