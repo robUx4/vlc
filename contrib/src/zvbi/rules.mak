@@ -45,6 +45,7 @@ endif
 
 .zvbi: zvbi
 	$(UPDATE_AUTOCONFIG)
+	cd $< && rm -rf aclocal.m4 Makefile.in
 	$(RECONF)
 	cd $< && $(HOSTVARS) CFLAGS="$(ZVBI_CFLAGS)" ./configure $(ZVBICONF)
 	cd $</src && $(MAKE) install
