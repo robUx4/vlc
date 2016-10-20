@@ -1135,7 +1135,7 @@ static int lavc_va_GetFrame(struct AVCodecContext *ctx, AVFrame *frame,
     if (va->release == NULL)
         release = lavc_ReleaseFrame;
 
-    frame->buf[0] = av_buffer_create(AV_FRAME_SURFACE(frame), 0, release, pic, 0);
+    frame->buf[0] = av_buffer_create(AV_FRAME_SURFACE_DATA(frame), 0, release, pic, 0);
     if (unlikely(frame->buf[0] == NULL))
     {
         release(pic);
