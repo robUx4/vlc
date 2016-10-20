@@ -70,7 +70,7 @@ vlc_va_t *vlc_va_New(vlc_object_t *obj, AVCodecContext *,
  * also as a reference frame to decode other surfaces.
  *
  * @param pic pointer to VLC picture being allocated [IN/OUT]
- * @param data pointer to the AVFrame data[0] and data[3] pointers [OUT]
+ * @param data pointer to the AVFrame data[3] pointers [OUT]
  *
  * @note This function needs not be reentrant. However it may be called
  * concurrently with vlc_va_Extract() and/or vlc_va_Release() from other
