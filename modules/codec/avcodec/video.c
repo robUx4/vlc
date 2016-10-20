@@ -43,6 +43,11 @@
 #include "avcodec.h"
 #include "va.h"
 
+/* data[0] must be non-NULL for libavcodec internal checks.
+ * data[3] actually contains the format-specific surface handle. */
+#define AV_FRAME_SURFACE(f)       (f->data[0])
+#define AV_FRAME_SURFACE_DATA(f)  (f->data[3])
+
 /*****************************************************************************
  * decoder_sys_t : decoder descriptor
  *****************************************************************************/
@@ -971,7 +976,7 @@ static picture_t *DecodeVideo( decoder_t *p_dec, block_t **pp_block )
         else
         {
             if( p_sys->p_va != NULL )
-                vlc_va_Extract( p_sys->p_va, p_pic, frame->data[3] );
+                vlc_va_Extract( p_sys->p_va, p_pic, AV_FRAME_SURFACE_DATA(frame) );
             picture_Hold( p_pic );
         }
 
@@ -1118,21 +1123,19 @@ static int lavc_va_GetFrame(struct AVCodecContext *ctx, AVFrame *frame,
     decoder_t *dec = ctx->opaque;
     vlc_va_t *va = dec->p_sys->p_va;
 
-    if (vlc_va_Get(va, pic, &frame->data[0]))
+    if (vlc_va_Get(va, pic, &AV_FRAME_SURFACE(frame)))
     {
         msg_Err(dec, "hardware acceleration picture allocation failed");
         picture_Release(pic);
         return -1;
     }
-    /* data[0] must be non-NULL for libavcodec internal checks.
-     * data[3] actually contains the format-specific surface handle. */
-    frame->data[3] = frame->data[0];
+    AV_FRAME_SURFACE_DATA(frame) = AV_FRAME_SURFACE(frame);
 
     void (*release)(void *) = va->release;
     if (va->release == NULL)
         release = lavc_ReleaseFrame;
 
-    frame->buf[0] = av_buffer_create(frame->data[0], 0, release, pic, 0);
+    frame->buf[0] = av_buffer_create(AV_FRAME_SURFACE(frame), 0, release, pic, 0);
     if (unlikely(frame->buf[0] == NULL))
     {
         release(pic);
@@ -1140,7 +1143,7 @@ static int lavc_va_GetFrame(struct AVCodecContext *ctx, AVFrame *frame,
     }
 
     frame->opaque = pic;
-    assert(frame->data[0] != NULL);
+    assert(AV_FRAME_SURFACE(frame) != NULL);
     return 0;
 }
 
