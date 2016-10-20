@@ -115,7 +115,7 @@ static vlc_vdp_video_field_t *GetSurface(vlc_va_t *va)
     return CreateSurface(va);
 }
 
-static int Lock(vlc_va_t *va, picture_t *pic, uint8_t **data)
+static int Lock(vlc_va_t *va, void **data_context, uint8_t **data)
 {
     vlc_vdp_video_field_t *field;
     unsigned tries = (CLOCK_FREQ + VOUT_OUTMEM_SLEEP) / VOUT_OUTMEM_SLEEP;
@@ -129,7 +129,7 @@ static int Lock(vlc_va_t *va, picture_t *pic, uint8_t **data)
         msleep(VOUT_OUTMEM_SLEEP);
     }
 
-    pic->context = field;
+    *data_context = field;
     *data = (void *)(uintptr_t)field->frame->surface;
     return VLC_SUCCESS;
 }

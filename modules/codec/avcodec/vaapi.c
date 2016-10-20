@@ -144,7 +144,7 @@ error:
     return ret;
 }
 
-static int Get( vlc_va_t *va, picture_t *pic, uint8_t **data )
+static int Get( vlc_va_t *va, void **data_context, uint8_t **data )
 {
     vlc_va_sys_t *sys = va->sys;
     unsigned i = sys->count;
@@ -162,7 +162,7 @@ static int Get( vlc_va_t *va, picture_t *pic, uint8_t **data )
 
     VASurfaceID *surface = &sys->surfaces[i];
 
-    pic->context = surface;
+    *data_context = surface;
     *data = (void *)(uintptr_t)*surface;
     return VLC_SUCCESS;
 }

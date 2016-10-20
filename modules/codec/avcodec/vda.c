@@ -157,10 +157,10 @@ static void Close( vlc_va_t *va, AVCodecContext *avctx )
 }
 
 // Never called
-static int Get( vlc_va_t *va, picture_t *p_picture, uint8_t **data )
+static int Get( vlc_va_t *va, void **data_context, uint8_t **data )
 {
     VLC_UNUSED( va );
-    (void) p_picture;
+    (void) data_context;
     (void) data;
     return VLC_SUCCESS;
 }

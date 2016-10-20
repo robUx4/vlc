@@ -296,9 +296,9 @@ static int CheckDevice(vlc_va_t *va)
     return VLC_SUCCESS;
 }
 
-static int Get(vlc_va_t *va, picture_t *pic, uint8_t **data)
+static int Get(vlc_va_t *va, void **data_context, uint8_t **data)
 {
-    return directx_va_Get(va, &va->sys->dx_sys, pic, data);
+    return directx_va_Get(va, &va->sys->dx_sys, data_context, data);
 }
 
 static void Close(vlc_va_t *va, AVCodecContext *ctx)

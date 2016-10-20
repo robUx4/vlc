@@ -40,7 +40,7 @@ struct vlc_va_t {
     VLC_DEPRECATED
     void (*setup)(vlc_va_t *, vlc_fourcc_t *output);
 #endif
-    int  (*get)(vlc_va_t *, picture_t *pic, uint8_t **data);
+    int  (*get)(vlc_va_t *, void **data_context, uint8_t **data);
     void (*release)(void *pic);
     int  (*extract)(vlc_va_t *, picture_t *pic, uint8_t *data);
 };
@@ -69,7 +69,7 @@ vlc_va_t *vlc_va_New(vlc_object_t *obj, AVCodecContext *,
  * The surface will be used as output for the hardware decoder, and possibly
  * also as a reference frame to decode other surfaces.
  *
- * @param pic pointer to VLC picture being allocated [IN/OUT]
+ * @param data_context pointer to VLC structure to free data being allocated [OUT]
  * @param data pointer to the AVFrame data[3] pointers [OUT]
  *
  * @note This function needs not be reentrant. However it may be called
@@ -78,9 +78,9 @@ vlc_va_t *vlc_va_New(vlc_object_t *obj, AVCodecContext *,
  *
  * @return VLC_SUCCESS on success, otherwise an error code.
  */
-static inline int vlc_va_Get(vlc_va_t *va, picture_t *pic, uint8_t **data)
+static inline int vlc_va_Get(vlc_va_t *va, void **data_context, uint8_t **data)
 {
-    return va->get(va, pic, data);
+    return va->get(va, data_context, data);
 }
 
 /**
