@@ -134,10 +134,18 @@ static int Lock(vlc_va_t *va, void **data_context, uint8_t **data)
     return VLC_SUCCESS;
 }
 
-static int Copy(vlc_va_t *va, picture_t *pic, uint8_t *data)
+static int Copy(vlc_va_t *va, picture_t *pic, void *data_context, uint8_t *data)
 {
-    (void) va; (void) pic; (void) data;
+    (void) va; (void) data;
+    vlc_vdp_video_field_t *field = data_context;
+    pic->context = vlc_vdp_video_copy(field);
     return VLC_SUCCESS;
+}
+
+static void Release(void *opaque)
+{
+    vlc_vdp_video_field_t *f = opaque;
+    DestroySurface(f);
 }
 
 static int Open(vlc_va_t *va, AVCodecContext *avctx, enum PixelFormat pix_fmt,
@@ -316,7 +324,7 @@ static int Open(vlc_va_t *va, AVCodecContext *avctx, enum PixelFormat pix_fmt,
 
     va->description = infos;
     va->get = Lock;
-    va->release = NULL;
+    va->release = Release;
     va->extract = Copy;
     return VLC_SUCCESS;
 

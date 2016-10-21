@@ -245,11 +245,11 @@ static filter_t *CreateFilter( vlc_object_t *p_this, const es_format_t *p_fmt_in
     return p_filter;
 }
 
-static int Extract(vlc_va_t *va, picture_t *output, uint8_t *data)
+static int Extract(vlc_va_t *va, picture_t *output, void *data_context, uint8_t *data)
 {
     vlc_va_sys_t *sys = va->sys;
     ID3D11VideoDecoderOutputView *src = (ID3D11VideoDecoderOutputView*)(uintptr_t)data;
-    vlc_va_surface_t *surface = output->context;
+    vlc_va_surface_t *surface = data_context;
     int ret = VLC_SUCCESS;
 
     switch (output->format.i_chroma)

@@ -144,7 +144,7 @@ static int Open(vlc_va_t *va,
     va->sys = sys;
     va->description = (char *)"VDA";
     va->get = Get;
-    va->release = Release;
+    va->release = NULL;
     va->extract = Extract;
 
     return VLC_SUCCESS;
@@ -165,14 +165,9 @@ static int Get( vlc_va_t *va, void **data_context, uint8_t **data )
     return VLC_SUCCESS;
 }
 
-// Never called
-static void Release( void *opaque )
+static int Extract( vlc_va_t *va, picture_t *p_picture, void *data_context, uint8_t *data )
 {
-    VLC_UNUSED(opaque);
-}
-
-static int Extract( vlc_va_t *va, picture_t *p_picture, uint8_t *data )
-{
+    (void) data_context;
     vlc_va_sys_t *sys = va->sys;
 
     CVPixelBufferRef cv_buffer = (CVPixelBufferRef)data;

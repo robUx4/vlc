@@ -79,8 +79,9 @@ struct vlc_va_sys_t
     VASurfaceID  surfaces[32];
 };
 
-static int Extract( vlc_va_t *va, picture_t *p_picture, uint8_t *data )
+static int Extract( vlc_va_t *va, picture_t *p_picture, void *data_context, uint8_t *data )
 {
+    (void) data_context;
     vlc_va_sys_t *sys = va->sys;
     VASurfaceID surface = (VASurfaceID)(uintptr_t)data;
     VAImage image;
@@ -169,8 +170,7 @@ static int Get( vlc_va_t *va, void **data_context, uint8_t **data )
 
 static void Release( void *opaque )
 {
-    picture_t *pic = opaque;
-    VASurfaceID *surface = pic->context;
+    VASurfaceID *surface = opaque;
     vlc_va_sys_t *sys = (void *)((((uintptr_t)surface)
         - offsetof(vlc_va_sys_t, surfaces)) & ~(sizeof (sys->surfaces) - 1));
     unsigned i = surface - sys->surfaces;
@@ -179,9 +179,6 @@ static void Release( void *opaque )
     assert(((sys->available >> i) & 1) == 0);
     sys->available |= 1 << i;
     vlc_mutex_unlock( &sys->lock );
-
-    pic->context = NULL;
-    picture_Release(pic);
 }
 
 static void Delete( vlc_va_t *va, AVCodecContext *avctx )

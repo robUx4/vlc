@@ -237,7 +237,7 @@ void SetupAVCodecContext(vlc_va_t *va)
         sys->hw.workaround |= FF_DXVA2_WORKAROUND_INTEL_CLEARVIDEO;
 }
 
-static int Extract(vlc_va_t *va, picture_t *picture, uint8_t *data)
+static int Extract(vlc_va_t *va, picture_t *picture, void *data_context, uint8_t *data)
 {
     directx_sys_t *dx_sys = &va->sys->dx_sys;
     LPDIRECT3DSURFACE9 d3d = (LPDIRECT3DSURFACE9)(uintptr_t)data;
@@ -269,7 +269,7 @@ static int Extract(vlc_va_t *va, picture_t *picture, uint8_t *data)
     }
     else if (va->sys->filter != NULL) {
         va->sys->filter->owner.sys = picture;
-        vlc_va_surface_t *surface = picture->context;
+        vlc_va_surface_t *surface = data_context;
         picture_Hold( surface->p_pic );
         va->sys->filter->pf_video_filter( va->sys->filter, surface->p_pic );
     } else {

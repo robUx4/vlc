@@ -954,8 +954,8 @@ static picture_t *DecodeVideo( decoder_t *p_dec, block_t **pp_block )
             }
         }
 
-        picture_t *p_pic = frame->opaque;
-        if( p_pic == NULL )
+        picture_t *p_pic = NULL;
+        if( frame->opaque == NULL )
         {   /* When direct rendering is not used, get_format() and get_buffer()
              * might not be called. The output video format must be set here
              * then picture buffer can be allocated. */
@@ -976,8 +976,21 @@ static picture_t *DecodeVideo( decoder_t *p_dec, block_t **pp_block )
         else
         {
             if( p_sys->p_va != NULL )
-                vlc_va_Extract( p_sys->p_va, p_pic, AV_FRAME_SURFACE_DATA(frame) );
-            picture_Hold( p_pic );
+            {
+                /* a picture_ has not been allocated yet, frame->opaque is meaningless */
+                p_pic = decoder_NewPicture(p_dec);
+                if( unlikely(p_pic==NULL) )
+                {
+                    av_frame_free(&frame);
+                    break;
+                }
+                vlc_va_Extract( p_sys->p_va, p_pic, AV_FRAME_SURFACE(frame), AV_FRAME_SURFACE_DATA(frame) );
+            }
+            else
+            {
+                p_pic = frame->opaque;
+                picture_Hold(p_pic);
+            }
         }
 
         if( !p_dec->fmt_in.video.i_sar_num || !p_dec->fmt_in.video.i_sar_den )
@@ -1117,34 +1130,24 @@ static void lavc_ReleaseFrame(void *opaque)
     picture_Release(picture);
 }
 
-static int lavc_va_GetFrame(struct AVCodecContext *ctx, AVFrame *frame,
-                            picture_t *pic)
+static int lavc_va_GetFrame(struct AVCodecContext *ctx, AVFrame *frame)
 {
     decoder_t *dec = ctx->opaque;
     vlc_va_t *va = dec->p_sys->p_va;
-    void *data_context;
 
-    if (vlc_va_Get(va, &data_context, &AV_FRAME_SURFACE_DATA(frame)))
+    if (vlc_va_Get(va, &AV_FRAME_SURFACE(frame), &AV_FRAME_SURFACE_DATA(frame)))
     {
         msg_Err(dec, "hardware acceleration picture allocation failed");
-        picture_Release(pic);
         return -1;
     }
-    pic->context = data_context;
-    AV_FRAME_SURFACE(frame) = AV_FRAME_SURFACE_DATA(frame);
 
-    void (*release)(void *) = va->release;
-    if (va->release == NULL)
-        release = lavc_ReleaseFrame;
-
-    frame->buf[0] = av_buffer_create(AV_FRAME_SURFACE_DATA(frame), 0, release, pic, 0);
+    frame->buf[0] = av_buffer_create(AV_FRAME_SURFACE_DATA(frame), 0, va->release, AV_FRAME_SURFACE(frame), 0);
     if (unlikely(frame->buf[0] == NULL))
     {
-        release(pic);
         return -1;
     }
 
-    frame->opaque = pic;
+    frame->opaque = AV_FRAME_SURFACE(frame);
     assert(AV_FRAME_SURFACE(frame) != NULL);
     return 0;
 }
@@ -1258,12 +1261,12 @@ static int lavc_GetFrame(struct AVCodecContext *ctx, AVFrame *frame, int flags)
     }
     post_mt(sys);
 
+    if (sys->p_va != NULL)
+        return lavc_va_GetFrame(ctx, frame);
+
     pic = decoder_NewPicture(dec);
     if (pic == NULL)
         return -ENOMEM;
-
-    if (sys->p_va != NULL)
-        return lavc_va_GetFrame(ctx, frame, pic);
 
     /* Some codecs set pix_fmt only after the 1st frame has been decoded,
      * so we need to check for direct rendering again. */
