@@ -48,8 +48,13 @@ endif
 	$(call pkg_static,"libxml-2.0.pc.in")
 	$(MOVE)
 
+LIBXML2_CFLAGS := $(CFLAGS) -DLIBXML_STATIC
+ifdef HAVE_WIN32
+LIBXML2_CFLAGS += -D_FILE_OFFSET_BITS=32
+endif
+
 .libxml2: libxml2
 	$(RECONF)
-	cd $< && $(HOSTVARS) ./configure $(HOSTCONF) CFLAGS="-DLIBXML_STATIC" $(XMLCONF)
+	cd $< && $(HOSTVARS) ./configure $(HOSTCONF) CFLAGS="$(LIBXML2_CFLAGS)" $(XMLCONF)
 	cd $< && $(MAKE) install
 	touch $@
