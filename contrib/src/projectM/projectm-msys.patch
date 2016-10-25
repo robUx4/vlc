@@ -1,0 +1,12 @@
+--- projectM/CMakeLists.txt	2016-10-25 08:25:03.082546900 +0200
++++ projectM/CMakeLists.txt.msys	2016-10-25 08:24:08.434783400 +0200
+@@ -41,6 +41,9 @@ ADD_DEFINITIONS(-DUSE_NATIVE_GLEW)
+ SET(GLEW_SOURCES glew.h glew.c)
+ SET(GLEW_LINK_TARGETS )
+ else(USE_NATIVE_GLEW)
++if (MSYS)
++include_directories( /mingw32/include )
++endif(MSYS)
+ SET(GLEW_SOURCES )
+ SET (GLEW_LINK_TARGETS GLEW)
+ endif(USE_NATIVE_GLEW)
