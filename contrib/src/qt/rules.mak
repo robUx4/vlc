@@ -32,7 +32,12 @@ QT_PLATFORM := -platform darwin-g++
 endif
 ifdef HAVE_WIN32
 QT_SPEC := win32-g++
-QT_PLATFORM := -xplatform win32-g++ -device-option CROSS_COMPILE=$(HOST)-
+ifdef HAVE_CROSS_COMPILE
+QT_PLATFORM := -xplatform win32-g++ CROSS_COMPILE=$(HOST)-
+else
+QT_PLATFORM := -platform win32-g++
+endif
+QT_PLATFORM += -device-option
 endif
 
 QT_CONFIG := -static -opensource -confirm-license -no-pkg-config \
