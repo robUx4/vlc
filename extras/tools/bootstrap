@@ -91,6 +91,7 @@ check_sed
 check protoc 2.6.0
 check ant
 check xz
+check_v widl
 
 [ -n "$NEEDED" ] && mkdir -p build/ && echo "To-be-built packages: `echo $NEEDED | sed 's/\.//g'`"
 
