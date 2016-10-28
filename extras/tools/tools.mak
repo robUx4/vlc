@@ -290,6 +290,27 @@ CLEAN_PKG += protobuf
 DISTCLEAN_PKG += protobuf-$(PROTOBUF_VERSION).tar.gz
 CLEAN_FILE += .protoc
 
+# Wine widl
+wine-$(WIDL_VERSION).tar.bz2:
+	$(call download_pkg,$(WIDL_URL),widl)
+
+widl: wine-$(WIDL_VERSION).tar.bz2
+	$(UNPACK)
+	$(MOVE)
+
+.widl: widl
+ifeq ($(shell uname -m),x86_64)
+	(cd $< && ./configure --prefix="$(PREFIX)" --disable-shared --enable-static --without-freetype --enable-win64 && $(MAKE) -C libs/port && $(MAKE) -C libs/wpp && $(MAKE) -C tools/widl)
+else
+	(cd $< && ./configure --prefix="$(PREFIX)" --disable-shared --enable-static --without-freetype && $(MAKE) -C libs/port && $(MAKE) -C libs/wpp && $(MAKE) -C tools/widl)
+endif
+	(mkdir -p $(PREFIX)/bin && cp $</tools/widl/widl* $(PREFIX)/bin/)
+	touch $@
+
+CLEAN_PKG += widl
+DISTCLEAN_PKG += wine-$(WIDL_VERSION).tar.bz2
+CLEAN_FILE += .widl
+
 #
 #
 #
