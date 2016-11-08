@@ -222,7 +222,7 @@ static int vlc_cache_load_config(module_config_t *cfg, block_t *file)
 
         if (cfg->list_count)
         {
-            LOAD_ALIGNOF(*cfg->list.i);
+            LOAD_ALIGNOF(const int);
         }
         else
             LOAD_STRING(cfg->list_cb_name);
@@ -544,7 +544,7 @@ static int CacheSaveConfig (FILE *file, const module_config_t *cfg)
 
         if (cfg->list_count > 0)
         {
-            SAVE_ALIGNOF(*cfg->list.i);
+            SAVE_ALIGNOF(const int);
         }
         else
             SAVE_STRING(cfg->list_cb_name);
