@@ -872,7 +872,7 @@ static HRESULT UpdateBackBuffer(vout_display_t *vd)
 }
 
 /* rotation around the Z axis */
-static void getZRotMatrix(float theta, FLOAT matrix[static 16])
+static void getZRotMatrix(float theta, FLOAT matrix[16])
 {
     float st, ct;
 
@@ -890,7 +890,7 @@ static void getZRotMatrix(float theta, FLOAT matrix[static 16])
 }
 
 /* rotation around the Y axis */
-static void getYRotMatrix(float theta, FLOAT matrix[static 16])
+static void getYRotMatrix(float theta, FLOAT matrix[16])
 {
     float st, ct;
 
@@ -908,7 +908,7 @@ static void getYRotMatrix(float theta, FLOAT matrix[static 16])
 }
 
 /* rotation around the X axis */
-static void getXRotMatrix(float phi, FLOAT matrix[static 16])
+static void getXRotMatrix(float phi, FLOAT matrix[16])
 {
     float sp, cp;
 
@@ -925,7 +925,7 @@ static void getXRotMatrix(float phi, FLOAT matrix[static 16])
     memcpy(matrix, m, sizeof(m));
 }
 
-static void getZoomMatrix(float zoom, FLOAT matrix[static 16]) {
+static void getZoomMatrix(float zoom, FLOAT matrix[16]) {
 
     const FLOAT m[] = {
         /* x   y     z     w */
@@ -939,7 +939,7 @@ static void getZoomMatrix(float zoom, FLOAT matrix[static 16]) {
 }
 
 /* perspective matrix see https://www.opengl.org/sdk/docs/man2/xhtml/gluPerspective.xml */
-static void getProjectionMatrix(float sar, float fovy, FLOAT matrix[static 16]) {
+static void getProjectionMatrix(float sar, float fovy, FLOAT matrix[16]) {
 
     float zFar  = 1000;
     float zNear = 0.01;
