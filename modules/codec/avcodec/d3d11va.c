@@ -305,6 +305,9 @@ static int Extract(vlc_va_t *va, picture_t *output, uint8_t *data)
                 goto done;
             }
         }
+#endif
+#if !LIBAVCODEC_VERSION_CHECK( 57, 28, 5, 66, 109 )
+#ifdef ID3D11VideoContext_VideoProcessorBlt
         else
 #endif
         {
@@ -328,6 +331,7 @@ static int Extract(vlc_va_t *va, picture_t *output, uint8_t *data)
                                                       viewDesc.Texture2D.ArraySlice,
                                                       &copyBox);
         }
+#endif
     }
         break;
     case VLC_CODEC_YV12:
@@ -372,7 +376,36 @@ static int CheckDevice(vlc_va_t *va)
 
 static int Get(vlc_va_t *va, picture_t *pic, uint8_t **data)
 {
+#if LIBAVCODEC_VERSION_CHECK( 57, 28, 5, 66, 109 )
+    picture_sys_t *p_sys = pic->p_sys;
+    if (p_sys->decoder == NULL)
+    {
+        HRESULT hr;
+
+        directx_sys_t *dx_sys = &va->sys->dx_sys;
+
+        D3D11_VIDEO_DECODER_OUTPUT_VIEW_DESC viewDesc;
+        ZeroMemory(&viewDesc, sizeof(viewDesc));
+        viewDesc.DecodeProfile = dx_sys->input;
+        viewDesc.ViewDimension = D3D11_VDOV_DIMENSION_TEXTURE2D;
+        viewDesc.Texture2D.ArraySlice = p_sys->slice_index;
+
+        hr = ID3D11VideoDevice_CreateVideoDecoderOutputView( (ID3D11VideoDevice*) dx_sys->d3ddec,
+                                                             (ID3D11Resource*) p_sys->texture,
+                                                             &viewDesc,
+                                                             &p_sys->decoder );
+        if (FAILED(hr)) {
+            msg_Warn(va, "CreateVideoDecoderOutputView %d failed. (hr=0x%0lx)", p_sys->slice_index, hr);
+            p_sys->decoder = NULL;
+        }
+    }
+    if (p_sys->decoder == NULL)
+        return VLC_EGENERIC;
+    *data = p_sys->decoder;
+    return VLC_SUCCESS;
+#else
     return directx_va_Get(va, &va->sys->dx_sys, pic, data);
+#endif
 }
 
 static void Close(vlc_va_t *va, AVCodecContext *ctx)
@@ -503,7 +536,11 @@ static int Open(vlc_va_t *va, AVCodecContext *ctx, enum PixelFormat pix_fmt,
     va->description = DxDescribe(dx_sys);
     va->setup   = Setup;
     va->get     = Get;
+#if LIBAVCODEC_VERSION_CHECK( 57, 28, 5, 66, 109 )
+    va->release = NULL;
+#else
     va->release = directx_va_Release;
+#endif
     va->extract = Extract;
 
     return VLC_SUCCESS;
@@ -986,6 +1023,9 @@ static int DxCreateDecoderSurfaces(vlc_va_t *va, int codec_id, const video_forma
 
     if (sys->b_extern_pool)
     {
+#if LIBAVCODEC_VERSION_CHECK( 57, 28, 5, 66, 109 )
+        dx_sys->surface_count = 0;
+#else
         size_t surface_idx;
         for (surface_idx = 0; surface_idx < dx_sys->surface_count; surface_idx++) {
             picture_t *pic = decoder_NewPicture( (decoder_t*) va->obj.parent );
@@ -1051,6 +1091,7 @@ static int DxCreateDecoderSurfaces(vlc_va_t *va, int codec_id, const video_forma
             }
         }
         else
+#endif
             msg_Dbg(va, "using external surface pool");
     }
 
