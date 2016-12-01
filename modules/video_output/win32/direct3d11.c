@@ -650,6 +650,8 @@ static void DestroyDisplayPoolPicture(picture_t *picture)
 {
     picture_sys_t *p_sys = (picture_sys_t*) picture->p_sys;
 
+    if (p_sys->decoder)
+        ID3D11VideoDecoderOutputView_Release(p_sys->decoder);
     if (p_sys->texture)
         ID3D11Texture2D_Release(p_sys->texture);
     if (p_sys->context)
