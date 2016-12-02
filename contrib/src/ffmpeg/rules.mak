@@ -178,7 +178,7 @@ FFMPEGCONF += --enable-w32threads
 ifndef HAVE_WINSTORE
 FFMPEGCONF += --enable-dxva2
 else
-FFMPEGCONF += --disable-dxva2
+FFMPEGCONF += --disable-dxva2 --disable-cuvid --disable-nvenc --disable-cuda
 endif
 
 ifdef HAVE_WIN64
