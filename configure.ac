@@ -458,6 +458,10 @@ AS_IF([test -n "${CONTRIB_DIR}"], [
     ])
   ])
 
+  AS_IF([test -x "${CONTRIB_DIR}/bin/protoc${BUILDEXEEXT}"], [
+    PROTOC="${CONTRIB_DIR}/bin/protoc${BUILDEXEEXT}"
+  ])
+
   AS_IF([test "${SYS}" = "darwin"], [
     export LD_LIBRARY_PATH="${CONTRIB_DIR}/lib:$LD_LIBRARY_PATH"
     export DYLD_LIBRARY_PATH="${CONTRIB_DIR}/lib:$DYLD_LIBRARY_PATH"
