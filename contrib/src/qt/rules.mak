@@ -60,7 +60,9 @@ endif
 	cd $</src && $(MAKE) sub-moc-install_subtargets sub-rcc-install_subtargets sub-uic-install_subtargets
 	# Install plugins
 	cd $</src/plugins && $(MAKE) sub-platforms-install_subtargets
+ifndef HAVE_WIN32
 	mv $(PREFIX)/plugins/platforms/libqwindows.a $(PREFIX)/lib/ && rm -rf $(PREFIX)/plugins
+endif
 	# Move includes to match what VLC expects
 	mkdir -p $(PREFIX)/include/QtGui/qpa
 	cp $(PREFIX)/include/QtGui/$(QT_VERSION)/QtGui/qpa/qplatformnativeinterface.h $(PREFIX)/include/QtGui/qpa
