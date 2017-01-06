@@ -1990,6 +1990,7 @@ static int AllocQuad(vout_display_t *vd, const video_format_t *fmt, d3d_quad_t *
     vout_display_sys_t *sys = vd->sys;
     D3D11_MAPPED_SUBRESOURCE mappedResource;
     HRESULT hr;
+    static const FLOAT FULL_TO_STUDIO_SHIFT = 16.f / 256.f;
 
     /* pixel shader constant buffer */
     PS_CONSTANT_BUFFER defaultConstants = {
@@ -2009,7 +2010,7 @@ static int AllocQuad(vout_display_t *vd, const video_format_t *fmt, d3d_quad_t *
         goto error;
     }
 
-    static const FLOAT WHITE_POINT_D65[4] = { -0.0625f, -0.5f, -0.5f, 1.f };
+    static const FLOAT WHITE_POINT_D65_TO_FULL[4] = { -FULL_TO_STUDIO_SHIFT, -0.5f, -0.5f, 1.f };
 
     static const FLOAT COLORSPACE_BT601_TO_FULL[4*4] = {
         1.164383561643836f,                 0.f,  1.596026785714286f, 0.f,
@@ -2052,7 +2053,7 @@ static int AllocQuad(vout_display_t *vd, const video_format_t *fmt, d3d_quad_t *
             break;
     }
     memcpy(colorspace.Colorspace, ppColorspace, sizeof(colorspace.Colorspace));
-    memcpy(colorspace.WhitePoint, WHITE_POINT_D65, sizeof(colorspace.WhitePoint));
+    memcpy(colorspace.WhitePoint, WHITE_POINT_D65_TO_FULL, sizeof(colorspace.WhitePoint));
     constantInit.pSysMem = &colorspace;
 
     static_assert((sizeof(PS_COLOR_TRANSFORM)%16)==0,"Constant buffers require 16-byte alignment");
