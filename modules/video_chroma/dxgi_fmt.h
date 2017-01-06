@@ -45,4 +45,7 @@ extern vlc_fourcc_t DxgiFormatFourcc(DXGI_FORMAT format);
 extern const d3d_format_t *GetRenderFormatList(void);
 extern void DxgiFormatMask(DXGI_FORMAT format, video_format_t *);
 
+typedef struct ID3D11Device ID3D11Device;
+extern bool isXboxHardware(ID3D11Device *d3ddev);
+
 #endif /* include-guard */
