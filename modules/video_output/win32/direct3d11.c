@@ -247,6 +247,14 @@ static const char* globPixelShaderDefault = "\
     float Opacity;\
     float opacityPadding[3];\
   };\
+  cbuffer PS_COLOR_TRANSFORM : register(b1)\
+  {\
+    float WhitePointX;\
+    float WhitePointY;\
+    float WhitePointZ;\
+    float whitePadding;\
+    float4x4 Colorspace;\
+  };\
   Texture2D shaderTexture;\
   SamplerState SampleType;\
   \
@@ -261,8 +269,11 @@ static const char* globPixelShaderDefault = "\
     float4 rgba; \
     \
     rgba = shaderTexture.Sample(SampleType, In.Texture);\
+    rgba.x += WhitePointX;\
+    rgba.y += WhitePointY;\
+    rgba.z += WhitePointZ;\
     rgba.a = rgba.a * Opacity;\
-    return rgba; \
+    return saturate(mul(rgba, Colorspace));\
   }\
 ";
 
@@ -1991,6 +2002,9 @@ static int AllocQuad(vout_display_t *vd, const video_format_t *fmt, d3d_quad_t *
     D3D11_MAPPED_SUBRESOURCE mappedResource;
     HRESULT hr;
     static const FLOAT FULL_TO_STUDIO_SHIFT = 16.f / 256.f;
+    const bool RGB_shader = cfg->resourceFormatYRGB != DXGI_FORMAT_R8_UNORM &&
+        cfg->resourceFormatYRGB != DXGI_FORMAT_R16_UNORM &&
+        fmt->i_chroma != VLC_CODEC_YUYV;
 
     /* pixel shader constant buffer */
     PS_CONSTANT_BUFFER defaultConstants = {
@@ -2011,7 +2025,15 @@ static int AllocQuad(vout_display_t *vd, const video_format_t *fmt, d3d_quad_t *
     }
 
     FLOAT WHITE_POINT_D65_TO_FULL[4] = { -FULL_TO_STUDIO_SHIFT, -0.5f, -0.5f, 1.f };
+    if (RGB_shader)
+        WHITE_POINT_D65_TO_FULL[0] = WHITE_POINT_D65_TO_FULL[1] = WHITE_POINT_D65_TO_FULL[2] = 0.f;
 
+    FLOAT COLORSPACE_RGB_FULL[4 * 4] = {
+        1.f, 0.f, 0.f, 0.f,
+        0.f, 1.f, 0.f, 0.f,
+        0.f, 0.f, 1.f, 0.f,
+        0.f, 0.f, 0.f, 1.f,
+    };
     FLOAT COLORSPACE_BT601_TO_FULL[4*4] = {
         1.164383561643836f,                 0.f,  1.596026785714286f, 0.f,
         1.164383561643836f, -0.391762290094914f, -0.812967647237771f, 0.f,
@@ -2034,6 +2056,9 @@ static int AllocQuad(vout_display_t *vd, const video_format_t *fmt, d3d_quad_t *
 
     PS_COLOR_TRANSFORM colorspace;
     FLOAT *ppColorspace;
+    if (RGB_shader)
+        ppColorspace = COLORSPACE_RGB_FULL;
+    else
     switch (fmt->space){
         case COLOR_SPACE_BT709:
             ppColorspace = COLORSPACE_BT709_TO_FULL;
