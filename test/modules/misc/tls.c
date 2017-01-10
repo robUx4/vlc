@@ -29,18 +29,29 @@
 #include <string.h>
 
 #include <sys/types.h>
-#include <sys/socket.h>
-#include <poll.h>
+#if defined(_WIN32)
+#   include <winsock2.h>
+#else
+#   include <sys/socket.h>
+#endif
+#ifdef HAVE_POLL
+# include <poll.h>
+#endif
 #include <fcntl.h>
 #include <unistd.h>
 
 #include <vlc_common.h>
 #include <vlc_modules.h>
 #include <vlc_tls.h>
+#include <vlc_fs.h>
 #include <vlc_dialog.h>
 #include "../../../lib/libvlc_internal.h"
 
 #include <vlc/vlc.h>
+
+#if defined(PF_UNIX) && !defined(PF_LOCAL)
+#    define PF_LOCAL PF_UNIX
+#endif
 
 static int tlspair(int fds[2])
 {
@@ -158,7 +169,7 @@ int main(void)
 
     assert(!strncmp(homedir, "/tmp/vlc-test-", 14));
     setenv("HOME", homedir, 1);
-    setenv("VLC_PLUGIN_PATH", "../modules", 1);
+    putenv("VLC_PLUGIN_PATH=../modules");
 
     vlc = libvlc_new(0, NULL);
     assert(vlc != NULL);
@@ -284,7 +295,9 @@ int main(void)
     vlc_tls_Delete(server_creds);
     libvlc_release(vlc);
 
+#ifndef _WIN32
     if (fork() == 0)
         execlp("rm", "rm", "-rf", homedir, (char *)NULL);
+#endif
     return 0;
 }

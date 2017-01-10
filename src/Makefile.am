@@ -482,17 +482,21 @@ check_PROGRAMS = \
 	test_block \
 	test_dictionary \
 	test_i18n_atof \
-	test_interrupt \
 	test_md5 \
 	test_picture_pool \
-	test_timer \
 	test_url \
 	test_utf8 \
 	test_xmlent \
 	test_headers \
 	test_mrl_helpers
 
+#	test_interrupt
+#	test_timer
+
 TESTS = $(check_PROGRAMS) check_symbols
+
+.PHONY: tests
+tests: $(check_PROGRAMS)
 
 test_block_SOURCES = test/block_test.c
 test_block_LDADD = $(LDADD) $(LIBS_libvlccore)

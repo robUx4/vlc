@@ -47,8 +47,17 @@ http_file_test_SOURCES = access/http/file_test.c \
 http_tunnel_test_SOURCES = access/http/tunnel_test.c
 http_tunnel_test_LDADD = libvlc_http.la
 check_PROGRAMS += hpack_test hpackenc_test \
-	h2frame_test h2output_test h2conn_test h1conn_test h1chunked_test \
+	h2frame_test h1chunked_test \
 	http_msg_test http_file_test http_tunnel_test
+if !HAVE_WIN32
+check_PROGRAMS += h2output_test h2conn_test h1conn_test
+endif
 TESTS += hpack_test hpackenc_test \
-	h2frame_test h2output_test h2conn_test h1conn_test h1chunked_test \
+	h2frame_test h1chunked_test \
 	http_msg_test http_file_test http_tunnel_test
+if !HAVE_WIN32
+TESTS += h2output_test h2conn_test h1conn_test
+endif
+
+.PHONY: tests
+tests: $(check_PROGRAMS)
