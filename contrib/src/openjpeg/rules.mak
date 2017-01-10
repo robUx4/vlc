@@ -10,6 +10,9 @@ $(TARBALLS)/openjpeg-$(OPENJPEG_VERSION).tar.gz:
 
 openjpeg: openjpeg-$(OPENJPEG_VERSION).tar.gz .sum-openjpeg
 	$(UNPACK)
+ifeq ($(shell uname -o),Msys)
+	dos2unix $(SRC)/openjpeg/freebsd.patch
+endif
 	$(APPLY) $(SRC)/openjpeg/freebsd.patch
 ifdef HAVE_VISUALSTUDIO
 	$(APPLY) $(SRC)/openjpeg/msvc.patch

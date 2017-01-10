@@ -25,7 +25,7 @@ then
 fi
 
 check_tar() {
-if ! tar PcJ /dev/null >/dev/null 2>&1
+if ! tar PcJ /dev/null >/dev/null 2>&1 && ! tar PcJf /dev/null /dev/null 2>&1
 then
     echo "tar doesn't support xz (J option)"
     NEEDED="$NEEDED .tar .xz"
@@ -44,7 +44,7 @@ fi
 }
 
 check() {
-if ! $1 --version >/dev/null 2>&1 && ! $1 -version >/dev/null 2>&1
+if ! $1 --version >/dev/null 2>&1 && ! $1 -version >/dev/null 2>&1 && ! $1 --version 2>/dev/null
 then
     echo "$1 not found"
     NEEDED="$NEEDED .$1"
@@ -70,6 +70,14 @@ else
 fi
 }
 
+check_v() {
+if ! $1 -V 2>/dev/null
+then
+    echo "$1 not found"
+    NEEDED="$NEEDED .$1"
+fi
+}
+
 check autoconf 2.69
 check automake 1.15
 check m4 1.4.16
@@ -83,6 +91,7 @@ check_sed
 check protoc 2.6.0
 check ant
 check xz
+check_v widl
 
 [ -n "$NEEDED" ] && mkdir -p build/ && echo "To-be-built packages: `echo $NEEDED | sed 's/\.//g'`"
 
