@@ -59,7 +59,8 @@ struct picture_sys_t
     ID3D11Texture2D               *texture;
     ID3D11DeviceContext           *context;
     unsigned                      slice_index;
-    HINSTANCE                     hd3d11_dll; /* TODO */
+    ID3D11VideoProcessorInputView *inputView; /* when used as processor input */
+    ID3D11ShaderResourceView      *resourceView[2];
 };
 
 struct filter_sys_t {
