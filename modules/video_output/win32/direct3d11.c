@@ -32,8 +32,9 @@
 
 #define USE_DXGI 0
 #ifndef HAVE_ID3D11VIDEODECODER
-#define HAVE_ID3D11VIDEODECODER
+#define HAVE_ID3D11VIDEODECODER 1
 #endif
+#define MODULE_NAME_IS_direct3d11
 
 #include <vlc_common.h>
 #include <vlc_plugin.h>
@@ -583,20 +584,14 @@ static picture_pool_t *Pool(vout_display_t *vd, unsigned pool_size)
     texDesc.ArraySize = pool_size;
 
     ID3D11Texture2D *texture;
-
     hr = ID3D11Device_CreateTexture2D( vd->sys->d3ddevice, &texDesc, NULL, &texture );
     if (FAILED(hr)) {
         msg_Err(vd, "CreateTexture2D failed for the %d pool. (hr=0x%0lx)", pool_size, hr);
         goto error;
     }
 
-    D3D11_SHADER_RESOURCE_VIEW_DESC resviewDesc = {
-        .ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2DARRAY,
-        .Texture2DArray.MipLevels = -1,
-        .Texture2DArray.ArraySize = texDesc.ArraySize,
-    };
-
     const d3d_format_t *cfg = NULL;
+    //ID3D11ShaderResourceView *resourceView[2] = {NULL,NULL};
     for (const d3d_format_t *output_format = GetRenderFormatList();
          output_format->name != NULL; ++output_format)
     {
@@ -611,8 +606,20 @@ static picture_pool_t *Pool(vout_display_t *vd, unsigned pool_size)
         if (unlikely(picsys == NULL))
             goto error;
 
-        resviewDesc.Texture2DArray.FirstArraySlice = picture_count;
-        resviewDesc.Format = cfg->formatY;
+        ID3D11Texture2D_AddRef(texture);
+        picsys->texture = texture;
+        picsys->slice_index = picture_count;
+        picsys->context = vd->sys->d3dcontext;
+
+#if 1
+        D3D11_SHADER_RESOURCE_VIEW_DESC resviewDesc = {
+            .Format = cfg->formatY,
+            .ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2DARRAY,
+            .Texture2DArray.MipLevels = -1,
+            .Texture2DArray.ArraySize = 1, //texDesc.ArraySize,
+            .Texture2DArray.FirstArraySlice = picture_count,
+        };
+
         hr = ID3D11Device_CreateShaderResourceView(vd->sys->d3ddevice, (ID3D11Resource *)texture, &resviewDesc, &picsys->resourceView[0]);
         if (FAILED(hr)) {
             msg_Err(vd, "Could not Create the Y/RGB D3d11 Texture ResourceView. (hr=0x%lX)", hr);
@@ -629,12 +636,10 @@ static picture_pool_t *Pool(vout_display_t *vd, unsigned pool_size)
             }
         } else
             picsys->resourceView[1] = NULL;
-
-        ID3D11Texture2D_AddRef(texture);
-        picsys->texture = texture;
-        picsys->slice_index = picture_count;
-        picsys->context = vd->sys->d3dcontext;
-
+#else
+        picsys->resourceView[0] = resourceView[0];
+        picsys->resourceView[1] = resourceView[1];
+#endif
         picture_resource_t resource = {
             .p_sys = picsys,
             .pf_destroy = DestroyDisplayPoolPicture,
@@ -1052,7 +1057,7 @@ static void Prepare(vout_display_t *vd, picture_t *picture, subpicture_t *subpic
     }
 
 #ifdef HAVE_ID3D11VIDEODECODER
-    if (is_d3d11_opaque(picture->format.i_chroma)) {
+    if (is_d3d11_opaque(picture->format.i_chroma) && false) {
         D3D11_BOX box;
         picture_sys_t *p_sys = picture->p_sys;
         D3D11_TEXTURE2D_DESC texDesc;
@@ -1074,8 +1079,11 @@ static void Prepare(vout_display_t *vd, picture_t *picture, subpicture_t *subpic
         box.back = 1;
         box.front = 0;
 
-        if ( sys->context_lock != INVALID_HANDLE_VALUE)
+        if ( sys->context_lock != INVALID_HANDLE_VALUE) {
             WaitForSingleObjectEx( sys->context_lock, INFINITE, FALSE );
+            sys->lock_time = mdate();
+            msg_Dbg(vd, "locked D3D11 context");
+        }
         ID3D11DeviceContext_CopySubresourceRegion(sys->d3dcontext,
                                                   (ID3D11Resource*) sys->picQuad.pTexture,
                                                   0, 0, 0, 0,
@@ -1096,7 +1104,7 @@ static void Prepare(vout_display_t *vd, picture_t *picture, subpicture_t *subpic
     }
 }
 
-static void DisplayD3DPicture(vout_display_sys_t *sys, d3d_quad_t *quad/*, ID3D11Texture2D *pTexture*/)
+static void DisplayD3DPicture(vout_display_sys_t *sys, d3d_quad_t *quad, ID3D11ShaderResourceView *resourceView[2])
 {
     UINT stride = sizeof(d3d_vertex_t);
     UINT offset = 0;
@@ -1115,7 +1123,7 @@ static void DisplayD3DPicture(vout_display_sys_t *sys, d3d_quad_t *quad/*, ID3D1
 
     ID3D11DeviceContext_PSSetConstantBuffers(sys->d3dcontext, 0, quad->PSConstantsCount, quad->pPixelShaderConstants);
 #if 1
-    ID3D11DeviceContext_PSSetShaderResources(sys->d3dcontext, 0, 2, quad->picSys.resourceView);
+    ID3D11DeviceContext_PSSetShaderResources(sys->d3dcontext, 0, 2, resourceView);
 #else
     ID3D11DeviceContext_PSSetShaderResources(sys->d3dcontext, 0, 1, &quad->picSys.resourceView[0]); /* TODO set in one call */
     if( quad->picSys.resourceView[1] )
@@ -1153,17 +1161,14 @@ static void Display(vout_display_t *vd, picture_t *picture, subpicture_t *subpic
         Direct3D11UnmapTexture(picture);
 
     /* Render the quad */
-    if (is_d3d11_opaque(picture->format.i_chroma)) {
-        DisplayD3DPicture(sys, &sys->picQuad);
-    } else {
-        DisplayD3DPicture(sys, &sys->picQuad);
-    }
+    DisplayD3DPicture(sys, &sys->picQuad, picture->p_sys->resourceView);
 
     if (subpicture) {
         // draw the additional vertices
         for (int i = 0; i < sys->d3dregion_count; ++i) {
             if (sys->d3dregions[i])
-                DisplayD3DPicture(sys, (d3d_quad_t *) sys->d3dregions[i]->p_sys);
+                DisplayD3DPicture(sys, (d3d_quad_t *) sys->d3dregions[i]->p_sys,
+                                  ((d3d_quad_t *) sys->d3dregions[i]->p_sys)->picSys.resourceView);
         }
     }
 
@@ -1284,119 +1289,6 @@ static const dxgi_color_space color_spaces[] = {
 #undef DXGIMAP
 };
 
-static bool SetupProcessor(vout_display_t *vd, const video_format_t *fmt)
-{
-    vout_display_sys_t *sys = vd->sys;
-    HRESULT hr;
-
-    hr = ID3D11Device_QueryInterface(sys->d3ddevice, &IID_ID3D11VideoDevice, (void **)&sys->d3dviddev);
-    if (FAILED(hr)) {
-       msg_Err(vd, "Could not Query ID3D11VideoDevice Interface. (hr=0x%lX)", hr);
-       return false;
-    }
-
-    hr = ID3D11DeviceContext_QueryInterface(sys->d3dcontext, &IID_ID3D11VideoContext, (void **)&sys->d3dvidctx);
-    if (FAILED(hr)) {
-       msg_Err(vd, "Could not Query ID3D11VideoDevice Interface from the picture. (hr=0x%lX)", hr);
-       ID3D11VideoDevice_Release(sys->d3dviddev);
-       return false;
-    }
-
-    ID3D11VideoProcessorEnumerator *processorEnumerator;
-    D3D11_VIDEO_PROCESSOR_CONTENT_DESC processorDesc = {
-        .InputFrameFormat = D3D11_VIDEO_FRAME_FORMAT_PROGRESSIVE,   /* TODO */
-        .InputFrameRate = {
-            .Numerator   = fmt->i_frame_rate_base > 0 ? fmt->i_frame_rate : 0,
-            .Denominator = fmt->i_frame_rate_base,
-        },
-        .InputWidth   = fmt->i_width,
-        .InputHeight  = fmt->i_height,
-        .OutputWidth  = fmt->i_width,
-        .OutputHeight = fmt->i_height,
-        .Usage = D3D11_VIDEO_USAGE_PLAYBACK_NORMAL,
-    };
-    hr = ID3D11VideoDevice_CreateVideoProcessorEnumerator(sys->d3dviddev, &processorDesc, &processorEnumerator);
-    if ( processorEnumerator == NULL )
-    {
-        msg_Dbg(vd, "Can't get a video processor for the video.");
-        return false;
-    }
-
-    UINT flags;
-#ifndef NDEBUG
-    for (int format = 0; format < 188; format++) {
-        hr = ID3D11VideoProcessorEnumerator_CheckVideoProcessorFormat(processorEnumerator, format, &flags);
-        if (SUCCEEDED(hr) && (flags & D3D11_VIDEO_PROCESSOR_FORMAT_SUPPORT_INPUT))
-            msg_Dbg(vd, "processor format %s (%d) is supported for input", DxgiFormatToStr(format),format);
-        if (SUCCEEDED(hr) && (flags & D3D11_VIDEO_PROCESSOR_FORMAT_SUPPORT_OUTPUT))
-            msg_Dbg(vd, "processor format %s (%d) is supported for output", DxgiFormatToStr(format),format);
-    }
-#endif
-    DXGI_FORMAT processorOutput = fmt->i_chroma == VLC_CODEC_D3D11_OPAQUE_10B ? DXGI_FORMAT_R10G10B10A2_UNORM : DXGI_FORMAT_R8G8B8A8_UNORM;
-    /* shortcut for the rendering output */
-    hr = ID3D11VideoProcessorEnumerator_CheckVideoProcessorFormat(processorEnumerator, processorOutput, &flags);
-    if (FAILED(hr) || !(flags & D3D11_VIDEO_PROCESSOR_FORMAT_SUPPORT_OUTPUT)) {
-        msg_Dbg(vd, "processor format %s not supported for output", DxgiFormatToStr(processorOutput));
-        processorOutput = DXGI_FORMAT_UNKNOWN;
-    }
-
-    if (processorOutput == DXGI_FORMAT_UNKNOWN)
-    {
-        // check if we can create render texture of that format
-        // check the decoder can output to that format
-        const UINT i_quadSupportFlags = D3D11_FORMAT_SUPPORT_TEXTURE2D | D3D11_FORMAT_SUPPORT_SHADER_LOAD;
-        for (const d3d_format_t *output = GetRenderFormatList();
-             output->name != NULL; ++output)
-        {
-            UINT i_formatSupport;
-            if( SUCCEEDED( ID3D11Device_CheckFormatSupport(sys->d3ddevice,
-                                                           output->formatTexture,
-                                                           &i_formatSupport)) &&
-                    ( i_formatSupport & i_quadSupportFlags ) == i_quadSupportFlags )
-            {
-                msg_Dbg(vd, "Render pixel format %s supported", DxgiFormatToStr(output->formatTexture) );
-
-                hr = ID3D11VideoProcessorEnumerator_CheckVideoProcessorFormat(processorEnumerator,
-                                                                              output->formatTexture, &flags);
-                if (FAILED(hr) || !(flags & D3D11_VIDEO_PROCESSOR_FORMAT_SUPPORT_OUTPUT))
-                    msg_Dbg(vd, "Processor format %s not supported for output", DxgiFormatToStr(output->formatTexture));
-                else
-                {
-                    processorOutput = output->formatTexture;
-                    break;
-                }
-            }
-        }
-    }
-
-    if (processorOutput != DXGI_FORMAT_UNKNOWN)
-    {
-        D3D11_VIDEO_PROCESSOR_CAPS processorCaps;
-
-        hr = ID3D11VideoProcessorEnumerator_GetVideoProcessorCaps(processorEnumerator, &processorCaps);
-
-        for (UINT type = 0; type < processorCaps.RateConversionCapsCount; ++type)
-        {
-            hr = ID3D11VideoDevice_CreateVideoProcessor(sys->d3dviddev,
-                                                        processorEnumerator, type, &sys->videoProcessor);
-            if (SUCCEEDED(hr))
-                break;
-            sys->videoProcessor = NULL;
-        }
-
-        if (sys->videoProcessor != NULL)
-        {
-            D3D11_VIDEO_PROCESSOR_COLOR_SPACE colorSpace;
-            ID3D11VideoContext_VideoProcessorGetOutputColorSpace(sys->d3dvidctx, sys->videoProcessor, &colorSpace);
-            sys->processorFormat = processorOutput;
-            sys->procEnumerator  = processorEnumerator;
-            return true;
-        }
-    }
-    ID3D11VideoProcessorEnumerator_Release(processorEnumerator);
-    return false;
-}
-
 static void D3D11SetColorSpace(vout_display_t *vd)
 {
     vout_display_sys_t *sys = vd->sys;
@@ -1435,8 +1327,6 @@ static void D3D11SetColorSpace(vout_display_t *vd)
             msg_Dbg(vd, "using color space %s", p_best->name);
         }
     }
-
-    SetupProcessor(vd, &vd->source);
 }
 
 static int Direct3D11Open(vout_display_t *vd, video_format_t *fmt)
@@ -1449,7 +1339,7 @@ static int Direct3D11Open(vout_display_t *vd, video_format_t *fmt)
 
     UINT creationFlags = 0;
 
-# if !defined(NDEBUG) //&& defined(_MSC_VER)
+# if !defined(NDEBUG) && defined(_MSC_VER)
     creationFlags |= D3D11_CREATE_DEVICE_DEBUG;
 # endif
 
@@ -1554,6 +1444,8 @@ static int Direct3D11Open(vout_display_t *vd, video_format_t *fmt)
                     driverAttempts[driver], i_feature_level);
 #endif
             break;
+        } else {
+            msg_Err(vd, "failed to create the D3D11 device %d. (hr=0x%lX)", driver, hr);
         }
     }
 
