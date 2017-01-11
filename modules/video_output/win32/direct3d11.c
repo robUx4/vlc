@@ -30,6 +30,8 @@
 # include "config.h"
 #endif
 
+#define HAVE_ID3D11VIDEODECODER
+
 #include <vlc_common.h>
 #include <vlc_plugin.h>
 #include <vlc_vout_display.h>
@@ -87,17 +89,6 @@ vlc_module_begin ()
     add_shortcut("direct3d11")
     set_callbacks(Open, Close)
 vlc_module_end ()
-
-#ifdef HAVE_ID3D11VIDEODECODER
-/* VLC_CODEC_D3D11_OPAQUE */
-struct picture_sys_t
-{
-    ID3D11VideoDecoderOutputView  *decoder; /* may be NULL for pictures from the pool */
-    ID3D11Texture2D               *texture;
-    ID3D11DeviceContext           *context;
-    unsigned                      slice_index;
-};
-#endif
 
 /* internal picture_t pool  */
 typedef struct
@@ -547,10 +538,12 @@ static picture_pool_t *Pool(vout_display_t *vd, unsigned pool_size)
     if ( vd->sys->pool != NULL )
         return vd->sys->pool;
 
+#if 0
     if (pool_size > 30) {
         msg_Err(vd, "Avoid crashing when using ID3D11VideoDecoderOutputView with too many slices (%d)", pool_size);
         return NULL;
     }
+#endif
 
 #ifdef HAVE_ID3D11VIDEODECODER
     picture_t**       pictures = NULL;
@@ -577,7 +570,7 @@ static picture_pool_t *Pool(vout_display_t *vd, unsigned pool_size)
     texDesc.SampleDesc.Count = 1;
     texDesc.MiscFlags = 0; //D3D11_RESOURCE_MISC_SHARED;
     texDesc.Usage = D3D11_USAGE_DEFAULT;
-    texDesc.BindFlags = D3D11_BIND_DECODER;
+    texDesc.BindFlags = D3D11_BIND_DECODER | D3D11_BIND_SHADER_RESOURCE;
     texDesc.CPUAccessFlags = 0;
 
     texDesc.ArraySize = pool_size;
@@ -1015,10 +1008,6 @@ static void Prepare(vout_display_t *vd, picture_t *picture, subpicture_t *subpic
 
 #ifdef HAVE_ID3D11VIDEODECODER
     if (is_d3d11_opaque(picture->format.i_chroma)) {
-        if( sys->context_lock != INVALID_HANDLE_VALUE )
-        {
-            WaitForSingleObjectEx( sys->context_lock, INFINITE, FALSE );
-        }
         D3D11_BOX box;
         picture_sys_t *p_sys = picture->p_sys;
         D3D11_TEXTURE2D_DESC texDesc;
@@ -1040,6 +1029,12 @@ static void Prepare(vout_display_t *vd, picture_t *picture, subpicture_t *subpic
         box.back = 1;
         box.front = 0;
 
+        if( sys->context_lock != INVALID_HANDLE_VALUE )
+        {
+            WaitForSingleObjectEx( sys->context_lock, INFINITE, FALSE );
+            sys->lock_time = mdate();
+            msg_Dbg(vd, "locked D3D11 context");
+        }
         ID3D11DeviceContext_CopySubresourceRegion(sys->d3dcontext,
                                                   (ID3D11Resource*) sys->picQuad.pTexture,
                                                   0, 0, 0, 0,
@@ -1058,7 +1053,7 @@ static void Prepare(vout_display_t *vd, picture_t *picture, subpicture_t *subpic
     }
 }
 
-static void DisplayD3DPicture(vout_display_sys_t *sys, d3d_quad_t *quad)
+static void DisplayD3DPicture(vout_display_sys_t *sys, d3d_quad_t *quad/*, ID3D11Texture2D *pTexture*/)
 {
     UINT stride = sizeof(d3d_vertex_t);
     UINT offset = 0;
@@ -1076,9 +1071,9 @@ static void DisplayD3DPicture(vout_display_sys_t *sys, d3d_quad_t *quad)
     ID3D11DeviceContext_PSSetShader(sys->d3dcontext, quad->d3dpixelShader, NULL, 0);
 
     ID3D11DeviceContext_PSSetConstantBuffers(sys->d3dcontext, 0, quad->PSConstantsCount, quad->pPixelShaderConstants);
-    ID3D11DeviceContext_PSSetShaderResources(sys->d3dcontext, 0, 1, &quad->d3dresViewY);
-    if( quad->d3dresViewUV )
-        ID3D11DeviceContext_PSSetShaderResources(sys->d3dcontext, 1, 1, &quad->d3dresViewUV);
+    ID3D11DeviceContext_PSSetShaderResources(sys->d3dcontext, 0, 1, &quad->picSys.resourceView[0]); /* TODO set in one call */
+    if( quad->picSys.resourceView[1] )
+        ID3D11DeviceContext_PSSetShaderResources(sys->d3dcontext, 1, 1, &quad->picSys.resourceView[1]);
 
     ID3D11DeviceContext_RSSetViewports(sys->d3dcontext, 1, &quad->cropViewport);
 
@@ -1103,7 +1098,11 @@ static void Display(vout_display_t *vd, picture_t *picture, subpicture_t *subpic
         Direct3D11UnmapTexture(picture);
 
     /* Render the quad */
-    DisplayD3DPicture(sys, &sys->picQuad);
+    if (is_d3d11_opaque(picture->format.i_chroma)) {
+        DisplayD3DPicture(sys, &sys->picQuad);
+    } else {
+        DisplayD3DPicture(sys, &sys->picQuad);
+    }
 
     if (subpicture) {
         // draw the additional vertices
@@ -1123,6 +1122,8 @@ static void Display(vout_display_t *vd, picture_t *picture, subpicture_t *subpic
     }
 #if defined(HAVE_ID3D11VIDEODECODER)
     if( is_d3d11_opaque(picture->format.i_chroma) && sys->context_lock != INVALID_HANDLE_VALUE) {
+        mtime_t duration = mdate() - sys->lock_time;
+        msg_Dbg(vd, "unlock D3D11 context after display duration:%lld", duration);
         ReleaseMutex( sys->context_lock );
     }
 #endif
@@ -1186,7 +1187,7 @@ static int Direct3D11Open(vout_display_t *vd, video_format_t *fmt)
     UINT creationFlags = 0;
     HRESULT hr = S_OK;
 
-# if !defined(NDEBUG) && defined(_MSC_VER)
+# if !defined(NDEBUG) //&& defined(_MSC_VER)
     creationFlags |= D3D11_CREATE_DEVICE_DEBUG;
 # endif
 
@@ -2179,7 +2180,7 @@ static int AllocQuad(vout_display_t *vd, const video_format_t *fmt, d3d_quad_t *
     resviewDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
     resviewDesc.Texture2D.MipLevels = texDesc.MipLevels;
 
-    hr = ID3D11Device_CreateShaderResourceView(sys->d3ddevice, (ID3D11Resource *)quad->pTexture, &resviewDesc, &quad->d3dresViewY);
+    hr = ID3D11Device_CreateShaderResourceView(sys->d3ddevice, (ID3D11Resource *)quad->pTexture, &resviewDesc, &quad->picSys.resourceView[0]);
     if (FAILED(hr)) {
         msg_Err(vd, "Could not Create the Y/RGB D3d11 Texture ResourceView. (hr=0x%lX)", hr);
         goto error;
@@ -2188,7 +2189,7 @@ static int AllocQuad(vout_display_t *vd, const video_format_t *fmt, d3d_quad_t *
     if( cfg->resourceFormatUV )
     {
         resviewDesc.Format = cfg->resourceFormatUV;
-        hr = ID3D11Device_CreateShaderResourceView(sys->d3ddevice, (ID3D11Resource *)quad->pTexture, &resviewDesc, &quad->d3dresViewUV);
+        hr = ID3D11Device_CreateShaderResourceView(sys->d3ddevice, (ID3D11Resource *)quad->pTexture, &resviewDesc, &quad->picSys.resourceView[1]);
         if (FAILED(hr)) {
             msg_Err(vd, "Could not Create the UV D3d11 Texture ResourceView. (hr=0x%lX)", hr);
             goto error;
@@ -2249,15 +2250,15 @@ static void ReleaseQuad(d3d_quad_t *quad)
         ID3D11Texture2D_Release(quad->pTexture);
         quad->pTexture = NULL;
     }
-    if (quad->d3dresViewY)
+    if (quad->picSys.resourceView[0])
     {
-        ID3D11ShaderResourceView_Release(quad->d3dresViewY);
-        quad->d3dresViewY = NULL;
+        ID3D11ShaderResourceView_Release(quad->picSys.resourceView[0]);
+        quad->picSys.resourceView[0] = NULL;
     }
-    if (quad->d3dresViewUV)
+    if (quad->picSys.resourceView[1])
     {
-        ID3D11ShaderResourceView_Release(quad->d3dresViewUV);
-        quad->d3dresViewUV = NULL;
+        ID3D11ShaderResourceView_Release(quad->picSys.resourceView[1]);
+        quad->picSys.resourceView[1] = NULL;
     }
     if (quad->d3dpixelShader)
     {

@@ -52,6 +52,19 @@ typedef struct
     DXGI_FORMAT   resourceFormatUV;
 } d3d_quad_cfg_t;
 
+#ifdef HAVE_ID3D11VIDEODECODER
+/* VLC_CODEC_D3D11_OPAQUE */
+struct picture_sys_t
+{
+    ID3D11VideoDecoderOutputView  *decoder; /* may be NULL for pictures from the pool */
+    ID3D11Texture2D               *texture;
+    ID3D11DeviceContext           *context;
+    unsigned                      slice_index;
+    ID3D11VideoProcessorInputView *inputView; /* when used as processor input */
+    ID3D11ShaderResourceView      *resourceView[2];
+};
+#endif
+
 typedef struct
 {
     ID3D11Buffer              *pVertexBuffer;
@@ -60,11 +73,10 @@ typedef struct
     ID3D11Buffer              *pIndexBuffer;
     UINT                      indexCount;
     ID3D11Buffer              *pVertexShaderConstants;
-    ID3D11Texture2D           *pTexture;
+    picture_sys_t             picSys;
+    ID3D11Texture2D           *pTexture; // TODO remove
     ID3D11Buffer              *pPixelShaderConstants[2];
     UINT                       PSConstantsCount;
-    ID3D11ShaderResourceView  *d3dresViewY;
-    ID3D11ShaderResourceView  *d3dresViewUV;
     ID3D11PixelShader         *d3dpixelShader;
     D3D11_VIEWPORT            cropViewport;
 } d3d_quad_t;
@@ -169,6 +181,7 @@ struct vout_display_sys_t
 #endif
 
 #ifdef MODULE_NAME_IS_direct3d11
+    mtime_t                lock_time;
 #if !VLC_WINSTORE_APP
     HINSTANCE                hdxgi_dll;        /* handle of the opened dxgi dll */
     HINSTANCE                hd3d11_dll;       /* handle of the opened d3d11 dll */

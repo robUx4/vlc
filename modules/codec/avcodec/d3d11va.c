@@ -114,6 +114,7 @@ struct vlc_va_sys_t
 
     ID3D11DeviceContext          *d3dctx;
     HANDLE                       context_mutex;
+    mtime_t                      lock_time;
 
     /* pool */
     bool                         b_extern_pool;
@@ -142,6 +143,7 @@ struct picture_sys_t
     ID3D11DeviceContext           *context;
     unsigned                      slice_index;
     ID3D11VideoProcessorInputView *inputView; /* when used as processor input */
+    ID3D11ShaderResourceView      *resourceView[2];
 };
 
 /* */
@@ -261,6 +263,8 @@ static int Extract(vlc_va_t *va, picture_t *output, uint8_t *data)
 
         if( sys->context_mutex != INVALID_HANDLE_VALUE ) {
             WaitForSingleObjectEx( sys->context_mutex, INFINITE, FALSE );
+            sys->lock_time = mdate();
+            msg_Dbg(va, "locked D3D11 extract context");
         }
 
 #ifdef ID3D11VideoContext_VideoProcessorBlt
@@ -337,6 +341,8 @@ static int Extract(vlc_va_t *va, picture_t *output, uint8_t *data)
 
 done:
     if( sys->context_mutex  != INVALID_HANDLE_VALUE ) {
+        mtime_t duration = mdate() - sys->lock_time;
+        msg_Dbg(va, "unlock D3D11 context duration:%lld", duration);
         ReleaseMutex( sys->context_mutex );
     }
 
