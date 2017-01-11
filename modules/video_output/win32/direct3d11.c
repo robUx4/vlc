@@ -30,7 +30,10 @@
 # include "config.h"
 #endif
 
+#define USE_DXGI 0
+#ifndef HAVE_ID3D11VIDEODECODER
 #define HAVE_ID3D11VIDEODECODER
+#endif
 
 #include <vlc_common.h>
 #include <vlc_plugin.h>
@@ -282,8 +285,8 @@ static const char *globPixelShaderBiplanarYUV_2RGB = "\
     float whitePadding;\
     float4x4 Colorspace;\
   };\
-  Texture2D shaderTextureY;\
-  Texture2D shaderTextureUV;\
+  Texture2DArray shaderTextureY;\
+  Texture2DArray shaderTextureUV;\
   SamplerState SampleType;\
   \
   struct PS_INPUT\
@@ -296,8 +299,11 @@ static const char *globPixelShaderBiplanarYUV_2RGB = "\
   {\
     float4 yuv;\
     float4 rgba;\
-    yuv.x  = shaderTextureY.Sample(SampleType, In.Texture).x;\
-    yuv.yz = shaderTextureUV.Sample(SampleType, In.Texture).xy;\
+    float3 Color; \
+    Color.xy = In.Texture.xy;\
+    Color.z = 1;\
+    yuv.x  = shaderTextureY.Sample(SampleType, Color).x;\
+    yuv.yz = shaderTextureUV.Sample(SampleType, Color).xy;\
     yuv.a  = Opacity;\
     yuv.x  += WhitePointX;\
     yuv.y  += WhitePointY;\
@@ -576,16 +582,52 @@ static picture_pool_t *Pool(vout_display_t *vd, unsigned pool_size)
     texDesc.ArraySize = pool_size;
 
     ID3D11Texture2D *texture;
+
     hr = ID3D11Device_CreateTexture2D( vd->sys->d3ddevice, &texDesc, NULL, &texture );
     if (FAILED(hr)) {
         msg_Err(vd, "CreateTexture2D failed for the %d pool. (hr=0x%0lx)", pool_size, hr);
         goto error;
     }
 
+    D3D11_SHADER_RESOURCE_VIEW_DESC resviewDesc = {
+        .ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2DARRAY,
+        .Texture2DArray.MipLevels = -1,
+        .Texture2DArray.ArraySize = texDesc.ArraySize,
+    };
+
+    const d3d_format_t *cfg = NULL;
+    for (const d3d_format_t *output_format = GetRenderFormatList();
+         output_format->name != NULL; ++output_format)
+    {
+        if (output_format->fourcc == vd->fmt.i_chroma) {
+            cfg = output_format;
+            break;
+        }
+    }
+
     for (picture_count = 0; picture_count < pool_size; picture_count++) {
         picture_sys_t *picsys = calloc(1, sizeof(*picsys));
         if (unlikely(picsys == NULL))
             goto error;
+
+        resviewDesc.Texture2DArray.FirstArraySlice = picture_count;
+        resviewDesc.Format = cfg->formatY;
+        hr = ID3D11Device_CreateShaderResourceView(vd->sys->d3ddevice, (ID3D11Resource *)texture, &resviewDesc, &picsys->resourceView[0]);
+        if (FAILED(hr)) {
+            msg_Err(vd, "Could not Create the Y/RGB D3d11 Texture ResourceView. (hr=0x%lX)", hr);
+            goto error;
+        }
+
+        if( cfg->formatUV )
+        {
+            resviewDesc.Format = cfg->formatUV;
+            hr = ID3D11Device_CreateShaderResourceView(vd->sys->d3ddevice, (ID3D11Resource *)texture, &resviewDesc, &picsys->resourceView[1]);
+            if (FAILED(hr)) {
+                msg_Err(vd, "Could not Create the UV D3d11 Texture ResourceView. (hr=0x%lX)", hr);
+                goto error;
+            }
+        } else
+            picsys->resourceView[1] = NULL;
 
         ID3D11Texture2D_AddRef(texture);
         picsys->texture = texture;
@@ -1008,6 +1050,13 @@ static void Prepare(vout_display_t *vd, picture_t *picture, subpicture_t *subpic
 
 #ifdef HAVE_ID3D11VIDEODECODER
     if (is_d3d11_opaque(picture->format.i_chroma)) {
+        if( sys->context_lock != INVALID_HANDLE_VALUE )
+        {
+            WaitForSingleObjectEx( sys->context_lock, INFINITE, FALSE );
+            sys->lock_time = mdate();
+            msg_Dbg(vd, "locked D3D11 context");
+        }
+
         D3D11_BOX box;
         picture_sys_t *p_sys = picture->p_sys;
         D3D11_TEXTURE2D_DESC texDesc;
@@ -1029,12 +1078,6 @@ static void Prepare(vout_display_t *vd, picture_t *picture, subpicture_t *subpic
         box.back = 1;
         box.front = 0;
 
-        if( sys->context_lock != INVALID_HANDLE_VALUE )
-        {
-            WaitForSingleObjectEx( sys->context_lock, INFINITE, FALSE );
-            sys->lock_time = mdate();
-            msg_Dbg(vd, "locked D3D11 context");
-        }
         ID3D11DeviceContext_CopySubresourceRegion(sys->d3dcontext,
                                                   (ID3D11Resource*) sys->picQuad.pTexture,
                                                   0, 0, 0, 0,
@@ -1071,9 +1114,13 @@ static void DisplayD3DPicture(vout_display_sys_t *sys, d3d_quad_t *quad/*, ID3D1
     ID3D11DeviceContext_PSSetShader(sys->d3dcontext, quad->d3dpixelShader, NULL, 0);
 
     ID3D11DeviceContext_PSSetConstantBuffers(sys->d3dcontext, 0, quad->PSConstantsCount, quad->pPixelShaderConstants);
+#if 1
+    ID3D11DeviceContext_PSSetShaderResources(sys->d3dcontext, 0, 2, quad->picSys.resourceView);
+#else
     ID3D11DeviceContext_PSSetShaderResources(sys->d3dcontext, 0, 1, &quad->picSys.resourceView[0]); /* TODO set in one call */
     if( quad->picSys.resourceView[1] )
         ID3D11DeviceContext_PSSetShaderResources(sys->d3dcontext, 1, 1, &quad->picSys.resourceView[1]);
+#endif
 
     ID3D11DeviceContext_RSSetViewports(sys->d3dcontext, 1, &quad->cropViewport);
 
@@ -1563,6 +1610,27 @@ static void UpdatePicQuadPosition(vout_display_t *vd)
 #endif
 }
 
+static ID3DBlob* CompileShader(vout_display_t *vd, const char *psz_shader, bool pixel)
+{
+    vout_display_sys_t *sys = vd->sys;
+    ID3DBlob* pShaderBlob = NULL, *pErrBlob;
+
+    /* TODO : Match the version to the D3D_FEATURE_LEVEL */
+    HRESULT hr = D3DCompile(psz_shader, strlen(psz_shader),
+                            NULL, NULL, NULL, pixel ? "PS" : "VS",
+                            pixel ? "ps_4_0" : "vs_4_0",
+                            0, 0, &pShaderBlob, &pErrBlob);
+
+    if (FAILED(hr)) {
+        char *err = pErrBlob ? ID3D10Blob_GetBufferPointer(pErrBlob) : NULL;
+        msg_Err(vd, "invalid %s Shader (hr=0x%lX): %s", pixel?"Pixel":"Vertex", hr, err );
+        if (pErrBlob)
+            ID3D10Blob_Release(pErrBlob);
+        return NULL;
+    }
+    return pShaderBlob;
+}
+
 /* TODO : handle errors better
    TODO : seperate out into smaller functions like createshaders */
 static int Direct3D11CreateResources(vout_display_t *vd, video_format_t *fmt)
@@ -1626,15 +1694,9 @@ static int Direct3D11CreateResources(vout_display_t *vd, video_format_t *fmt)
         ID3D11DepthStencilState_Release(pDepthStencilState);
     }
 
-    ID3DBlob* pVSBlob = NULL;
-    /* TODO : Match the version to the D3D_FEATURE_LEVEL */
-    hr = D3DCompile(globVertexShaderFlat, strlen(globVertexShaderFlat),
-                    NULL, NULL, NULL, "VS", "vs_4_0_level_9_1", 0, 0, &pVSBlob, NULL);
-
-    if( FAILED(hr)) {
-      msg_Err(vd, "The flat Vertex Shader is invalid. (hr=0x%lX)", hr);
-      return VLC_EGENERIC;
-    }
+    ID3DBlob *pVSBlob = CompileShader(vd, globVertexShaderFlat , false);
+    if (!pVSBlob)
+        return VLC_EGENERIC;
 
     hr = ID3D11Device_CreateVertexShader(sys->d3ddevice, (void *)ID3D10Blob_GetBufferPointer(pVSBlob),
                                         ID3D10Blob_GetBufferSize(pVSBlob), NULL, &sys->flatVSShader);
@@ -1662,14 +1724,10 @@ static int Direct3D11CreateResources(vout_display_t *vd, video_format_t *fmt)
     }
     ID3D11DeviceContext_IASetInputLayout(sys->d3dcontext, pVertexLayout);
     ID3D11InputLayout_Release(pVertexLayout);
-    
-    hr = D3DCompile(globVertexShaderProjection, strlen(globVertexShaderProjection),
-                    NULL, NULL, NULL, "VS", "vs_4_0_level_9_1", 0, 0, &pVSBlob, NULL);
 
-    if( FAILED(hr)) {
-      msg_Err(vd, "The projection Vertex Shader is invalid. (hr=0x%lX)", hr);
-      return VLC_EGENERIC;
-    }
+    pVSBlob = CompileShader(vd, globVertexShaderProjection, false);
+    if (!pVSBlob)
+        return VLC_EGENERIC;
 
     hr = ID3D11Device_CreateVertexShader(sys->d3ddevice, (void *)ID3D10Blob_GetBufferPointer(pVSBlob),
                                         ID3D10Blob_GetBufferSize(pVSBlob), NULL, &sys->projectionVSShader);
@@ -1683,17 +1741,9 @@ static int Direct3D11CreateResources(vout_display_t *vd, video_format_t *fmt)
 
     ID3D11DeviceContext_IASetPrimitiveTopology(sys->d3dcontext, D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
-    ID3DBlob* pPSBlob = NULL;
-
-    /* TODO : Match the version to the D3D_FEATURE_LEVEL */
-    hr = D3DCompile(sys->d3dPxShader, strlen(sys->d3dPxShader),
-                    NULL, NULL, NULL, "PS", "ps_4_0_level_9_1", 0, 0, &pPSBlob, NULL);
-
-
-    if( FAILED(hr)) {
-      msg_Err(vd, "The Pixel Shader is invalid. (hr=0x%lX)", hr );
-      return VLC_EGENERIC;
-    }
+    ID3DBlob *pPSBlob = CompileShader(vd, sys->d3dPxShader, true);
+    if (!pPSBlob)
+        return VLC_EGENERIC;
 
     ID3D11PixelShader *pPicQuadShader;
     hr = ID3D11Device_CreatePixelShader(sys->d3ddevice, (void *)ID3D10Blob_GetBufferPointer(pPSBlob),
@@ -1708,11 +1758,9 @@ static int Direct3D11CreateResources(vout_display_t *vd, video_format_t *fmt)
 
     if (sys->psz_rgbaPxShader != NULL)
     {
-        hr = D3DCompile(sys->psz_rgbaPxShader, strlen(sys->psz_rgbaPxShader),
-                        NULL, NULL, NULL, "PS", "ps_4_0_level_9_1", 0, 0, &pPSBlob, NULL);
-        if( FAILED(hr)) {
+        pPSBlob = CompileShader(vd, sys->psz_rgbaPxShader, true);
+        if (!pPSBlob) {
           ID3D11PixelShader_Release(pPicQuadShader);
-          msg_Err(vd, "The RGBA Pixel Shader is invalid. (hr=0x%lX)", hr );
           return VLC_EGENERIC;
         }
 
