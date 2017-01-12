@@ -30,7 +30,6 @@
 # include "config.h"
 #endif
 
-
 #include <vlc_common.h>
 #include <vlc_plugin.h>
 #include <vlc_vout_display.h>
@@ -1166,6 +1165,97 @@ static HINSTANCE Direct3D11LoadShaderLibrary(void)
 }
 #endif
 
+#define COLOR_RANGE_FULL   1 /* 0-255 */
+#define COLOR_RANGE_STUDIO 0 /* 16-235 */
+
+typedef enum video_color_axis {
+    COLOR_AXIS_RGB,
+    COLOR_AXIS_YCBCR,
+} video_color_axis;
+
+typedef struct {
+    DXGI_COLOR_SPACE_TYPE   dxgi;
+    const char              *name;
+    video_color_axis        axis;
+    video_color_primaries_t primaries;
+    video_transfer_func_t   transfer;
+    video_color_space_t     color;
+    bool                    b_full_range;
+} dxgi_color_space;
+
+#define TRANSFER_FUNC_10    TRANSFER_FUNC_LINEAR
+#define TRANSFER_FUNC_22    TRANSFER_FUNC_SRGB
+#define TRANSFER_FUNC_2084  TRANSFER_FUNC_SMPTE_ST2084
+
+#define COLOR_PRIMARIES_BT601  COLOR_PRIMARIES_BT601_525
+
+static const dxgi_color_space color_spaces[] = {
+#define DXGIMAP(AXIS, RANGE, GAMMA, SITTING, PRIMARIES) \
+    { DXGI_COLOR_SPACE_##AXIS##_##RANGE##_G##GAMMA##_##SITTING##_P##PRIMARIES, \
+      #AXIS " Rec." #PRIMARIES " gamma:" #GAMMA " range:" #RANGE, \
+      COLOR_AXIS_##AXIS, COLOR_PRIMARIES_BT##PRIMARIES, TRANSFER_FUNC_##GAMMA, \
+      COLOR_SPACE_BT##PRIMARIES, COLOR_RANGE_##RANGE},
+
+    DXGIMAP(YCBCR, STUDIO,   22,    LEFT,   601)
+    DXGIMAP(YCBCR, FULL,     22,    LEFT,   601)
+    DXGIMAP(RGB,   FULL,     10,    NONE,   709)
+    DXGIMAP(RGB,   FULL,     22,    NONE,   709)
+    DXGIMAP(RGB,   STUDIO,   22,    NONE,   709)
+    DXGIMAP(YCBCR, STUDIO,   22,    LEFT,   709)
+    DXGIMAP(YCBCR, FULL,     22,    LEFT,   709)
+    DXGIMAP(RGB,   STUDIO,   22,    NONE,  2020)
+    DXGIMAP(YCBCR, STUDIO,   22,    LEFT,  2020)
+    DXGIMAP(YCBCR, FULL,     22,    LEFT,  2020)
+    DXGIMAP(YCBCR, STUDIO,   22, TOPLEFT,  2020)
+    DXGIMAP(RGB,   FULL,     22,    NONE,  2020)
+    DXGIMAP(RGB,   FULL,   2084,    NONE,  2020)
+    DXGIMAP(YCBCR, STUDIO, 2084,    LEFT,  2020)
+    DXGIMAP(RGB,   STUDIO, 2084,    NONE,  2020)
+    DXGIMAP(YCBCR, STUDIO, 2084, TOPLEFT,  2020)
+    /*DXGIMAP(YCBCR, FULL,     22,    NONE,  2020, 601)*/
+    {DXGI_COLOR_SPACE_RESERVED, NULL, 0, 0, 0, 0, 0},
+#undef DXGIMAP
+};
+
+static void D3D11SetColorSpace(vout_display_t *vd)
+{
+    vout_display_sys_t *sys = vd->sys;
+    HRESULT hr;
+    int best = -1;
+    int score, best_score = 0;
+    UINT support;
+
+    /* pick the best output based on color support and transfer */
+    /* TODO support YUV output later */
+    for (int i=0; color_spaces[i].name; ++i)
+    {
+        hr = IDXGISwapChain3_CheckColorSpaceSupport(sys->dxgiswapChain3, color_spaces[i].dxgi, &support);
+        if (SUCCEEDED(hr) && support) {
+            msg_Dbg(vd, "supports color space %s", color_spaces[i].name);
+            score = 0;
+            if (color_spaces[i].primaries == vd->source.primaries)
+                score++;
+            if (color_spaces[i].color == vd->source.space)
+                score++;
+            if (color_spaces[i].transfer == vd->source.transfer)
+                score++;
+            if (color_spaces[i].b_full_range == vd->source.b_color_range_full)
+                score++;
+            if (score > best_score || (score && best == -1)) {
+                best = i;
+                best_score = score;
+            }
+        }
+    }
+
+    if (best != -1) {
+        const dxgi_color_space *p_best = &color_spaces[best];
+        hr = IDXGISwapChain3_SetColorSpace1(sys->dxgiswapChain3, p_best->dxgi);
+        if (SUCCEEDED(hr)) {
+            msg_Dbg(vd, "using color space %s", p_best->name);
+        }
+    }
+}
 
 static const char *GetFormatPixelShader(const d3d_format_t *format)
 {
@@ -1291,6 +1381,10 @@ static int Direct3D11Open(vout_display_t *vd, video_format_t *fmt)
     }
 #endif
 
+    hr = IDXGISwapChain1_QueryInterface( sys->dxgiswapChain, &IID_IDXGISwapChain3, (void **)&sys->dxgiswapChain3);
+    if (SUCCEEDED(hr))
+        D3D11SetColorSpace(vd);
+
     // look for the requested pixel format first
     sys->picQuadConfig = GetOutputFormat(vd, fmt->i_chroma, 0, true, false);
 
@@ -1414,6 +1508,11 @@ static void Direct3D11Close(vout_display_t *vd)
     {
         IDXGISwapChain_Release(sys->dxgiswapChain);
         sys->dxgiswapChain = NULL;
+    }
+    if (sys->dxgiswapChain3)
+    {
+        IDXGISwapChain3_Release(sys->dxgiswapChain3);
+        sys->dxgiswapChain3 = NULL;
     }
 
     msg_Dbg(vd, "Direct3D11 device adapter closed");
