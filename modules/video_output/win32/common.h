@@ -210,7 +210,7 @@ struct vout_display_sys_t
     vlc_fourcc_t             pSubpictureChromas[2];
     const char               *psz_rgbaPxShader;
     ID3D11PixelShader        *pSPUPixelShader;
-    DXGI_FORMAT              d3dregion_format;
+    const d3d_format_t       *d3dregion_format;
     int                      d3dregion_count;
     picture_t                **d3dregions;
 #endif
