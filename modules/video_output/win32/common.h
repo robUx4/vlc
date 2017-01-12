@@ -45,13 +45,7 @@
 #include "events.h"
 
 #ifdef MODULE_NAME_IS_direct3d11
-typedef struct
-{
-    DXGI_FORMAT   textureFormat;
-    DXGI_FORMAT   resourceFormatYRGB;
-    DXGI_FORMAT   resourceFormatUV;
-} d3d_quad_cfg_t;
-
+#include "../../video_chroma/dxgi_fmt.h"
 #ifdef HAVE_ID3D11VIDEODECODER
 /* VLC_CODEC_D3D11_OPAQUE */
 struct picture_sys_t
@@ -200,7 +194,7 @@ struct vout_display_sys_t
     ID3D11DeviceContext      *d3dcontext;      /* D3D context */
     bool                     legacy_shader;
     d3d_quad_t               picQuad;
-    d3d_quad_cfg_t           picQuadConfig;
+    const d3d_format_t       *picQuadConfig;
 
     /* staging quad to adjust visible borders */
     d3d_quad_t               stagingQuad;
