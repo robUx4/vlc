@@ -4253,7 +4253,6 @@ AC_CONFIG_FILES([
   test/Makefile
   modules/gui/macosx/Makefile
   modules/gui/qt/Makefile
-  modules/gui/skins2/Makefile
   modules/hw/mmal/Makefile
   share/vlc.appdata.xml.in
 ])
