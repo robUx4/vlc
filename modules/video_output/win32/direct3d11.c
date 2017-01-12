@@ -440,8 +440,12 @@ static int Open(vlc_object_t *object)
     info.has_pictures_invalid = !is_d3d11_opaque(fmt.i_chroma);
 
     if (var_InheritBool(vd, "direct3d11-hw-blending") &&
-        vd->sys->d3dregion_format != DXGI_FORMAT_UNKNOWN)
+        vd->sys->d3dregion_format != NULL)
+    {
+        vd->sys->pSubpictureChromas[0] = vd->sys->d3dregion_format->fourcc;
+        vd->sys->pSubpictureChromas[1] = 0;
         info.subpicture_chromas = vd->sys->pSubpictureChromas;
+    }
     else
         info.subpicture_chromas = NULL;
 
@@ -475,11 +479,14 @@ static void Close(vlc_object_t *object)
 }
 
 static const d3d_format_t *GetOutputFormat(vout_display_t *vd, vlc_fourcc_t i_src_chroma,
-                                           uint8_t bits_per_channel, bool b_allow_opaque)
+                                           uint8_t bits_per_channel, bool b_allow_opaque,
+                                           bool blendable)
 {
     vout_display_sys_t *sys = vd->sys;
     UINT i_formatSupport;
     UINT i_quadSupportFlags = D3D11_FORMAT_SUPPORT_TEXTURE2D | D3D11_FORMAT_SUPPORT_SHADER_LOAD;
+    if (blendable)
+        i_quadSupportFlags |= D3D11_FORMAT_SUPPORT_BLENDABLE;
 
     for (const d3d_format_t *output_format = GetRenderFormatList();
          output_format->name != NULL; ++output_format)
@@ -1245,7 +1252,7 @@ static int Direct3D11Open(vout_display_t *vd, video_format_t *fmt)
 #endif
 
     // look for the requested pixel format first
-    sys->picQuadConfig = GetOutputFormat(vd, fmt->i_chroma, 0, true);
+    sys->picQuadConfig = GetOutputFormat(vd, fmt->i_chroma, 0, true, false);
 
     // look for any pixel format that we can handle with enough pixels per channel
     if ( !sys->picQuadConfig )
@@ -1267,12 +1274,12 @@ static int Direct3D11Open(vout_display_t *vd, video_format_t *fmt)
             break;
         }
 
-        sys->picQuadConfig = GetOutputFormat(vd, 0, bits_per_channel, false);
+        sys->picQuadConfig = GetOutputFormat(vd, 0, bits_per_channel, false, false);
     }
 
     // look for any pixel format that we can handle
     if ( !sys->picQuadConfig )
-        sys->picQuadConfig = GetOutputFormat(vd, 0, 0, false);
+        sys->picQuadConfig = GetOutputFormat(vd, 0, 0, false, false);
 
     if ( !sys->picQuadConfig )
     {
@@ -1285,26 +1292,9 @@ static int Direct3D11Open(vout_display_t *vd, video_format_t *fmt)
     DxgiFormatMask( sys->picQuadConfig->formatTexture, fmt );
 
     /* check the region pixel format */
-    UINT i_formatSupport;
-    UINT i_quadSupportFlags = D3D11_FORMAT_SUPPORT_TEXTURE2D |
-            D3D11_FORMAT_SUPPORT_SHADER_LOAD| D3D11_FORMAT_SUPPORT_BLENDABLE;
-    if( SUCCEEDED( ID3D11Device_CheckFormatSupport(sys->d3ddevice,
-                                                   DXGI_FORMAT_R8G8B8A8_UNORM,
-                                                   &i_formatSupport)) &&
-            ( i_formatSupport & i_quadSupportFlags ) == i_quadSupportFlags) {
-        sys->d3dregion_format = DXGI_FORMAT_R8G8B8A8_UNORM;
-        sys->pSubpictureChromas[0] = VLC_CODEC_RGBA;
-        sys->pSubpictureChromas[1] = 0;
-    } else if( SUCCEEDED( ID3D11Device_CheckFormatSupport(sys->d3ddevice,
-                                                          DXGI_FORMAT_B8G8R8A8_UNORM,
-                                                          &i_formatSupport)) &&
-                   ( i_formatSupport & i_quadSupportFlags ) == i_quadSupportFlags) {
-        sys->d3dregion_format = DXGI_FORMAT_B8G8R8A8_UNORM;
-        sys->pSubpictureChromas[0] = VLC_CODEC_BGRA;
-        sys->pSubpictureChromas[1] = 0;
-    } else {
-        sys->d3dregion_format = DXGI_FORMAT_UNKNOWN;
-    }
+    sys->d3dregion_format = GetOutputFormat(vd, VLC_CODEC_RGBA, 0, false, true);
+    if (!sys->d3dregion_format)
+        sys->d3dregion_format = GetOutputFormat(vd, VLC_CODEC_BGRA, 0, false, true);
 
     if (sys->picQuadConfig->formatY == DXGI_FORMAT_R8_UNORM ||
         sys->picQuadConfig->formatY == DXGI_FORMAT_R16_UNORM)
@@ -1315,7 +1305,7 @@ static int Direct3D11Open(vout_display_t *vd, video_format_t *fmt)
     else
         sys->d3dPxShader = globPixelShaderDefault;
 
-    if (sys->d3dregion_format != DXGI_FORMAT_UNKNOWN)
+    if (sys->d3dregion_format != NULL)
         sys->psz_rgbaPxShader = globPixelShaderDefault;
     else
         sys->psz_rgbaPxShader = NULL;
@@ -2235,6 +2225,9 @@ static int Direct3D11MapSubpicture(vout_display_t *vd, int *subpicture_region_co
     HRESULT hr;
     int err;
 
+    if (sys->d3dregion_format == NULL)
+        return VLC_EGENERIC;
+
     int count = 0;
     for (subpicture_region_t *r = subpicture->p_region; r; r = r->p_next)
         count++;
@@ -2253,7 +2246,7 @@ static int Direct3D11MapSubpicture(vout_display_t *vd, int *subpicture_region_co
             picture_t *cache = sys->d3dregions[j];
             if (cache != NULL && ((d3d_quad_t *) cache->p_sys)->pTexture) {
                 ID3D11Texture2D_GetDesc( ((d3d_quad_t *) cache->p_sys)->pTexture, &texDesc );
-                if (texDesc.Format == sys->d3dregion_format &&
+                if (texDesc.Format == sys->d3dregion_format->formatTexture &&
                     texDesc.Width  == r->fmt.i_visible_width &&
                     texDesc.Height == r->fmt.i_visible_height) {
                     (*region)[i] = cache;
@@ -2269,11 +2262,7 @@ static int Direct3D11MapSubpicture(vout_display_t *vd, int *subpicture_region_co
             if (unlikely(d3dquad==NULL)) {
                 continue;
             }
-            d3d_format_t rgbaCfg = {
-                .formatTexture      = sys->d3dregion_format,
-                .formatY            = sys->d3dregion_format,
-            };
-            err = AllocQuad( vd, &r->fmt, d3dquad, &rgbaCfg, sys->pSPUPixelShader,
+            err = AllocQuad( vd, &r->fmt, d3dquad, sys->d3dregion_format, sys->pSPUPixelShader,
                              false, PROJECTION_MODE_RECTANGULAR );
             if (err != VLC_SUCCESS) {
                 msg_Err(vd, "Failed to create %dx%d texture for OSD",
