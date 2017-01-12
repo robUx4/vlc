@@ -232,7 +232,7 @@ static const char* globPixelShaderDefault = "\
     float whitePadding;\
     float4x4 Colorspace;\
   };\
-  Texture2D shaderTexture;\
+  Texture2D%s shaderTexture;\
   SamplerState SampleType;\
   \
   struct PS_INPUT\
@@ -269,8 +269,8 @@ static const char *globPixelShaderBiplanarYUV_2RGB = "\
     float whitePadding;\
     float4x4 Colorspace;\
   };\
-  Texture2D shaderTextureY;\
-  Texture2D shaderTextureUV;\
+  Texture2D%s shaderTextureY;\
+  Texture2D%s shaderTextureUV;\
   SamplerState SampleType;\
   \
   struct PS_INPUT\
@@ -308,7 +308,7 @@ static const char *globPixelShaderBiplanarYUYV_2RGB = "\
     float whitePadding;\
     float4x4 Colorspace;\
   };\
-  Texture2D shaderTextureYUYV;\
+  Texture2D%s shaderTextureYUYV;\
   SamplerState SampleType;\
   \
   struct PS_INPUT\
@@ -948,7 +948,7 @@ static void Prepare(vout_display_t *vd, picture_t *picture, subpicture_t *subpic
     }
 
 #ifdef HAVE_ID3D11VIDEODECODER
-    if (is_d3d11_opaque(picture->format.i_chroma)) {
+    if (is_d3d11_opaque(picture->format.i_chroma) && sys->legacy_shader) {
         D3D11_BOX box;
         picture_sys_t *p_sys = picture->p_sys;
         D3D11_TEXTURE2D_DESC texDesc;
@@ -1043,7 +1043,10 @@ static void Display(vout_display_t *vd, picture_t *picture, subpicture_t *subpic
         Direct3D11UnmapTexture(picture);
 
     /* Render the quad */
-    DisplayD3DPicture(sys, &sys->picQuad, sys->picQuad.picSys.resourceView);
+    if (is_d3d11_opaque(picture->format.i_chroma) && !sys->legacy_shader)
+        DisplayD3DPicture(sys, &sys->picQuad, picture->p_sys->resourceView);
+    else
+        DisplayD3DPicture(sys, &sys->picQuad, sys->picQuad.picSys.resourceView);
 
     if (subpicture) {
         // draw the additional vertices
@@ -1360,13 +1363,6 @@ static int Direct3D11Open(vout_display_t *vd, video_format_t *fmt)
     else
         sys->psz_rgbaPxShader = NULL;
 
-    if ( fmt->i_height != fmt->i_visible_height || fmt->i_width != fmt->i_visible_width )
-    {
-        msg_Dbg( vd, "use a staging texture to crop to visible size" );
-        AllocQuad( vd, fmt, &sys->stagingQuad, &sys->picQuadConfig, NULL, false,
-                   PROJECTION_MODE_RECTANGULAR );
-    }
-
     video_format_t core_source;
     CropStagingFormat( vd, &core_source );
     UpdateRects(vd, NULL, NULL, true);
@@ -1395,6 +1391,13 @@ static int Direct3D11Open(vout_display_t *vd, video_format_t *fmt)
         ReleaseMutex( sys->context_lock );
     }
 #endif
+
+    if ( fmt->i_height != fmt->i_visible_height || fmt->i_width != fmt->i_visible_width )
+    {
+        msg_Dbg( vd, "use a staging texture to crop to visible size" );
+        AllocQuad( vd, fmt, &sys->stagingQuad, sys->picQuadConfig, NULL,
+                   PROJECTION_MODE_RECTANGULAR );
+    }
 
 #if !VLC_WINSTORE_APP
     EventThreadUpdateTitle(sys->event, VOUT_TITLE " (Direct3D11 output)");
@@ -1461,12 +1464,28 @@ static ID3DBlob* CompileShader(vout_display_t *vd, const char *psz_shader, bool 
 {
     vout_display_sys_t *sys = vd->sys;
     ID3DBlob* pShaderBlob = NULL, *pErrBlob;
+    char *shader;
+    if (!pixel)
+        shader = (char*)psz_shader;
+    else
+    {
+        shader = malloc(strlen(psz_shader) + 32);
+        if (!shader)
+        {
+            msg_Err(vd, "no room for the Pixel Shader");
+            return NULL;
+        }
+        sprintf(shader, psz_shader, sys->legacy_shader ? "" : "Array", sys->legacy_shader ? "" : "Array");
+    }
 
     /* TODO : Match the version to the D3D_FEATURE_LEVEL */
-    HRESULT hr = D3DCompile(psz_shader, strlen(psz_shader),
+    HRESULT hr = D3DCompile(shader, strlen(shader),
                             NULL, NULL, NULL, pixel ? "PS" : "VS",
-                            pixel ? "ps_4_0_level_9_1" : "vs_4_0_level_9_1",
+                            pixel ? (sys->legacy_shader ? "ps_4_0_level_9_1" : "ps_4_0") :
+                                    (sys->legacy_shader ? "vs_4_0_level_9_1" : "vs_4_0"),
                             0, 0, &pShaderBlob, &pErrBlob);
+    if (pixel)
+        free(shader);
 
     if (FAILED(hr)) {
         char *err = pErrBlob ? ID3D10Blob_GetBufferPointer(pErrBlob) : NULL;
@@ -1541,6 +1560,51 @@ static int Direct3D11CreateResources(vout_display_t *vd, video_format_t *fmt)
         ID3D11DepthStencilState_Release(pDepthStencilState);
     }
 
+#ifdef HAVE_ID3D11VIDEODECODER
+    sys->legacy_shader = false;
+#else
+    sys->legacy_shader = true;
+#endif
+    ID3DBlob *pPSBlob = CompileShader(vd, sys->d3dPxShader, true);
+    if (!pPSBlob)
+    {
+        sys->legacy_shader = true;
+        pPSBlob = CompileShader(vd, sys->d3dPxShader, true);
+        if (!pPSBlob)
+            return VLC_EGENERIC;
+    }
+
+    ID3D11PixelShader *pPicQuadShader;
+    hr = ID3D11Device_CreatePixelShader(sys->d3ddevice, (void *)ID3D10Blob_GetBufferPointer(pPSBlob),
+                                        ID3D10Blob_GetBufferSize(pPSBlob), NULL, &pPicQuadShader);
+
+    ID3D10Blob_Release(pPSBlob);
+
+    if(FAILED(hr)) {
+      msg_Err(vd, "Failed to create the pixel shader. (hr=0x%lX)", hr);
+      return VLC_EGENERIC;
+    }
+
+    if (sys->psz_rgbaPxShader != NULL)
+    {
+        pPSBlob = CompileShader(vd, sys->psz_rgbaPxShader, true);
+        if (!pPSBlob) {
+          ID3D11PixelShader_Release(pPicQuadShader);
+          return VLC_EGENERIC;
+        }
+
+        hr = ID3D11Device_CreatePixelShader(sys->d3ddevice, (void *)ID3D10Blob_GetBufferPointer(pPSBlob),
+                                            ID3D10Blob_GetBufferSize(pPSBlob), NULL, &sys->pSPUPixelShader);
+
+        ID3D10Blob_Release(pPSBlob);
+
+        if(FAILED(hr)) {
+          ID3D11PixelShader_Release(pPicQuadShader);
+          msg_Err(vd, "Failed to create the SPU pixel shader. (hr=0x%lX)", hr);
+          return VLC_EGENERIC;
+        }
+    }
+
     ID3DBlob *pVSBlob = CompileShader(vd, globVertexShaderFlat , false);
     if (!pVSBlob)
         return VLC_EGENERIC;
@@ -1586,43 +1650,6 @@ static int Direct3D11CreateResources(vout_display_t *vd, video_format_t *fmt)
     }
     ID3D10Blob_Release(pVSBlob);
 
-    ID3D11DeviceContext_IASetPrimitiveTopology(sys->d3dcontext, D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-
-    ID3DBlob *pPSBlob = CompileShader(vd, sys->d3dPxShader, true);
-    if (!pPSBlob)
-        return VLC_EGENERIC;
-
-    ID3D11PixelShader *pPicQuadShader;
-    hr = ID3D11Device_CreatePixelShader(sys->d3ddevice, (void *)ID3D10Blob_GetBufferPointer(pPSBlob),
-                                        ID3D10Blob_GetBufferSize(pPSBlob), NULL, &pPicQuadShader);
-
-    ID3D10Blob_Release(pPSBlob);
-
-    if(FAILED(hr)) {
-      msg_Err(vd, "Failed to create the pixel shader. (hr=0x%lX)", hr);
-      return VLC_EGENERIC;
-    }
-
-    if (sys->psz_rgbaPxShader != NULL)
-    {
-        pPSBlob = CompileShader(vd, sys->psz_rgbaPxShader, true);
-        if (!pPSBlob) {
-          ID3D11PixelShader_Release(pPicQuadShader);
-          return VLC_EGENERIC;
-        }
-
-        hr = ID3D11Device_CreatePixelShader(sys->d3ddevice, (void *)ID3D10Blob_GetBufferPointer(pPSBlob),
-                                            ID3D10Blob_GetBufferSize(pPSBlob), NULL, &sys->pSPUPixelShader);
-
-        ID3D10Blob_Release(pPSBlob);
-
-        if(FAILED(hr)) {
-          ID3D11PixelShader_Release(pPicQuadShader);
-          msg_Err(vd, "Failed to create the SPU pixel shader. (hr=0x%lX)", hr);
-          return VLC_EGENERIC;
-        }
-    }
-
     if (AllocQuad( vd, fmt, &sys->picQuad, &sys->picQuadConfig, pPicQuadShader,
                    true, vd->fmt.projection_mode) != VLC_SUCCESS) {
         ID3D11PixelShader_Release(pPicQuadShader);
@@ -1630,6 +1657,8 @@ static int Direct3D11CreateResources(vout_display_t *vd, video_format_t *fmt)
         return VLC_EGENERIC;
     }
     ID3D11PixelShader_Release(pPicQuadShader);
+
+    ID3D11DeviceContext_IASetPrimitiveTopology(sys->d3dcontext, D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
     video_format_t core_source;
     CropStagingFormat( vd, &core_source );
@@ -2069,11 +2098,21 @@ static int AllocQuad(vout_display_t *vd, const video_format_t *fmt, d3d_quad_t *
     }
 
     /* map texture planes to resource views */
-    D3D11_SHADER_RESOURCE_VIEW_DESC resviewDesc;
-    memset(&resviewDesc, 0, sizeof(resviewDesc));
-    resviewDesc.Format = cfg->resourceFormatYRGB;
-    resviewDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
-    resviewDesc.Texture2D.MipLevels = texDesc.MipLevels;
+    D3D11_SHADER_RESOURCE_VIEW_DESC resviewDesc = {
+        .Format = cfg->resourceFormatYRGB,
+    };
+    if (sys->legacy_shader)
+    {
+        resviewDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
+        resviewDesc.Texture2D.MipLevels = 1;
+    }
+    else
+    {
+        resviewDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2DARRAY;
+        resviewDesc.Texture2DArray.MipLevels = -1;
+        resviewDesc.Texture2DArray.ArraySize = 1;
+        resviewDesc.Texture2DArray.FirstArraySlice = slice_index;
+    }
 
     hr = ID3D11Device_CreateShaderResourceView(sys->d3ddevice, (ID3D11Resource *)quad->pTexture, &resviewDesc, &quad->picSys.resourceView[0]);
     if (FAILED(hr)) {
