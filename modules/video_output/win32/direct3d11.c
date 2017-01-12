@@ -233,7 +233,7 @@ static const char* globPixelShaderDefault = "\
     float whitePadding;\
     float4x4 Colorspace;\
   };\
-  Texture2D shaderTexture;\
+  Texture2DArray shaderTexture;\
   SamplerState SampleType;\
   \
   struct PS_INPUT\
@@ -270,8 +270,8 @@ static const char *globPixelShaderBiplanarYUV_2RGB = "\
     float whitePadding;\
     float4x4 Colorspace;\
   };\
-  Texture2D shaderTextureY;\
-  Texture2D shaderTextureUV;\
+  Texture2DArray shaderTextureY;\
+  Texture2DArray shaderTextureUV;\
   SamplerState SampleType;\
   \
   struct PS_INPUT\
@@ -309,7 +309,7 @@ static const char *globPixelShaderBiplanarYUYV_2RGB = "\
     float whitePadding;\
     float4x4 Colorspace;\
   };\
-  Texture2D shaderTextureYUYV;\
+  Texture2DArray shaderTextureYUYV;\
   SamplerState SampleType;\
   \
   struct PS_INPUT\
@@ -1462,7 +1462,7 @@ static ID3DBlob* CompileShader(vout_display_t *vd, const char *psz_shader, bool 
     /* TODO : Match the version to the D3D_FEATURE_LEVEL */
     HRESULT hr = D3DCompile(psz_shader, strlen(psz_shader),
                             NULL, NULL, NULL, pixel ? "PS" : "VS",
-                            pixel ? "ps_4_0_level_9_1" : "vs_4_0_level_9_1",
+                            pixel ? "ps_4_0" : "vs_4_0",
                             0, 0, &pShaderBlob, &pErrBlob);
 
     if (FAILED(hr)) {
@@ -2066,11 +2066,13 @@ static int AllocQuad(vout_display_t *vd, const video_format_t *fmt, d3d_quad_t *
     }
 
     /* map texture planes to resource views */
-    D3D11_SHADER_RESOURCE_VIEW_DESC resviewDesc;
-    memset(&resviewDesc, 0, sizeof(resviewDesc));
-    resviewDesc.Format = cfg->resourceFormatYRGB;
-    resviewDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
-    resviewDesc.Texture2D.MipLevels = texDesc.MipLevels;
+    D3D11_SHADER_RESOURCE_VIEW_DESC resviewDesc = {
+        .Format = cfg->resourceFormatYRGB,
+        .ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2DARRAY,
+        .Texture2DArray.MipLevels = -1,
+        .Texture2DArray.ArraySize = 1,
+        .Texture2DArray.FirstArraySlice = 0,
+    };
 
     hr = ID3D11Device_CreateShaderResourceView(sys->d3ddevice, (ID3D11Resource *)quad->pTexture, &resviewDesc, &quad->picSys.resourceView[0]);
     if (FAILED(hr)) {
