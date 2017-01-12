@@ -192,6 +192,7 @@ struct vout_display_sys_t
     IDXGISwapChain1          *dxgiswapChain;   /* DXGI 1.1 swap chain */
     ID3D11Device             *d3ddevice;       /* D3D device */
     ID3D11DeviceContext      *d3dcontext;      /* D3D context */
+    bool                     legacy_shader;
     d3d_quad_t               picQuad;
     const d3d_format_t       *picQuadConfig;
 
