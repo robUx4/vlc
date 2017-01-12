@@ -1103,6 +1103,12 @@ static void Display(vout_display_t *vd, picture_t *picture, subpicture_t *subpic
         }
     }
 
+#if defined(HAVE_ID3D11VIDEODECODER)
+    if( is_d3d11_opaque(picture->format.i_chroma) && sys->context_lock != INVALID_HANDLE_VALUE) {
+        ReleaseMutex( sys->context_lock );
+    }
+#endif
+
     DXGI_PRESENT_PARAMETERS presentParams;
     memset(&presentParams, 0, sizeof(presentParams));
     HRESULT hr = IDXGISwapChain1_Present1(sys->dxgiswapChain, 0, 0, &presentParams);
@@ -1111,11 +1117,6 @@ static void Display(vout_display_t *vd, picture_t *picture, subpicture_t *subpic
         /* TODO device lost */
         msg_Dbg(vd, "SwapChain Present failed. (hr=0x%lX)", hr);
     }
-#if defined(HAVE_ID3D11VIDEODECODER)
-    if( is_d3d11_opaque(picture->format.i_chroma) && sys->context_lock != INVALID_HANDLE_VALUE) {
-        ReleaseMutex( sys->context_lock );
-    }
-#endif
 
     picture_Release(picture);
     if (subpicture)
