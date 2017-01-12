@@ -28,7 +28,7 @@
 #endif
 #ifdef MODULE_NAME_IS_direct3d11
 # include <d3d11.h>
-# include <dxgi1_2.h>
+# include <dxgi1_4.h>
 # include <d3dcompiler.h>
 #endif
 #ifdef MODULE_NAME_IS_direct3d9
@@ -196,6 +196,7 @@ struct vout_display_sys_t
                                                   for hw decoding */
 #endif
     IDXGISwapChain1          *dxgiswapChain;   /* DXGI 1.1 swap chain */
+    IDXGISwapChain3          *dxgiswapChain3;  /* DXGI 1.3 swap chain */
     ID3D11Device             *d3ddevice;       /* D3D device */
     ID3D11DeviceContext      *d3dcontext;      /* D3D context */
     d3d_quad_t               picQuad;
