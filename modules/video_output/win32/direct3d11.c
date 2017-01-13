@@ -1011,62 +1011,12 @@ static void Prepare(vout_display_t *vd, picture_t *picture, subpicture_t *subpic
     {
         Direct3D11UnmapTexture(picture);
 
-        D3D11_BOX box;
-        box.left   = picture->format.i_x_offset;
-        /* box.right  = picture->format.i_x_offset + picture->format.i_visible_width; */
-        box.top    = picture->format.i_y_offset;
-        /* box.bottom = picture->format.i_y_offset + picture->format.i_visible_height; */
-        box.back = 1;
-        box.front = 0;
-
-        D3D11_TEXTURE2D_DESC dstDesc;
-        ID3D11Texture2D_GetDesc(sys->picQuad.pTexture, &dstDesc);
-        box.bottom = box.top  + dstDesc.Height;
-        box.right  = box.left + dstDesc.Width;
-
         ID3D11DeviceContext_CopySubresourceRegion(sys->d3dcontext,
                                                   (ID3D11Resource*) sys->picQuad.pTexture,
                                                   0, 0, 0, 0,
                                                   (ID3D11Resource*) sys->stagingQuad.pTexture,
-                                                  0, &box);
+                                                  0, NULL);
     }
-
-#ifdef HAVE_ID3D11VIDEODECODER
-    if (is_d3d11_opaque(picture->format.i_chroma)) {
-        D3D11_BOX box;
-        picture_sys_t *p_sys = picture->p_sys;
-        D3D11_TEXTURE2D_DESC texDesc;
-        ID3D11Texture2D_GetDesc( p_sys->texture, &texDesc );
-        if (texDesc.Format == DXGI_FORMAT_NV12 || texDesc.Format == DXGI_FORMAT_P010)
-        {
-            box.left   = (picture->format.i_x_offset + 1) & ~1;
-            box.right  = (picture->format.i_x_offset + picture->format.i_visible_width) & ~1;
-            box.top    = (picture->format.i_y_offset + 1) & ~1;
-            box.bottom = (picture->format.i_y_offset + picture->format.i_visible_height) & ~1;
-        }
-        else
-        {
-            box.left   = picture->format.i_x_offset;
-            box.right  = picture->format.i_x_offset + picture->format.i_visible_width;
-            box.top    = picture->format.i_y_offset;
-            box.bottom = picture->format.i_y_offset + picture->format.i_visible_height;
-        }
-        box.back = 1;
-        box.front = 0;
-
-        if( sys->context_lock != INVALID_HANDLE_VALUE )
-        {
-            WaitForSingleObjectEx( sys->context_lock, INFINITE, FALSE );
-        }
-        ID3D11DeviceContext_CopySubresourceRegion(sys->d3dcontext,
-                                                  (ID3D11Resource*) sys->picQuad.pTexture,
-                                                  0, 0, 0, 0,
-                                                  (ID3D11Resource*) p_sys->texture,
-                                                  p_sys->slice_index, &box);
-        if ( sys->context_lock != INVALID_HANDLE_VALUE)
-            ReleaseMutex( sys->context_lock );
-    }
-#endif
 
     if (subpicture) {
         int subpicture_region_count    = 0;
@@ -1127,7 +1077,10 @@ static void Display(vout_display_t *vd, picture_t *picture, subpicture_t *subpic
         Direct3D11UnmapTexture(picture);
 
     /* Render the quad */
-    DisplayD3DPicture(sys, &sys->picQuad, sys->picQuad.picSys.resourceView);
+    if (is_d3d11_opaque(picture->format.i_chroma))
+        DisplayD3DPicture(sys, &sys->picQuad, picture->p_sys->resourceView);
+    else
+        DisplayD3DPicture(sys, &sys->picQuad, sys->picQuad.picSys.resourceView);
 
     if (subpicture) {
         // draw the additional vertices
@@ -1647,7 +1600,7 @@ static int Direct3D11CreateResources(vout_display_t *vd, video_format_t *fmt)
     }
 
     if (AllocQuad( vd, fmt, &sys->picQuad, sys->picQuadConfig, pPicQuadShader,
-                   true, vd->fmt.projection_mode) != VLC_SUCCESS) {
+                   false, vd->fmt.projection_mode) != VLC_SUCCESS) {
         ID3D11PixelShader_Release(pPicQuadShader);
         msg_Err(vd, "Could not Create the main quad picture. (hr=0x%lX)", hr);
         return VLC_EGENERIC;
@@ -1745,12 +1698,12 @@ static void Direct3D11DestroyPool(vout_display_t *vd)
     sys->pool = NULL;
 }
 
-static void SetupQuadFlat(d3d_vertex_t *dst_data, WORD *triangle_pos)
+static void SetupQuadFlat(d3d_vertex_t *dst_data, const video_format_t *fmt, WORD *triangle_pos)
 {
-    float right = 1.0f;
-    float left = -1.0f;
-    float top = 1.0f;
-    float bottom = -1.0f;
+    float right  =  (float) (2*fmt->i_width-fmt->i_visible_width-2*fmt->i_x_offset) / (float) fmt->i_visible_width;
+    float left   = -(float) (2*fmt->i_x_offset + fmt->i_visible_width) / (float) fmt->i_visible_width;
+    float top    =  (float) (2*fmt->i_y_offset + fmt->i_visible_height) / (float) fmt->i_visible_height;
+    float bottom = -(float) (2*fmt->i_height-fmt->i_visible_height-2*fmt->i_y_offset) / (float) fmt->i_visible_height;
 
     // bottom left
     dst_data[0].position.x = left;
@@ -1839,7 +1792,7 @@ static void SetupQuadSphere(d3d_vertex_t *dst_data, WORD *triangle_pos)
     }
 }
 
-static bool AllocQuadVertices(vout_display_t *vd, d3d_quad_t *quad, video_projection_mode_t projection)
+static bool AllocQuadVertices(vout_display_t *vd, d3d_quad_t *quad, const video_format_t *fmt, video_projection_mode_t projection)
 {
     HRESULT hr;
     D3D11_MAPPED_SUBRESOURCE mappedResource;
@@ -1903,7 +1856,7 @@ static bool AllocQuadVertices(vout_display_t *vd, d3d_quad_t *quad, video_projec
     WORD *triangle_pos = mappedResource.pData;
 
     if ( projection == PROJECTION_MODE_RECTANGULAR )
-        SetupQuadFlat(dst_data, triangle_pos);
+        SetupQuadFlat(dst_data, fmt, triangle_pos);
     else
         SetupQuadSphere(dst_data, triangle_pos);
 
@@ -2096,7 +2049,7 @@ static int AllocQuad(vout_display_t *vd, const video_format_t *fmt, d3d_quad_t *
 
     if ( d3dpixelShader != NULL )
     {
-        if (!AllocQuadVertices(vd, quad, projection))
+        if (!AllocQuadVertices(vd, quad, fmt, projection))
             goto error;
 
         if (projection == PROJECTION_MODE_RECTANGULAR)
