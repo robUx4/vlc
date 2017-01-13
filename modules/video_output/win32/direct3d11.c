@@ -1033,43 +1033,6 @@ static void Prepare(vout_display_t *vd, picture_t *picture, subpicture_t *subpic
                                                   0, &box);
     }
 
-#ifdef HAVE_ID3D11VIDEODECODER
-    if (is_d3d11_opaque(picture->format.i_chroma)) {
-        D3D11_BOX box;
-        picture_sys_t *p_sys = picture->p_sys;
-        D3D11_TEXTURE2D_DESC texDesc;
-        ID3D11Texture2D_GetDesc( p_sys->texture, &texDesc );
-        if (texDesc.Format == DXGI_FORMAT_NV12 || texDesc.Format == DXGI_FORMAT_P010)
-        {
-            box.left   = (picture->format.i_x_offset + 1) & ~1;
-            box.right  = (picture->format.i_x_offset + picture->format.i_visible_width) & ~1;
-            box.top    = (picture->format.i_y_offset + 1) & ~1;
-            box.bottom = (picture->format.i_y_offset + picture->format.i_visible_height) & ~1;
-        }
-        else
-        {
-            box.left   = picture->format.i_x_offset;
-            box.right  = picture->format.i_x_offset + picture->format.i_visible_width;
-            box.top    = picture->format.i_y_offset;
-            box.bottom = picture->format.i_y_offset + picture->format.i_visible_height;
-        }
-        box.back = 1;
-        box.front = 0;
-
-        if( sys->context_lock != INVALID_HANDLE_VALUE )
-        {
-            WaitForSingleObjectEx( sys->context_lock, INFINITE, FALSE );
-        }
-        ID3D11DeviceContext_CopySubresourceRegion(sys->d3dcontext,
-                                                  (ID3D11Resource*) sys->picQuad.pTexture,
-                                                  0, 0, 0, 0,
-                                                  (ID3D11Resource*) p_sys->texture,
-                                                  p_sys->slice_index, &box);
-        if ( sys->context_lock != INVALID_HANDLE_VALUE)
-            ReleaseMutex( sys->context_lock );
-    }
-#endif
-
     if (subpicture) {
         int subpicture_region_count    = 0;
         picture_t **subpicture_regions = NULL;
@@ -1129,7 +1092,10 @@ static void Display(vout_display_t *vd, picture_t *picture, subpicture_t *subpic
         Direct3D11UnmapTexture(picture);
 
     /* Render the quad */
-    DisplayD3DPicture(sys, &sys->picQuad, sys->picQuad.picSys.resourceView);
+    if (is_d3d11_opaque(picture->format.i_chroma))
+        DisplayD3DPicture(sys, &sys->picQuad, picture->p_sys->resourceView);
+    else
+        DisplayD3DPicture(sys, &sys->picQuad, sys->picQuad.picSys.resourceView);
 
     if (subpicture) {
         // draw the additional vertices
