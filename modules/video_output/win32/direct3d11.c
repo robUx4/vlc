@@ -167,13 +167,13 @@ static const char* globVertexShaderFlat = "\
   struct VS_INPUT\
   {\
     float4 Position   : POSITION;\
-    float2 Texture    : TEXCOORD0;\
+    float4 Texture    : TEXCOORD0;\
   };\
   \
   struct VS_OUTPUT\
   {\
     float4 Position   : SV_POSITION;\
-    float2 Texture    : TEXCOORD0;\
+    float4 Texture    : TEXCOORD0;\
   };\
   \
   VS_OUTPUT VS( VS_INPUT In )\
@@ -194,13 +194,13 @@ static const char* globVertexShaderProjection = "\
   struct VS_INPUT\
   {\
     float4 Position   : POSITION;\
-    float2 Texture    : TEXCOORD0;\
+    float4 Texture    : TEXCOORD0;\
   };\
   \
   struct VS_OUTPUT\
   {\
     float4 Position   : SV_POSITION;\
-    float2 Texture    : TEXCOORD0;\
+    float4 Texture    : TEXCOORD0;\
   };\
   \
   VS_OUTPUT VS( VS_INPUT In )\
@@ -238,7 +238,7 @@ static const char* globPixelShaderDefault = "\
   struct PS_INPUT\
   {\
     float4 Position   : SV_POSITION;\
-    float2 Texture    : TEXCOORD0;\
+    float4 Texture    : TEXCOORD0;\
   };\
   \
   float4 PS( PS_INPUT In ) : SV_TARGET\
@@ -254,6 +254,7 @@ static const char* globPixelShaderDefault = "\
   }\
 ";
 
+/* for NV12/P010 source */
 static const char *globPixelShaderBiplanarYUV_2RGB = "\
   cbuffer PS_CONSTANT_BUFFER : register(b0)\
   {\
@@ -275,7 +276,7 @@ static const char *globPixelShaderBiplanarYUV_2RGB = "\
   struct PS_INPUT\
   {\
     float4 Position   : SV_POSITION;\
-    float2 Texture    : TEXCOORD0;\
+    float4 Texture    : TEXCOORD0;\
   };\
   \
   float4 PS( PS_INPUT In ) : SV_TARGET\
@@ -313,7 +314,7 @@ static const char *globPixelShaderBiplanarYUYV_2RGB = "\
   struct PS_INPUT\
   {\
     float4 Position   : SV_POSITION;\
-    float2 Texture    : TEXCOORD0;\
+    float4 Texture    : TEXCOORD0;\
   };\
   \
   float4 PS( PS_INPUT In ) : SV_TARGET\
