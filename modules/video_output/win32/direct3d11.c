@@ -1072,7 +1072,7 @@ static void Display(vout_display_t *vd, picture_t *picture, subpicture_t *subpic
 {
     vout_display_sys_t *sys = vd->sys;
 #ifdef HAVE_ID3D11VIDEODECODER
-    if (is_d3d11_opaque(picture->format.i_chroma)&& sys->context_lock != INVALID_HANDLE_VALUE )
+    if (sys->context_lock != INVALID_HANDLE_VALUE && is_d3d11_opaque(picture->format.i_chroma))
     {
         WaitForSingleObjectEx( sys->context_lock, INFINITE, FALSE );
     }
