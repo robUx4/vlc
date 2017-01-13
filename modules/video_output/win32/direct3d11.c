@@ -509,6 +509,47 @@ static const d3d_format_t *GetOutputFormat(vout_display_t *vd, vlc_fourcc_t i_sr
     return NULL;
 }
 
+/* map texture planes to resource views */
+static int AllocateShaderView(vout_display_t *vd, const d3d_format_t *format, ID3D11Texture2D *texture,
+                              int slice_index, ID3D11ShaderResourceView *resourceView[2])
+{
+    HRESULT hr;
+    vout_display_sys_t *sys = vd->sys;
+    D3D11_SHADER_RESOURCE_VIEW_DESC resviewDesc = {
+        .Format = format->formatY,
+        .ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2DARRAY,
+        .Texture2DArray.MipLevels = -1,
+        .Texture2DArray.ArraySize = 1,
+        .Texture2DArray.FirstArraySlice = slice_index,
+    };
+
+    hr = ID3D11Device_CreateShaderResourceView(sys->d3ddevice, (ID3D11Resource *)texture, &resviewDesc, &resourceView[0]);
+    if (FAILED(hr)) {
+        msg_Err(vd, "Could not Create the Y/RGB Texture ResourceView slice %d. (hr=0x%lX)", slice_index, hr);
+        goto error;
+    }
+
+    resourceView[1] = NULL;
+    if( format->formatUV )
+    {
+        resviewDesc.Format = format->formatUV;
+        hr = ID3D11Device_CreateShaderResourceView(sys->d3ddevice, (ID3D11Resource *)texture, &resviewDesc, &resourceView[1]);
+        if (FAILED(hr)) {
+            msg_Err(vd, "Could not Create the UV Texture ResourceView slice %d. (hr=0x%lX)", slice_index, hr);
+            goto error;
+        }
+    }
+
+    return VLC_SUCCESS;
+error:
+    if (resourceView[0]) {
+        ID3D11ShaderResourceView_Release(resourceView[0]);
+        resourceView[0] = NULL;
+    }
+    resourceView[1] = NULL;
+    return VLC_EGENERIC;
+}
+
 static picture_pool_t *Pool(vout_display_t *vd, unsigned pool_size)
 {
     if ( vd->sys->pool != NULL )
@@ -2040,32 +2081,8 @@ static int AllocQuad(vout_display_t *vd, const video_format_t *fmt, d3d_quad_t *
         goto error;
     }
 
-    /* map texture planes to resource views */
-    D3D11_SHADER_RESOURCE_VIEW_DESC resviewDesc = {
-        .Format = cfg->formatY,
-        .ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2DARRAY,
-        .Texture2DArray.MipLevels = -1,
-        .Texture2DArray.ArraySize = 1,
-        .Texture2DArray.FirstArraySlice = 0,
-    };
-
-    hr = ID3D11Device_CreateShaderResourceView(sys->d3ddevice, (ID3D11Resource *)quad->pTexture, &resviewDesc, &quad->picSys.resourceView[0]);
-    if (FAILED(hr)) {
-        msg_Err(vd, "Could not Create the Y/RGB D3d11 Texture ResourceView. (hr=0x%lX)", hr);
+    if (AllocateShaderView(vd, cfg, quad->pTexture, 0, quad->picSys.resourceView) != VLC_SUCCESS)
         goto error;
-    }
-
-    if( cfg->formatUV )
-    {
-        resviewDesc.Format = cfg->formatUV;
-        hr = ID3D11Device_CreateShaderResourceView(sys->d3ddevice, (ID3D11Resource *)quad->pTexture, &resviewDesc, &quad->picSys.resourceView[1]);
-        if (FAILED(hr)) {
-            msg_Err(vd, "Could not Create the UV D3d11 Texture ResourceView. (hr=0x%lX)", hr);
-            goto error;
-        }
-    }
-    else
-        quad->picSys.resourceView[1] = NULL;
 
     if ( d3dpixelShader != NULL )
     {
