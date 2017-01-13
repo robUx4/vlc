@@ -573,6 +573,9 @@ static picture_pool_t *Pool(vout_display_t *vd, unsigned pool_size)
     unsigned          picture_count = 0;
     HRESULT           hr;
 
+    const d3d_format_t *cfg = GetOutputFormat(vd, vd->fmt.i_chroma, 0, true, false);
+    assert(cfg == vd->sys->picQuadConfig);
+
     ID3D10Multithread *pMultithread;
     hr = ID3D11Device_QueryInterface( vd->sys->d3ddevice, &IID_ID3D10Multithread, (void **)&pMultithread);
     if (SUCCEEDED(hr)) {
@@ -614,6 +617,9 @@ static picture_pool_t *Pool(vout_display_t *vd, unsigned pool_size)
         picsys->texture = texture;
         picsys->slice_index = picture_count;
         picsys->context = vd->sys->d3dcontext;
+
+        if (AllocateShaderView(vd, vd->sys->picQuadConfig, texture, picture_count, picsys->resourceView) != VLC_SUCCESS)
+            goto error;
 
         picture_resource_t resource = {
             .p_sys = picsys,
@@ -666,6 +672,10 @@ static void DestroyDisplayPoolPicture(picture_t *picture)
 {
     picture_sys_t *p_sys = (picture_sys_t*) picture->p_sys;
 
+    if (p_sys->resourceView[0])
+        ID3D11ShaderResourceView_Release(p_sys->resourceView[0]);
+    if (p_sys->resourceView[1])
+        ID3D11ShaderResourceView_Release(p_sys->resourceView[1]);
     if (p_sys->texture)
         ID3D11Texture2D_Release(p_sys->texture);
     if (p_sys->context)
