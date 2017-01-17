@@ -30,6 +30,8 @@
 # include "config.h"
 #endif
 
+#define DISPLAY_VIA_STAGING  (HAVE_ID3D11VIDEODECODER && 1)
+
 #include <vlc_common.h>
 #include <vlc_plugin.h>
 #include <vlc_vout_display.h>
@@ -1017,7 +1019,7 @@ static void Prepare(vout_display_t *vd, picture_t *picture, subpicture_t *subpic
                                                   0, NULL);
     }
 
-#ifdef HAVE_ID3D11VIDEODECODER
+#if DISPLAY_VIA_STAGING
     if (is_d3d11_opaque(picture->format.i_chroma)) {
         picture_sys_t *p_sys = picture->p_sys;
         if( sys->context_lock != INVALID_HANDLE_VALUE )
@@ -1093,7 +1095,12 @@ static void Display(vout_display_t *vd, picture_t *picture, subpicture_t *subpic
         Direct3D11UnmapTexture(picture);
 
     /* Render the quad */
-    DisplayD3DPicture(sys, &sys->picQuad, sys->picQuad.picSys.resourceView);
+#if !DISPLAY_VIA_STAGING
+    if (is_d3d11_opaque(picture->format.i_chroma))
+        DisplayD3DPicture(sys, &sys->picQuad, picture->p_sys->resourceView);
+    else
+#endif
+        DisplayD3DPicture(sys, &sys->picQuad, sys->picQuad.picSys.resourceView);
 
     if (subpicture) {
         // draw the additional vertices
