@@ -62,6 +62,9 @@ static void Close(vlc_object_t *);
 #define HW_BLENDING_TEXT N_("Use hardware blending support")
 #define HW_BLENDING_LONGTEXT N_(\
     "Try to use hardware acceleration for subtitle/OSD blending.")
+#define HW_0COPY_TEXT N_("Use 0-copy with hardware decoder")
+#define HW_0COPY_LONGTEXT N_(\
+    "Use one less copy per frame displayed, may not work on all hardware.")
 
 vlc_module_begin ()
     set_shortname("Direct3D11")
@@ -71,6 +74,7 @@ vlc_module_begin ()
     set_subcategory(SUBCAT_VIDEO_VOUT)
 
     add_bool("direct3d11-hw-blending", true, HW_BLENDING_TEXT, HW_BLENDING_LONGTEXT, true)
+    add_bool("direct3d11-direct-hw", true, HW_0COPY_TEXT, HW_0COPY_LONGTEXT, true)
 
 #if VLC_WINSTORE_APP
     add_integer("winrt-d3dcontext",    0x0, NULL, NULL, true); /* ID3D11DeviceContext* */
@@ -1569,7 +1573,8 @@ static int Direct3D11CreateResources(vout_display_t *vd, video_format_t *fmt)
     }
 
 #ifdef HAVE_ID3D11VIDEODECODER
-    sys->legacy_shader = false;
+    sys->legacy_shader = !var_InheritBool(vd, "direct3d11-direct-hw");
+#if 0
     IDXGIAdapter *pAdapter = D3D11DeviceAdapter(sys->d3ddevice);
     if (pAdapter) {
         DXGI_ADAPTER_DESC adapterDesc;
@@ -1580,6 +1585,7 @@ static int Direct3D11CreateResources(vout_display_t *vd, video_format_t *fmt)
         }
         IDXGIAdapter_Release(pAdapter);
     }
+#endif
 #else
     sys->legacy_shader = true;
 #endif
