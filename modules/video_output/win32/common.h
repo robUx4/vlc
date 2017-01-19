@@ -196,9 +196,6 @@ struct vout_display_sys_t
     d3d_quad_t               picQuad;
     const d3d_format_t       *picQuadConfig;
 
-    /* staging quad to adjust visible borders */
-    d3d_quad_t               stagingQuad;
-
     ID3D11RenderTargetView   *d3drenderTargetView;
     ID3D11DepthStencilView   *d3ddepthStencilView;
     const char               *d3dPxShader;
