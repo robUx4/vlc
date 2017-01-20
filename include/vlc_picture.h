@@ -222,6 +222,20 @@ VLC_API int picture_Export( vlc_object_t *p_obj, block_t **pp_image, video_forma
  */
 VLC_API int picture_Setup( picture_t *, const video_format_t * );
 
+/**
+ * This function setup the plane dimensions needed to store the specified chroma with
+ * the dimensions from the given format.
+ *
+ * It will return VLC_EGENERIC if the core does not understand the requested
+ * chroma.
+ *
+ * p_planes and plane_count will be filled when succesful.
+ *
+ * p_planes should hold at least PICTURE_PLANE_MAX plane_t items.
+ */
+VLC_API int plane_Setup(vlc_fourcc_t chroma, const video_format_t *fmt, plane_t *p_planes, int *plane_count);
+
+
 
 /*****************************************************************************
  * Shortcuts to access image components
