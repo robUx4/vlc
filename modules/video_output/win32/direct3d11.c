@@ -183,6 +183,9 @@ static const char* globVertexShaderFlat = "\
   }\
 ";
 
+#define STRINGIZE2(s) #s
+#define STRINGIZE(s) STRINGIZE2(s)
+
 static const char* globVertexShaderProjection = "\
   cbuffer VS_PROJECTION_CONST : register(b0)\
   {\
@@ -233,7 +236,7 @@ static const char* globPixelShaderDefault = "\
     float whitePadding;\
     float4x4 Colorspace;\
   };\
-  Texture2D%s shaderTexture;\
+  Texture2D%s shaderTexture[" STRINGIZE(D3D11_MAX_SHADER_VIEW) "];\
   SamplerState SampleType;\
   \
   struct PS_INPUT\
@@ -246,7 +249,7 @@ static const char* globPixelShaderDefault = "\
   {\
     float4 rgba; \
     \
-    rgba = shaderTexture.Sample(SampleType, In.Texture);\
+    rgba = shaderTexture[0].Sample(SampleType, In.Texture);\
     rgba.x += WhitePointX;\
     rgba.y += WhitePointY;\
     rgba.z += WhitePointZ;\
@@ -270,8 +273,7 @@ static const char *globPixelShaderBiplanarYUV_2RGB = "\
     float whitePadding;\
     float4x4 Colorspace;\
   };\
-  Texture2D%s shaderTextureY;\
-  Texture2D%s shaderTextureUV;\
+  Texture2D%s shaderTexture[" STRINGIZE(D3D11_MAX_SHADER_VIEW) "];\
   SamplerState SampleType;\
   \
   struct PS_INPUT\
@@ -284,8 +286,8 @@ static const char *globPixelShaderBiplanarYUV_2RGB = "\
   {\
     float4 yuv;\
     float4 rgba;\
-    yuv.x  = shaderTextureY.Sample(SampleType, In.Texture).x;\
-    yuv.yz = shaderTextureUV.Sample(SampleType, In.Texture).xy;\
+    yuv.x  = shaderTexture[0].Sample(SampleType, In.Texture).x;\
+    yuv.yz = shaderTexture[1].Sample(SampleType, In.Texture).xy;\
     yuv.a  = Opacity;\
     yuv.x  += WhitePointX;\
     yuv.y  += WhitePointY;\
@@ -309,7 +311,7 @@ static const char *globPixelShaderBiplanarYUYV_2RGB = "\
     float whitePadding;\
     float4x4 Colorspace;\
   };\
-  Texture2D%s shaderTextureYUYV;\
+  Texture2D%s shaderTexture[" STRINGIZE(D3D11_MAX_SHADER_VIEW) "];\
   SamplerState SampleType;\
   \
   struct PS_INPUT\
@@ -322,9 +324,9 @@ static const char *globPixelShaderBiplanarYUYV_2RGB = "\
   {\
     float4 yuv;\
     float4 rgba;\
-    yuv.x  = shaderTextureYUYV.Sample(SampleType, In.Texture).x;\
-    yuv.y  = shaderTextureYUYV.Sample(SampleType, In.Texture).y;\
-    yuv.z  = shaderTextureYUYV.Sample(SampleType, In.Texture).a;\
+    yuv.x  = shaderTexture[0].Sample(SampleType, In.Texture).x;\
+    yuv.y  = shaderTexture[0].Sample(SampleType, In.Texture).y;\
+    yuv.z  = shaderTexture[0].Sample(SampleType, In.Texture).a;\
     yuv.a  = Opacity;\
     yuv.x  += WhitePointX;\
     yuv.y  += WhitePointY;\
@@ -514,13 +516,13 @@ static const d3d_format_t *GetOutputFormat(vout_display_t *vd, vlc_fourcc_t i_sr
 
 /* map texture planes to resource views */
 static int AllocateShaderView(vout_display_t *vd, const d3d_format_t *format, ID3D11Texture2D *texture,
-                              int slice_index, ID3D11ShaderResourceView *resourceView[2])
+                              int slice_index, ID3D11ShaderResourceView *resourceView[D3D11_MAX_SHADER_VIEW])
 {
     HRESULT hr;
     vout_display_sys_t *sys = vd->sys;
-    D3D11_SHADER_RESOURCE_VIEW_DESC resviewDesc = {
-        .Format = format->formatY,
-    };
+    int i;
+    D3D11_SHADER_RESOURCE_VIEW_DESC resviewDesc = { 0 };
+
     if (sys->legacy_shader)
     {
         resviewDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
@@ -534,31 +536,33 @@ static int AllocateShaderView(vout_display_t *vd, const d3d_format_t *format, ID
         resviewDesc.Texture2DArray.FirstArraySlice = slice_index;
     }
 
-    hr = ID3D11Device_CreateShaderResourceView(sys->d3ddevice, (ID3D11Resource *)texture, &resviewDesc, &resourceView[0]);
-    if (FAILED(hr)) {
-        msg_Err(vd, "Could not Create the Y/RGB Texture ResourceView slice %d. (hr=0x%lX)", slice_index, hr);
-        goto error;
-    }
-
-    resourceView[1] = NULL;
-    if( format->formatUV )
+    for (i=0; i<D3D11_MAX_SHADER_VIEW; i++)
     {
-        resviewDesc.Format = format->formatUV;
-        hr = ID3D11Device_CreateShaderResourceView(sys->d3ddevice, (ID3D11Resource *)texture, &resviewDesc, &resourceView[1]);
-        if (FAILED(hr)) {
-            msg_Err(vd, "Could not Create the UV Texture ResourceView slice %d. (hr=0x%lX)", slice_index, hr);
-            goto error;
+        if (!format->resourceFormat[i])
+            resourceView[i] = NULL;
+        else
+        {
+            resviewDesc.Format = format->resourceFormat[i];
+            hr = ID3D11Device_CreateShaderResourceView(sys->d3ddevice, (ID3D11Resource *)texture, &resviewDesc, &resourceView[i]);
+            if (FAILED(hr)) {
+                msg_Err(vd, "Could not Create the Texture ResourceView %d slice %d. (hr=0x%lX)", i, slice_index, hr);
+                break;
+            }
         }
     }
 
-    return VLC_SUCCESS;
-error:
-    if (resourceView[0]) {
-        ID3D11ShaderResourceView_Release(resourceView[0]);
-        resourceView[0] = NULL;
+    if (i != D3D11_MAX_SHADER_VIEW)
+    {
+        while (i >= 0)
+        {
+            ID3D11ShaderResourceView_Release(resourceView[i]);
+            resourceView[i] = NULL;
+            i--;
+        }
+        return VLC_EGENERIC;
     }
-    resourceView[1] = NULL;
-    return VLC_EGENERIC;
+
+    return VLC_SUCCESS;
 }
 
 static picture_pool_t *Pool(vout_display_t *vd, unsigned pool_size)
@@ -670,10 +674,10 @@ static void DestroyDisplayPoolPicture(picture_t *picture)
 {
     picture_sys_t *p_sys = (picture_sys_t*) picture->p_sys;
 
-    if (p_sys->resourceView[0])
-        ID3D11ShaderResourceView_Release(p_sys->resourceView[0]);
-    if (p_sys->resourceView[1])
-        ID3D11ShaderResourceView_Release(p_sys->resourceView[1]);
+    for (int i=0; i<D3D11_MAX_SHADER_VIEW; i++) {
+        if (p_sys->resourceView[i])
+            ID3D11ShaderResourceView_Release(p_sys->resourceView[i]);
+    }
     if (p_sys->texture)
         ID3D11Texture2D_Release(p_sys->texture);
     if (p_sys->context)
@@ -1013,7 +1017,7 @@ static void Prepare(vout_display_t *vd, picture_t *picture, subpicture_t *subpic
     }
 }
 
-static void DisplayD3DPicture(vout_display_sys_t *sys, d3d_quad_t *quad, ID3D11ShaderResourceView *resourceView[2])
+static void DisplayD3DPicture(vout_display_sys_t *sys, d3d_quad_t *quad, ID3D11ShaderResourceView *resourceView[D3D11_MAX_SHADER_VIEW])
 {
     UINT stride = sizeof(d3d_vertex_t);
     UINT offset = 0;
@@ -1031,7 +1035,7 @@ static void DisplayD3DPicture(vout_display_sys_t *sys, d3d_quad_t *quad, ID3D11S
     ID3D11DeviceContext_PSSetShader(sys->d3dcontext, quad->d3dpixelShader, NULL, 0);
 
     ID3D11DeviceContext_PSSetConstantBuffers(sys->d3dcontext, 0, quad->PSConstantsCount, quad->pPixelShaderConstants);
-    ID3D11DeviceContext_PSSetShaderResources(sys->d3dcontext, 0, 2, resourceView);
+    ID3D11DeviceContext_PSSetShaderResources(sys->d3dcontext, 0, D3D11_MAX_SHADER_VIEW, resourceView);
 
     ID3D11DeviceContext_RSSetViewports(sys->d3dcontext, 1, &quad->cropViewport);
 
@@ -1868,8 +1872,8 @@ static int AllocQuad(vout_display_t *vd, const video_format_t *fmt, d3d_quad_t *
     D3D11_MAPPED_SUBRESOURCE mappedResource;
     HRESULT hr;
     static const FLOAT FULL_TO_STUDIO_SHIFT = 16.f / 256.f;
-    const bool RGB_shader = cfg->formatY != DXGI_FORMAT_R8_UNORM &&
-        cfg->formatY != DXGI_FORMAT_R16_UNORM &&
+    const bool RGB_shader = cfg->resourceFormat[0] != DXGI_FORMAT_R8_UNORM &&
+        cfg->resourceFormat[0] != DXGI_FORMAT_R16_UNORM &&
         fmt->i_chroma != VLC_CODEC_YUYV;
 
     /* pixel shader constant buffer */
@@ -2095,15 +2099,12 @@ static void ReleaseQuad(d3d_quad_t *quad)
         ID3D11Texture2D_Release(quad->pTexture);
         quad->pTexture = NULL;
     }
-    if (quad->picSys.resourceView[0])
-    {
-        ID3D11ShaderResourceView_Release(quad->picSys.resourceView[0]);
-        quad->picSys.resourceView[0] = NULL;
-    }
-    if (quad->picSys.resourceView[1])
-    {
-        ID3D11ShaderResourceView_Release(quad->picSys.resourceView[1]);
-        quad->picSys.resourceView[1] = NULL;
+    for (int i=0; i<D3D11_MAX_SHADER_VIEW; i++) {
+        if (quad->picSys.resourceView[i])
+        {
+            ID3D11ShaderResourceView_Release(quad->picSys.resourceView[i]);
+            quad->picSys.resourceView[i] = NULL;
+        }
     }
     if (quad->d3dpixelShader)
     {
