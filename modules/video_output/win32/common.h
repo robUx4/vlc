@@ -51,11 +51,12 @@
 struct picture_sys_t
 {
     ID3D11VideoDecoderOutputView  *decoder; /* may be NULL for pictures from the pool */
-    ID3D11Texture2D               *texture;
+    ID3D11Texture2D               *texture[D3D11_MAX_SHADER_VIEW];
     ID3D11DeviceContext           *context;
     unsigned                      slice_index;
     ID3D11VideoProcessorInputView *inputView; /* when used as processor input */
     ID3D11ShaderResourceView      *resourceView[D3D11_MAX_SHADER_VIEW];
+    bool                          mapped;
 };
 #endif
 
@@ -68,7 +69,7 @@ typedef struct
     UINT                      indexCount;
     ID3D11Buffer              *pVertexShaderConstants;
     picture_sys_t             picSys;
-    ID3D11Texture2D           *pTexture;
+    ID3D11Texture2D           *pTexture[D3D11_MAX_SHADER_VIEW];
     ID3D11Buffer              *pPixelShaderConstants[2];
     UINT                       PSConstantsCount;
     ID3D11PixelShader         *d3dpixelShader;
@@ -279,7 +280,8 @@ void CommonClean(vout_display_t *);
 void CommonManage(vout_display_t *);
 int  CommonControl(vout_display_t *, int , va_list );
 void CommonDisplay(vout_display_t *);
-int  CommonUpdatePicture(picture_t *, picture_t **, uint8_t *, unsigned);
+int  CommonUpdatePicture(picture_t *, picture_t **fallback, uint8_t *plane, unsigned pitch);
+int  CommonUpdatePictureSplit(picture_t *, uint8_t **planes, unsigned *pitches, unsigned *heights);
 
 void UpdateRects (vout_display_t *,
                   const vout_display_cfg_t *,
