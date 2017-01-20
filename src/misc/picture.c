@@ -137,25 +137,11 @@ static int LCM( int a, int b )
     return a * b / GCD( a, b );
 }
 
-int picture_Setup( picture_t *p_picture, const video_format_t *restrict fmt )
+int picture_SetupPlanes( vlc_fourcc_t i_chroma, const video_format_t *restrict fmt,
+                         plane_t *planes, int *plane_count )
 {
-    /* Store default values */
-    p_picture->i_planes = 0;
-    for( unsigned i = 0; i < VOUT_MAX_PLANES; i++ )
-    {
-        plane_t *p = &p_picture->p[i];
-        p->p_pixels = NULL;
-        p->i_pixel_pitch = 0;
-    }
-
-    p_picture->i_nb_fields = 2;
-
-    video_format_Setup( &p_picture->format, fmt->i_chroma, fmt->i_width, fmt->i_height,
-                        fmt->i_visible_width, fmt->i_visible_height,
-                        fmt->i_sar_num, fmt->i_sar_den );
-
     const vlc_chroma_description_t *p_dsc =
-        vlc_fourcc_GetChromaDescription( p_picture->format.i_chroma );
+            vlc_fourcc_GetChromaDescription( i_chroma );
     if( !p_dsc )
         return VLC_EGENERIC;
 
@@ -182,7 +168,7 @@ int picture_Setup( picture_t *p_picture, const video_format_t *restrict fmt )
     const int i_height_extra   = 2 * i_ratio_h; /* This one is a hack for some ASM functions */
     for( unsigned i = 0; i < p_dsc->plane_count; i++ )
     {
-        plane_t *p = &p_picture->p[i];
+        plane_t *p = &planes[i];
 
         p->i_lines         = (i_height_aligned + i_height_extra ) * p_dsc->p[i].h.num / p_dsc->p[i].h.den;
         p->i_visible_lines = fmt->i_visible_height * p_dsc->p[i].h.num / p_dsc->p[i].h.den;
@@ -192,9 +178,31 @@ int picture_Setup( picture_t *p_picture, const video_format_t *restrict fmt )
 
         assert( (p->i_pitch % 16) == 0 );
     }
-    p_picture->i_planes  = p_dsc->plane_count;
+
+    *plane_count = p_dsc->plane_count;
 
     return VLC_SUCCESS;
+}
+
+int picture_Setup( picture_t *p_picture, const video_format_t *restrict fmt )
+{
+    /* Store default values */
+    p_picture->i_planes = 0;
+    for( unsigned i = 0; i < VOUT_MAX_PLANES; i++ )
+    {
+        plane_t *p = &p_picture->p[i];
+        p->p_pixels = NULL;
+        p->i_pixel_pitch = 0;
+    }
+
+    p_picture->i_nb_fields = 2;
+
+    video_format_Setup( &p_picture->format, fmt->i_chroma, fmt->i_width, fmt->i_height,
+                        fmt->i_visible_width, fmt->i_visible_height,
+                        fmt->i_sar_num, fmt->i_sar_den );
+
+    return picture_SetupPlanes( p_picture->format.i_chroma, fmt, p_picture->p,
+                                &p_picture->i_planes );
 }
 
 /*****************************************************************************
