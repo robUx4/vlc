@@ -327,6 +327,7 @@ picture_pool_Reserve
 picture_pool_Wait
 picture_Reset
 picture_Setup
+picture_SetupPlanes
 plane_CopyPixels
 playlist_Add
 playlist_AddExt
