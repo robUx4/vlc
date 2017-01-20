@@ -222,6 +222,10 @@ VLC_API int picture_Export( vlc_object_t *p_obj, block_t **pp_image, video_forma
  */
 VLC_API int picture_Setup( picture_t *, const video_format_t * );
 
+VLC_API int picture_SetupPlanes(vlc_fourcc_t, const video_format_t *, plane_t *,
+                                int *plane_count);
+
+
 
 /*****************************************************************************
  * Shortcuts to access image components
