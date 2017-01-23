@@ -1750,24 +1750,24 @@ static int Direct3D11CreatePool(vout_display_t *vd, video_format_t *fmt)
         /* a D3D11VA pool will be created when needed */
         return VLC_SUCCESS;
 
-    picture_sys_pool_t *picsys = calloc(1, sizeof(*picsys));
-    if (unlikely(picsys == NULL)) {
+    picture_sys_pool_t *poolsys = calloc(1, sizeof(*poolsys));
+    if (unlikely(poolsys == NULL)) {
         return VLC_ENOMEM;
     }
-    picsys->texture  = sys->picQuad.pTexture[0];
-    picsys->vd       = vd;
+    poolsys->texture  = sys->picQuad.pTexture[0];
+    poolsys->vd       = vd;
 
     picture_resource_t resource = {
-        .p_sys = (picture_sys_t*) picsys,
+        .p_sys = (picture_sys_t*) poolsys,
         .pf_destroy = DestroyDisplayPicture,
     };
 
     picture_t *picture = picture_NewFromResource(fmt, &resource);
     if (!picture) {
-        free(picsys);
+        free(poolsys);
         return VLC_ENOMEM;
     }
-    ID3D11Texture2D_AddRef(picsys->texture);
+    ID3D11Texture2D_AddRef(poolsys->texture);
 
     picture_pool_configuration_t pool_cfg;
     memset(&pool_cfg, 0, sizeof(pool_cfg));
