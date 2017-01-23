@@ -1797,8 +1797,8 @@ static void SetupQuadFlat(d3d_vertex_t *dst_data, const video_format_t *fmt, WOR
     float top    =  (float) (2*fmt->i_y_offset + fmt->i_visible_height) / (float) fmt->i_visible_height;
     float bottom = -(float) (2*fmt->i_height-fmt->i_visible_height-2*fmt->i_y_offset) / (float) fmt->i_visible_height;
 
-top = right = 1.f;
-bottom = left = -1.f;
+//top = right = 1.f;
+//bottom = left = -1.f;
 
     // bottom left
     dst_data[0].position.x = left;
