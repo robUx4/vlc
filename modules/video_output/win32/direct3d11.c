@@ -690,6 +690,7 @@ static picture_pool_t *Pool(vout_display_t *vd, unsigned pool_size)
             .pf_destroy = DestroyDisplayPoolPicture,
         };
 
+        picsys->vd = VLC_OBJECT(vd);
         picsys->slice_index = picture_count;
         picsys->context = vd->sys->d3dcontext;
 
@@ -1154,6 +1155,8 @@ static void Display(vout_display_t *vd, picture_t *picture, subpicture_t *subpic
     {
         Direct3D11UnmapTexture(picture);
     }
+
+    msg_Dbg(vd, "display texture slice %d", picture->p_sys->slice_index);
 
     /* Render the quad */
     if ((true || is_d3d11_opaque(picture->format.i_chroma)) && !sys->legacy_shader)
@@ -1798,8 +1801,8 @@ static void SetupQuadFlat(d3d_vertex_t *dst_data, const video_format_t *fmt, WOR
     float top    =  (float) (2*fmt->i_y_offset + fmt->i_visible_height) / (float) fmt->i_visible_height;
     float bottom = -(float) (2*fmt->i_height-fmt->i_visible_height-2*fmt->i_y_offset) / (float) fmt->i_visible_height;
 
-//top = right = 1.f;
-//bottom = left = -1.f;
+top = right = 1.f;
+bottom = left = -1.f;
 
     // bottom left
     dst_data[0].position.x = left;
@@ -2273,6 +2276,7 @@ static int Direct3D11MapTexture(picture_t *picture)
     D3D11_MAPPED_SUBRESOURCE mappedResource;
     D3D11_TEXTURE2D_DESC texDesc;
     HRESULT hr;
+    uint8_t *plane1;
     uint8_t *planes[D3D11_MAX_SHADER_VIEW];
     unsigned pitches[D3D11_MAX_SHADER_VIEW];
     unsigned heights[D3D11_MAX_SHADER_VIEW];
@@ -2292,17 +2296,27 @@ static int Direct3D11MapTexture(picture_t *picture)
         heights[i] = texDesc.Height;
     }
     picture->p_sys->mapped = true;
-    return CommonUpdatePictureSplit(picture, planes, pitches, heights);
+
+    msg_Dbg(picture->p_sys->vd, "mapped texture slice %d", picture->p_sys->slice_index);
+    plane1 = picture->p->p_pixels;
+
+    int err = CommonUpdatePictureSplit(picture, planes, pitches, heights);
+    if (plane1 != NULL && plane1 != picture->p->p_pixels) {
+        msg_Dbg(picture->p_sys->vd, "pixel changed in slice %d %p to %p", picture->p_sys->slice_index, plane1, picture->p->p_pixels);
+    }
+    return err;
 }
 
 static int Direct3D11LockTexture(picture_t *picture)
 {
+    msg_Dbg(picture->p_sys->vd, "lock texture slice %d", picture->p_sys->slice_index);
     picture->p_sys->locked = true; /* TODO atomic */
     return Direct3D11MapTexture(picture);
 }
 
 static void Direct3D11UnlockTexture(picture_t *picture)
 {
+    msg_Dbg(picture->p_sys->vd, "unlock texture slice %d", picture->p_sys->slice_index);
     picture->p_sys->locked = false;
     Direct3D11UnmapTexture(picture);
 }
@@ -2310,10 +2324,13 @@ static void Direct3D11UnlockTexture(picture_t *picture)
 static void Direct3D11UnmapTexture(picture_t *picture)
 {
     if (picture->p_sys->mapped) {
+        msg_Dbg(picture->p_sys->vd, "unmap texture slice %d", picture->p_sys->slice_index);
         for (int i=0; i<D3D11_MAX_SHADER_VIEW; i++) {
             ID3D11DeviceContext_Unmap(picture->p_sys->context, (ID3D11Resource *)picture->p_sys->texture[i], 0);
         }
         picture->p_sys->mapped = false;
+    } else {
+        msg_Dbg(picture->p_sys->vd, "texture slice %d was already unmapped", picture->p_sys->slice_index);
     }
 }
 

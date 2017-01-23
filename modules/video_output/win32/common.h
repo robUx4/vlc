@@ -58,6 +58,7 @@ struct picture_sys_t
     ID3D11ShaderResourceView      *resourceView[D3D11_MAX_SHADER_VIEW];
     bool                          mapped;
     bool                          locked;
+    vlc_object_t *vd;
 };
 #endif
 
