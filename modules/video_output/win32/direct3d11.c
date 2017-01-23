@@ -2133,7 +2133,9 @@ static int AllocQuad(vout_display_t *vd, const video_format_t *fmt, d3d_quad_t *
         goto error;
     }
     /* FIXME ugly */
+    ID3D11Texture2D_AddRef(quad->pTexture[0]);
     quad->pTexture[1] = quad->pTexture[0];
+    ID3D11Texture2D_AddRef(quad->pTexture[0]);
     quad->pTexture[2] = quad->pTexture[1];
 
     hr = ID3D11DeviceContext_Map(sys->d3dcontext, (ID3D11Resource *)quad->pTexture[0], 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource);
