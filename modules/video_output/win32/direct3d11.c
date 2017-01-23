@@ -640,13 +640,11 @@ static picture_pool_t *Pool(vout_display_t *vd, unsigned pool_size)
     if (picture_SetupPlanes(vd->fmt.i_chroma, &vd->fmt, planes, &plane_count) != VLC_SUCCESS)
         return NULL;
 
-    if (is_d3d11_opaque(vd->fmt.i_chroma)) {
-        ID3D10Multithread *pMultithread;
-        hr = ID3D11Device_QueryInterface( vd->sys->d3ddevice, &IID_ID3D10Multithread, (void **)&pMultithread);
-        if (SUCCEEDED(hr)) {
-            ID3D10Multithread_SetMultithreadProtected(pMultithread, TRUE);
-            ID3D10Multithread_Release(pMultithread);
-        }
+    ID3D10Multithread *pMultithread;
+    hr = ID3D11Device_QueryInterface( vd->sys->d3ddevice, &IID_ID3D10Multithread, (void **)&pMultithread);
+    if (SUCCEEDED(hr)) {
+        ID3D10Multithread_SetMultithreadProtected(pMultithread, TRUE);
+        ID3D10Multithread_Release(pMultithread);
     }
 
     pictures = calloc(pool_size, sizeof(*pictures));
