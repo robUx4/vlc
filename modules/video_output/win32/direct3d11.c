@@ -567,8 +567,8 @@ static int AllocateShaderView(vout_display_t *vd, const d3d_format_t *format, ID
 
 static picture_pool_t *Pool(vout_display_t *vd, unsigned pool_size)
 {
-    if ( vd->sys->pool != NULL )
-        return vd->sys->pool;
+    if ( vd->sys->sys.pool != NULL )
+        return vd->sys->sys.pool;
 
 #ifdef HAVE_ID3D11VIDEODECODER
     picture_t**       pictures = NULL;
@@ -649,10 +649,10 @@ static picture_pool_t *Pool(vout_display_t *vd, unsigned pool_size)
     pool_cfg.picture_count = pool_size;
     pool_cfg.picture       = pictures;
 
-    vd->sys->pool = picture_pool_NewExtended( &pool_cfg );
+    vd->sys->sys.pool = picture_pool_NewExtended( &pool_cfg );
 
 error:
-    if (vd->sys->pool ==NULL && pictures) {
+    if (vd->sys->sys.pool ==NULL && pictures) {
         msg_Dbg(vd, "Failed to create the picture d3d11 pool");
         for (unsigned i=0;i<picture_count; ++i)
             DestroyDisplayPoolPicture(pictures[i]);
@@ -663,10 +663,10 @@ error:
         memset( &pool_cfg, 0, sizeof( pool_cfg ) );
         pool_cfg.picture_count = 0;
 
-        vd->sys->pool = picture_pool_NewExtended( &pool_cfg );
+        vd->sys->sys.pool = picture_pool_NewExtended( &pool_cfg );
     }
 #endif
-    return vd->sys->pool;
+    return vd->sys->sys.pool;
 }
 
 #ifdef HAVE_ID3D11VIDEODECODER
@@ -705,8 +705,8 @@ static HRESULT UpdateBackBuffer(vout_display_t *vd)
     HRESULT hr;
     ID3D11Texture2D* pDepthStencil;
     ID3D11Texture2D* pBackBuffer;
-    uint32_t i_width  = RECTWidth(sys->rect_dest_clipped);
-    uint32_t i_height = RECTHeight(sys->rect_dest_clipped);
+    uint32_t i_width  = RECTWidth(sys->sys.rect_dest_clipped);
+    uint32_t i_height = RECTHeight(sys->sys.rect_dest_clipped);
 #if VLC_WINSTORE_APP
     UINT dataSize = sizeof(i_width);
     hr = IDXGISwapChain_GetPrivateData(sys->dxgiswapChain, &GUID_SWAPCHAIN_WIDTH, &dataSize, &i_width);
@@ -958,12 +958,12 @@ static int Control(vout_display_t *vd, int query, va_list args)
 static void Manage(vout_display_t *vd)
 {
     vout_display_sys_t *sys = vd->sys;
-    RECT size_before = sys->rect_dest_clipped;
+    RECT size_before = sys->sys.rect_dest_clipped;
 
     CommonManage(vd);
 
-    if (RECTWidth(size_before)  != RECTWidth(sys->rect_dest_clipped) ||
-        RECTHeight(size_before) != RECTHeight(sys->rect_dest_clipped))
+    if (RECTWidth(size_before)  != RECTWidth(sys->sys.rect_dest_clipped) ||
+        RECTHeight(size_before) != RECTHeight(sys->sys.rect_dest_clipped))
     {
 #if defined(HAVE_ID3D11VIDEODECODER)
         if( sys->context_lock != INVALID_HANDLE_VALUE )
@@ -971,8 +971,8 @@ static void Manage(vout_display_t *vd)
             WaitForSingleObjectEx( sys->context_lock, INFINITE, FALSE );
         }
 #endif
-        msg_Dbg(vd, "Manage detected size change %dx%d", RECTWidth(sys->rect_dest_clipped),
-                RECTHeight(sys->rect_dest_clipped));
+        msg_Dbg(vd, "Manage detected size change %dx%d", RECTWidth(sys->sys.rect_dest_clipped),
+                RECTHeight(sys->sys.rect_dest_clipped));
 
         UpdateBackBuffer(vd);
 
@@ -1253,7 +1253,7 @@ static int Direct3D11Open(vout_display_t *vd, video_format_t *fmt)
     }
 
     hr = IDXGIFactory2_CreateSwapChainForHwnd(sys->dxgifactory, (IUnknown *)sys->d3ddevice,
-                                              sys->hvideownd, &scd, NULL, NULL, &sys->dxgiswapChain);
+                                              sys->sys.hvideownd, &scd, NULL, NULL, &sys->dxgiswapChain);
     IDXGIFactory2_Release(sys->dxgifactory);
     if (FAILED(hr)) {
        msg_Err(vd, "Could not create the SwapChain. (hr=0x%lX)", hr);
@@ -1347,7 +1347,7 @@ static int Direct3D11Open(vout_display_t *vd, video_format_t *fmt)
 #endif
 
 #if !VLC_WINSTORE_APP
-    EventThreadUpdateTitle(sys->event, VOUT_TITLE " (Direct3D11 output)");
+    EventThreadUpdateTitle(sys->sys.event, VOUT_TITLE " (Direct3D11 output)");
 #endif
 
     msg_Dbg(vd, "Direct3D11 device adapter successfully initialized");
@@ -1383,8 +1383,8 @@ static void UpdatePicQuadPosition(vout_display_t *vd)
 {
     vout_display_sys_t *sys = vd->sys;
 
-    sys->picQuad.cropViewport.Width    = RECTWidth(sys->rect_dest_clipped);
-    sys->picQuad.cropViewport.Height   = RECTHeight(sys->rect_dest_clipped);
+    sys->picQuad.cropViewport.Width    = RECTWidth(sys->sys.rect_dest_clipped);
+    sys->picQuad.cropViewport.Height   = RECTHeight(sys->sys.rect_dest_clipped);
     sys->picQuad.cropViewport.TopLeftX = sys->sys.rect_dest_clipped.left;
     sys->picQuad.cropViewport.TopLeftY = sys->sys.rect_dest_clipped.top;
 
@@ -1675,8 +1675,8 @@ static int Direct3D11CreatePool(vout_display_t *vd, video_format_t *fmt)
     pool_cfg.lock          = Direct3D11MapTexture;
     //pool_cfg.unlock        = Direct3D11UnmapTexture;
 
-    sys->pool = picture_pool_NewExtended(&pool_cfg);
-    if (!sys->pool) {
+    sys->sys.pool = picture_pool_NewExtended(&pool_cfg);
+    if (!sys->sys.pool) {
         picture_Release(picture);
         return VLC_ENOMEM;
     }
@@ -1688,9 +1688,9 @@ static void Direct3D11DestroyPool(vout_display_t *vd)
 {
     vout_display_sys_t *sys = vd->sys;
 
-    if (sys->pool)
-        picture_pool_Release(sys->pool);
-    sys->pool = NULL;
+    if (sys->sys.pool)
+        picture_pool_Release(sys->sys.pool);
+    sys->sys.pool = NULL;
 }
 
 static void SetupQuadFlat(d3d_vertex_t *dst_data, const video_format_t *fmt, WORD *triangle_pos)
@@ -2302,12 +2302,12 @@ static int Direct3D11MapSubpicture(vout_display_t *vd, int *subpicture_region_co
 
         d3d_quad_t *quad = (d3d_quad_t *) quad_picture->p_sys;
 
-        quad->cropViewport.Width =  (FLOAT) r->fmt.i_visible_width  * RECTWidth(sys->rect_dest)  / subpicture->i_original_picture_width;
-        quad->cropViewport.Height = (FLOAT) r->fmt.i_visible_height * RECTHeight(sys->rect_dest) / subpicture->i_original_picture_height;
+        quad->cropViewport.Width =  (FLOAT) r->fmt.i_visible_width  * RECTWidth(sys->sys.rect_dest)  / subpicture->i_original_picture_width;
+        quad->cropViewport.Height = (FLOAT) r->fmt.i_visible_height * RECTHeight(sys->sys.rect_dest) / subpicture->i_original_picture_height;
         quad->cropViewport.MinDepth = 0.0f;
         quad->cropViewport.MaxDepth = 1.0f;
-        quad->cropViewport.TopLeftX = sys->rect_dest.left + (FLOAT) r->i_x * RECTWidth(sys->rect_dest) / subpicture->i_original_picture_width;
-        quad->cropViewport.TopLeftY = sys->rect_dest.top  + (FLOAT) r->i_y * RECTHeight(sys->rect_dest) / subpicture->i_original_picture_height;
+        quad->cropViewport.TopLeftX = sys->sys.rect_dest.left + (FLOAT) r->i_x * RECTWidth(sys->sys.rect_dest) / subpicture->i_original_picture_width;
+        quad->cropViewport.TopLeftY = sys->sys.rect_dest.top  + (FLOAT) r->i_y * RECTHeight(sys->sys.rect_dest) / subpicture->i_original_picture_height;
 
         UpdateQuadOpacity(vd, quad, r->i_alpha / 255.0f );
     }
