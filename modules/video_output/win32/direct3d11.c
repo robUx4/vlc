@@ -664,6 +664,8 @@ static picture_pool_t *Pool(vout_display_t *vd, unsigned pool_size)
 
     if (vd->sys->picQuadConfig->formatTexture == DXGI_FORMAT_UNKNOWN) {
         texDesc.Format = vd->sys->picQuadConfig->resourceFormat[0];
+        assert(vd->sys->picQuadConfig->resourceFormat[1] == vd->sys->picQuadConfig->resourceFormat[0]);
+        assert(vd->sys->picQuadConfig->resourceFormat[2] == vd->sys->picQuadConfig->resourceFormat[0]);
         texture_amount = D3D11_MAX_SHADER_VIEW;
         //texDesc.Height *= 1; /* TODO depends on the chroma subsampling */
         //pool_size = 1;
