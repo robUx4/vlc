@@ -65,7 +65,10 @@ struct picture_sys_t
 
 struct filter_sys_t {
     copy_cache_t     cache;
-    ID3D11Texture2D  *staging;
+    union {
+        ID3D11Texture2D  *staging;
+        ID3D11Resource   *staging_resource;
+    };
     vlc_mutex_t      staging_lock;
 };
 
@@ -119,12 +122,12 @@ static void D3D11_YUY2(filter_t *p_filter, picture_t *src, picture_t *dst)
     D3D11_VIDEO_DECODER_OUTPUT_VIEW_DESC viewDesc;
     ID3D11VideoDecoderOutputView_GetDesc( p_sys->decoder, &viewDesc );
 
-    ID3D11DeviceContext_CopySubresourceRegion(p_sys->context, (ID3D11Resource*) sys->staging,
+    ID3D11DeviceContext_CopySubresourceRegion(p_sys->context, sys->staging_resource,
                                               0, 0, 0, 0,
                                               (ID3D11Resource*) p_sys->texture, viewDesc.Texture2D.ArraySlice,
                                               NULL);
 
-    HRESULT hr = ID3D11DeviceContext_Map(p_sys->context, (ID3D11Resource*) sys->staging,
+    HRESULT hr = ID3D11DeviceContext_Map(p_sys->context, sys->staging_resource,
                                          0, D3D11_MAP_READ, 0, &lock);
     if (FAILED(hr)) {
         msg_Err(p_filter, "Failed to map source surface. (hr=0x%0lx)", hr);
@@ -178,7 +181,7 @@ static void D3D11_YUY2(filter_t *p_filter, picture_t *src, picture_t *dst)
     }
 
     /* */
-    ID3D11DeviceContext_Unmap(p_sys->context, (ID3D11Resource*)sys->staging, 0);
+    ID3D11DeviceContext_Unmap(p_sys->context, sys->staging_resource, 0);
     vlc_mutex_unlock(&sys->staging_lock);
 }
 
@@ -200,12 +203,12 @@ static void D3D11_NV12(filter_t *p_filter, picture_t *src, picture_t *dst)
     D3D11_VIDEO_DECODER_OUTPUT_VIEW_DESC viewDesc;
     ID3D11VideoDecoderOutputView_GetDesc( p_sys->decoder, &viewDesc );
 
-    ID3D11DeviceContext_CopySubresourceRegion(p_sys->context, (ID3D11Resource*) sys->staging,
+    ID3D11DeviceContext_CopySubresourceRegion(p_sys->context, sys->staging_resource,
                                               0, 0, 0, 0,
                                               (ID3D11Resource*) p_sys->texture, viewDesc.Texture2D.ArraySlice,
                                               NULL);
 
-    HRESULT hr = ID3D11DeviceContext_Map(p_sys->context, (ID3D11Resource*) sys->staging,
+    HRESULT hr = ID3D11DeviceContext_Map(p_sys->context, sys->staging_resource,
                                          0, D3D11_MAP_READ, 0, &lock);
     if (FAILED(hr)) {
         msg_Err(p_filter, "Failed to map source surface. (hr=0x%0lx)", hr);
@@ -230,7 +233,7 @@ static void D3D11_NV12(filter_t *p_filter, picture_t *src, picture_t *dst)
     }
 
     /* */
-    ID3D11DeviceContext_Unmap(p_sys->context, (ID3D11Resource*)sys->staging, 0);
+    ID3D11DeviceContext_Unmap(p_sys->context, sys->staging_resource, 0);
     vlc_mutex_unlock(&sys->staging_lock);
 }
 
