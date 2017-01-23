@@ -152,6 +152,8 @@ static void Direct3D11DestroyPool(vout_display_t *);
 
 static void DestroyDisplayPicture(picture_t *);
 static void DestroyDisplayPoolPicture(picture_t *);
+static int Direct3D11LockTexture(picture_t *);
+static void Direct3D11UnlockTexture(picture_t *);
 static int  Direct3D11MapTexture(picture_t *);
 static void Direct3D11UnmapTexture(picture_t *);
 static void Direct3D11DeleteRegions(int, picture_t **);
@@ -730,8 +732,8 @@ static picture_pool_t *Pool(vout_display_t *vd, unsigned pool_size)
     picture_pool_configuration_t pool_cfg;
     memset(&pool_cfg, 0, sizeof(pool_cfg));
     if (vd->sys->picQuadConfig->formatTexture == DXGI_FORMAT_UNKNOWN) {
-        pool_cfg.lock = Direct3D11MapTexture;
-        pool_cfg.unlock = Direct3D11UnmapTexture;
+        pool_cfg.lock = Direct3D11LockTexture;
+        pool_cfg.unlock = Direct3D11UnlockTexture;
     }
     pool_cfg.picture_count = pool_size;
     pool_cfg.picture       = pictures;
@@ -1161,7 +1163,8 @@ static void Display(vout_display_t *vd, picture_t *picture, subpicture_t *subpic
 
     if ( !is_d3d11_opaque(picture->format.i_chroma))
     {
-        Direct3D11MapTexture(picture);
+        if (!picture->p_sys->locked)
+            Direct3D11MapTexture(picture);
     }
 
     if (subpicture) {
@@ -1767,8 +1770,8 @@ static int Direct3D11CreatePool(vout_display_t *vd, video_format_t *fmt)
     memset(&pool_cfg, 0, sizeof(pool_cfg));
     pool_cfg.picture_count = 1;
     pool_cfg.picture       = &picture;
-    pool_cfg.lock          = Direct3D11MapTexture;
-    pool_cfg.unlock        = Direct3D11UnmapTexture;
+    pool_cfg.lock          = Direct3D11LockTexture;
+    pool_cfg.unlock        = Direct3D11UnlockTexture;
 
     sys->pool = picture_pool_NewExtended(&pool_cfg);
     if (!sys->pool) {
@@ -2280,7 +2283,7 @@ static int Direct3D11MapTexture(picture_t *picture)
         if( FAILED(hr) )
         {
             while (i-- >= 0)
-                ID3D11DeviceContext_Unmap(picture->p_sys->context, (ID3D11Resource *)picture->p_sys->texture[i], 0);
+                ID3D11DeviceContext_Unmap(picture->p_sys->context, (ID3D11Resource *)picture->p_sys->texture[i+1], 0);
             return VLC_EGENERIC;
         }
         ID3D11Texture2D_GetDesc(picture->p_sys->texture[i], &texDesc);
@@ -2290,6 +2293,18 @@ static int Direct3D11MapTexture(picture_t *picture)
     }
     picture->p_sys->mapped = true;
     return CommonUpdatePictureSplit(picture, planes, pitches, heights);
+}
+
+static int Direct3D11LockTexture(picture_t *picture)
+{
+    picture->p_sys->locked = true; /* TODO atomic */
+    return Direct3D11MapTexture(picture);
+}
+
+static void Direct3D11UnlockTexture(picture_t *picture)
+{
+    picture->p_sys->locked = false;
+    Direct3D11UnmapTexture(picture);
 }
 
 static void Direct3D11UnmapTexture(picture_t *picture)

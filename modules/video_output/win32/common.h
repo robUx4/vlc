@@ -57,6 +57,7 @@ struct picture_sys_t
     ID3D11VideoProcessorInputView *inputView; /* when used as processor input */
     ID3D11ShaderResourceView      *resourceView[D3D11_MAX_SHADER_VIEW];
     bool                          mapped;
+    bool                          locked;
 };
 #endif
 
