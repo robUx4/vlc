@@ -631,7 +631,7 @@ static picture_pool_t *Pool(vout_display_t *vd, unsigned pool_size)
     picture_t**       pictures = NULL;
     size_t            texture_amount = 1;
     unsigned          picture_count = 0;
-    unsigned          texture_count = 0;
+    unsigned          plane = 0;
     HRESULT           hr;
 
     const d3d_format_t *cfg = GetOutputFormat(vd, vd->fmt.i_chroma, 0, true, false);
@@ -693,18 +693,18 @@ static picture_pool_t *Pool(vout_display_t *vd, unsigned pool_size)
         picsys->slice_index = picture_count;
         picsys->context = vd->sys->d3dcontext;
 
-        for (texture_count = 0; texture_count < texture_amount; texture_count++)
+        for (plane = 0; plane < texture_amount; plane++)
         {
-            texDesc.Height = planes[texture_count].i_lines;
-            texDesc.Width = planes[texture_count].i_pitch;
-            hr = ID3D11Device_CreateTexture2D( vd->sys->d3ddevice, &texDesc, NULL, &picsys->texture[texture_count] );
+            texDesc.Height = planes[plane].i_lines;
+            texDesc.Width = planes[plane].i_pitch;
+            hr = ID3D11Device_CreateTexture2D( vd->sys->d3ddevice, &texDesc, NULL, &picsys->texture[plane] );
             if (FAILED(hr)) {
                 msg_Err(vd, "CreateTexture2D failed for the %d pool. (hr=0x%0lx)", pool_size, hr);
                 goto error;
             }
         }
-        for (;texture_count < D3D11_MAX_SHADER_VIEW; texture_count++)
-            picsys->texture[texture_count] = picsys->texture[texture_count-1];
+        for (;plane < D3D11_MAX_SHADER_VIEW; plane++)
+            picsys->texture[plane] = picsys->texture[plane-1];
         if (AllocateShaderView(vd, vd->sys->picQuadConfig, picsys->texture,
                                vd->sys->picQuadConfig->formatTexture == DXGI_FORMAT_UNKNOWN ? 0 : picture_count,
                                picsys->resourceView) != VLC_SUCCESS)
