@@ -681,8 +681,8 @@ static const d3d_format_t *GetOutputFormat(vout_display_t *vd, vlc_fourcc_t i_sr
 }
 
 /* map texture planes to resource views */
-static int AllocateShaderView(vout_display_t *vd, const d3d_format_t *format, ID3D11Texture2D *texture[D3D11_MAX_SHADER_VIEW],
-                              int slice_index, ID3D11ShaderResourceView *resourceView[D3D11_MAX_SHADER_VIEW])
+static int AllocateShaderView(vout_display_t *vd, const d3d_format_t *format,
+                              int slice_index, picture_sys_t *picsys)
 {
     HRESULT hr;
     vout_display_sys_t *sys = vd->sys;
@@ -705,11 +705,12 @@ static int AllocateShaderView(vout_display_t *vd, const d3d_format_t *format, ID
     for (i=0; i<D3D11_MAX_SHADER_VIEW; i++)
     {
         if (!format->resourceFormat[i])
-            resourceView[i] = NULL;
+            picsys->resourceView[i] = NULL;
         else
         {
             resviewDesc.Format = format->resourceFormat[i];
-            hr = ID3D11Device_CreateShaderResourceView(sys->d3ddevice, (ID3D11Resource *)texture[i], &resviewDesc, &resourceView[i]);
+            hr = ID3D11Device_CreateShaderResourceView(sys->d3ddevice, picsys->resource[i],
+                                                       &resviewDesc, &picsys->resourceView[i]);
             if (FAILED(hr)) {
                 msg_Err(vd, "Could not Create the Texture ResourceView %d slice %d. (hr=0x%lX)", i, slice_index, hr);
                 break;
@@ -721,12 +722,14 @@ static int AllocateShaderView(vout_display_t *vd, const d3d_format_t *format, ID
     {
         while (i >= 0)
         {
-            ID3D11ShaderResourceView_Release(resourceView[i]);
-            resourceView[i] = NULL;
+            ID3D11ShaderResourceView_Release(picsys->resourceView[i]);
+            picsys->resourceView[i] = NULL;
             i--;
         }
         return VLC_EGENERIC;
     }
+    picsys->context = vd->sys->d3dcontext;
+    ID3D11DeviceContext_AddRef(picsys->context);
 
     return VLC_SUCCESS;
 }
@@ -813,11 +816,19 @@ static picture_pool_t *Pool(vout_display_t *vd, unsigned pool_size)
                 goto error;
             }
         }
-        for (;plane < D3D11_MAX_SHADER_VIEW; plane++)
-            picsys->texture[plane] = picsys->texture[plane-1];
-        if (AllocateShaderView(vd, vd->sys->picQuadConfig, picsys->texture,
+        for (; plane < D3D11_MAX_SHADER_VIEW; plane++) {
+            if (!vd->sys->picQuadConfig->resourceFormat[plane])
+                picsys->texture[plane] = NULL;
+            else
+            {
+                picsys->texture[plane] = picsys->texture[KNOWN_DXGI_INDEX];
+                ID3D11Texture2D_AddRef(picsys->texture[plane]);
+            }
+        }
+
+        if (AllocateShaderView(vd, vd->sys->picQuadConfig,
                                vd->sys->picQuadConfig->formatTexture == DXGI_FORMAT_UNKNOWN ? 0 : picture_count,
-                               picsys->resourceView) != VLC_SUCCESS)
+                               picsys) != VLC_SUCCESS)
             goto error;
 
         picture_resource_t resource = {
@@ -2243,11 +2254,15 @@ static int AllocQuad(vout_display_t *vd, const video_format_t *fmt, d3d_quad_t *
         msg_Err(vd, "Could not Create the D3d11 Texture. (hr=0x%lX)", hr);
         goto error;
     }
-    /* FIXME ugly */
-    ID3D11Texture2D_AddRef(quad->picSys.texture[0]);
-    quad->picSys.texture[1] = quad->picSys.texture[0];
-    ID3D11Texture2D_AddRef(quad->picSys.texture[0]);
-    quad->picSys.texture[2] = quad->picSys.texture[1];
+    for (int i=KNOWN_DXGI_INDEX+1; i<D3D11_MAX_SHADER_VIEW; i++) {
+        if (!cfg->resourceFormat[i])
+            quad->picSys.texture[i] = NULL;
+        else
+        {
+            quad->picSys.texture[i] = quad->picSys.texture[KNOWN_DXGI_INDEX];
+            ID3D11Texture2D_AddRef(quad->picSys.texture[i]);
+        }
+    }
 
     hr = ID3D11DeviceContext_Map(sys->d3dcontext, quad->picSys.resource[KNOWN_DXGI_INDEX], 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource);
     if( FAILED(hr) ) {
@@ -2261,7 +2276,7 @@ static int AllocQuad(vout_display_t *vd, const video_format_t *fmt, d3d_quad_t *
         goto error;
     }
 
-    if (AllocateShaderView(vd, cfg, quad->picSys.texture, 0, quad->picSys.resourceView) != VLC_SUCCESS)
+    if (AllocateShaderView(vd, cfg, 0, &quad->picSys) != VLC_SUCCESS)
         goto error;
 
     if ( d3dpixelShader != NULL )
