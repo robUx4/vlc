@@ -435,6 +435,7 @@ static const char *globPixelShaderTriplanarI420_2RGB = "\
 
 static int Direct3D11MapPoolTexture(picture_t *picture)
 {
+    picture_sys_t *p_sys = picture->p_sys;
     D3D11_MAPPED_SUBRESOURCE mappedResource;
     D3D11_TEXTURE2D_DESC texDesc;
     HRESULT hr;
@@ -444,27 +445,27 @@ static int Direct3D11MapPoolTexture(picture_t *picture)
     unsigned heights[D3D11_MAX_SHADER_VIEW];
 
     for (int i=0; i<D3D11_MAX_SHADER_VIEW; i++) {
-        hr = ID3D11DeviceContext_Map(picture->p_sys->context, picture->p_sys->resource[i],
+        hr = ID3D11DeviceContext_Map(p_sys->context, p_sys->resource[i],
                 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource);
         if( FAILED(hr) )
         {
             while (i-- >= 0)
-                ID3D11DeviceContext_Unmap(picture->p_sys->context, picture->p_sys->resource[i+1], 0);
+                ID3D11DeviceContext_Unmap(p_sys->context, p_sys->resource[i+1], 0);
             return VLC_EGENERIC;
         }
-        ID3D11Texture2D_GetDesc(picture->p_sys->texture[i], &texDesc);
+        ID3D11Texture2D_GetDesc(p_sys->texture[i], &texDesc);
         planes[i]  = mappedResource.pData;
         pitches[i] = mappedResource.RowPitch;
         heights[i] = texDesc.Height;
     }
-    picture->p_sys->mapped = true;
+    p_sys->mapped = true;
 
-    msg_Dbg(picture->p_sys->vd, "mapped texture slice %d", picture->p_sys->slice_index);
+    msg_Dbg(p_sys->vd, "mapped texture slice %d", p_sys->slice_index);
     plane1 = picture->p->p_pixels;
 
     int err = CommonUpdatePictureSplit(picture, planes, pitches, heights);
     if (plane1 != NULL && plane1 != picture->p->p_pixels) {
-        msg_Dbg(picture->p_sys->vd, "pixel changed in slice %d %p to %p", picture->p_sys->slice_index, plane1, picture->p->p_pixels);
+        msg_Dbg(p_sys->vd, "pixel changed in slice %d %p to %p", p_sys->slice_index, plane1, picture->p->p_pixels);
     }
     return err;
 }
@@ -598,25 +599,23 @@ static int Open(vlc_object_t *object)
         goto error;
     }
 
-    vout_display_info_t info  = vd->info;
-    info.is_slow              = false; //!is_d3d11_opaque(fmt.i_chroma);
-    info.has_double_click     = true;
-    info.has_hide_mouse       = false;
-    info.has_pictures_invalid = false; //!is_d3d11_opaque(fmt.i_chroma);
+    video_format_Clean(&vd->fmt);
+    video_format_Copy(&vd->fmt, &fmt);
+
+    vd->info.is_slow              = false; //!is_direct_rendering(vd);
+    vd->info.has_double_click     = true;
+    vd->info.has_hide_mouse       = false;
+    vd->info.has_pictures_invalid = false; //!is_d3d11_opaque(fmt.i_chroma);
 
     if (var_InheritBool(vd, "direct3d11-hw-blending") &&
         vd->sys->d3dregion_format != NULL)
     {
         vd->sys->pSubpictureChromas[0] = vd->sys->d3dregion_format->fourcc;
         vd->sys->pSubpictureChromas[1] = 0;
-        info.subpicture_chromas = vd->sys->pSubpictureChromas;
+        vd->info.subpicture_chromas = vd->sys->pSubpictureChromas;
     }
     else
-        info.subpicture_chromas = NULL;
-
-    video_format_Clean(&vd->fmt);
-    video_format_Copy(&vd->fmt, &fmt);
-    vd->info = info;
+        vd->info.subpicture_chromas = NULL;
 
     vd->pool    = Pool;
     vd->prepare = Prepare;
@@ -664,7 +663,7 @@ static const d3d_format_t *GetOutputFormat(vout_display_t *vd, vlc_fourcc_t i_sr
             continue;
 
         DXGI_FORMAT textureFormat;
-        if (output_format->formatTexture ==DXGI_FORMAT_UNKNOWN)
+        if (output_format->formatTexture == DXGI_FORMAT_UNKNOWN)
             textureFormat = output_format->resourceFormat[0];
         else
             textureFormat = output_format->formatTexture;
@@ -749,13 +748,13 @@ static picture_pool_t *Pool(vout_display_t *vd, unsigned pool_size)
     size_t            texture_amount = 1;
     unsigned          picture_count = 0;
     unsigned          plane = 0;
+    plane_t           planes[PICTURE_PLANE_MAX];
+    int               plane_count;
     HRESULT           hr;
 
     const d3d_format_t *cfg = GetOutputFormat(vd, vd->fmt.i_chroma, 0, true, false);
     assert(cfg == vd->sys->picQuadConfig);
 
-    plane_t planes[PICTURE_PLANE_MAX];
-    int plane_count;
     if (picture_SetupPlanes(vd->fmt.i_chroma, &vd->fmt, planes, &plane_count) != VLC_SUCCESS)
         return NULL;
 
@@ -772,8 +771,6 @@ static picture_pool_t *Pool(vout_display_t *vd, unsigned pool_size)
 
     D3D11_TEXTURE2D_DESC texDesc;
     ZeroMemory(&texDesc, sizeof(texDesc));
-    //texDesc.Width = vd->fmt.i_width;
-    //texDesc.Height = vd->fmt.i_height;
     texDesc.MipLevels = 1;
     texDesc.SampleDesc.Count = 1;
     texDesc.MiscFlags = 0; //D3D11_RESOURCE_MISC_SHARED;
@@ -1278,9 +1275,7 @@ static void Display(vout_display_t *vd, picture_t *picture, subpicture_t *subpic
     ID3D11DeviceContext_ClearDepthStencilView(sys->d3dcontext, sys->d3ddepthStencilView, D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0);
 
     if ( !is_d3d11_opaque(picture->format.i_chroma))
-    {
         Direct3D11UnmapPoolTexture(picture);
-    }
 
     msg_Dbg(vd, "display picture slice %d", picture->p_sys->slice_index);
 
@@ -1873,8 +1868,9 @@ static int Direct3D11CreatePool(vout_display_t *vd, video_format_t *fmt)
 {
     vout_display_sys_t *sys = vd->sys;
 
-    if ( is_d3d11_opaque(fmt->i_chroma) || true )
-        /* a D3D11VA pool will be created when needed */
+    if ( is_d3d11_opaque(fmt->i_chroma) ||
+         vd->sys->picQuadConfig->formatTexture == DXGI_FORMAT_UNKNOWN )
+        /* a decoder pool will be created when needed */
         return VLC_SUCCESS;
 
     picture_resource_t resource = {
