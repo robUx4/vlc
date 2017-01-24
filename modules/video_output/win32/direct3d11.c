@@ -841,9 +841,6 @@ static picture_pool_t *Pool(vout_display_t *vd, unsigned pool_size)
         }
 
         pictures[picture_count] = picture;
-        /* each picture_t holds a ref to the context and release it on Destroy */
-        ID3D11DeviceContext_AddRef(picsys->context);
-        /* TODO ID3D11Texture2D_Release(texture); */
     }
 
     msg_Dbg(vd, "ID3D11VideoDecoderOutputView succeed with %d slices (%dx%d) context 0x%p",
