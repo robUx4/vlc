@@ -102,7 +102,7 @@ typedef struct
     UINT                      indexCount;
     ID3D11Buffer              *pVertexShaderConstants;
     picture_sys_t             picSys;
-    ID3D11Texture2D           *pTexture;
+    ID3D11Texture2D           *pTexture[D3D11_MAX_SHADER_VIEW];
     ID3D11Buffer              *pPixelShaderConstants[2];
     UINT                       PSConstantsCount;
     ID3D11PixelShader         *d3dpixelShader;
@@ -579,7 +579,7 @@ static const d3d_format_t *GetOutputFormat(vout_display_t *vd, vlc_fourcc_t i_sr
 }
 
 /* map texture planes to resource views */
-static int AllocateShaderView(vout_display_t *vd, const d3d_format_t *format, ID3D11Texture2D *texture,
+static int AllocateShaderView(vout_display_t *vd, const d3d_format_t *format, ID3D11Texture2D *texture[D3D11_MAX_SHADER_VIEW],
                               int slice_index, ID3D11ShaderResourceView *resourceView[D3D11_MAX_SHADER_VIEW])
 {
     HRESULT hr;
@@ -602,12 +602,12 @@ static int AllocateShaderView(vout_display_t *vd, const d3d_format_t *format, ID
 
     for (i=0; i<D3D11_MAX_SHADER_VIEW; i++)
     {
-        if (!format->resourceFormat[i])
+        if (!texture[i])
             resourceView[i] = NULL;
         else
         {
             resviewDesc.Format = format->resourceFormat[i];
-            hr = ID3D11Device_CreateShaderResourceView(sys->d3ddevice, (ID3D11Resource *)texture, &resviewDesc, &resourceView[i]);
+            hr = ID3D11Device_CreateShaderResourceView(sys->d3ddevice, (ID3D11Resource *)texture[i], &resviewDesc, &resourceView[i]);
             if (FAILED(hr)) {
                 msg_Err(vd, "Could not Create the Texture ResourceView %d slice %d. (hr=0x%lX)", i, slice_index, hr);
                 break;
@@ -642,6 +642,7 @@ static picture_pool_t *Pool(vout_display_t *vd, unsigned pool_size)
 #ifdef HAVE_ID3D11VIDEODECODER
     picture_t**       pictures = NULL;
     unsigned          picture_count = 0;
+    unsigned          plane;
     HRESULT           hr;
 
     const d3d_format_t *cfg = GetOutputFormat(vd, vd->fmt.i_chroma, 0, true, false);
@@ -685,11 +686,22 @@ static picture_pool_t *Pool(vout_display_t *vd, unsigned pool_size)
             goto error;
 
         ID3D11Texture2D_AddRef(texture);
-        picsys->texture = texture;
+        picsys->texture[KNOWN_DXGI_INDEX] = texture;
         picsys->slice_index = picture_count;
         picsys->context = vd->sys->d3dcontext;
 
-        if (AllocateShaderView(vd, vd->sys->picQuadConfig, texture, picture_count, picsys->resourceView) != VLC_SUCCESS)
+        plane = KNOWN_DXGI_INDEX + 1;
+        for (; plane < D3D11_MAX_SHADER_VIEW; plane++) {
+            if (!vd->sys->picQuadConfig->resourceFormat[plane])
+                picsys->texture[plane] = NULL;
+            else
+            {
+                picsys->texture[plane] = picsys->texture[KNOWN_DXGI_INDEX];
+                ID3D11Texture2D_AddRef(picsys->texture[plane]);
+            }
+        }
+
+        if (AllocateShaderView(vd, vd->sys->picQuadConfig, picsys->texture, picture_count, picsys->resourceView) != VLC_SUCCESS)
             goto error;
 
         picture_resource_t resource = {
@@ -746,9 +758,9 @@ static void DestroyDisplayPoolPicture(picture_t *picture)
     for (int i=0; i<D3D11_MAX_SHADER_VIEW; i++) {
         if (p_sys->resourceView[i])
             ID3D11ShaderResourceView_Release(p_sys->resourceView[i]);
+        if (p_sys->texture[i])
+            ID3D11Texture2D_Release(p_sys->texture[i]);
     }
-    if (p_sys->texture)
-        ID3D11Texture2D_Release(p_sys->texture);
     if (p_sys->context)
         ID3D11DeviceContext_Release(p_sys->context);
 
@@ -1067,9 +1079,9 @@ static void Prepare(vout_display_t *vd, picture_t *picture, subpicture_t *subpic
             WaitForSingleObjectEx( sys->context_lock, INFINITE, FALSE );
         }
         ID3D11DeviceContext_CopySubresourceRegion(sys->d3dcontext,
-                                                  (ID3D11Resource*) sys->picQuad.pTexture,
+                                                  (ID3D11Resource*) sys->picQuad.pTexture[KNOWN_DXGI_INDEX],
                                                   0, 0, 0, 0,
-                                                  p_sys->resource,
+                                                  p_sys->resource[KNOWN_DXGI_INDEX],
                                                   p_sys->slice_index, NULL);
         if ( sys->context_lock != INVALID_HANDLE_VALUE)
             ReleaseMutex( sys->context_lock );
@@ -1722,7 +1734,7 @@ static int Direct3D11CreatePool(vout_display_t *vd, video_format_t *fmt)
     if (unlikely(poolsys == NULL)) {
         return VLC_ENOMEM;
     }
-    poolsys->texture  = sys->picQuad.pTexture;
+    poolsys->texture  = sys->picQuad.pTexture[KNOWN_DXGI_INDEX];
     poolsys->vd       = vd;
 
     picture_resource_t resource = {
@@ -2090,18 +2102,27 @@ static int AllocQuad(vout_display_t *vd, const video_format_t *fmt, d3d_quad_t *
         texDesc.Height &= ~1;
     }
 
-    hr = ID3D11Device_CreateTexture2D(sys->d3ddevice, &texDesc, NULL, &quad->pTexture);
+    hr = ID3D11Device_CreateTexture2D(sys->d3ddevice, &texDesc, NULL, &quad->pTexture[KNOWN_DXGI_INDEX]);
     if (FAILED(hr)) {
         msg_Err(vd, "Could not Create the D3d11 Texture. (hr=0x%lX)", hr);
         goto error;
     }
+    for (int i=KNOWN_DXGI_INDEX+1; i<D3D11_MAX_SHADER_VIEW; i++) {
+        if (!cfg->resourceFormat[i])
+            quad->pTexture[i] = NULL;
+        else
+        {
+            quad->pTexture[i] = quad->pTexture[KNOWN_DXGI_INDEX];
+            ID3D11Texture2D_AddRef(quad->pTexture[i]);
+        }
+    }
 
-    hr = ID3D11DeviceContext_Map(sys->d3dcontext, (ID3D11Resource *)quad->pTexture, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource);
+    hr = ID3D11DeviceContext_Map(sys->d3dcontext, (ID3D11Resource *)quad->pTexture[KNOWN_DXGI_INDEX], 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource);
     if( FAILED(hr) ) {
         msg_Err(vd, "The texture cannot be mapped. (hr=0x%lX)", hr);
         goto error;
     }
-    ID3D11DeviceContext_Unmap(sys->d3dcontext, (ID3D11Resource *)quad->pTexture, 0);
+    ID3D11DeviceContext_Unmap(sys->d3dcontext, (ID3D11Resource *)quad->pTexture[KNOWN_DXGI_INDEX], 0);
     if (mappedResource.RowPitch < p_chroma_desc->pixel_size * texDesc.Width) {
         msg_Err( vd, "The texture row pitch is too small (%d instead of %d)", mappedResource.RowPitch,
                  p_chroma_desc->pixel_size * texDesc.Width );
@@ -2160,12 +2181,12 @@ static void ReleaseQuad(d3d_quad_t *quad)
         ID3D11Buffer_Release(quad->pVertexShaderConstants);
         quad->pVertexShaderConstants = NULL;
     }
-    if (quad->pTexture)
-    {
-        ID3D11Texture2D_Release(quad->pTexture);
-        quad->pTexture = NULL;
-    }
     for (int i=0; i<D3D11_MAX_SHADER_VIEW; i++) {
+        if (quad->pTexture[i])
+        {
+            ID3D11Texture2D_Release(quad->pTexture[i]);
+            quad->pTexture[i] = NULL;
+        }
         if (quad->picSys.resourceView[i])
         {
             ID3D11ShaderResourceView_Release(quad->picSys.resourceView[i]);
@@ -2309,7 +2330,7 @@ static int Direct3D11MapSubpicture(vout_display_t *vd, int *subpicture_region_co
         for (int j = 0; j < sys->d3dregion_count; j++) {
             picture_t *cache = sys->d3dregions[j];
             if (cache != NULL && ((d3d_quad_t *) cache->p_sys)->pTexture) {
-                ID3D11Texture2D_GetDesc( ((d3d_quad_t *) cache->p_sys)->pTexture, &texDesc );
+                ID3D11Texture2D_GetDesc( ((d3d_quad_t *) cache->p_sys)->pTexture[KNOWN_DXGI_INDEX], &texDesc );
                 if (texDesc.Format == sys->d3dregion_format->formatTexture &&
                     texDesc.Width  == r->fmt.i_visible_width &&
                     texDesc.Height == r->fmt.i_visible_height) {
@@ -2348,7 +2369,7 @@ static int Direct3D11MapSubpicture(vout_display_t *vd, int *subpicture_region_co
             quad_picture = (*region)[i];
         }
 
-        hr = ID3D11DeviceContext_Map(sys->d3dcontext, (ID3D11Resource *)((d3d_quad_t *) quad_picture->p_sys)->pTexture, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource);
+        hr = ID3D11DeviceContext_Map(sys->d3dcontext, (ID3D11Resource *)((d3d_quad_t *) quad_picture->p_sys)->pTexture[KNOWN_DXGI_INDEX], 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource);
         if( SUCCEEDED(hr) ) {
             err = CommonUpdatePicture(quad_picture, NULL, mappedResource.pData, mappedResource.RowPitch);
             if (err != VLC_SUCCESS) {
@@ -2359,7 +2380,7 @@ static int Direct3D11MapSubpicture(vout_display_t *vd, int *subpicture_region_co
 
             picture_CopyPixels(quad_picture, r->p_picture);
 
-            ID3D11DeviceContext_Unmap(sys->d3dcontext, (ID3D11Resource *)((d3d_quad_t *) quad_picture->p_sys)->pTexture, 0);
+            ID3D11DeviceContext_Unmap(sys->d3dcontext, (ID3D11Resource *)((d3d_quad_t *) quad_picture->p_sys)->pTexture[KNOWN_DXGI_INDEX], 0);
         } else {
             msg_Err(vd, "Failed to map the SPU texture (hr=0x%lX)", hr );
             picture_Release(quad_picture);
