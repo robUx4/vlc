@@ -577,6 +577,12 @@ static bool is_d3d11_opaque(vlc_fourcc_t chroma)
     }
 }
 
+static bool is_direct_rendering(vout_display_t *vd)
+{
+    return is_d3d11_opaque(vd->fmt.i_chroma) ||
+           vd->sys->picQuadConfig->formatTexture == DXGI_FORMAT_UNKNOWN;
+}
+
 static int Open(vlc_object_t *object)
 {
     vout_display_t *vd = (vout_display_t *)object;
@@ -602,10 +608,10 @@ static int Open(vlc_object_t *object)
     video_format_Clean(&vd->fmt);
     video_format_Copy(&vd->fmt, &fmt);
 
-    vd->info.is_slow              = false; //!is_direct_rendering(vd);
+    vd->info.is_slow              = !is_direct_rendering(vd);
     vd->info.has_double_click     = true;
     vd->info.has_hide_mouse       = false;
-    vd->info.has_pictures_invalid = false; //!is_d3d11_opaque(fmt.i_chroma);
+    vd->info.has_pictures_invalid = !is_direct_rendering(vd);
 
     if (var_InheritBool(vd, "direct3d11-hw-blending") &&
         vd->sys->d3dregion_format != NULL)
