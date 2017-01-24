@@ -47,19 +47,7 @@
 #ifdef MODULE_NAME_IS_direct3d11
 #include "../../video_chroma/dxgi_fmt.h"
 #ifdef HAVE_ID3D11VIDEODECODER
-/* VLC_CODEC_D3D11_OPAQUE */
-struct picture_sys_t
-{
-    ID3D11VideoDecoderOutputView  *decoder; /* may be NULL for pictures from the pool */
-    ID3D11Texture2D               *texture[D3D11_MAX_SHADER_VIEW];
-    ID3D11DeviceContext           *context;
-    unsigned                      slice_index;
-    ID3D11VideoProcessorInputView *inputView; /* when used as processor input */
-    ID3D11ShaderResourceView      *resourceView[D3D11_MAX_SHADER_VIEW];
-    bool                          mapped;
-    bool                          locked;
-    vlc_object_t *vd;
-};
+#include "../../video_chroma/d3d11_fmt.h"
 #endif
 
 typedef struct
