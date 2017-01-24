@@ -1287,7 +1287,7 @@ static void Display(vout_display_t *vd, picture_t *picture, subpicture_t *subpic
     msg_Dbg(vd, "display picture slice %d", picture->p_sys->slice_index);
 
     /* Render the quad */
-    if ((true || is_d3d11_opaque(picture->format.i_chroma)) && !sys->legacy_shader)
+    if (is_direct_rendering(vd) && !sys->legacy_shader)
         DisplayD3DPicture(sys, &sys->picQuad, picture->p_sys->resourceView);
     else
         DisplayD3DPicture(sys, &sys->picQuad, sys->picQuad.picSys.resourceView);
