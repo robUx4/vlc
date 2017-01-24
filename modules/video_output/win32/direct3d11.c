@@ -152,13 +152,6 @@ struct vout_display_sys_t
     picture_t                **d3dregions;
 };
 
-/* internal picture_t pool  */
-typedef struct
-{
-    ID3D11Texture2D               *texture;
-    vout_display_t                *vd;
-} picture_sys_pool_t;
-
 /* matches the D3D11_INPUT_ELEMENT_DESC we setup */
 typedef struct d3d_vertex_t {
     struct {
@@ -213,7 +206,6 @@ static void Direct3D11DestroyResources(vout_display_t *);
 static int  Direct3D11CreatePool (vout_display_t *, video_format_t *);
 static void Direct3D11DestroyPool(vout_display_t *);
 
-static void DestroyDisplayPicture(picture_t *);
 static void DestroyDisplayPoolPicture(picture_t *);
 static int Direct3D11LockTexture(picture_t *);
 static void Direct3D11UnlockTexture(picture_t *);
@@ -748,11 +740,6 @@ static picture_pool_t *Pool(vout_display_t *vd, unsigned pool_size)
         if (unlikely(picsys == NULL))
             goto error;
 
-        picture_resource_t resource = {
-            .p_sys = picsys,
-            .pf_destroy = DestroyDisplayPoolPicture,
-        };
-
         picsys->vd = VLC_OBJECT(vd);
         picsys->slice_index = picture_count;
         picsys->context = vd->sys->d3dcontext;
@@ -774,15 +761,17 @@ static picture_pool_t *Pool(vout_display_t *vd, unsigned pool_size)
                                picsys->resourceView) != VLC_SUCCESS)
             goto error;
 
+        picture_resource_t resource = {
+            .p_sys = picsys,
+            .pf_destroy = DestroyDisplayPoolPicture,
+        };
+
         picture_t *picture = picture_NewFromResource(&vd->fmt, &resource);
         if (unlikely(picture == NULL)) {
             free(picsys);
             msg_Err( vd, "Failed to create picture %d in the pool.", picture_count );
             goto error;
         }
-
-        //Direct3D11MapTexture(picture);
-        //Direct3D11UnmapTexture(picture);
 
         pictures[picture_count] = picture;
         /* each picture_t holds a ref to the context and release it on Destroy */
@@ -822,32 +811,36 @@ error:
     return vd->sys->sys.pool;
 }
 
-#ifdef HAVE_ID3D11VIDEODECODER
-static void DestroyDisplayPoolPicture(picture_t *picture)
+static void ReleasePictureResources(picture_sys_t *p_sys)
 {
-    picture_sys_t *p_sys = (picture_sys_t*) picture->p_sys;
-
     for (int i=0; i<D3D11_MAX_SHADER_VIEW; i++) {
-        if (p_sys->resourceView[i])
+        if (p_sys->resourceView[i]) {
             ID3D11ShaderResourceView_Release(p_sys->resourceView[i]);
-        if (p_sys->texture[i])
+            p_sys->resourceView[i] = NULL;
+        }
+        if (p_sys->texture[i]) {
             ID3D11Texture2D_Release(p_sys->texture[i]);
+            p_sys->texture[i] = NULL;
+        }
     }
-    if (p_sys->context)
+    if (p_sys->context) {
         ID3D11DeviceContext_Release(p_sys->context);
+        p_sys->context = NULL;
+    }
+}
 
-    free(p_sys);
+static void DestroyQuadPicture(picture_t *picture)
+{
+    picture_sys_t *p_sys = picture->p_sys;
+    ReleasePictureResources( p_sys );
+    /* belongs to the quad free(p_sys);*/
     free(picture);
 }
-#endif
 
-static void DestroyDisplayPicture(picture_t *picture)
+static void DestroyDisplayPoolPicture(picture_t *picture)
 {
-    picture_sys_pool_t *p_sys = (picture_sys_pool_t*) picture->p_sys;
-
-    if (p_sys->texture)
-        ID3D11Texture2D_Release(p_sys->texture);
-
+    picture_sys_t *p_sys = picture->p_sys;
+    ReleasePictureResources( p_sys );
     free(p_sys);
     free(picture);
 }
@@ -1813,24 +1806,15 @@ static int Direct3D11CreatePool(vout_display_t *vd, video_format_t *fmt)
         /* a D3D11VA pool will be created when needed */
         return VLC_SUCCESS;
 
-    picture_sys_pool_t *poolsys = calloc(1, sizeof(*poolsys));
-    if (unlikely(poolsys == NULL)) {
-        return VLC_ENOMEM;
-    }
-    poolsys->texture  = sys->picQuad.picSys.texture[KNOWN_DXGI_INDEX];
-    poolsys->vd       = vd;
-
     picture_resource_t resource = {
-        .p_sys = (picture_sys_t*) poolsys,
-        .pf_destroy = DestroyDisplayPicture,
+        .p_sys = &sys->picQuad.picSys,
+        .pf_destroy = DestroyQuadPicture,
     };
 
     picture_t *picture = picture_NewFromResource(fmt, &resource);
     if (!picture) {
-        free(poolsys);
         return VLC_ENOMEM;
     }
-    ID3D11Texture2D_AddRef(poolsys->texture);
 
     picture_pool_configuration_t pool_cfg;
     memset(&pool_cfg, 0, sizeof(pool_cfg));
