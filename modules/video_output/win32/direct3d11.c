@@ -751,7 +751,6 @@ static picture_pool_t *Pool(vout_display_t *vd, unsigned pool_size)
 
 #ifdef HAVE_ID3D11VIDEODECODER
     picture_t**       pictures = NULL;
-    size_t            texture_amount = 1;
     unsigned          picture_count = 0;
     unsigned          plane = 0;
     plane_t           planes[PICTURE_PLANE_MAX];
@@ -760,9 +759,6 @@ static picture_pool_t *Pool(vout_display_t *vd, unsigned pool_size)
 
     const d3d_format_t *cfg = GetOutputFormat(vd, vd->fmt.i_chroma, 0, true, false);
     assert(cfg == vd->sys->picQuadConfig);
-
-    if (picture_SetupPlanes(vd->fmt.i_chroma, &vd->fmt, planes, &plane_count) != VLC_SUCCESS)
-        return NULL;
 
     ID3D10Multithread *pMultithread;
     hr = ID3D11Device_QueryInterface( vd->sys->d3ddevice, &IID_ID3D10Multithread, (void **)&pMultithread);
@@ -783,16 +779,24 @@ static picture_pool_t *Pool(vout_display_t *vd, unsigned pool_size)
     texDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
 
     if (vd->sys->picQuadConfig->formatTexture == DXGI_FORMAT_UNKNOWN) {
+        if (picture_SetupPlanes(vd->fmt.i_chroma, &vd->fmt, planes, &plane_count) != VLC_SUCCESS ||
+            plane_count == 0)
+        {
+            msg_Dbg(vd, "failed to get the pixel format planes for %4.4", (char *)&vd->fmt.i_chroma);
+            return NULL;
+        }
+        assert(plane_count <= D3D11_MAX_SHADER_VIEW);
+
         texDesc.Format = vd->sys->picQuadConfig->resourceFormat[0];
         assert(vd->sys->picQuadConfig->resourceFormat[1] == vd->sys->picQuadConfig->resourceFormat[0]);
         assert(vd->sys->picQuadConfig->resourceFormat[2] == vd->sys->picQuadConfig->resourceFormat[0]);
-        texture_amount = D3D11_MAX_SHADER_VIEW;
-        //texDesc.Height *= 1; /* TODO depends on the chroma subsampling */
-        //pool_size = 1;
         texDesc.Usage = D3D11_USAGE_DYNAMIC;
         texDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
         texDesc.ArraySize = 1;
     } else {
+        plane_count = 1;
+        planes[0].i_lines = vd->fmt.i_height;
+        planes[0].i_pitch = vd->fmt.i_width;
         texDesc.Format = vd->sys->picQuadConfig->formatTexture;
         texDesc.BindFlags |= D3D11_BIND_DECODER;
         texDesc.Usage = D3D11_USAGE_DEFAULT;
@@ -809,7 +813,7 @@ static picture_pool_t *Pool(vout_display_t *vd, unsigned pool_size)
         picsys->slice_index = picture_count;
         picsys->context = vd->sys->d3dcontext;
 
-        for (plane = 0; plane < texture_amount; plane++)
+        for (plane = 0; plane < plane_count; plane++)
         {
             texDesc.Height = planes[plane].i_lines;
             texDesc.Width = planes[plane].i_pitch;
@@ -850,7 +854,7 @@ static picture_pool_t *Pool(vout_display_t *vd, unsigned pool_size)
     }
 
     msg_Dbg(vd, "ID3D11VideoDecoderOutputView succeed with %d slices (%dx%d) context 0x%p",
-            pool_size * texture_amount, vd->fmt.i_width, vd->fmt.i_height, vd->sys->d3dcontext);
+            pool_size * plane_count, vd->fmt.i_width, vd->fmt.i_height, vd->sys->d3dcontext);
 
     picture_pool_configuration_t pool_cfg;
     memset(&pool_cfg, 0, sizeof(pool_cfg));
