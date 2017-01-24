@@ -755,6 +755,7 @@ static picture_pool_t *Pool(vout_display_t *vd, unsigned pool_size)
     unsigned          plane = 0;
     plane_t           planes[PICTURE_PLANE_MAX];
     int               plane_count;
+    ID3D11Texture2D   *knownTexture = NULL;
     HRESULT           hr;
 
     const d3d_format_t *cfg = GetOutputFormat(vd, vd->fmt.i_chroma, 0, true, false);
@@ -782,7 +783,7 @@ static picture_pool_t *Pool(vout_display_t *vd, unsigned pool_size)
         if (picture_SetupPlanes(vd->fmt.i_chroma, &vd->fmt, planes, &plane_count) != VLC_SUCCESS ||
             plane_count == 0)
         {
-            msg_Dbg(vd, "failed to get the pixel format planes for %4.4", (char *)&vd->fmt.i_chroma);
+            msg_Dbg(vd, "failed to get the pixel format planes for %4.4s", (char *)&vd->fmt.i_chroma);
             return NULL;
         }
         assert(plane_count <= D3D11_MAX_SHADER_VIEW);
@@ -795,13 +796,19 @@ static picture_pool_t *Pool(vout_display_t *vd, unsigned pool_size)
         texDesc.ArraySize = 1;
     } else {
         plane_count = 1;
-        planes[0].i_lines = vd->fmt.i_height;
-        planes[0].i_pitch = vd->fmt.i_width;
         texDesc.Format = vd->sys->picQuadConfig->formatTexture;
         texDesc.BindFlags |= D3D11_BIND_DECODER;
         texDesc.Usage = D3D11_USAGE_DEFAULT;
         texDesc.CPUAccessFlags = 0;
         texDesc.ArraySize = pool_size;
+
+        texDesc.Height = vd->fmt.i_height;
+        texDesc.Width = vd->fmt.i_width;
+        hr = ID3D11Device_CreateTexture2D( vd->sys->d3ddevice, &texDesc, NULL, &knownTexture );
+        if (FAILED(hr)) {
+            msg_Err(vd, "CreateTexture2D failed for the %d pool. (hr=0x%0lx)", pool_size, hr);
+            goto error;
+        }
     }
 
     for (picture_count = 0; picture_count < pool_size; picture_count++) {
@@ -815,12 +822,17 @@ static picture_pool_t *Pool(vout_display_t *vd, unsigned pool_size)
 
         for (plane = 0; plane < plane_count; plane++)
         {
-            texDesc.Height = planes[plane].i_lines;
-            texDesc.Width = planes[plane].i_pitch;
-            hr = ID3D11Device_CreateTexture2D( vd->sys->d3ddevice, &texDesc, NULL, &picsys->texture[plane] );
-            if (FAILED(hr)) {
-                msg_Err(vd, "CreateTexture2D failed for the %d pool. (hr=0x%0lx)", pool_size, hr);
-                goto error;
+            if (knownTexture) {
+                picsys->texture[plane] = knownTexture;
+                ID3D11Texture2D_AddRef(knownTexture);
+            } else {
+                texDesc.Height = planes[plane].i_lines;
+                texDesc.Width = planes[plane].i_pitch;
+                hr = ID3D11Device_CreateTexture2D( vd->sys->d3ddevice, &texDesc, NULL, &picsys->texture[plane] );
+                if (FAILED(hr)) {
+                    msg_Err(vd, "CreateTexture2D failed for the %d pool. (hr=0x%0lx)", pool_size, hr);
+                    goto error;
+                }
             }
         }
         for (; plane < D3D11_MAX_SHADER_VIEW; plane++) {
@@ -881,6 +893,8 @@ error:
 
         vd->sys->sys.pool = picture_pool_NewExtended( &pool_cfg );
     }
+    if (knownTexture)
+        ID3D11Texture2D_Release(knownTexture);
 #endif
     return vd->sys->sys.pool;
 }
