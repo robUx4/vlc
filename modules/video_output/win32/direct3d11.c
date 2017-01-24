@@ -1911,12 +1911,29 @@ static void Direct3D11DestroyPool(vout_display_t *vd)
     sys->sys.pool = NULL;
 }
 
-static void SetupQuadFlat(d3d_vertex_t *dst_data, const video_format_t *fmt, WORD *triangle_pos)
+static void SetupQuadFlat(d3d_vertex_t *dst_data, const video_format_t *fmt, const d3d_format_t *cfg, WORD *triangle_pos)
 {
-    float right  =  (float) (2*fmt->i_width-fmt->i_visible_width-2*fmt->i_x_offset) / (float) fmt->i_visible_width;
+    plane_t           planes[PICTURE_PLANE_MAX];
+    int               plane_count;
+    unsigned int      width, height;
+
+    if ( cfg->formatTexture == DXGI_FORMAT_UNKNOWN &&
+         picture_SetupPlanes(fmt->i_chroma, fmt, planes, &plane_count) == VLC_SUCCESS )
+    {
+        /* get the visible area from the decoded luminance plane */
+        width  = planes[0].i_pitch;
+        height = planes[0].i_lines;
+    }
+    else
+    {
+        width = fmt->i_width;
+        height = fmt->i_height;
+    }
+
+    float right  =  (float) (2*width-fmt->i_visible_width-2*fmt->i_x_offset) / (float) fmt->i_visible_width;
     float left   = -(float) (2*fmt->i_x_offset + fmt->i_visible_width) / (float) fmt->i_visible_width;
     float top    =  (float) (2*fmt->i_y_offset + fmt->i_visible_height) / (float) fmt->i_visible_height;
-    float bottom = -(float) (2*fmt->i_height-fmt->i_visible_height-2*fmt->i_y_offset) / (float) fmt->i_visible_height;
+    float bottom = -(float) (2*height-fmt->i_visible_height-2*fmt->i_y_offset) / (float) fmt->i_visible_height;
 
 //top = right = 1.f;
 //bottom = left = -1.f;
@@ -2008,7 +2025,8 @@ static void SetupQuadSphere(d3d_vertex_t *dst_data, WORD *triangle_pos)
     }
 }
 
-static bool AllocQuadVertices(vout_display_t *vd, d3d_quad_t *quad, const video_format_t *fmt, video_projection_mode_t projection)
+static bool AllocQuadVertices(vout_display_t *vd, d3d_quad_t *quad, const video_format_t *fmt,
+                              const d3d_format_t *cfg, video_projection_mode_t projection)
 {
     HRESULT hr;
     D3D11_MAPPED_SUBRESOURCE mappedResource;
@@ -2072,7 +2090,7 @@ static bool AllocQuadVertices(vout_display_t *vd, d3d_quad_t *quad, const video_
     WORD *triangle_pos = mappedResource.pData;
 
     if ( projection == PROJECTION_MODE_RECTANGULAR )
-        SetupQuadFlat(dst_data, fmt, triangle_pos);
+        SetupQuadFlat(dst_data, fmt, cfg, triangle_pos);
     else
         SetupQuadSphere(dst_data, triangle_pos);
 
@@ -2280,7 +2298,7 @@ static int AllocQuad(vout_display_t *vd, const video_format_t *fmt, d3d_quad_t *
 
     if ( d3dpixelShader != NULL )
     {
-        if (!AllocQuadVertices(vd, quad, fmt, projection))
+        if (!AllocQuadVertices(vd, quad, fmt, cfg, projection))
             goto error;
 
         if (projection == PROJECTION_MODE_RECTANGULAR)
