@@ -95,6 +95,7 @@ void CommonManage(vout_display_t *);
 int  CommonControl(vout_display_t *, int , va_list );
 void CommonDisplay(vout_display_t *);
 int  CommonUpdatePicture(picture_t *, picture_t **fallback, uint8_t *plane, unsigned pitch);
+int  CommonUpdatePictureSplit(picture_t *, uint8_t **planes, unsigned *pitches, unsigned *heights);
 
 void UpdateRects (vout_display_t *,
                   const vout_display_cfg_t *,

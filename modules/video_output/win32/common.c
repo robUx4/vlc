@@ -438,6 +438,21 @@ void CommonDisplay(vout_display_t *vd)
 }
 #endif
 
+int CommonUpdatePictureSplit(picture_t *picture, uint8_t **planes,
+                             unsigned *pitches, unsigned *heights)
+{
+    /* fill in buffer info in first plane */
+    for (int n = 0; n < picture->i_planes; n++) {
+        picture->p[n].p_pixels = planes[n];
+        picture->p[n].i_pitch  = pitches[n];
+        picture->p[n].i_lines  = heights[n];
+        assert(picture->p[n].i_visible_pitch <= picture->p[n].i_pitch);
+        assert(picture->p[n].i_visible_lines <= picture->p[n].i_lines);
+    }
+    return VLC_SUCCESS;
+
+}
+
 /**
  * It updates a picture data/pitches.
  */
