@@ -512,13 +512,6 @@ static void Direct3D11UnmapPoolTexture(picture_t *picture)
     }
 }
 
-static void Direct3D11UnlockDirectTexture(picture_t *picture)
-{
-    picture_sys_t *p_sys = picture->p_sys;
-    Direct3D11UnmapPoolTexture(picture);
-    p_sys->locked = false;
-}
-
 #if !VLC_WINSTORE_APP
 static int OpenHwnd(vout_display_t *vd)
 {
@@ -922,7 +915,7 @@ static picture_pool_t *Pool(vout_display_t *vd, unsigned pool_size)
     memset(&pool_cfg, 0, sizeof(pool_cfg));
     if (vd->sys->picQuadConfig->formatTexture == DXGI_FORMAT_UNKNOWN) {
         pool_cfg.lock = Direct3D11LockDirectTexture;
-        pool_cfg.unlock = Direct3D11UnlockDirectTexture;
+        pool_cfg.unlock = Direct3D11UnmapPoolTexture;
     }
     pool_cfg.picture_count = pool_size;
     pool_cfg.picture       = pictures;
