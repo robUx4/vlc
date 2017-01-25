@@ -632,8 +632,6 @@ static int AllocateShaderView(vout_display_t *vd, const d3d_format_t *format,
         }
         return VLC_EGENERIC;
     }
-    picsys->context = vd->sys->d3dcontext;
-    ID3D11DeviceContext_AddRef(picsys->context);
 
     return VLC_SUCCESS;
 }
@@ -2131,6 +2129,8 @@ static int AllocQuad(vout_display_t *vd, const video_format_t *fmt, d3d_quad_t *
         goto error;
 
     quad->picSys.formatTexture = cfg->formatTexture;
+    quad->picSys.context = sys->d3dcontext;
+    ID3D11DeviceContext_AddRef(quad->picSys.context);
 
     if ( d3dpixelShader != NULL )
     {
