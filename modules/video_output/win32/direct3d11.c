@@ -869,17 +869,10 @@ static picture_pool_t *Pool(vout_display_t *vd, unsigned pool_size)
     if ( vd->sys->sys.pool != NULL )
         return vd->sys->sys.pool;
 
-#if 0
-    if (pool_size > 30) {
-        msg_Err(vd, "Avoid crashing when using ID3D11VideoDecoderOutputView with too many slices (%d)", pool_size);
-        return NULL;
-    }
-#endif
-
 #ifdef HAVE_ID3D11VIDEODECODER
     picture_t**       pictures = NULL;
     unsigned          picture_count = 0;
-    int               plane = 0;
+    unsigned          plane;
     ID3D11Texture2D  *textures[pool_size * D3D11_MAX_SHADER_VIEW];
     HRESULT           hr;
 
@@ -1330,7 +1323,6 @@ static void Prepare(vout_display_t *vd, picture_t *picture, subpicture_t *subpic
                                                       p_sys->resource[plane],
                                                       0, &box);
         }
-        //Direct3D11MapPoolTexture(picture, D3D11_MAP_WRITE); /* TODO do it much later to allow more command pipelining */
     }
 
     if (subpicture) {
@@ -1387,33 +1379,14 @@ static void Display(vout_display_t *vd, picture_t *picture, subpicture_t *subpic
 
     ID3D11DeviceContext_ClearDepthStencilView(sys->d3dcontext, sys->d3ddepthStencilView, D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0);
 
-    msg_Dbg(vd, "display picture %p texture %p slice %d", picture, picture->p_sys->texture[0], picture->p_sys->slice_index);
-
-    /* unmap if still mapped */
-    if ( !is_d3d11_opaque(picture->format.i_chroma) ) {
-        if (picture->p_sys->formatTexture == DXGI_FORMAT_UNKNOWN && !sys->legacy_shader) {
-            Direct3D11UnlockTexture(picture);
-        } else {
-            Direct3D11UnlockTexture(picture);
-        }
-    }
+    if ( !is_d3d11_opaque(picture->format.i_chroma) )
+        Direct3D11UnlockTexture(picture);
 
     /* Render the quad */
-    if (is_d3d11_opaque(vd->fmt.i_chroma) && !sys->legacy_shader)
+    if (is_d3d11_opaque(picture->format.i_chroma) && !sys->legacy_shader)
         DisplayD3DPicture(sys, &sys->picQuad, picture->p_sys->resourceView);
     else
         DisplayD3DPicture(sys, &sys->picQuad, sys->picQuad.picSys.resourceView);
-
-    if (false && !is_d3d11_opaque(picture->format.i_chroma) )
-    {
-        if (!picture->p_sys->locked) {
-            if (picture->p_sys->formatTexture == DXGI_FORMAT_UNKNOWN && !sys->legacy_shader) {
-                Direct3D11MapPoolTexture(picture, D3D11_MAP_WRITE_DISCARD);
-            } else {
-                //Direct3D11LockTexture(picture);
-            }
-        }
-    }
 
     if (subpicture) {
         // draw the additional vertices
@@ -1432,7 +1405,6 @@ static void Display(vout_display_t *vd, picture_t *picture, subpicture_t *subpic
         ReleaseMutex( sys->context_lock );
     }
 #endif
-    picture_Release(picture);
 
     DXGI_PRESENT_PARAMETERS presentParams;
     memset(&presentParams, 0, sizeof(presentParams));
@@ -1443,6 +1415,7 @@ static void Display(vout_display_t *vd, picture_t *picture, subpicture_t *subpic
         msg_Dbg(vd, "SwapChain Present failed. (hr=0x%lX)", hr);
     }
 
+    picture_Release(picture);
     if (subpicture)
         subpicture_Delete(subpicture);
 
@@ -2007,8 +1980,6 @@ static int Direct3D11CreatePool(vout_display_t *vd, video_format_t *fmt)
         return VLC_ENOMEM;
     }
 
-    msg_Dbg(vd, "created picQuad picture %p", picture);
-
     picture_pool_configuration_t pool_cfg;
     memset(&pool_cfg, 0, sizeof(pool_cfg));
     pool_cfg.picture_count = 1;
@@ -2057,9 +2028,6 @@ static void SetupQuadFlat(d3d_vertex_t *dst_data, const video_format_t *fmt, con
     float left   = -(float) (2*fmt->i_x_offset + fmt->i_visible_width) / (float) fmt->i_visible_width;
     float top    =  (float) (2*fmt->i_y_offset + fmt->i_visible_height) / (float) fmt->i_visible_height;
     float bottom = -(float) (2*height-fmt->i_visible_height-2*fmt->i_y_offset) / (float) fmt->i_visible_height;
-
-//top = right = 1.f;
-//bottom = left = -1.f;
 
     // bottom left
     dst_data[0].position.x = left;
