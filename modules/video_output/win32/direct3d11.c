@@ -731,14 +731,13 @@ static picture_pool_t *Pool(vout_display_t *vd, unsigned pool_size)
         for (plane = 0; plane < D3D11_MAX_SHADER_VIEW; plane++)
             picsys->texture[plane] = textures[picture_count * D3D11_MAX_SHADER_VIEW + plane];
 
-        picsys->texture[KNOWN_DXGI_INDEX] = textures[picture_count * D3D11_MAX_SHADER_VIEW];
+        if (AllocateShaderView(vd, vd->sys->picQuadConfig, picture_count, picsys) != VLC_SUCCESS)
+            goto error;
+
         picsys->slice_index = picture_count;
         picsys->formatTexture = vd->sys->picQuadConfig->formatTexture;
         picsys->context = vd->sys->d3dcontext;
         ID3D11DeviceContext_AddRef(picsys->context);
-		
-        if (AllocateShaderView(vd, vd->sys->picQuadConfig, picture_count, picsys) != VLC_SUCCESS)
-            goto error;
 
         picture_resource_t resource = {
             .p_sys = picsys,
