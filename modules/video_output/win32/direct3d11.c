@@ -484,12 +484,7 @@ static int Direct3D11MapPoolTexture(picture_t *picture, D3D11_MAP map_mode)
 /* map a texture to CPU that will also be used for drawing to the swapchain */
 static int Direct3D11LockTexture(picture_t *picture)
 {
-    picture_sys_t *p_sys = picture->p_sys;
-    int res = Direct3D11MapPoolTexture(picture, D3D11_MAP_WRITE_DISCARD);
-    if (res == VLC_SUCCESS) {
-        p_sys->locked = true; /* TODO atomic */
-    }
-    return res;
+    return Direct3D11MapPoolTexture(picture, D3D11_MAP_WRITE_DISCARD);
 }
 
 static int Direct3D11LockDirectTexture(picture_t *picture)
@@ -515,12 +510,6 @@ static void Direct3D11UnmapPoolTexture(picture_t *picture)
         }
         p_sys->mapped = false;
     }
-}
-
-static void Direct3D11UnlockTexture(picture_t *picture)
-{
-    Direct3D11UnmapPoolTexture(picture);
-    //p_sys->locked = false;
 }
 
 static void Direct3D11UnlockDirectTexture(picture_t *picture)
@@ -1380,7 +1369,7 @@ static void Display(vout_display_t *vd, picture_t *picture, subpicture_t *subpic
     ID3D11DeviceContext_ClearDepthStencilView(sys->d3dcontext, sys->d3ddepthStencilView, D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0);
 
     if ( !is_d3d11_opaque(picture->format.i_chroma) )
-        Direct3D11UnlockTexture(picture);
+        Direct3D11UnmapPoolTexture(picture);
 
     /* Render the quad */
     if (is_d3d11_opaque(picture->format.i_chroma) && !sys->legacy_shader)
@@ -1985,7 +1974,7 @@ static int Direct3D11CreatePool(vout_display_t *vd, video_format_t *fmt)
     pool_cfg.picture_count = 1;
     pool_cfg.picture       = &picture;
     pool_cfg.lock          = Direct3D11LockTexture;
-    pool_cfg.unlock        = Direct3D11UnlockTexture;
+    //pool_cfg.unlock        = Direct3D11UnmapPoolTexture;
 
     sys->sys.pool = picture_pool_NewExtended(&pool_cfg);
     if (!sys->sys.pool) {
@@ -2369,7 +2358,6 @@ static int AllocQuad(vout_display_t *vd, const video_format_t *fmt, d3d_quad_t *
     quad->picSys.formatTexture = cfg->formatTexture;
     quad->picSys.context = sys->d3dcontext;
     ID3D11DeviceContext_AddRef(quad->picSys.context);
-
 
     if ( d3dpixelShader != NULL )
     {
