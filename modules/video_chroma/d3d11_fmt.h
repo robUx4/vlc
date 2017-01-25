@@ -39,8 +39,9 @@ struct picture_sys_t
     unsigned                      slice_index;
     ID3D11VideoProcessorInputView *inputView; /* when used as processor input */
     ID3D11ShaderResourceView      *resourceView[D3D11_MAX_SHADER_VIEW];
+    DXGI_FORMAT                   formatTexture;
     bool                          mapped;
-    bool                          locked;
+    bool                          locked; /* once a dynamic texture is mapped to the CPU we don't want to discard the buffer */
     vlc_object_t *vd;
 };
 
