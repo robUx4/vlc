@@ -692,6 +692,7 @@ static picture_pool_t *Pool(vout_display_t *vd, unsigned pool_size)
         ID3D11Texture2D_AddRef(texture);
         picsys->texture[KNOWN_DXGI_INDEX] = texture;
         picsys->slice_index = picture_count;
+        picsys->formatTexture = vd->sys->picQuadConfig->formatTexture;
         picsys->context = vd->sys->d3dcontext;
 
         plane = KNOWN_DXGI_INDEX + 1;
@@ -2128,6 +2129,8 @@ static int AllocQuad(vout_display_t *vd, const video_format_t *fmt, d3d_quad_t *
 
     if (AllocateShaderView(vd, cfg, 0, &quad->picSys) != VLC_SUCCESS)
         goto error;
+
+    quad->picSys.formatTexture = cfg->formatTexture;
 
     if ( d3dpixelShader != NULL )
     {
