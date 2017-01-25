@@ -439,7 +439,6 @@ static int Direct3D11MapPoolTexture(picture_t *picture, D3D11_MAP map_mode)
     D3D11_MAPPED_SUBRESOURCE mappedResource;
     int res;
     HRESULT hr;
-    uint8_t *plane1 = picture->p->p_pixels;
 
     if ( p_sys->formatTexture == DXGI_FORMAT_UNKNOWN )
     {
@@ -470,7 +469,6 @@ static int Direct3D11MapPoolTexture(picture_t *picture, D3D11_MAP map_mode)
         }
         p_sys->mapped = true;
 
-        //msg_Dbg(p_sys->vd, "mapped texture slice %d", p_sys->slice_index);
         res = CommonUpdatePictureSplit(picture, planes, pitches, heights);
     } else {
         hr = ID3D11DeviceContext_Map(p_sys->context, p_sys->resource[KNOWN_DXGI_INDEX], 0, map_mode, 0, &mappedResource);
@@ -478,11 +476,7 @@ static int Direct3D11MapPoolTexture(picture_t *picture, D3D11_MAP map_mode)
             return VLC_EGENERIC;
         p_sys->mapped = true;
 
-        msg_Dbg(p_sys->vd, "mapped picture %p", picture);
         res = CommonUpdatePicture(picture, NULL, mappedResource.pData, mappedResource.RowPitch);
-    }
-    if (plane1 != NULL && plane1 != picture->p->p_pixels) {
-        msg_Dbg(p_sys->vd, "pixel changed in slice %d %p to %p", p_sys->slice_index, plane1, picture->p->p_pixels);
     }
     return res;
 }
@@ -491,7 +485,6 @@ static int Direct3D11MapPoolTexture(picture_t *picture, D3D11_MAP map_mode)
 static int Direct3D11LockTexture(picture_t *picture)
 {
     picture_sys_t *p_sys = picture->p_sys;
-    msg_Dbg(p_sys->vd, "lock picture %p texture %p slice %d", picture, picture->p_sys->texture[0], p_sys->slice_index);
     int res = Direct3D11MapPoolTexture(picture, D3D11_MAP_WRITE_DISCARD);
     if (res == VLC_SUCCESS) {
         p_sys->locked = true; /* TODO atomic */
@@ -502,7 +495,6 @@ static int Direct3D11LockTexture(picture_t *picture)
 static int Direct3D11LockDirectTexture(picture_t *picture)
 {
     picture_sys_t *p_sys = picture->p_sys;
-    msg_Dbg(p_sys->vd, "lock direct picture %p texture %p slice %d", picture, picture->p_sys->texture[0], p_sys->slice_index);
     int res = Direct3D11MapPoolTexture(picture, D3D11_MAP_WRITE);
     if (res == VLC_SUCCESS) {
         p_sys->locked = true; /* TODO atomic */
@@ -515,7 +507,6 @@ static void Direct3D11UnmapPoolTexture(picture_t *picture)
     picture_sys_t *p_sys = picture->p_sys;
     if (p_sys->mapped) {
         if ( p_sys->formatTexture == DXGI_FORMAT_UNKNOWN ) {
-            msg_Dbg(p_sys->vd, "unmap texture slice %d", p_sys->slice_index);
             for (int i = 0; i < picture->i_planes; i++) {
                 ID3D11DeviceContext_Unmap(p_sys->context, p_sys->resource[i], 0);
             }
@@ -523,15 +514,11 @@ static void Direct3D11UnmapPoolTexture(picture_t *picture)
             ID3D11DeviceContext_Unmap(p_sys->context, p_sys->resource[KNOWN_DXGI_INDEX], 0);
         }
         p_sys->mapped = false;
-    } else {
-        msg_Dbg(p_sys->vd, "texture slice %d was already unmapped", p_sys->slice_index);
     }
 }
 
 static void Direct3D11UnlockTexture(picture_t *picture)
 {
-    picture_sys_t *p_sys = picture->p_sys;
-    msg_Dbg(p_sys->vd, "unlock picture %p texture %p slice %d", picture, picture->p_sys->texture[0], p_sys->slice_index);
     Direct3D11UnmapPoolTexture(picture);
     //p_sys->locked = false;
 }
@@ -539,7 +526,6 @@ static void Direct3D11UnlockTexture(picture_t *picture)
 static void Direct3D11UnlockDirectTexture(picture_t *picture)
 {
     picture_sys_t *p_sys = picture->p_sys;
-    msg_Dbg(p_sys->vd, "unlock direct picture %p texture %p slice %d", picture, picture->p_sys->texture[0], p_sys->slice_index);
     Direct3D11UnmapPoolTexture(picture);
     p_sys->locked = false;
 }
@@ -929,7 +915,6 @@ static picture_pool_t *Pool(vout_display_t *vd, unsigned pool_size)
 
         picsys->slice_index = picture_count;
         picsys->formatTexture = vd->sys->picQuadConfig->formatTexture;
-        picsys->vd = VLC_OBJECT(vd);
         picsys->context = vd->sys->d3dcontext;
         ID3D11DeviceContext_AddRef(picsys->context);
 
@@ -2414,7 +2399,6 @@ static int AllocQuad(vout_display_t *vd, const video_format_t *fmt, d3d_quad_t *
         goto error;
 
     quad->picSys.formatTexture = cfg->formatTexture;
-    quad->picSys.vd = VLC_OBJECT(vd);
     quad->picSys.context = sys->d3dcontext;
     ID3D11DeviceContext_AddRef(quad->picSys.context);
 

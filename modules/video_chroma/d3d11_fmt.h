@@ -42,7 +42,6 @@ struct picture_sys_t
     DXGI_FORMAT                   formatTexture;
     bool                          mapped;
     bool                          locked; /* once a dynamic texture is mapped to the CPU we don't want to discard the buffer */
-    vlc_object_t *vd;
 };
 
 /* index to use for texture/resource that use a known DXGI format
