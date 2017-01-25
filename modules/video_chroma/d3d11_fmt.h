@@ -40,6 +40,9 @@ struct picture_sys_t
     ID3D11VideoProcessorInputView *inputView; /* when used as processor input */
     ID3D11ShaderResourceView      *resourceView[D3D11_MAX_SHADER_VIEW];
     DXGI_FORMAT                   formatTexture;
+    bool                          mapped;
+	/* once a dynamic texture is mapped to the CPU we don't want to discard the buffer */
+    bool                          locked;
 };
 
 /* index to use for texture/resource that use a known DXGI format
