@@ -397,13 +397,19 @@ static int Direct3D11MapPoolTexture(picture_t *picture)
     {
         return VLC_EGENERIC;
     }
+
+    p_sys->mapped = true;
+
     return CommonUpdatePicture(picture, NULL, mappedResource.pData, mappedResource.RowPitch);
 }
 
 static void Direct3D11UnmapPoolTexture(picture_t *picture)
 {
     picture_sys_t *p_sys = picture->p_sys;
-    ID3D11DeviceContext_Unmap(p_sys->context, p_sys->resource[KNOWN_DXGI_INDEX], 0);
+    if (p_sys->mapped) {
+        ID3D11DeviceContext_Unmap(p_sys->context, p_sys->resource[KNOWN_DXGI_INDEX], 0);
+        p_sys->mapped = true;
+    }
 }
 
 #if !VLC_WINSTORE_APP
