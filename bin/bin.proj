@@ -1,13 +1,18 @@
 CON(!HAVE_DARWIN) vlc-static
 {
+  // from automake
   OUTPUT_DIR bin
   DEFINE HAVE_CONFIG_H // from CONFIG_HEADERS 
+  NO_STDAFX .
 }
 
 CON vlc-cache-gen
 {
+  // from automake
   OUTPUT_DIR bin
   DEFINE HAVE_CONFIG_H // from CONFIG_HEADERS 
+  NO_STDAFX .
+  
   USE compat
   USE libvlc
   SOURCE cachegen.c
@@ -21,8 +26,11 @@ CON vlc-cache-gen
 
 CON(!HAVE_DARWIN) vlc
 {
+  // from automake
   OUTPUT_DIR bin
   DEFINE HAVE_CONFIG_H // from CONFIG_HEADERS 
+  NO_STDAFX .
+
   PROJECT_VERSION 3.0.0
   DEFINE(HAVE_DBUS) HAVE_DBUS
   IF TARGET_WIN
