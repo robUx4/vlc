@@ -1,0 +1,11 @@
+// coremake project file
+CONFIG_FILE config.h
+
+WORKSPACE vlc
+{
+  USE vlc
+  USE vlc-static
+  USE vlc-cache-gen
+}
+
+#include "*/*.proj"

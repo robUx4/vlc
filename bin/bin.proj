@@ -1,0 +1,38 @@
+CON(!HAVE_DARWIN) vlc-static
+{
+  OUTPUT_DIR bin
+}
+
+CON vlc-cache-gen
+{
+  OUTPUT_DIR bin
+  USE compat
+  USE libvlc
+  SOURCE cachegen.c
+  IF TARGET_WIN
+    SOURCEAM vlc_win32_rc.rc.in
+    // for the resource file
+    INCLUDE ../share/icons
+    INCLUDE ../extras/package/win32
+  ENDIF
+}
+
+CON(!HAVE_DARWIN) vlc
+{
+  PROJECT_VERSION 3.0.0
+  OUTPUT_DIR bin
+  DEFINE(HAVE_DBUS) HAVE_DBUS
+  IF TARGET_WIN
+    SOURCE winvlc.c
+    SOURCEAM vlc_win32_rc.rc.in
+    // for the resource file
+    INCLUDE ../share/icons
+    INCLUDE ../extras/package/win32
+    LIBS psapi.lib
+    LIBS wininet.lib
+  ELSE
+    SOURCE vlc.c
+    SOURCE override.c
+  ENDIF
+  INCLUDE ../include
+}
