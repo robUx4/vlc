@@ -4,6 +4,7 @@ CON(!HAVE_DARWIN) vlc-static
   OUTPUT_DIR bin
   DEFINE HAVE_CONFIG_H // from CONFIG_HEADERS 
   NO_STDAFX .
+  NO_PROJECT .
 }
 
 CON vlc-cache-gen
@@ -12,7 +13,8 @@ CON vlc-cache-gen
   OUTPUT_DIR bin
   DEFINE HAVE_CONFIG_H // from CONFIG_HEADERS 
   NO_STDAFX .
-  
+  NO_PROJECT .
+
   USE compat
   USE libvlc
   SOURCE cachegen.c
@@ -30,8 +32,8 @@ CON(!HAVE_DARWIN) vlc
   OUTPUT_DIR bin
   DEFINE HAVE_CONFIG_H // from CONFIG_HEADERS 
   NO_STDAFX .
+  NO_PROJECT .
 
-  PROJECT_VERSION 3.0.0
   DEFINE(HAVE_DBUS) HAVE_DBUS
   IF TARGET_WIN
     SOURCE winvlc.c
