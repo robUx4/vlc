@@ -1,5 +1,5 @@
 // coremake project file
-CONFIG_FILE config.h
+CONFIG_FILE config.h { NO_INCLUDE . }
 
 WORKSPACE vlc
 {
