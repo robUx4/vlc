@@ -18,4 +18,6 @@ LIB compat
   SOURCE(!HAVE_SENDMSG) sendmsg.c
   SOURCE(!HAVE_MEMRCHR) memrchr.c
   SOURCE(!HAVE_REALPATH) realpath.c
+  SOURCE(!HAVE_FLOCKFILE) flockfile.c
+  SOURCE(!HAVE_SETENV) setenv.c
 }
