@@ -186,6 +186,8 @@
 /* Define to 1 if you have the <dxva2api.h> header file. */
 #define HAVE_DXVA2API_H 1
 
+#define HAVE_DYNAMIC_PLUGINS 1
+
 /* Define to 1 if evas is enabled. */
 /* #undef HAVE_EVAS */
 
