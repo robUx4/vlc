@@ -4,6 +4,7 @@ DLL libvlccore
   USE coremake_automake
 
   USE fourcc_tables.h
+  USE compat
   
   INCLUDE ../include
 
@@ -176,6 +177,8 @@ DLL libvlccore
   
   IF TARGET_WIN
     INCLUDE ../extras/package/win32
+    LIBS ws2_32.lib
+    LIBS winmm.lib
 
     SOURCEAM libvlc_win32_rc.rc.in
     SOURCE win32/dirs.c
