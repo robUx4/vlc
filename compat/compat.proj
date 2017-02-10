@@ -17,4 +17,5 @@ LIB compat
   SOURCE(!HAVE_RECVMSG) recvmsg.c
   SOURCE(!HAVE_SENDMSG) sendmsg.c
   SOURCE(!HAVE_MEMRCHR) memrchr.c
+  SOURCE(!HAVE_REALPATH) realpath.c
 }
