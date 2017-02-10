@@ -3,8 +3,10 @@ DLL libvlccore
   OUTPUT_DIR src
   USE coremake_automake
 
-  DEP fourcc_gen
+  USE fourcc_tables.h
+  
   INCLUDE ../include
+
   SOURCE fourcc_tables.h
   SOURCE libvlc.c
   SOURCE libvlc.h
@@ -173,6 +175,8 @@ DLL libvlccore
   SOURCE misc/subpicture.h
   
   IF TARGET_WIN
+    INCLUDE ../extras/package/win32
+
     SOURCEAM libvlc_win32_rc.rc.in
     SOURCE win32/dirs.c
     SOURCE win32/error.c
@@ -193,7 +197,17 @@ DLL libvlccore
 
 CON fourcc_gen
 {
+  OUTPUT_DIR src
+
   SOURCE misc/fourcc_gen.c
   HEADER misc/fourcc_list.h
   HEADER ../include/vlc_fourcc.h
+}
+
+GENERATE fourcc_tables.h
+{
+  OUTPUT_DIR src
+
+  DEP fourcc_gen
+  RUN "fourcc_gen > fourcc_tables.h"
 }
