@@ -175,6 +175,19 @@ DLL libvlccore
   SOURCE misc/subpicture.c
   SOURCE misc/subpicture.h
   
+  IF ENABLE_SOUT
+    SOURCE stream_output/sap.c
+    SOURCE stream_output/sdp.c
+    SOURCE stream_output/stream_output.c
+    HEADER stream_output/stream_output.h
+  ENDIF
+  
+  IF ENABLE_VLM
+    SOURCE input/vlm.c
+    SOURCE input/vlm_event.c
+    SOURCE input/vlmshell.c
+  ENDIF
+  
   IF TARGET_WIN
     INCLUDE ../extras/package/win32
     LIBS ws2_32.lib
