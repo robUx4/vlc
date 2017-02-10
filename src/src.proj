@@ -5,6 +5,7 @@ DLL libvlccore
 
   USE fourcc_tables.h
   USE compat
+  USE iconv
   
   INCLUDE ../include
 

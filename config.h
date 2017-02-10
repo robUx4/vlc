@@ -259,7 +259,7 @@
 #define HAVE_GMTIME_R 1
 
 /* Define if you have the iconv() function and it works. */
-#define HAVE_ICONV 1
+/* #undef HAVE_ICONV */
 
 /* Define to 1 if the system has the type `ID3D11VideoDecoder'. */
 #define HAVE_ID3D11VIDEODECODER 1

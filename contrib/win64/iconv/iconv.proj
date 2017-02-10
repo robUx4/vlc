@@ -1,0 +1,3 @@
+#include "*/*.proj"
+
+CONFIG_FILE config.h { NO_INCLUDE . }
