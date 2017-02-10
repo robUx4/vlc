@@ -8,4 +8,12 @@ WORKSPACE vlc
   USE vlc-cache-gen
 }
 
+GROUP coremake_automake
+{
+  // from automake
+  DEFINE HAVE_CONFIG_H // from CONFIG_HEADERS 
+  NO_STDAFX .
+  NO_PROJECT .
+}
+
 #include "*/*.proj"

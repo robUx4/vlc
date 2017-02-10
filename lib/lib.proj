@@ -1,0 +1,30 @@
+DLL libvlc
+{
+  OUTPUT_DIR lib
+  USE coremake_automake
+
+  USE libvlccore
+  INCLUDE ../include
+  SOURCE core.c
+  SOURCE dialog.c
+  SOURCE renderer_discoverer.c
+  SOURCE error.c
+  SOURCE log.c
+  SOURCE playlist.c
+  SOURCE vlm.c
+  SOURCE video.c
+  SOURCE audio.c
+  SOURCE event.c
+  SOURCE media.c
+  SOURCE media_player.c
+  SOURCE media_list.c
+  SOURCE media_list_path.h
+  SOURCE media_list_player.c
+  SOURCE media_library.c
+  SOURCE media_discoverer.c
+  HEADER libvlc_internal.h
+  HEADER media_internal.h
+  HEADER media_list_internal.h
+  HEADER media_player_internal.h
+  HEADER renderer_discoverer_internal.h
+}

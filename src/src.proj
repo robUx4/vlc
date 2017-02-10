@@ -1,10 +1,7 @@
 DLL libvlccore
 {
-  // from automake
   OUTPUT_DIR src
-  DEFINE HAVE_CONFIG_H // from CONFIG_HEADERS 
-  NO_STDAFX .
-  NO_PROJECT .
+  USE coremake_automake
 
   DEP fourcc_gen
   INCLUDE ../include
