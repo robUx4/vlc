@@ -3,7 +3,9 @@ DLL libvlc
   OUTPUT_DIR lib
   USE coremake_automake
 
+  USE compat
   USE libvlccore
+
   INCLUDE ../include
   SOURCE core.c
   SOURCE dialog.c
