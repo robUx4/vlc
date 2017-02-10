@@ -1,0 +1,20 @@
+LIB compat
+{
+  OUTPUT_DIR compat
+  USE coremake_automake
+
+  SOURCE(!HAVE_STRNDUP) strndup.c
+  SOURCE(!HAVE_STRSEP) strsep.c
+  SOURCE(!HAVE_GETDELIM) getdelim.c
+  SOURCE(!HAVE_FSYNC) fsync.c
+  SOURCE(!HAVE_STRVERSCMP) strverscmp.c
+  SOURCE(!HAVE_STRCASESTR) strcasestr.c
+  SOURCE(!HAVE_STRLCPY) strlcpy.c
+  SOURCE(!HAVE_POLL) poll.c
+  SOURCE(!HAVE_FFSLL) ffsll.c
+  SOURCE(!HAVE_TIMESPEC_GET) timespec_get.c
+  SOURCE(!HAVE_NRAND48) nrand48.c
+  SOURCE(!HAVE_RECVMSG) recvmsg.c
+  SOURCE(!HAVE_SENDMSG) sendmsg.c
+  SOURCE(!HAVE_MEMRCHR) memrchr.c
+}
