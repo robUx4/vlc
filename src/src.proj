@@ -215,6 +215,7 @@ DLL libvlccore
 CON fourcc_gen
 {
   OUTPUT_DIR src
+  INCLUDE .
 
   SOURCE misc/fourcc_gen.c
   HEADER misc/fourcc_list.h
