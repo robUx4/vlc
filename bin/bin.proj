@@ -34,6 +34,7 @@ CON(!HAVE_DARWIN) vlc
     INCLUDE ../share/icons
     INCLUDE ../extras/package/win32
     LIBS psapi.lib
+    LIBS shell32.lib
     LIBS wininet.lib
   ELSE
     SOURCE vlc.c
