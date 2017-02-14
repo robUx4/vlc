@@ -11,12 +11,12 @@ DLL libvlccore
 
   SOURCE fourcc_tables.h
   SOURCE libvlc.c
-  SOURCE libvlc.h
+  HEADER libvlc.h
   SOURCE libvlc-module.c
   SOURCE missing.c
   SOURCE revision.c
   SOURCE version.c
-  SOURCE config/configuration.h
+  HEADER config/configuration.h
   SOURCE config/core.c
   SOURCE config/chain.c
   SOURCE config/file.c
@@ -25,10 +25,10 @@ DLL libvlccore
   SOURCE config/keys.c
   SOURCE config/cmdline.c
   SOURCE config/getopt.c
-  SOURCE config/vlc_getopt.h
+  HEADER config/vlc_getopt.h
   SOURCE extras/libc.c
   SOURCE extras/tdestroy.c
-  SOURCE modules/modules.h
+  HEADER modules/modules.h
   SOURCE modules/modules.c
   SOURCE modules/bank.c
   SOURCE modules/cache.c
@@ -36,19 +36,19 @@ DLL libvlccore
   SOURCE modules/textdomain.c
   SOURCE interface/dialog.c
   SOURCE interface/interface.c
-  SOURCE playlist/playlist_internal.h
+  HEADER playlist/playlist_internal.h
   SOURCE playlist/art.c
-  SOURCE playlist/art.h
+  HEADER playlist/art.h
   SOURCE playlist/aout.c
   SOURCE playlist/thread.c
   SOURCE playlist/control.c
   SOURCE playlist/engine.c
   SOURCE playlist/fetcher.c
-  SOURCE playlist/fetcher.h
+  HEADER playlist/fetcher.h
   SOURCE playlist/sort.c
   SOURCE playlist/loadsave.c
   SOURCE playlist/preparser.c
-  SOURCE playlist/preparser.h
+  HEADER playlist/preparser.h
   SOURCE playlist/tree.c
   SOURCE playlist/item.c
   SOURCE playlist/search.c
@@ -65,22 +65,22 @@ DLL libvlccore
   SOURCE input/es_out_timeshift.c
   SOURCE input/event.c
   SOURCE input/input.c
-  SOURCE input/info.h
+  HEADER input/info.h
   SOURCE input/meta.c
-  SOURCE input/clock.h
-  SOURCE input/decoder.h
-  SOURCE input/demux.h
-  SOURCE input/es_out.h
-  SOURCE input/es_out_timeshift.h
-  SOURCE input/event.h
-  SOURCE input/item.h
-  SOURCE input/mrl_helpers.h
-  SOURCE input/stream.h
-  SOURCE input/input_internal.h
-  SOURCE input/input_interface.h
-  SOURCE input/vlm_internal.h
-  SOURCE input/vlm_event.h
-  SOURCE input/resource.h
+  HEADER input/clock.h
+  HEADER input/decoder.h
+  HEADER input/demux.h
+  HEADER input/es_out.h
+  HEADER input/es_out_timeshift.h
+  HEADER input/event.h
+  HEADER input/item.h
+  HEADER input/mrl_helpers.h
+  HEADER input/stream.h
+  HEADER input/input_internal.h
+  HEADER input/input_interface.h
+  HEADER input/vlm_internal.h
+  HEADER input/vlm_event.h
+  HEADER input/resource.h
   SOURCE input/resource.c
   SOURCE input/services_discovery.c
   SOURCE input/stats.c
@@ -91,36 +91,36 @@ DLL libvlccore
   SOURCE input/stream_memory.c
   SOURCE input/subtitles.c
   SOURCE input/var.c
-  SOURCE audio_output/aout_internal.h
+  HEADER audio_output/aout_internal.h
   SOURCE audio_output/common.c
   SOURCE audio_output/dec.c
   SOURCE audio_output/filters.c
   SOURCE audio_output/output.c
   SOURCE audio_output/volume.c
-  SOURCE video_output/chrono.h
+  HEADER video_output/chrono.h
   SOURCE video_output/control.c
-  SOURCE video_output/control.h
+  HEADER video_output/control.h
   SOURCE video_output/display.c
-  SOURCE video_output/display.h
-  SOURCE video_output/event.h
+  HEADER video_output/display.h
+  HEADER video_output/event.h
   SOURCE video_output/inhibit.c
-  SOURCE video_output/inhibit.h
+  HEADER video_output/inhibit.h
   SOURCE video_output/interlacing.c
-  SOURCE video_output/interlacing.h
+  HEADER video_output/interlacing.h
   SOURCE video_output/snapshot.c
-  SOURCE video_output/snapshot.h
-  SOURCE video_output/statistic.h
+  HEADER video_output/snapshot.h
+  HEADER video_output/statistic.h
   SOURCE video_output/video_output.c
   SOURCE video_output/video_text.c
   SOURCE video_output/video_epg.c
   SOURCE video_output/video_widgets.c
   SOURCE video_output/vout_subpictures.c
   SOURCE video_output/window.c
-  SOURCE video_output/window.h
+  HEADER video_output/window.h
   SOURCE video_output/opengl.c
   SOURCE video_output/vout_intf.c
-  SOURCE video_output/vout_internal.h
-  SOURCE video_output/vout_control.h
+  HEADER video_output/vout_internal.h
+  HEADER video_output/vout_control.h
   SOURCE video_output/vout_wrapper.c
   SOURCE network/getaddrinfo.c
   SOURCE network/http_auth.c
@@ -136,7 +136,7 @@ DLL libvlccore
   SOURCE text/url.c
   SOURCE text/filesystem.c
   SOURCE text/iso_lang.c
-  SOURCE text/iso-639_def.h
+  HEADER text/iso-639_def.h
   SOURCE misc/md5.c
   SOURCE misc/probe.c
   SOURCE misc/rand.c
@@ -144,13 +144,13 @@ DLL libvlccore
   SOURCE misc/block.c
   SOURCE misc/fifo.c
   SOURCE misc/fourcc.c
-  SOURCE misc/fourcc_list.h
+  HEADER misc/fourcc_list.h
   SOURCE misc/es_format.c
   SOURCE misc/picture.c
-  SOURCE misc/picture.h
+  HEADER misc/picture.h
   SOURCE misc/picture_fifo.c
   SOURCE misc/picture_pool.c
-  SOURCE misc/interrupt.h
+  HEADER misc/interrupt.h
   SOURCE misc/interrupt.c
   SOURCE misc/keystore.c
   SOURCE misc/renderer_discovery.c
@@ -163,7 +163,7 @@ DLL libvlccore
   SOURCE misc/messages.c
   SOURCE misc/mime.c
   SOURCE misc/objects.c
-  SOURCE misc/variables.h
+  HEADER misc/variables.h
   SOURCE misc/variables.c
   SOURCE misc/error.c
   SOURCE misc/xml.c
@@ -174,7 +174,7 @@ DLL libvlccore
   SOURCE misc/fingerprinter.c
   SOURCE misc/text_style.c
   SOURCE misc/subpicture.c
-  SOURCE misc/subpicture.h
+  HEADER misc/subpicture.h
   
   IF ENABLE_SOUT
     SOURCE stream_output/sap.c
