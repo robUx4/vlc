@@ -13,7 +13,7 @@ CON vlc-cache-gen
   USE libvlc
   SOURCE cachegen.c
   IF TARGET_WIN
-    SOURCEAM vlc_win32_rc.rc.in
+    SOURCEAM(!COMPILER_MSVC)  vlc_win32_rc.rc.in
     // for the resource file
     INCLUDE ../share/icons
     INCLUDE ../extras/package/win32
@@ -29,7 +29,7 @@ CON(!HAVE_DARWIN) vlc
   DEFINE(HAVE_DBUS) HAVE_DBUS
   IF TARGET_WIN
     SOURCE winvlc.c
-    SOURCEAM vlc_win32_rc.rc.in
+    SOURCEAM(!COMPILER_MSVC)  vlc_win32_rc.rc.in
     // for the resource file
     INCLUDE ../share/icons
     INCLUDE ../extras/package/win32
