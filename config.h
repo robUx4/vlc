@@ -535,7 +535,7 @@
 #define HAVE_STDLIB_H 1
 
 /* Define to 1 if you have the `strcasecmp' function. */
-#define HAVE_STRCASECMP 1
+/* #undef HAVE_STRCASECMP */
 
 /* Define to 1 if you have the `strcasestr' function. */
 /* #undef HAVE_STRCASESTR */
@@ -687,7 +687,7 @@
 #define HAVE_ZLIB_H 1
 
 /* Define to 1 if you have the `_lock_file' function. */
-#define HAVE__LOCK_FILE 1
+/* #undef HAVE__LOCK_FILE */
 
 /* Define as const if the declaration of iconv() needs const. */
 #define ICONV_CONST 
@@ -747,7 +747,9 @@
 #define STDC_HEADERS 1
 
 /* Define to 1 for Unicode (Wide Chars) APIs. */
+#ifndef UNICODE
 #define UNICODE 1
+#endif
 
 /* Enable extensions on AIX 3, Interix.  */
 #ifndef _ALL_SOURCE
@@ -845,7 +847,9 @@
 #define _THREAD_SAFE /**/
 
 /* Define to 1 for Unicode (Wide Chars) APIs. */
+#ifndef _UNICODE
 #define _UNICODE 1
+#endif
 
 /* Define to '0x0600' for IE 6.0 (and shell) APIs. */
 #define _WIN32_IE 0x0600
