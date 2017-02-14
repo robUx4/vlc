@@ -121,7 +121,7 @@
 /* #undef HAVE_ARPA_INET_H */
 
 /* Define to 1 if you have asprintf function */
-#define HAVE_ASPRINTF 1
+/* #undef HAVE_ASPRINTF */
 
 /* Define to 1 if you have the `atof' function. */
 #define HAVE_ATOF 1
@@ -130,7 +130,7 @@
 #define HAVE_ATOLL 1
 
 /* Support for __attribute__((packed)) for structs */
-#define HAVE_ATTRIBUTE_PACKED 1
+/* #undef HAVE_ATTRIBUTE_PACKED */
 
 /* Define to 1 if you have the <audio_io.h> header file. */
 /* #undef HAVE_AUDIO_IO_H */
@@ -258,7 +258,7 @@
 #define HAVE_GL_WGLEW_H 1
 
 /* Define to 1 if you have gmtime_r function */
-#define HAVE_GMTIME_R 1
+/* #undef HAVE_GMTIME_R */
 
 /* Define if you have the iconv() function and it works. */
 /* #undef HAVE_ICONV */
@@ -267,7 +267,7 @@
 #define HAVE_ID3D11VIDEODECODER 1
 
 /* Define to 1 if you have GNU libidn. */
-/*#undef HAVE_IDN */
+/* #undef HAVE_IDN */
 
 /* Define to 1 if you have the `if_nameindex' function. */
 /* #undef HAVE_IF_NAMEINDEX */
@@ -366,7 +366,7 @@
 #define HAVE_LLDIV 1
 
 /* Define to 1 if you have localtime_r function */
-#define HAVE_LOCALTIME_R 1
+/* #undef HAVE_LOCALTIME_R */
 
 /* Define to 1 if you have the lrintf function */
 #define HAVE_LRINTF 1
@@ -584,7 +584,7 @@
 #define HAVE_STRTOF 1
 
 /* Define to 1 if you have the `strtok_r' function. */
-#define HAVE_STRTOK_R 1
+/* #undef HAVE_STRTOK_R */
 
 /* Define to 1 if you have the `strtoll' function. */
 #define HAVE_STRTOLL 1
@@ -644,7 +644,7 @@
 /* #undef HAVE_TIMEGM */
 
 /* Define to 1 if you have the `timespec_get' function. */
-/* #undef HAVE_TIMESPEC_GET */
+#define HAVE_TIMESPEC_GET 1
 
 /* Define to 1 if vlc is built against Tizen SDK */
 /* #undef HAVE_TIZEN_SDK */
@@ -665,7 +665,7 @@
 /* #undef HAVE_VALGRIND_VALGRIND_H */
 
 /* Define to 1 if you have vasprintf function */
-#define HAVE_VASPRINTF 1
+/* #undef HAVE_VASPRINTF */
 
 /* Define to 1 if you have the <VideoDecodeAcceleration/VDADecoder.h> header
    file. */
@@ -878,7 +878,7 @@
 /* Define to the equivalent of the C99 'restrict' keyword, or to
    nothing if this is not supported.  Do not define if restrict is
    supported directly.  */
-#define restrict __restrict
+/* #undef restrict */
 /* Work around a bug in Sun C++: it does not support _Restrict or
    __restrict__, even though the corresponding Sun C compiler ends up with
    "#define restrict _Restrict" or "#define restrict __restrict__" in the
