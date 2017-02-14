@@ -5,6 +5,7 @@ LIB compat
   OUTPUT_DIR compat
   USE coremake_automake
 
+  SOURCE(!HAVE_ASPRINTF) asprintf.c
   SOURCE(!HAVE_STRNDUP) strndup.c
   SOURCE(!HAVE_STRSEP) strsep.c
   SOURCE(!HAVE_GETDELIM) getdelim.c
@@ -22,4 +23,8 @@ LIB compat
   SOURCE(!HAVE_REALPATH) realpath.c
   SOURCE(!HAVE_FLOCKFILE) flockfile.c
   SOURCE(!HAVE_SETENV) setenv.c
+  SOURCE(!HAVE_VASPRINTF) vasprintf.c
+  SOURCE(!HAVE_GMTIME_R) gmtime_r.c
+  SOURCE(!HAVE_LOCALTIME_R) localtime_r.c
+  SOURCE(!HAVE_STRTOK_R) strtok_r.c
 }
