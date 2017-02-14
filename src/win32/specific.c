@@ -33,6 +33,7 @@
 #include "../lib/libvlc_internal.h"
 #include "config/vlc_getopt.h"
 
+#include <windows.h>
 #include <mmsystem.h>
 #include <winsock.h>
 
