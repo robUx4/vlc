@@ -9,7 +9,6 @@ DLL libvlccore
   
   INCLUDE ../include
 
-  SOURCE fourcc_tables.h
   SOURCE libvlc.c
   HEADER libvlc.h
   SOURCE libvlc-module.c
