@@ -16,6 +16,8 @@ GROUP coremake_automake
   NO_PROJECT .
   HEADER config.h
   INCLUDE include
+
+  USE msvc_compat
 }
 
 #include "*/*.proj"
