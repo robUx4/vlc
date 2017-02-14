@@ -1,3 +1,5 @@
+#include "*/*.proj"
+
 LIB compat
 {
   OUTPUT_DIR compat
