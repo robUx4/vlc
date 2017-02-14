@@ -197,7 +197,7 @@ DLL libvlccore
     LIBS(!WINSTORE_APP) advapi32.lib
     LIBS(!WINSTORE_APP) user32.lib
 
-    SOURCEAM libvlc_win32_rc.rc.in
+    SOURCEAM(!COMPILER_MSVC) libvlc_win32_rc.rc.in
     SOURCE win32/dirs.c
     SOURCE win32/error.c
     SOURCE win32/filesystem.c
