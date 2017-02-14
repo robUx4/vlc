@@ -8,6 +8,7 @@ DLL libvlccore
   USE iconv
   
   INCLUDE ../include
+  INCLUDE .
 
   SOURCE libvlc.c
   HEADER libvlc.h
