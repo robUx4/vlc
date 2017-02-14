@@ -1,7 +1,7 @@
 GROUP(COMPILER_MSVC) msvc_compat
 {
   INCLUDE .
+  HEADER_FORCE msvc_fixup.h
   HEADER dirent.h
-  HEADER msvc_fixup.h
   HEADER(VLC_WINSTORE_APP) winstorecompat.h
 }
