@@ -191,8 +191,11 @@ DLL libvlccore
   
   IF TARGET_WIN
     INCLUDE ../extras/package/win32
+    LIBS shell32.lib
     LIBS ws2_32.lib
     LIBS winmm.lib
+    LIBS(!WINSTORE_APP) advapi32.lib
+    LIBS(!WINSTORE_APP) user32.lib
 
     SOURCEAM libvlc_win32_rc.rc.in
     SOURCE win32/dirs.c
