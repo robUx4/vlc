@@ -6,10 +6,12 @@
 #define WIN32_LEAN_AND_MEAN
 #endif /* WIN32_LEAN_AND_MEAN */
 
+#if 0
 #ifndef NOUSER
 #define NOUSER /* avoid bogus pragma push/pop */
 typedef struct tagMSG MSG, *LPMSG;
 #endif /* NOUSER */
+#endif
 
 #ifndef WIN32
 #define WIN32
