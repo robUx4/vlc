@@ -36,6 +36,7 @@
 #ifdef __MINGW32__
 # include <w32api.h>
 #endif
+#include <windows.h>
 #include <direct.h>
 #include <shlobj.h>
 
