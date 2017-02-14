@@ -20,7 +20,7 @@ DLL libvlc
   SOURCE media.c
   SOURCE media_player.c
   SOURCE media_list.c
-  SOURCE media_list_path.h
+  HEADER media_list_path.h
   SOURCE media_list_player.c
   SOURCE media_library.c
   SOURCE media_discoverer.c
