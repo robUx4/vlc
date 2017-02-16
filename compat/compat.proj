@@ -5,6 +5,8 @@ LIB compat
   OUTPUT_DIR compat
   USE coremake_automake
 
+  LIBS(TARGET_WIN) ws2_32.lib
+
   SOURCE(!HAVE_ASPRINTF) asprintf.c
   SOURCE(!HAVE_STRNDUP) strndup.c
   SOURCE(!HAVE_STRSEP) strsep.c
