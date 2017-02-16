@@ -8,6 +8,11 @@ WORKSPACE vlc
   USE vlc-cache-gen
 }
 
+GROUP coremake_libtool
+{
+  DEFINE DLL_EXPORT
+}
+
 GROUP coremake_automake
 {
   // from automake

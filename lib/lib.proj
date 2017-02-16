@@ -2,6 +2,7 @@ DLL libvlc
 {
   OUTPUT_DIR lib
   USE coremake_automake
+  USE coremake_libtool
 
   USE compat
   USE libvlccore
