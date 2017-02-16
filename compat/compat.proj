@@ -27,4 +27,5 @@ LIB compat
   SOURCE(!HAVE_GMTIME_R) gmtime_r.c
   SOURCE(!HAVE_LOCALTIME_R) localtime_r.c
   SOURCE(!HAVE_STRTOK_R) strtok_r.c
+  SOURCE(!HAVE_TFIND) tfind.c
 }
