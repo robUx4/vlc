@@ -20,7 +20,7 @@ CON vlc-cache-gen
   ENDIF
 }
 
-CON(!HAVE_DARWIN) vlc
+EXE(!HAVE_DARWIN) vlc
 {
   OUTPUT_DIR bin
   USE coremake_automake
@@ -28,6 +28,8 @@ CON(!HAVE_DARWIN) vlc
   USE libvlc
   DEFINE(HAVE_DBUS) HAVE_DBUS
   IF TARGET_WIN
+    LIBS user32.lib
+    LIBS advapi32.lib
     SOURCE winvlc.c
     SOURCEAM(!COMPILER_MSVC)  vlc_win32_rc.rc.in
     // for the resource file
