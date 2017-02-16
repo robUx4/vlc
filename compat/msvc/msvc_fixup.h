@@ -46,7 +46,7 @@ typedef _off_t off_t;
 
 typedef unsigned int mode_t;
 //# define N_(x) x
-# define _(x) x
+//# define _(x) x
 
 #if _MSC_VER < 1900
 # ifndef __cplusplus
@@ -62,6 +62,8 @@ typedef unsigned int mode_t;
 
 #if defined(__clang__) /* && !defined(__cplusplus) */
 # define restrict __restrict
+#else
+# define restrict 
 #endif
 
 // Stats part
