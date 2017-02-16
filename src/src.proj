@@ -2,6 +2,7 @@ DLL libvlccore
 {
   OUTPUT_DIR src
   USE coremake_automake
+  USE coremake_libtool
 
   USE fourcc_tables.h
   USE compat
