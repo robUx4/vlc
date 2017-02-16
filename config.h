@@ -499,7 +499,7 @@
 /* #undef HAVE_SCSIREQ_IN_SYS_SCSIIO_H */
 
 /* Define to 1 if you have the <search.h> header file. */
-#define HAVE_SEARCH_H 1
+/* #undef HAVE_SEARCH_H */
 
 /* Define to 1 if you have the `sendmsg' function. */
 /* #undef HAVE_SENDMSG */
@@ -635,7 +635,7 @@
 /* #undef HAVE_TDESTROY */
 
 /* Define to 1 if you have the `tfind' function. */
-#define HAVE_TFIND 1
+/* #undef HAVE_TFIND */
 
 /* Define if libtiger is available. */
 /* #undef HAVE_TIGER */
