@@ -240,7 +240,7 @@
 #define HAVE_GETENV 1
 
 /* Define to 1 if you have the <getopt.h> header file. */
-#define HAVE_GETOPT_H 1
+/* #undef HAVE_GETOPT_H */
 
 /* Define to 1 if you have the `getpid' function. */
 #define HAVE_GETPID 1
