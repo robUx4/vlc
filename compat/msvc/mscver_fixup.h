@@ -78,4 +78,7 @@ typedef unsigned int mode_t;
 #endif
 #endif
 
+/* make sure math.h defines the values we want */
+#define _USE_MATH_DEFINES
+
 #endif /* _MSC_VER */
