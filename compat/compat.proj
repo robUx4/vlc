@@ -30,4 +30,5 @@ LIB compat
   SOURCE(!HAVE_LOCALTIME_R) localtime_r.c
   SOURCE(!HAVE_STRTOK_R) strtok_r.c
   SOURCE(!HAVE_TFIND) tfind.c
+  SOURCE(!HAVE_SINCOS) sincos.c
 }
