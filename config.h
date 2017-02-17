@@ -511,7 +511,7 @@
 #define HAVE_SETLOCALE 1
 
 /* Define to 1 if you have the sincos function. */
-#define HAVE_SINCOS 1
+/* #undef HAVE_SINCOS */
 
 /* Define to 1 if you have the <SLES/OpenSLES.h> header file. */
 /* #undef HAVE_SLES_OPENSLES_H */
