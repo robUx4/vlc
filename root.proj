@@ -6,6 +6,7 @@ WORKSPACE vlc
   USE vlc
   USE vlc-static
   USE vlc-cache-gen
+  USE modules
 }
 
 GROUP coremake_libtool
