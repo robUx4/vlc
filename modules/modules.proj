@@ -1,0 +1,58 @@
+GROUP modules
+{
+  USE access
+  USE access_http
+  USE access_rtp
+  USE arm_neon
+  USE audio_filter
+  USE audio_mixer
+  USE audio_output
+  USE codec
+  USE control
+  USE demux
+  USE gui
+  USE hw_vdpau
+  USE keystore
+  USE logger
+  USE lua
+  USE meta_engine
+  USE misc
+  USE notify
+  USE packetizer
+  USE services_discovery
+  USE spu
+  USE stream_filter
+  USE stream_extractor
+  USE text_renderer
+  USE video_chroma
+  USE video_filter
+  USE video_splitter
+  USE video_output
+  USE visualization
+  IF ENABLE_SOUT
+    USE access_output
+    USE mux
+    USE stream_out
+  ENDIF
+  IF HAVE_MMAL
+    USE hw_mmal
+  ENDIF
+
+  IF TARGET_WIN
+    SOURCEAM(!COMPILER_MSVC)  module.rc.in
+  ENDIF
+}
+
+GROUP modules_common
+{
+  OUTPUT_DIR modules
+  IF HAVE_DYNAMIC_PLUGINS
+    DEFINE __PLUGIN__
+  ELSE
+    DEFINE "MODULE_NAME=$(MODULE_NAME)"
+  ENDIF
+  USE compat
+  USE libvlccore
+}
+
+#include "*/*.proj"

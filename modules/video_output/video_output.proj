@@ -1,0 +1,107 @@
+DLL(HAVE_WIN32_DESKTOP) direct3d9_plugin
+{
+  USE coremake_automake
+  USE coremake_libtool
+  USE modules_common
+
+  SOURCE win32/direct3d9.c
+  SOURCE win32/common.c
+  HEADER win32/common.h
+  SOURCE win32/events.c
+  HEADER win32/events.h
+  HEADER win32/builtin_shaders.h
+  SOURCE win32/win32touch.c
+  HEADER win32/win32touch.h
+  
+  DEFINE MODULE_NAME_IS_direct3d9
+  LIBS gdi32.lib
+  LIBS uuid.lib
+}
+
+DLL direct3d11_plugin
+{
+  USE coremake_automake
+  USE coremake_libtool
+  USE modules_common
+
+  SOURCE win32/direct3d11.c
+  HEADER ../video_chroma/d3d11_fmt.h
+  SOURCE ../video_chroma/dxgi_fmt.c
+  HEADER ../video_chroma/dxgi_fmt.h
+  SOURCE win32/common.c
+  HEADER win32/common.h
+  
+  DEFINE MODULE_NAME_IS_direct3d11
+  
+  IF !HAVE_WINSTORE
+    SOURCE win32/events.c
+    HEADER win32/events.h
+    SOURCE win32/win32touch.c
+    HEADER win32/win32touch.h
+  ELSE
+    LIBS d3dcompiler_47.lib
+    LIBS uuid.lib
+  ENDIF
+  LIBS(!WINSTORE_APP) advapi32.lib
+  LIBS(!WINSTORE_APP) gdi32.lib
+  LIBS(!WINSTORE_APP) ole32.lib
+  LIBS(!WINSTORE_APP) shell32.lib
+  LIBS(!WINSTORE_APP) user32.lib
+}
+
+DLL(TARGET_WIN) drawable_plugin
+{
+  USE coremake_automake
+  USE coremake_libtool
+  USE modules_common
+
+  SOURCE drawable.c
+}
+
+DLL flaschen_plugin
+{
+  USE coremake_automake
+  USE coremake_libtool
+  USE modules_common
+
+  SOURCE flaschen.c
+  LIBS ws2_32.lib
+}
+
+DLL vdummy_plugin
+{
+  USE coremake_automake
+  USE coremake_libtool
+  USE modules_common
+
+  SOURCE vdummy.c
+}
+
+DLL vmem_plugin
+{
+  USE coremake_automake
+  USE coremake_libtool
+  USE modules_common
+
+  SOURCE vmem.c
+}
+
+DLL yuv_plugin
+{
+  USE coremake_automake
+  USE coremake_libtool
+  USE modules_common
+
+  SOURCE yuv.c
+}
+
+
+GROUP video_output
+{
+  USE direct3d9_plugin
+  USE direct3d11_plugin
+  USE flaschen_plugin
+  USE vdummy_plugin
+  USE yuv_plugin
+  USE vmem_plugin
+}
