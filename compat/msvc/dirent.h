@@ -24,7 +24,22 @@
 #include <stdlib.h>
 #include <io.h>
 
-#include <windows.h> /* for GetFileAttributes */
+/* defines to avoid including windows.h prematurely */
+typedef unsigned long DIRENT_DWORD;
+#define DIRENT_MAX_PATH                 260
+#define DIRENT_INVALID_FILE_ATTRIBUTES  ((DIRENT_DWORD)-1)
+#define DIRENT_FILE_ATTRIBUTE_DIRECTORY  0x00000010
+#define DIRENT_ERROR_NO_MORE_FILES       18L
+#define DIRENT_WINBASEAPI                __declspec(dllimport)
+extern DIRENT_WINBASEAPI DIRENT_DWORD GetLastError(void);
+#ifdef UNICODE
+extern DIRENT_WINBASEAPI DIRENT_DWORD GetFileAttributesW(const wchar_t *lpFileName);
+#define dirent_GetFileAttributes  GetFileAttributesW
+#else
+extern DIRENT_WINBASEAPI DIRENT_DWORD GetFileAttributesW(const char *lpFileName);
+#define dirent_GetFileAttributes  GetFileAttributesA
+#endif // !UNICODE
+
 
 #include <tchar.h>
 #define SUFFIX	_T("*")
@@ -136,7 +151,7 @@ _topendir (const _TCHAR *szPath)
 {
   _TDIR *nd;
   unsigned int rc;
-  _TCHAR szFullPath[MAX_PATH];
+  _TCHAR szFullPath[DIRENT_MAX_PATH];
 
   errno = 0;
 
@@ -153,14 +168,14 @@ _topendir (const _TCHAR *szPath)
     }
 
   /* Attempt to determine if the given path really is a directory. */
-  rc = GetFileAttributes (szPath);
-  if (rc == INVALID_FILE_ATTRIBUTES)
+  rc = dirent_GetFileAttributes (szPath);
+  if (rc == DIRENT_INVALID_FILE_ATTRIBUTES)
     {
       /* call GetLastError for more error info */
       errno = ENOENT;
       return (_TDIR *) 0;
     }
-  if (!(rc & FILE_ATTRIBUTE_DIRECTORY))
+  if (!(rc & DIRENT_FILE_ATTRIBUTE_DIRECTORY))
     {
       /* Error, entry exists but not a directory. */
       errno = ENOTDIR;
@@ -168,7 +183,7 @@ _topendir (const _TCHAR *szPath)
     }
 
   /* Make an absolute pathname.  */
-  _tfullpath (szFullPath, szPath, MAX_PATH);
+  _tfullpath (szFullPath, szPath, DIRENT_MAX_PATH);
 
   /* Allocate enough space to store DIR structure and the complete
    * directory path given. */
@@ -265,8 +280,8 @@ _treaddir (_TDIR * dirp)
 	  /* We are off the end or otherwise error.
 	     _findnext sets errno to ENOENT if no more file
 	     Undo this. */
-	  DWORD winerr = GetLastError ();
-	  if (winerr == ERROR_NO_MORE_FILES)
+      DIRENT_DWORD winerr = GetLastError ();
+	  if (winerr == DIRENT_ERROR_NO_MORE_FILES)
 	    errno = 0;
 	  _findclose (dirp->dd_handle);
 	  dirp->dd_handle = -1;
