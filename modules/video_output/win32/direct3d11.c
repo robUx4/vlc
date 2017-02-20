@@ -40,7 +40,7 @@
 #define COBJMACROS
 #include <initguid.h>
 #include <d3d11.h>
-#include <dxgi1_2.h>
+#include <dxgi1_3.h>
 #include <d3dcompiler.h>
 
 /* avoided until we can pass ISwapchainPanel without c++/cx mode
@@ -1413,6 +1413,34 @@ static int Direct3D11Open(vout_display_t *vd, video_format_t *fmt)
        msg_Err(vd, "Could not get the DXGI Adapter");
        return VLC_EGENERIC;
     }
+
+#ifndef NDEBUG
+    for (UINT adapter = 0;; adapter++)
+    {
+        IDXGIOutput *pOutput;
+        hr = IDXGIAdapter_EnumOutputs(dxgiadapter, adapter, &pOutput);
+        if (FAILED(hr))
+            break;
+
+        IDXGIOutput3 *pOutput3;
+        hr = ID3D11Device_QueryInterface( pOutput, &IID_IDXGIOutput3, (void **)&pOutput3);
+        if (SUCCEEDED(hr)) {
+            for (const d3d_format_t *output = GetRenderFormatList();
+                 output->name != NULL; ++output)
+            {
+                UINT supported;
+                hr = IDXGIOutput3_CheckOverlaySupport(pOutput3, output->formatTexture, (IUnknown*)sys->d3ddevice, &supported);
+                if (SUCCEEDED(hr))
+                {
+                    if (supported)
+                        msg_Dbg(vd, "format %s overlay support %x", output->name, supported);
+                }
+            }
+            IDXGIOutput_Release(pOutput3);
+        }
+        IDXGIOutput_Release(pOutput);
+    }
+#endif
 
     hr = IDXGIAdapter_GetParent(dxgiadapter, &IID_IDXGIFactory2, (void **)&dxgifactory);
     IDXGIAdapter_Release(dxgiadapter);
