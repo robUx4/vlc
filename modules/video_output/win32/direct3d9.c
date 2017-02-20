@@ -52,6 +52,13 @@
 #endif
 #include "../../video_chroma/d3d9_fmt.h"
 
+#ifdef _MSC_VER
+#define ID3DXBuffer_GetBufferPointer(This)	\
+    ( (This)->lpVtbl -> GetBufferPointer(This) ) 
+#define ID3DXBuffer_Release(This)	\
+    ( (This)->lpVtbl -> Release(This) ) 
+#endif
+
 #include "common.h"
 #include "builtin_shaders.h"
 
