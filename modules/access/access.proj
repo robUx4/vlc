@@ -1,0 +1,89 @@
+GROUP modules_access_automake
+{
+  USE modules_automake
+  INCLUDE .
+}
+
+DLL attachment_plugin
+{
+  USE modules_access_automake
+
+  SOURCE attachment.c
+}
+
+DLL filesystem_plugin
+{
+  USE modules_access_automake
+
+  HEADER fs.h
+  SOURCE file.c
+  SOURCE directory.c
+  SOURCE fs.c
+  LIBS(TARGET_WIN) shlwapi.lib
+}
+
+DLL dummy_plugin
+{
+  USE modules_access_automake
+
+  SOURCE idummy.c
+}
+
+DLL imem_plugin
+{
+  USE modules_access_automake
+
+  SOURCE imem-access.c
+}
+
+DLL access_imem_plugin
+{
+  USE modules_access_automake
+
+  SOURCE imem.c
+}
+
+DLL rar_plugin
+{
+  USE modules_access_automake
+
+  SOURCE rar/rar.c
+  HEADER rar/rar.h
+  SOURCE rar/access.c
+  SOURCE rar/stream.c
+  SOURCE rar/module.c
+}
+
+DLL sdp_plugin
+{
+  USE modules_access_automake
+
+  SOURCE sdp.c
+}
+
+DLL timecode_plugin
+{
+  USE modules_access_automake
+
+  SOURCE timecode.c
+}
+
+DLL vdr_plugin
+{
+  USE modules_access_automake
+
+  SOURCE vdr.c
+}
+
+GROUP access
+{
+  USE attachment_plugin
+  USE filesystem_plugin
+  USE dummy_plugin
+  USE imem_plugin
+  USE access_imem_plugin
+  USE rar_plugin
+  USE sdp_plugin
+  USE timecode_plugin
+  USE vdr_plugin
+}
