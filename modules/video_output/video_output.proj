@@ -1,8 +1,12 @@
+GROUP modules_video_output_automake
+{
+  USE modules_automake
+  INCLUDE .
+}
+
 DLL(HAVE_WIN32_DESKTOP) direct3d9_plugin
 {
-  USE coremake_automake
-  USE coremake_libtool
-  USE modules_common
+  USE modules_video_output_automake
 
   SOURCE win32/direct3d9.c
   SOURCE win32/common.c
@@ -20,9 +24,7 @@ DLL(HAVE_WIN32_DESKTOP) direct3d9_plugin
 
 DLL direct3d11_plugin
 {
-  USE coremake_automake
-  USE coremake_libtool
-  USE modules_common
+  USE modules_video_output_automake
 
   SOURCE win32/direct3d11.c
   HEADER ../video_chroma/d3d11_fmt.h
@@ -51,18 +53,14 @@ DLL direct3d11_plugin
 
 DLL(TARGET_WIN) drawable_plugin
 {
-  USE coremake_automake
-  USE coremake_libtool
-  USE modules_common
+  USE modules_video_output_automake
 
   SOURCE drawable.c
 }
 
 DLL flaschen_plugin
 {
-  USE coremake_automake
-  USE coremake_libtool
-  USE modules_common
+  USE modules_video_output_automake
 
   SOURCE flaschen.c
   LIBS ws2_32.lib
@@ -70,27 +68,21 @@ DLL flaschen_plugin
 
 DLL vdummy_plugin
 {
-  USE coremake_automake
-  USE coremake_libtool
-  USE modules_common
+  USE modules_video_output_automake
 
   SOURCE vdummy.c
 }
 
 DLL vmem_plugin
 {
-  USE coremake_automake
-  USE coremake_libtool
-  USE modules_common
+  USE modules_video_output_automake
 
   SOURCE vmem.c
 }
 
 DLL yuv_plugin
 {
-  USE coremake_automake
-  USE coremake_libtool
-  USE modules_common
+  USE modules_video_output_automake
 
   SOURCE yuv.c
 }
