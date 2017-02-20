@@ -49,10 +49,6 @@ typedef struct tagMSG MSG, *LPMSG;
 
 #define restrict 
 
-#define	S_ISFIFO(m)	(((m) & S_IFMT) == S_IFIFO)
-#define	S_ISCHR(m)	(((m) & S_IFMT) == S_IFCHR)
-#define	S_ISBLK(m)	(((m) & S_IFMT) == S_IFBLK)
-
 #define __func__ __FUNCDNAME__
 # if !defined(vsnprintf) && !defined(__cplusplus) && _MSC_VER < 1900
 #  define HAVE_VSNPRINTF /* bogus autoconf detection using a define */
