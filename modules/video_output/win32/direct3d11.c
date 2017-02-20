@@ -51,8 +51,8 @@
 #include "common.h"
 
 #if !VLC_WINSTORE_APP
-# define D3D11CreateDevice(args...)             sys->OurD3D11CreateDevice(args)
-# define D3DCompile(args...)                    sys->OurD3DCompile(args)
+# define D3D11CreateDevice(a, b, c, f, l, d, e, g, h, i)    sys->OurD3D11CreateDevice(a, b, c, f, l, d, e, g, h, i)
+# define D3DCompile(s, l, a, b, c, m, t, i, j, o, e)        sys->OurD3DCompile(s, l, a, b, c, m, t, i, j, o, e)
 #endif
 
 DEFINE_GUID(GUID_SWAPCHAIN_WIDTH,  0xf1b59347, 0x1643, 0x411a, 0xad, 0x6b, 0xc7, 0x80, 0x17, 0x7a, 0x06, 0xb6);
