@@ -55,4 +55,12 @@ GROUP modules_common
   USE libvlccore
 }
 
+GROUP modules_automake
+{
+  USE coremake_automake
+  USE coremake_libtool
+  USE modules_common
+  INCLUDE .
+}
+
 #include "*/*.proj"
