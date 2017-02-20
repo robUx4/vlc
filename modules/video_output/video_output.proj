@@ -4,9 +4,10 @@ GROUP modules_video_output_automake
   INCLUDE .
 }
 
-DLL(HAVE_WIN32_DESKTOP) direct3d9_plugin
+DLL(!WINSTORE_APP) direct3d9_plugin /* HAVE_WIN32_DESKTOP */
 {
   USE modules_video_output_automake
+  INCLUDE(COMPILER_MSVC) $(DXSDK_DIR)include
 
   SOURCE win32/direct3d9.c
   SOURCE win32/common.c
@@ -18,8 +19,11 @@ DLL(HAVE_WIN32_DESKTOP) direct3d9_plugin
   HEADER win32/win32touch.h
   
   DEFINE MODULE_NAME_IS_direct3d9
+  LIBS advapi32.lib
   LIBS gdi32.lib
-  LIBS uuid.lib
+  LIBS ole32.lib
+  LIBS shell32.lib
+  LIBS user32.lib
 }
 
 DLL direct3d11_plugin
