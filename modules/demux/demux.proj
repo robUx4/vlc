@@ -1,0 +1,492 @@
+GROUP modules_demux_automake
+{
+  USE modules_automake
+  INCLUDE .
+}
+
+DLL flacsys_plugin
+{
+  USE modules_demux_automake
+
+  SOURCE flac.c
+  HEADER xiph_metadata.h
+  SOURCE xiph_metadata.c
+}
+
+DLL demuxdump_plugin
+{
+  USE modules_demux_automake
+
+  SOURCE demuxdump.c
+}
+
+DLL rawdv_plugin
+{
+  USE modules_demux_automake
+
+  SOURCE rawdv.c
+  HEADER rawdv.h
+}
+
+DLL rawvid_plugin
+{
+  USE modules_demux_automake
+
+  SOURCE rawvid.c
+}
+
+DLL au_plugin
+{
+  USE modules_demux_automake
+
+  SOURCE au.c
+}
+
+DLL rawaud_plugin
+{
+  USE modules_demux_automake
+
+  SOURCE rawaud.c
+}
+
+DLL wav_plugin
+{
+  USE modules_demux_automake
+
+  SOURCE wav.c
+  HEADER windows_audio_commons.h
+}
+
+DLL nsv_plugin
+{
+  USE modules_demux_automake
+
+  SOURCE nsv.c
+}
+
+DLL real_plugin
+{
+  USE modules_demux_automake
+
+  SOURCE real.c
+}
+
+DLL ps_plugin
+{
+  USE modules_demux_automake
+
+  SOURCE mpeg/ps.c
+  HEADER mpeg/ps.h
+  HEADER mpeg/pes.h
+}
+
+DLL(HAVE_MODPLUG) mod_plugin
+{
+  USE modules_demux_automake
+
+  SOURCE mod.c
+}
+
+DLL pva_plugin
+{
+  USE modules_demux_automake
+
+  SOURCE pva.c
+}
+
+DLL aiff_plugin
+{
+  USE modules_demux_automake
+
+  SOURCE aiff.c
+}
+
+DLL mjpeg_plugin
+{
+  USE modules_demux_automake
+
+  SOURCE mjpeg.c
+  HEADER mxpeg_helper.h
+}
+
+DLL subtitle_plugin
+{
+  USE modules_demux_automake
+
+  SOURCE subtitle.c
+  HEADER subtitle_helper.h
+}
+
+DLL ty_plugin
+{
+  USE modules_demux_automake
+
+  SOURCE ty.c
+  HEADER ../codec/cc.h
+}
+
+DLL tta_plugin
+{
+  USE modules_demux_automake
+
+  SOURCE tta.c
+}
+
+DLL vc1_plugin
+{
+  USE modules_demux_automake
+
+  SOURCE vc1.c
+}
+
+DLL asf_plugin
+{
+  USE modules_demux_automake
+
+  SOURCE asf/asf.c
+  SOURCE asf/libasf.c
+  HEADER asf/libasf.h
+  SOURCE asf/asfpacket.c
+  HEADER asf/asfpacket.h
+  HEADER asf/libasf_guid.h
+}
+
+DLL caf_plugin
+{
+  USE modules_demux_automake
+
+  SOURCE caf.c
+}
+
+DLL mkv_plugin
+{
+  USE modules_demux_automake
+  USE matroska
+
+  HEADER mkv/util.hpp
+  SOURCE mkv/util.cpp
+  HEADER mkv/virtual_segment.hpp
+  SOURCE mkv/virtual_segment.cpp
+  HEADER mkv/matroska_segment.hpp
+  SOURCE mkv/matroska_segment.cpp
+  SOURCE mkv/matroska_segment_parse.cpp
+  HEADER mkv/matroska_segment_seeker.hpp
+  SOURCE mkv/matroska_segment_seeker.cpp
+  HEADER mkv/demux.hpp
+  SOURCE mkv/demux.cpp
+  HEADER mkv/dispatcher.hpp
+  HEADER mkv/string_dispatcher.hpp
+  HEADER mkv/Ebml_parser.hpp
+  SOURCE mkv/Ebml_parser.cpp
+  HEADER mkv/Ebml_dispatcher.hpp
+  HEADER mkv/chapters.hpp
+  SOURCE mkv/chapters.cpp
+  HEADER mkv/chapter_command.hpp
+  SOURCE mkv/chapter_command.cpp
+  HEADER mkv/stream_io_callback.hpp
+  SOURCE mkv/stream_io_callback.cpp
+  SOURCE mp4/libmp4.c
+  HEADER vobsub.h
+  HEADER mkv/mkv.hpp
+  SOURCE mkv/mkv.cpp
+  HEADER windows_audio_commons.h
+  HEADER ../packetizer/dts_header.h
+  SOURCE ../packetizer/dts_header.c
+
+  IF HAVE_ZLIB
+    LIBS z
+  ENDIF
+}
+
+DLL mp4_plugin
+{
+  USE modules_demux_automake
+
+  SOURCE mp4/mp4.c
+  HEADER mp4/mp4.h
+  SOURCE mp4/fragments.c
+  HEADER mp4/fragments.h
+  SOURCE mp4/libmp4.c
+  HEADER mp4/libmp4.h
+  HEADER mp4/id3genres.h
+  HEADER mp4/languages.h
+  SOURCE asf/asfpacket.c
+  HEADER asf/asfpacket.h
+  HEADER mp4/avci.h
+  SOURCE mp4/essetup.c
+  SOURCE mp4/meta.c
+
+  IF HAVE_ZLIB
+    LIBS z
+  ENDIF
+}
+
+DLL mpgv_plugin
+{
+  USE modules_demux_automake
+
+  SOURCE mpeg/mpgv.c
+}
+
+DLL(HAVE_DVBPSI) ts_plugin
+{
+  USE modules_demux_automake
+
+  SOURCE mpeg/ts.c
+  HEADER mpeg/ts.h
+  HEADER mpeg/ts_pid.h
+  HEADER mpeg/ts_pid_fwd.h
+  SOURCE mpeg/ts_pid.c
+  HEADER mpeg/ts_psi.h
+  SOURCE mpeg/ts_psi.c
+  HEADER mpeg/ts_si.h
+  SOURCE mpeg/ts_si.c
+  HEADER mpeg/ts_psip.h
+  SOURCE mpeg/ts_psip.c
+  HEADER mpeg/ts_psip_dvbpsi_fixes.h
+  SOURCE mpeg/ts_psip_dvbpsi_fixes.c
+  HEADER mpeg/ts_decoders.h
+  SOURCE mpeg/ts_decoders.c
+  HEADER mpeg/ts_streams.h
+  SOURCE mpeg/ts_streams.c
+  HEADER mpeg/ts_scte.h
+  SOURCE mpeg/ts_scte.c
+  SOURCE mpeg/sections.c
+  HEADER mpeg/sections.h
+  SOURCE mpeg/mpeg4_iod.c
+  HEADER mpeg/mpeg4_iod.h
+  SOURCE mpeg/ts_sl.c
+  HEADER mpeg/ts_sl.h
+  SOURCE mpeg/ts_metadata.c
+  HEADER mpeg/ts_metadata.h
+  SOURCE mpeg/ts_hotfixes.c
+  HEADER mpeg/ts_hotfixes.h
+  HEADER mpeg/ts_strings.h
+  HEADER mpeg/ts_streams_private.h
+  HEADER mpeg/pes.h
+  HEADER mpeg/timestamps.h
+  HEADER dvb-text.h
+  HEADER opus.h
+  SOURCE ../mux/mpeg/csa.c
+  HEADER ../mux/mpeg/dvbpsi_compat.h
+  HEADER ../mux/mpeg/streams.h
+  SOURCE ../mux/mpeg/tables.c
+  HEADER ../mpeg/tables.h
+  SOURCE ../mux/mpeg/tsutil.c
+  HEADER ../mpeg/tsutil.h
+  HEADER ../access/dtv/en50221_capmt.h
+  HEADER ../codec/scte18.h
+  SOURCE ../codec/atsc_a65.c
+  HEADER ../codec/atsc_a65.h
+  SOURCE ../codec/opus_header.c
+}
+
+DLL adaptive_plugin
+{
+  USE modules_demux_automake
+
+  SOURCE adaptive/playlist/AbstractPlaylist.cpp
+  HEADER adaptive/playlist/AbstractPlaylist.hpp
+  SOURCE adaptive/playlist/BaseAdaptationSet.cpp
+  HEADER adaptive/playlist/BaseAdaptationSet.h
+  SOURCE adaptive/playlist/BasePeriod.cpp
+  HEADER adaptive/playlist/BasePeriod.h
+  SOURCE adaptive/playlist/BaseRepresentation.cpp
+  HEADER adaptive/playlist/BaseRepresentation.h
+  SOURCE adaptive/playlist/CommonAttributesElements.cpp
+  HEADER adaptive/playlist/CommonAttributesElements.h
+  HEADER adaptive/playlist/ICanonicalUrl.hpp
+  HEADER adaptive/playlist/Inheritables.hpp
+  SOURCE adaptive/playlist/Inheritables.cpp
+  SOURCE adaptive/playlist/Segment.cpp
+  HEADER adaptive/playlist/Segment.h
+  SOURCE adaptive/playlist/SegmentBase.cpp
+  HEADER adaptive/playlist/SegmentBase.h
+  SOURCE adaptive/playlist/SegmentChunk.cpp
+  HEADER adaptive/playlist/SegmentChunk.hpp
+  SOURCE adaptive/playlist/SegmentInfoCommon.cpp
+  HEADER adaptive/playlist/SegmentInfoCommon.h
+  SOURCE adaptive/playlist/SegmentList.cpp
+  HEADER adaptive/playlist/SegmentList.h
+  SOURCE adaptive/playlist/SegmentTimeline.cpp
+  HEADER adaptive/playlist/SegmentTimeline.h
+  SOURCE adaptive/playlist/SegmentInformation.cpp
+  HEADER adaptive/playlist/SegmentInformation.hpp
+  SOURCE adaptive/playlist/SegmentTemplate.cpp
+  HEADER adaptive/playlist/SegmentTemplate.h
+  SOURCE adaptive/playlist/Url.cpp
+  HEADER adaptive/playlist/Url.hpp
+  HEADER adaptive/playlist/Templates.hpp
+  SOURCE adaptive/logic/AbstractAdaptationLogic.cpp
+  HEADER adaptive/logic/AbstractAdaptationLogic.h
+  SOURCE adaptive/logic/AlwaysBestAdaptationLogic.cpp
+  HEADER adaptive/logic/AlwaysBestAdaptationLogic.h
+  SOURCE adaptive/logic/AlwaysLowestAdaptationLogic.cpp
+  HEADER adaptive/logic/AlwaysLowestAdaptationLogic.hpp
+  HEADER adaptive/logic/IDownloadRateObserver.h
+  HEADER adaptive/logic/PredictiveAdaptationLogic.hpp
+  SOURCE adaptive/logic/PredictiveAdaptationLogic.cpp
+  HEADER adaptive/logic/RateBasedAdaptationLogic.h
+  SOURCE adaptive/logic/RateBasedAdaptationLogic.cpp
+  HEADER adaptive/logic/Representationselectors.hpp
+  SOURCE adaptive/logic/Representationselectors.cpp
+  SOURCE adaptive/mp4/AtomsReader.cpp
+  HEADER adaptive/mp4/AtomsReader.hpp
+  SOURCE adaptive/http/BytesRange.cpp
+  HEADER adaptive/http/BytesRange.hpp
+  SOURCE adaptive/http/Chunk.cpp
+  HEADER adaptive/http/Chunk.h
+  SOURCE adaptive/http/ConnectionParams.cpp
+  HEADER adaptive/http/ConnectionParams.hpp
+  SOURCE adaptive/http/Downloader.cpp
+  HEADER adaptive/http/Downloader.hpp
+  SOURCE adaptive/http/HTTPConnection.cpp
+  HEADER adaptive/http/HTTPConnection.hpp
+  SOURCE adaptive/http/HTTPConnectionManager.cpp
+  HEADER adaptive/http/HTTPConnectionManager.h
+  HEADER adaptive/http/Sockets.hpp
+  SOURCE adaptive/http/Sockets.cpp
+  SOURCE adaptive/plumbing/CommandsQueue.cpp
+  HEADER adaptive/plumbing/CommandsQueue.hpp
+  SOURCE adaptive/plumbing/Demuxer.cpp
+  HEADER adaptive/plumbing/Demuxer.hpp
+  SOURCE adaptive/plumbing/FakeESOut.cpp
+  HEADER adaptive/plumbing/FakeESOut.hpp
+  SOURCE adaptive/plumbing/FakeESOutID.cpp
+  HEADER adaptive/plumbing/FakeESOutID.hpp
+  SOURCE adaptive/plumbing/SourceStream.cpp
+  HEADER adaptive/plumbing/SourceStream.hpp
+  HEADER adaptive/ChunksSource.hpp
+  HEADER adaptive/ID.hpp
+  SOURCE adaptive/ID.cpp
+  SOURCE adaptive/PlaylistManager.cpp
+  HEADER adaptive/PlaylistManager.h
+  SOURCE adaptive/SegmentTracker.cpp
+  HEADER adaptive/SegmentTracker.hpp
+  SOURCE adaptive/StreamFormat.cpp
+  HEADER adaptive/StreamFormat.hpp
+  SOURCE adaptive/Streams.cpp
+  HEADER adaptive/Streams.hpp
+  HEADER adaptive/Time.hpp
+  HEADER adaptive/tools/Conversions.hpp
+  SOURCE adaptive/tools/Conversions.cpp
+  HEADER adaptive/tools/Debug.hpp
+  SOURCE adaptive/tools/Helper.cpp
+  HEADER adaptive/tools/Helper.h
+  HEADER adaptive/tools/MovingAverage.hpp
+  HEADER adaptive/tools/Properties.hpp
+  SOURCE adaptive/tools/Retrieve.cpp
+  HEADER adaptive/tools/Retrieve.hpp
+  SOURCE adaptive/xml/DOMHelper.cpp
+  HEADER adaptive/xml/DOMHelper.h
+  SOURCE adaptive/xml/DOMParser.cpp
+  HEADER adaptive/xml/DOMParser.h
+  SOURCE adaptive/xml/Node.cpp
+  HEADER adaptive/xml/Node.h
+  SOURCE dash/mpd/AdaptationSet.cpp
+  HEADER dash/mpd/AdaptationSet.h
+  SOURCE dash/mpd/DASHCommonAttributesElements.cpp
+  HEADER dash/mpd/DASHCommonAttributesElements.h
+  SOURCE dash/mpd/DASHSegment.cpp
+  HEADER dash/mpd/DASHSegment.h
+  SOURCE dash/mpd/ContentDescription.cpp
+  HEADER dash/mpd/ContentDescription.h
+  SOURCE dash/mpd/IsoffMainParser.cpp
+  HEADER dash/mpd/IsoffMainParser.h
+  SOURCE dash/mpd/MPD.cpp
+  HEADER dash/mpd/MPD.h
+  SOURCE dash/mpd/Period.cpp
+  HEADER dash/mpd/Period.h
+  SOURCE dash/mpd/Profile.cpp
+  HEADER dash/mpd/Profile.hpp
+  SOURCE dash/mpd/ProgramInformation.cpp
+  HEADER dash/mpd/ProgramInformation.h
+  SOURCE dash/mpd/Representation.cpp
+  HEADER dash/mpd/Representation.h
+  SOURCE dash/mpd/TrickModeType.cpp
+  HEADER dash/mpd/TrickModeType.h
+  SOURCE dash/mp4/IndexReader.cpp
+  HEADER dash/mp4/IndexReader.hpp
+  SOURCE dash/DASHManager.cpp
+  HEADER dash/DASHManager.h
+  SOURCE dash/DASHStream.cpp
+  HEADER dash/DASHStream.hpp
+  HEADER hls/playlist/M3U8.hpp
+  SOURCE hls/playlist/M3U8.cpp
+  HEADER hls/playlist/Parser.hpp
+  SOURCE hls/playlist/Parser.cpp
+  HEADER hls/playlist/Representation.hpp
+  SOURCE hls/playlist/Representation.cpp
+  HEADER hls/playlist/HLSSegment.hpp
+  SOURCE hls/playlist/HLSSegment.cpp
+  HEADER hls/playlist/Tags.hpp
+  SOURCE hls/playlist/Tags.cpp
+  HEADER hls/HLSManager.hpp
+  SOURCE hls/HLSManager.cpp
+  HEADER hls/HLSStreams.hpp
+  SOURCE hls/HLSStreams.cpp
+  HEADER ../meta_engine/ID3Tag.h
+  HEADER ../meta_engine/ID3Meta.h
+  SOURCE smooth/mp4/IndexReader.cpp
+  HEADER smooth/mp4/IndexReader.hpp
+  HEADER smooth/playlist/ForgedInitSegment.hpp
+  SOURCE smooth/playlist/ForgedInitSegment.cpp
+  HEADER smooth/playlist/Manifest.hpp
+  SOURCE smooth/playlist/Manifest.cpp
+  HEADER smooth/playlist/MemoryChunk.hpp
+  SOURCE smooth/playlist/MemoryChunk.cpp
+  HEADER smooth/playlist/Parser.hpp
+  SOURCE smooth/playlist/Parser.cpp
+  HEADER smooth/playlist/Representation.hpp
+  SOURCE smooth/playlist/Representation.cpp
+  HEADER smooth/playlist/SmoothSegment.hpp
+  SOURCE smooth/playlist/SmoothSegment.cpp
+  HEADER smooth/SmoothManager.hpp
+  SOURCE smooth/SmoothManager.cpp
+  HEADER smooth/SmoothStream.hpp
+  SOURCE smooth/SmoothStream.cpp
+  SOURCE ../mux/mp4/libmp4mux.c
+  HEADER ../mux/mp4/libmp4mux.h
+  SOURCE ../packetizer/h264_nal.c
+  HEADER ../packetizer/h264_nal.h
+
+  SOURCE adaptive/adaptive.cpp
+  SOURCE mp4/libmp4.c
+  HEADER mp4/libmp4.h
+
+  INCLUDE adaptive
+
+  IF HAVE_ZLIB
+    LIBS z
+  ENDIF
+}
+
+
+GROUP demux
+{
+  USE flacsys_plugin
+  USE demuxdump_plugin
+  USE rawdv_plugin
+  USE rawvid_plugin
+  USE au_plugin
+  USE rawaud_plugin
+  USE wav_plugin
+  USE nsv_plugin
+  USE real_plugin
+  USE ps_plugin
+  USE mod_plugin
+  USE pva_plugin
+  USE aiff_plugin
+  USE mjpeg_plugin
+  USE subtitle_plugin
+  USE ty_plugin
+  USE tta_plugin
+  USE vc1_plugin
+  USE asf_plugin
+  USE caf_plugin
+  USE mkv_plugin
+  USE mp4_plugin
+  USE mpgv_plugin
+  USE ts_plugin
+  USE adaptive_plugin
+}
