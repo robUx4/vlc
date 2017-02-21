@@ -3,8 +3,13 @@
 LIB iconv
 {
   EXPDEFINE HAVE_ICONV
+  DEFINE LIBDIR /* DIRTY */
+  INCLUDE ..
+  INCLUDE .
+  INCLUDE ../include
+  EXPINCLUDE ../include
   SOURCE iconv.c 
   SOURCE relocatable.c
-  SOURCE ../windows/libiconv.rc
+  SOURCE(!COMPILER_MSVC) ../windows/libiconv.rc
   SOURCE ../libcharset/lib/localcharset.c
 }
