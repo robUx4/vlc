@@ -177,6 +177,8 @@ DLL libvlccore
   SOURCE misc/subpicture.c
   HEADER misc/subpicture.h
   
+  HEADER ../include/vlc_aout.h
+  
   IF ENABLE_SOUT
     SOURCE stream_output/sap.c
     SOURCE stream_output/sdp.c
