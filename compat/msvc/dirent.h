@@ -24,6 +24,10 @@
 #include <stdlib.h>
 #include <io.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /* defines to avoid including windows.h prematurely */
 typedef unsigned long DIRENT_DWORD;
 #define DIRENT_MAX_PATH                 260
@@ -31,12 +35,13 @@ typedef unsigned long DIRENT_DWORD;
 #define DIRENT_FILE_ATTRIBUTE_DIRECTORY  0x00000010
 #define DIRENT_ERROR_NO_MORE_FILES       18L
 #define DIRENT_WINBASEAPI                __declspec(dllimport)
-extern DIRENT_WINBASEAPI DIRENT_DWORD GetLastError(void);
+#define DIRENT_WINAPI                    __stdcall
+extern DIRENT_WINBASEAPI DIRENT_DWORD DIRENT_WINAPI GetLastError(void);
 #ifdef UNICODE
-extern DIRENT_WINBASEAPI DIRENT_DWORD GetFileAttributesW(const wchar_t *lpFileName);
+extern DIRENT_WINBASEAPI DIRENT_DWORD DIRENT_WINAPI GetFileAttributesW(const wchar_t *lpFileName);
 #define dirent_GetFileAttributes  GetFileAttributesW
 #else
-extern DIRENT_WINBASEAPI DIRENT_DWORD GetFileAttributesW(const char *lpFileName);
+extern DIRENT_WINBASEAPI DIRENT_DWORD DIRENT_WINAPI GetFileAttributesW(const char *lpFileName);
 #define dirent_GetFileAttributes  GetFileAttributesA
 #endif // !UNICODE
 
@@ -58,10 +63,6 @@ extern DIRENT_WINBASEAPI DIRENT_DWORD GetFileAttributesW(const char *lpFileName)
 #define opendir(x)  NULL
 #define readdir(x)  NULL
 #define closedir(x)
-
-#ifdef __cplusplus
-extern "C" {
-#endif
 
 struct dirent
 {
