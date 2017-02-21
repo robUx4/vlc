@@ -57,7 +57,7 @@ GROUP modules_common
 
 GROUP modules_automake
 {
-  USE coremake_automake
+  USE root_coremake_automake
   USE coremake_libtool
   USE modules_common
   INCLUDE .
