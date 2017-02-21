@@ -1,0 +1,173 @@
+GROUP modules_audio_output_automake
+{
+  USE modules_automake
+  INCLUDE .
+}
+
+DLL(HAVE_ANDROID) android_audiotrack_plugin
+{
+  USE modules_audio_output_automake
+
+}
+
+DLL(HAVE_ANDROID) opensles_android_plugin
+{
+  USE modules_audio_output_automake
+
+}
+
+DLL adummy_plugin
+{
+  USE modules_audio_output_automake
+
+  SOURCE adummy.c
+}
+
+DLL afile_plugin
+{
+  USE modules_audio_output_automake
+
+  SOURCE file.c
+}
+
+DLL amem_plugin
+{
+  USE modules_audio_output_automake
+
+  SOURCE amem.c
+}
+
+DLL(HAVE_OSS) oss_plugin
+{
+  USE modules_audio_output_automake
+
+}
+
+DLL(HAVE_ALSA) alsa_plugin
+{
+  USE modules_audio_output_automake
+
+}
+
+DLL(HAVE_PULSE) pulse_plugin
+{
+  USE modules_audio_output_automake
+
+}
+
+DLL(HAVE_JACK) jack_plugin
+{
+  USE modules_audio_output_automake
+
+}
+
+DLL(HAVE_WASAPI) wasapi_plugin
+{
+  USE modules_audio_output_automake
+
+  SOURCE wasapi.c
+
+  LIBS ksuser.lib
+  LIBS ole32.lib
+}
+
+DLL(!HAVE_WINSTORE && !COMPILER_MSVC) mmdevice_plugin
+{
+  /* doesn't build under MSVC in C, CLSID and IID are missing */
+  USE modules_audio_output_automake
+
+  SOURCE mmdevice.c
+  HEADER mmdevice.h
+  
+  LIBS ole32.lib
+}
+
+DLL(HAVE_WINSTORE) winstore_plugin
+{
+  USE modules_audio_output_automake
+
+  SOURCE winstore.c
+  HEADER mmdevice.h
+  
+  LIBS ole32.lib
+}
+
+DLL(!WINSTORE_APP) directsound_plugin /* HAVE_WIN32_DESKTOP */
+{
+  USE modules_audio_output_automake
+  SOURCE directsound.c
+  HEADER windows_audio_common.h
+  
+  LIBS ole32.lib
+  LIBS user32.lib
+}
+
+DLL(HAVE_KAI) kai_plugin
+{
+  USE modules_audio_output_automake
+
+}
+
+DLL(HAVE_SNDIO) sndio_plugin
+{
+  USE modules_audio_output_automake
+
+}
+
+DLL(HAVE_WIN32_DESKTOP) waveout_plugin
+{
+  USE modules_audio_output_automake
+
+  SOURCE waveout.c
+  HEADER windows_audio_common.h
+  
+  LIBS winmm.lib
+}
+
+DLL(HAVE_OSX) auhal_plugin
+{
+  USE modules_audio_output_automake
+
+}
+
+DLL(HAVE_IOS || HAVE_TVOS) audiounit_ios_plugin
+{
+  USE modules_audio_output_automake
+
+}
+
+DLL(HAVE_OSX) audioqueue_plugin
+{
+  USE modules_audio_output_automake
+
+}
+
+DLL(HAVE_TIZEN) tizen_audio_plugin
+{
+  USE modules_audio_output_automake
+
+}
+
+GROUP audio_output
+{
+  USE android_audiotrack_plugin
+  USE opensles_android_plugin
+  USE adummy_plugin
+  USE afile_plugin
+  USE amem_plugin
+  USE oss_plugin
+  USE alsa_plugin
+  USE pulse_plugin
+  USE jack_plugin
+  USE wasapi_plugin
+  USE mmdevice_plugin
+  USE winstore_plugin
+  USE directsound_plugin
+  USE kai_plugin
+  USE sndio_plugin
+  USE waveout_plugin
+  USE auhal_plugin
+  USE audiounit_ios_plugin
+  USE audioqueue_plugin
+  USE tizen_audio_plugin
+}
