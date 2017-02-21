@@ -15,3 +15,8 @@ GROUP(COMPILER_MSVC) msvc_compat
   HEADER(!COMPILER_CLANG) stdalign.h
   HEADER(!COMPILER_CLANG) sys/time.h
 }
+
+GROUP(COMPILER_CLANG) clang_cpp_fixup
+{
+  SOURCE sscanf.cpp
+}
