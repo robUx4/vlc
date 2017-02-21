@@ -192,6 +192,7 @@ DLL mkv_plugin
   HEADER windows_audio_commons.h
   HEADER ../packetizer/dts_header.h
   SOURCE ../packetizer/dts_header.c
+  SOURCE(COMPILER_CLANG) mkv/sscanf.cpp
 
   IF HAVE_ZLIB
     LIBS z
