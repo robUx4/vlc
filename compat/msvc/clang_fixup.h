@@ -9,10 +9,15 @@
 #define _CRT_DECLARE_NONSTDC_NAMES 1
 #include <corecrt.h>
 
+#ifdef __cplusplus
+#define restrict
+#define NOMINMAX
+#else /* __cplusplus */
 #define STATIC_ASSERT_CONCAT_(a, b) a##b
 #define STATIC_ASSERT_CONCAT(a, b) STATIC_ASSERT_CONCAT_(a, b)
 #define _Static_assert(x, s) extern char STATIC_ASSERT_CONCAT(static_assert_, __LINE__)[sizeof(struct { unsigned:-!(x); })]
 #define static_assert _Static_assert
+#endif /* __cplusplus */
 
 #if 0 /* TODO */
 
