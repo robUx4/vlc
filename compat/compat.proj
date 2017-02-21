@@ -3,7 +3,7 @@
 LIB compat
 {
   OUTPUT_DIR compat
-  USE coremake_automake
+  USE root_coremake_automake
 
   LIBS(TARGET_WIN) ws2_32.lib
 

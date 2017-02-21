@@ -14,7 +14,7 @@ GROUP coremake_libtool
   DEFINE DLL_EXPORT
 }
 
-GROUP coremake_automake
+GROUP root_coremake_automake
 {
   // from automake
   DEFINE HAVE_CONFIG_H // from CONFIG_HEADERS 
