@@ -161,6 +161,7 @@ DLL caf_plugin
 DLL mkv_plugin
 {
   USE modules_demux_automake
+  USE clang_cpp_fixup
   USE matroska
 
   HEADER mkv/util.hpp
@@ -192,7 +193,6 @@ DLL mkv_plugin
   HEADER windows_audio_commons.h
   HEADER ../packetizer/dts_header.h
   SOURCE ../packetizer/dts_header.c
-  SOURCE(COMPILER_CLANG) mkv/sscanf.cpp
 
   IF HAVE_ZLIB
     LIBS z
@@ -285,6 +285,7 @@ DLL(HAVE_DVBPSI) ts_plugin
 DLL adaptive_plugin
 {
   USE modules_demux_automake
+  USE clang_cpp_fixup
 
   SOURCE adaptive/playlist/AbstractPlaylist.cpp
   HEADER adaptive/playlist/AbstractPlaylist.hpp
