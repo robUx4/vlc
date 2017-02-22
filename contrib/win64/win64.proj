@@ -1,1 +1,9 @@
+WORKSPACE contribs
+{
+  USE ebml
+  USE matroska
+  USE iconv
+  USE zlib
+}
+
 #include "*/*.proj"
