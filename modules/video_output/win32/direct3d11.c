@@ -1895,8 +1895,7 @@ static ID3DBlob* CompileShader(vout_display_t *vd, const char *psz_shader, bool 
     /* TODO : Match the version to the D3D_FEATURE_LEVEL */
     HRESULT hr = D3DCompile(psz_shader, strlen(psz_shader),
                             NULL, NULL, NULL, "main",
-                            pixel ? (sys->legacy_shader ? "ps_4_0_level_9_1" : "ps_4_0") :
-                                    (sys->legacy_shader ? "vs_4_0_level_9_1" : "vs_4_0"),
+                            pixel ? "ps_5_0" : "vs_5_0",
                             0, 0, &pShaderBlob, &pErrBlob);
 
     if (FAILED(hr)) {
