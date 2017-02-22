@@ -1,5 +1,7 @@
 #include "*/*.proj"
 
+CONFIG_FILE config.h { NO_INCLUDE . }
+
 GROUP libebml_coremake_automake
 {
   // from automake
