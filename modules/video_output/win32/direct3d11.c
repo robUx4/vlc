@@ -335,6 +335,24 @@ static const char* globPixelShaderDefault = "\
       %s;\
   }\
   \
+  /* darkening gamma curve */\
+  inline float4 transfer_sRGB(float4 color) {\
+     const float GAMMA = 2.2;\
+     color.r = pow(color.r, GAMMA);\
+     color.g = pow(color.g, GAMMA);\
+     color.b = pow(color.b, GAMMA);\
+     return color;\
+  }\
+  \
+  /* lightening gamma curve */\
+  inline float4 transfer_sRGB_inverse(float4 color) {\
+     const float GAMMA = 1.0 / 2.2;\
+     color.r = pow(color.r, GAMMA);\
+     color.g = pow(color.g, GAMMA);\
+     color.b = pow(color.b, GAMMA);\
+     return color;\
+  }\
+  \
   float4 main( PS_INPUT In ) : SV_TARGET\
   {\
     float4 sample;\
