@@ -217,6 +217,9 @@ enum {
     VOUT_DISPLAY_EVENT_MOUSE_PRESSED,
     VOUT_DISPLAY_EVENT_MOUSE_RELEASED,
     VOUT_DISPLAY_EVENT_MOUSE_DOUBLE_CLICK,
+
+    /* VR navigation */
+    VOUT_DISPLAY_EVENT_UPDATE_VIEWPOINT,
 };
 
 /**
@@ -395,6 +398,16 @@ static inline void vout_display_SendEventMouseReleased(vout_display_t *vd, int b
 static inline void vout_display_SendEventMouseDoubleClick(vout_display_t *vd)
 {
     vout_display_SendEvent(vd, VOUT_DISPLAY_EVENT_MOUSE_DOUBLE_CLICK);
+}
+static inline void vout_display_SendEventViewpointChanged(vout_display_t *vd, float yaw, float pitch, float roll)
+{
+    vlc_viewpoint_t vp = {
+        .yaw   = yaw,
+        .pitch = pitch,
+        .roll  = roll,
+        .fov = 0,
+    };
+    vout_display_SendEvent(vd, VOUT_DISPLAY_EVENT_UPDATE_VIEWPOINT, vp);
 }
 
 /**

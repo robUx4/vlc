@@ -133,6 +133,25 @@ static int MovedEvent( vlc_object_t *p_this, char const *psz_var,
     return VLC_SUCCESS;
 }
 
+static int DeviceMovedEvent( vlc_object_t *p_this, char const *psz_var,
+                             vlc_value_t oldval, vlc_value_t newval, void *p_data )
+{
+    intf_thread_t *p_intf = (intf_thread_t *)p_data;
+    intf_sys_t    *p_sys = p_intf->p_sys;
+
+    (void) p_this; (void) psz_var; (void) oldval;
+
+    vlc_viewpoint_t viewpoint = {
+        .yaw   = (int16_t)((newval.i_int >> 32) & 0xFFFF) / 100.f,
+        .pitch = (int16_t)((newval.i_int >> 16) & 0xFFFF) / 100.f,
+        .roll  = (int16_t)((newval.i_int >>  0) & 0xFFFF) / 100.f,
+    };
+
+    input_UpdateViewpoint( p_sys->p_input, &viewpoint, false );
+
+    return VLC_SUCCESS;
+}
+
 static int ButtonEvent( vlc_object_t *p_this, char const *psz_var,
                         vlc_value_t oldval, vlc_value_t newval, void *p_data )
 {
@@ -189,6 +208,8 @@ static void ChangeVout( intf_thread_t *p_intf, vout_thread_t *p_vout )
                              p_intf );
             var_DelCallback( p_old_vout, "mouse-button-down", ButtonEvent,
                              p_intf );
+            var_DelCallback( p_old_vout, "device-moved", DeviceMovedEvent,
+                             p_intf );
         }
         vlc_object_release( p_old_vout );
     }
@@ -199,6 +220,8 @@ static void ChangeVout( intf_thread_t *p_intf, vout_thread_t *p_vout )
         var_AddCallback( p_sys->p_vout, "mouse-moved", MovedEvent,
                          p_intf );
         var_AddCallback( p_sys->p_vout, "mouse-button-down", ButtonEvent,
+                         p_intf );
+        var_AddCallback( p_sys->p_vout, "device-moved", DeviceMovedEvent,
                          p_intf );
     }
 }
@@ -237,6 +260,8 @@ static void ChangeInput( intf_thread_t *p_intf, input_thread_t *p_input )
             var_DelCallback( p_old_vout, "mouse-moved", MovedEvent,
                              p_intf );
             var_DelCallback( p_old_vout, "mouse-button-down", ButtonEvent,
+                             p_intf );
+            var_DelCallback( p_old_vout, "device-moved", DeviceMovedEvent,
                              p_intf );
         }
     }

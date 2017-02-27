@@ -600,6 +600,15 @@ static void VoutDisplayEventMouse(vout_display_t *vd, int event, va_list args)
     vlc_mutex_unlock(&osys->lock);
 }
 
+static void VoutDisplayEventDevice(vout_display_t *vd, const vlc_viewpoint_t *p_viewpoint)
+{
+    vout_display_owner_sys_t *osys = vd->owner.sys;
+
+    vlc_mutex_lock(&osys->lock);
+    vout_SendEventDeviceMoved(osys->vout, p_viewpoint->yaw, p_viewpoint->pitch, p_viewpoint->roll);
+    vlc_mutex_unlock(&osys->lock);
+}
+
 noreturn static void *VoutDisplayEventKeyDispatch(void *data)
 {
     vout_display_owner_sys_t *osys = data;
@@ -666,6 +675,13 @@ static void VoutDisplayEvent(vout_display_t *vd, int event, va_list args)
     case VOUT_DISPLAY_EVENT_MOUSE_DOUBLE_CLICK:
         VoutDisplayEventMouse(vd, event, args);
         break;
+
+    case VOUT_DISPLAY_EVENT_UPDATE_VIEWPOINT: {
+        msg_Dbg(vd, "update viewpoint");
+        const vlc_viewpoint_t viewpoint = (vlc_viewpoint_t)va_arg(args, vlc_viewpoint_t);
+        VoutDisplayEventDevice(vd, &viewpoint);
+        break;
+    }
 
     case VOUT_DISPLAY_EVENT_FULLSCREEN: {
         const int is_fullscreen = (int)va_arg(args, int);

@@ -303,6 +303,9 @@ void vout_IntfInit( vout_thread_t *p_vout )
     var_Create( p_vout, "mouse-moved", VLC_VAR_COORDS );
     var_Create( p_vout, "mouse-clicked", VLC_VAR_COORDS );
 
+    /* Device orientation */
+    var_Create( p_vout, "device-moved", VLC_VAR_INTEGER );
+
     /* Viewpoint */
     var_Create( p_vout, "viewpoint", VLC_VAR_ADDRESS  | VLC_VAR_DOINHERIT );
     var_AddCallback( p_vout, "viewpoint", ViewpointCallback, NULL );

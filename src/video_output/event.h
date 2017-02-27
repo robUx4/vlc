@@ -52,6 +52,15 @@ static inline void vout_SendEventMouseMoved(vout_thread_t *vout, int x, int y)
 {
     var_SetCoords(vout, "mouse-moved", x, y);
 }
+static inline void vout_SendEventDeviceMoved(vout_thread_t *vout, float yaw, float pitch, float roll)
+{
+    int64_t value;
+    value  = (((int64_t)lround(yaw   * 100) % (360*100)) & 0xFFFF) << 32;
+    value |= (((int64_t)lround(pitch * 100) % (360*100)) & 0xFFFF) << 16;
+    value |= (((int64_t)lround(roll  * 100) % (360*100)) & 0xFFFF) <<  0;
+
+    var_SetInteger(vout, "device-moved", value);
+}
 static inline void vout_SendEventMousePressed(vout_thread_t *vout, int button)
 {
     int key = KEY_UNSET;
