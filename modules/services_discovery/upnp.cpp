@@ -1320,7 +1320,7 @@ UpnpInstanceWrapper::~UpnpInstanceWrapper()
 static char *getIpv4ForMulticast()
 {
 # ifdef _WIN32
-#  if !VLC_WINSTORE_APP || _WIN32_WINNT >= 0x0A00
+#  if !VLC_WINSTORE_APP && _WIN32_WINNT >= 0x0A00
     ULONG addrSize;
     IP_ADAPTER_UNICAST_ADDRESS *p_best_ip = NULL;
     wchar_t psz_uri[32];
