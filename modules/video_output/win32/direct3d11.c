@@ -353,6 +353,18 @@ static const char* globPixelShaderDefault = "\
      return color;\
   }\
   \
+  inline float hable(float x) {\
+      const float A = 0.15, B = 0.50, C = 0.10, D = 0.20, E = 0.02, F = 0.30;\
+      return ((x * (A*x + (C*B))+(D*E))/(x * (A*x + B) + (D*F))) - E/F;\
+  }\
+  \
+  inline float4 hable(float4 x) {\
+      x.r = hable(x.r);\
+      x.g = hable(x.g);\
+      x.b = hable(x.b);\
+      return x;\
+  }\
+  \
   float4 main( PS_INPUT In ) : SV_TARGET\
   {\
     float4 sample;\
