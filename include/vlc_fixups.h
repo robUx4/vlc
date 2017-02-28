@@ -141,7 +141,7 @@ typedef struct {
 } max_align_t;
 #endif
 #ifdef _MSC_VER
-#define alignas(x)  __declspec(align( 32 ))
+#define alignas(x)  __declspec(align( x ))
 #endif
 
 /* stdio.h */
