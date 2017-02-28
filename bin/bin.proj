@@ -1,13 +1,13 @@
 CON(!HAVE_DARWIN) vlc-static
 {
   OUTPUT_DIR bin
-  USE coremake_automake
+  USE root_coremake_automake
 }
 
 CON vlc-cache-gen
 {
   OUTPUT_DIR bin
-  USE coremake_automake
+  USE root_coremake_automake
 
   USE compat
   USE libvlc
@@ -23,7 +23,7 @@ CON vlc-cache-gen
 EXE(!HAVE_DARWIN) vlc
 {
   OUTPUT_DIR bin
-  USE coremake_automake
+  USE root_coremake_automake
 
   USE libvlc
   DEFINE(HAVE_DBUS) HAVE_DBUS
