@@ -301,7 +301,6 @@ static inline ssize_t vlc_array_index_of_item( const vlc_array_t *ar,
 #pragma warning(push)
 #pragma warning(disable:4127)
 #endif
-static inline void
 static inline void vlc_array_insert( vlc_array_t *ar, void *elem, int idx )
 {
     void **pp = (void **)realloc( ar->pp_elems,
