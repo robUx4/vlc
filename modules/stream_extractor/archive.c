@@ -133,7 +133,7 @@ static int libarchive_jump_cb( libarchive_t* p_arc, void* p_obj_current,
 }
 
 
-static la_int64_t libarchive_skip_cb( libarchive_t* p_arc, void* p_obj,
+static __LA_INT64_T libarchive_skip_cb( libarchive_t* p_arc, void* p_obj,
   off_t i_request )
 {
     VLC_UNUSED( p_arc );
@@ -157,8 +157,8 @@ static la_int64_t libarchive_skip_cb( libarchive_t* p_arc, void* p_obj,
     return  i_read >= 0 ? i_read : ARCHIVE_FATAL;
 }
 
-static la_int64_t libarchive_seek_cb( libarchive_t* p_arc, void* p_obj,
-  la_int64_t offset, int whence )
+static __LA_INT64_T libarchive_seek_cb( libarchive_t* p_arc, void* p_obj,
+  __LA_INT64_T offset, int whence )
 {
     VLC_UNUSED( p_arc );
 
@@ -182,7 +182,7 @@ static la_int64_t libarchive_seek_cb( libarchive_t* p_arc, void* p_obj,
     return vlc_stream_Tell( p_source );
 }
 
-static la_ssize_t libarchive_read_cb( libarchive_t* p_arc, void* p_obj,
+static __LA_SSIZE_T libarchive_read_cb( libarchive_t* p_arc, void* p_obj,
   const void** pp_dst )
 {
     VLC_UNUSED( p_arc );
