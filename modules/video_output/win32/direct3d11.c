@@ -353,6 +353,7 @@ static const char* globPixelShaderDefault = "\
      return color;\
   }\
   \
+  /* see http://filmicworlds.com/blog/filmic-tonemapping-operators/ */\
   inline float hable(float x) {\
       const float A = 0.15, B = 0.50, C = 0.10, D = 0.20, E = 0.02, F = 0.30;\
       return ((x * (A*x + (C*B))+(D*E))/(x * (A*x + B) + (D*F))) - E/F;\
