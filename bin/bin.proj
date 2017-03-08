@@ -9,7 +9,7 @@ CON vlc-cache-gen
   OUTPUT_DIR bin
   USE root_coremake_automake
 
-  USE compat
+  USE vlc_compat
   USE libvlc
   SOURCE cachegen.c
   IF TARGET_WIN
