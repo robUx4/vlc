@@ -1,6 +1,6 @@
 #include "*/*.proj"
 
-LIB compat
+LIB vlc_compat
 {
   OUTPUT_DIR compat
   USE root_coremake_automake

@@ -4,7 +4,7 @@ DLL libvlc
   USE root_coremake_automake
   USE coremake_libtool
 
-  USE compat
+  USE vlc_compat
   USE libvlccore
 
   INCLUDE ../include
