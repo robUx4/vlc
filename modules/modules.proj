@@ -51,7 +51,7 @@ GROUP modules_common
   ELSE
     DEFINE "MODULE_NAME=$(MODULE_NAME)"
   ENDIF
-  USE compat
+  USE vlc_compat
   USE libvlccore
 }
 

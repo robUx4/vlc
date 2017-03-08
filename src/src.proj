@@ -5,7 +5,7 @@ DLL libvlccore
   USE coremake_libtool
 
   USE fourcc_tables.h
-  USE compat
+  USE vlc_compat
   USE iconv
   
   INCLUDE ../include
