@@ -33,6 +33,7 @@
 #include <vlc_common.h>
 #include <vlc_codecs.h>
 #include <vlc_codec.h>
+#include <vlc_modules.h>
 
 #define COBJMACROS
 
@@ -454,7 +455,7 @@ int directx_va_Open(vlc_va_t *va, directx_sys_t *dx_sys,
 
     if (b_dll) {
         /* Load dll*/
-        dx_sys->hdecoder_dll = LoadLibrary(dx_sys->psz_decoder_dll);
+        dx_sys->hdecoder_dll = vlc_load_syslib(dx_sys->psz_decoder_dll);
         if (!dx_sys->hdecoder_dll) {
             msg_Warn(va, "cannot load DirectX decoder DLL");
             goto error;

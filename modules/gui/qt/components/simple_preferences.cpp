@@ -609,7 +609,7 @@ SPrefsPanel::SPrefsPanel( intf_thread_t *_p_intf, QWidget *_parent,
             }
             CONFIG_GENERIC( "avcodec-hw", StringList, ui.hwAccelLabel, hwAccelModule );
 #ifdef _WIN32
-            HINSTANCE hdxva2_dll = LoadLibrary(TEXT("DXVA2.DLL") );
+            HMODULE hdxva2_dll = vlc_load_syslib("DXVA2.DLL");
             if( !hdxva2_dll )
                 ui.hwAccelModule->setEnabled( false );
             else

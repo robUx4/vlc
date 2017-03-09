@@ -34,6 +34,7 @@
 
 #include <vlc_common.h>
 #include <vlc_plugin.h>
+#include <vlc_modules.h>
 #include <vlc_aout.h>
 #include <vlc_charset.h>
 #include <vlc_memory.h>
@@ -1043,7 +1044,7 @@ static int ReloadDirectXDevices( vlc_object_t *p_this, char const *psz_name,
 
     (void) psz_name;
 
-    HANDLE hdsound_dll = LoadLibrary(_T("DSOUND.DLL"));
+    HMODULE hdsound_dll = vlc_load_syslib("DSOUND.DLL");
     if( hdsound_dll == NULL )
     {
         msg_Warn( p_this, "cannot open DSOUND.DLL" );
@@ -1078,7 +1079,7 @@ static int Open(vlc_object_t *obj)
 {
     audio_output_t *aout = (audio_output_t *)obj;
 
-    HINSTANCE hdsound_dll = LoadLibrary(_T("DSOUND.DLL"));
+    HMODULE hdsound_dll = vlc_load_syslib("DSOUND.DLL");
     if (hdsound_dll == NULL)
     {
         msg_Warn(aout, "cannot open DSOUND.DLL");

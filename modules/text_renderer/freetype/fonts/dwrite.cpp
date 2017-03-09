@@ -28,6 +28,7 @@
 #include <vlc_common.h>
 #include <vlc_filter.h>
 #include <vlc_charset.h>
+#include <vlc_modules.h>
 
 #include <dwrite_2.h>
 #include <wrl/client.h>
@@ -113,7 +114,7 @@ extern "C" int InitDWrite( filter_t *p_filter )
 #if VLC_WINSTORE_APP
         p_dw_sys = new dw_sys_t( p_dw_dll );
 #else
-        p_dw_dll = LoadLibrary( TEXT( "Dwrite.dll" ) );
+        p_dw_dll = vlc_load_syslib( "Dwrite.dll" );
         if( p_dw_dll == NULL )
             return VLC_EGENERIC;
 

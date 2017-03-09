@@ -64,7 +64,7 @@ typedef struct
 
     /* DLL */
     HINSTANCE             hdecoder_dll;
-    const TCHAR           *psz_decoder_dll;
+    const char            *psz_decoder_dll;
 
     /* Direct3D */
     IUnknown              *d3ddev;
