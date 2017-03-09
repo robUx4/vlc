@@ -65,6 +65,19 @@ VLC_API const char * module_get_capability( const module_t *m ) VLC_USED;
 VLC_API int module_get_score( const module_t *m ) VLC_USED;
 VLC_API const char * module_gettext( const module_t *, const char * ) VLC_USED;
 
+#ifdef _WIN32
+typedef HMODULE vlc_lib_handle_t;
+#else
+typedef void *vlc_lib_handle_t;
+#endif
+
+/**
+ * Load a system library (DLL) in memory.
+ *
+ * @param libname the name of system library to load.
+ */
+VLC_API vlc_lib_handle_t vlc_load_syslib(const char *libname);
+
 VLC_USED static inline module_t *module_get_main (void)
 {
     return module_find ("core");

@@ -36,6 +36,7 @@
 #include <errno.h>
 #include <assert.h>
 
+#include <vlc_modules.h>
 #include <vlc_network.h>
 
 #ifdef _WIN32
@@ -105,7 +106,7 @@ static int net_SetupDgramSocket (vlc_object_t *p_obj, int fd,
      * receive buffer if that isn't present
      */
 #if (_WIN32_WINNT < _WIN32_WINNT_WIN8)
-    HINSTANCE h_Network = LoadLibrary(TEXT("Windows.Networking.dll"));
+    HMODULE h_Network = vlc_load_syslib("Windows.Networking.dll");
     if( (h_Network == NULL) ||
         (GetProcAddress( h_Network, "SetSocketMediaStreamingMode" ) == NULL ) )
     {
