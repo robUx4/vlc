@@ -133,3 +133,42 @@ void *module_Lookup( module_handle_t handle, const char *psz_function )
 {
     return (void *)GetProcAddress( handle, (char *)psz_function );
 }
+
+HMODULE win32_LoadSyslib(const TCHAR *libname)
+{
+    HMODULE module;
+    bool has_KB2533623 = true;
+#if (_WIN32_WINNT < _WIN32_WINNT_WIN8)
+    /* check for KB2533623 */
+    if (GetProcAddress(GetModuleHandle(TEXT("kernel32.dll")),
+                                       "SetDefaultDllDirectories") == NULL)
+        has_KB2533623 = false;
+#endif
+
+    if (has_KB2533623)
+        module = LoadLibraryEx(libname, NULL, LOAD_LIBRARY_SEARCH_SYSTEM32);
+    else
+    {
+        /* force the path of the DLL inside system32 */
+        TCHAR *slibname = (TCHAR*)libname;
+        DWORD systemLen = GetSystemDirectory(NULL, 0);
+        if (systemLen) {
+            systemLen += 1 + _tcslen(libname);
+            slibname = malloc(systemLen * sizeof(*slibname));
+            if (likely(slibname != NULL))
+            {
+                if (GetSystemDirectory(slibname, systemLen))
+                {
+                    _tcsncat(slibname, _T("\\"), systemLen);
+                    _tcsncat(slibname, libname, systemLen);
+                }
+            }
+        }
+
+        module = LoadLibrary(slibname);
+
+        if (slibname != libname)
+            free(slibname);
+    }
+    return module;
+}

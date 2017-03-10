@@ -839,7 +839,7 @@ char *vlc_uri_fixup(const char *str)
 #  define IDN_ALLOW_UNASSIGNED 0x01
 static int IdnToAscii(DWORD flags, LPCWSTR str, int len, LPWSTR buf, int size)
 {
-    HMODULE h = LoadLibrary(_T("Normaliz.dll"));
+    HMODULE h = win32_LoadSyslib(TEXT("Normaliz.dll"));
     if (h == NULL)
     {
         errno = ENOSYS;

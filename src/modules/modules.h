@@ -132,4 +132,8 @@ vlc_plugin_t *vlc_cache_lookup(vlc_plugin_t **, const char *relpath);
 
 void CacheSave(vlc_object_t *, const char *, vlc_plugin_t *const *, size_t);
 
+#ifdef _WIN32
+HMODULE win32_LoadSyslib(const TCHAR *libname);
+#endif
+
 #endif /* !LIBVLC_MODULES_H */
