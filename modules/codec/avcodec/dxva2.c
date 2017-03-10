@@ -353,7 +353,7 @@ static int Open(vlc_va_t *va, AVCodecContext *ctx, enum PixelFormat pix_fmt,
         return VLC_ENOMEM;
 
     /* Load dll*/
-    sys->hd3d9_dll = vlc_load_syslib("D3D9.DLL");
+    sys->hd3d9_dll = LoadLibrary(TEXT("D3D9.DLL"));
     if (!sys->hd3d9_dll) {
         msg_Warn(va, "cannot load d3d9.dll");
         goto error;

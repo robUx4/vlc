@@ -455,7 +455,7 @@ static int Open(vlc_va_t *va, AVCodecContext *ctx, enum PixelFormat pix_fmt,
         return VLC_ENOMEM;
 
 #if !defined(NDEBUG) && defined(HAVE_DXGIDEBUG_H)
-    sys->dxgidebug_dll = vlc_load_syslib("DXGIDEBUG.DLL");
+    sys->dxgidebug_dll = LoadLibrary(TEXT("DXGIDEBUG.DLL"));
 #endif
 
     dx_sys = &sys->dx_sys;
@@ -473,7 +473,7 @@ static int Open(vlc_va_t *va, AVCodecContext *ctx, enum PixelFormat pix_fmt,
     dx_sys->pf_get_input_list          = DxGetInputList;
     dx_sys->pf_setup_output            = DxSetupOutput;
     dx_sys->pf_alloc_surface_pic       = DxAllocPicture;
-    dx_sys->psz_decoder_dll            = "D3D11.DLL";
+    dx_sys->psz_decoder_dll            = TEXT("D3D11.DLL");
 
     va->sys = sys;
 

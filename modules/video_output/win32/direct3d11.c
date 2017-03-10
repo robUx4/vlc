@@ -33,7 +33,6 @@
 #include <vlc_common.h>
 #include <vlc_plugin.h>
 #include <vlc_vout_display.h>
-#include <vlc_modules.h>
 
 #include <assert.h>
 #include <math.h>
@@ -414,7 +413,7 @@ static int OpenHwnd(vout_display_t *vd)
     if (!sys)
         return VLC_ENOMEM;
 
-    sys->hd3d11_dll = vlc_load_syslib("D3D11.DLL");
+    sys->hd3d11_dll = LoadLibrary(TEXT("D3D11.DLL"));
     if (!sys->hd3d11_dll) {
         msg_Warn(vd, "cannot load d3d11.dll, aborting");
         return VLC_EGENERIC;
@@ -1346,11 +1345,11 @@ static void Direct3D11Destroy(vout_display_t *vd)
 static HINSTANCE Direct3D11LoadShaderLibrary(void)
 {
     HINSTANCE instance = NULL;
-    char filename[19];
     /* d3dcompiler_47 is the latest on windows 8.1 */
     for (int i = 47; i > 41; --i) {
-        snprintf(filename, 19, "D3DCOMPILER_%d.dll", i);
-        instance = vlc_load_syslib(filename);
+        TCHAR filename[19];
+        _sntprintf(filename, 19, TEXT("D3DCOMPILER_%d.dll"), i);
+        instance = LoadLibrary(filename);
         if (instance) break;
     }
     return instance;
@@ -1371,7 +1370,7 @@ static int Direct3D11Open(vout_display_t *vd, video_format_t *fmt)
     HRESULT hr = S_OK;
 
 # if !defined(NDEBUG)
-    HMODULE sdklayer_dll = vlc_load_syslib("d3d11_1sdklayers.dll");
+    HINSTANCE sdklayer_dll = LoadLibrary(TEXT("d3d11_1sdklayers.dll"));
     if (sdklayer_dll) {
         creationFlags |= D3D11_CREATE_DEVICE_DEBUG;
         FreeLibrary(sdklayer_dll);

@@ -43,7 +43,7 @@
 #include <vlc_common.h>
 #include <vlc_plugin.h>
 #include <vlc_vout_display.h>
-#include <vlc_modules.h>
+#include <vlc_charset.h> /* ToT function */
 
 #include <windows.h>
 #include <d3d9.h>
@@ -635,10 +635,10 @@ static void Manage (vout_display_t *vd)
 static HINSTANCE Direct3D9LoadShaderLibrary(void)
 {
     HINSTANCE instance = NULL;
-    char filename[16];
     for (int i = 43; i > 23; --i) {
-        snprintf(filename, 16, "D3dx9_%d.dll", i);
-        instance = vlc_load_syslib(filename);
+        TCHAR filename[16];
+        _sntprintf(filename, 16, TEXT("D3dx9_%d.dll"), i);
+        instance = LoadLibrary(filename);
         if (instance)
             break;
     }
@@ -652,7 +652,7 @@ static int Direct3D9Create(vout_display_t *vd)
 {
     vout_display_sys_t *sys = vd->sys;
 
-    sys->hd3d9_dll = vlc_load_syslib("D3D9.DLL");
+    sys->hd3d9_dll = LoadLibrary(TEXT("D3D9.DLL"));
     if (!sys->hd3d9_dll) {
         msg_Warn(vd, "cannot load d3d9.dll, aborting");
         return VLC_EGENERIC;

@@ -46,7 +46,6 @@
 #include <vlc_common.h>
 #include <vlc_plugin.h>
 #include <vlc_codec.h>
-#include <vlc_modules.h>
 #include "../packetizer/h264_nal.h"
 #define _VIDEOINFOHEADER_
 #include <vlc_codecs.h>
@@ -1092,7 +1091,7 @@ static int FindMFT(decoder_t *p_dec)
 static int LoadMFTLibrary(MFHandle *mf)
 {
 #if _WIN32_WINNT < _WIN32_WINNT_WIN7 || VLC_WINSTORE_APP
-    mf->mfplat_dll = vlc_load_syslib("mfplat.dll");
+    mf->mfplat_dll = LoadLibrary(TEXT("mfplat.dll"));
     if (!mf->mfplat_dll)
         return VLC_EGENERIC;
 

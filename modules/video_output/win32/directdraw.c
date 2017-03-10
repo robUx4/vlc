@@ -44,7 +44,7 @@
 #include <vlc_common.h>
 #include <vlc_plugin.h>
 #include <vlc_vout_display.h>
-#include <vlc_modules.h>
+#include <vlc_charset.h>    /* FromT */
 
 #include <windows.h>
 #include <ddraw.h>
@@ -205,7 +205,7 @@ static int Open(vlc_object_t *object)
         return VLC_ENOMEM;
 
     /* Load direct draw DLL */
-    sys->hddraw_dll = vlc_load_syslib("DDRAW.DLL");
+    sys->hddraw_dll = LoadLibrary(_T("DDRAW.DLL"));
     if (!sys->hddraw_dll) {
         msg_Warn(vd, "DirectXInitDDraw failed loading ddraw.dll");
         free(sys);
@@ -1494,7 +1494,7 @@ static int FindDevicesCallback(vlc_object_t *object, const char *name,
     ctx.count = 1;
 
     /* Load direct draw DLL */
-    HMODULE hddraw_dll = vlc_load_syslib("DDRAW.DLL");
+    HINSTANCE hddraw_dll = LoadLibrary(_T("DDRAW.DLL"));
     if (hddraw_dll != NULL)
     {
         /* Enumerate displays */

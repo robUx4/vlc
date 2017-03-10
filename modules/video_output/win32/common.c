@@ -33,7 +33,6 @@
 #endif
 
 #include <vlc_common.h>
-#include <vlc_modules.h>
 #include <vlc_vout_display.h>
 
 #include <windows.h>
@@ -125,7 +124,7 @@ int CommonInit(vout_display_t *vd)
     DisableScreensaver (vd);
 #endif
 #if !defined(NDEBUG) && defined(HAVE_DXGIDEBUG_H)
-    sys->dxgidebug_dll = vlc_load_syslib("DXGIDEBUG.DLL");
+    sys->dxgidebug_dll = LoadLibrary(TEXT("DXGIDEBUG.DLL"));
 #endif
 
     return VLC_SUCCESS;
