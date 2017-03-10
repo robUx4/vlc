@@ -442,10 +442,3 @@ update_release_t *update_GetRelease(update_t *u)
     vlc_assert_unreachable();
 }
 #endif /* !UPDATE_CHECK */
-
-#ifndef _WIN32
-void *vlc_load_syslib(const char *libname)
-{
-    return NULL;
-}
-#endif

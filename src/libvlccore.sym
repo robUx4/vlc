@@ -462,7 +462,6 @@ us_vasprintf
 vlc_close
 vlc_fopen
 utf8_fprintf
-vlc_load_syslib
 vlc_loaddir
 vlc_lstat
 vlc_mkdir

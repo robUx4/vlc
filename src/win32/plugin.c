@@ -29,7 +29,6 @@
 
 #include <vlc_common.h>
 #include <vlc_charset.h>
-#include <vlc_modules.h>
 #include "modules/modules.h"
 #include <windows.h>
 #include <wchar.h>
@@ -133,60 +132,4 @@ void module_Unload( module_handle_t handle )
 void *module_Lookup( module_handle_t handle, const char *psz_function )
 {
     return (void *)GetProcAddress( handle, (char *)psz_function );
-}
-
-HMODULE vlc_load_syslib(const char *libname)
-{
-    HMODULE module;
-    bool has_KB2533623 = true;
-    TCHAR *tlibname;
-#if (_WIN32_WINNT < _WIN32_WINNT_WIN8)
-    /* check for KB2533623 */
-    if (GetProcAddress(GetModuleHandle(TEXT("kernel32.dll")),
-                                       "SetDefaultDllDirectories") == NULL)
-        has_KB2533623 = false;
-#endif
-
-#ifdef UNICODE
-    tlibname = ToWide(libname);
-    if (unlikely(tlibname==NULL))
-        return NULL;
-#else
-    tlibname = libname;
-#endif
-
-    if (false && has_KB2533623)
-        module = LoadLibraryEx(tlibname, NULL, LOAD_LIBRARY_SEARCH_SYSTEM32);
-    else
-    {
-        /* force the path of the DLL inside system32 */
-        DWORD systemLen = GetSystemDirectory(NULL, 0);
-        if (systemLen) {
-            systemLen += 1 + _tcslen(tlibname);
-            TCHAR *sysdir = malloc(systemLen * sizeof(*sysdir));
-            if (likely(sysdir!=NULL)) {
-                if (GetSystemDirectory(sysdir, systemLen)) {
-                    _tcsncat(sysdir, _T("\\"), systemLen);
-                    _tcsncat(sysdir, tlibname, systemLen);
-
-#ifdef UNICODE
-                    free(tlibname);
-#endif
-                    tlibname = sysdir;
-                }
-            }
-        }
-
-        module = LoadLibrary(tlibname);
-
-        if ((const char*)tlibname != libname) {
-            free(tlibname);
-            tlibname = NULL; /* no double free on unicode */
-        }
-    }
-
-#ifdef UNICODE
-    free(tlibname);
-#endif
-    return module;
 }
