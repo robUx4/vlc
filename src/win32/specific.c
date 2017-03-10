@@ -32,6 +32,7 @@
 #include "libvlc.h"
 #include "../lib/libvlc_internal.h"
 #include "config/vlc_getopt.h"
+#include "modules/modules.h"
 
 #include <windows.h>
 #include <mmsystem.h>

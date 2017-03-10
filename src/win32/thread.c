@@ -720,6 +720,10 @@ static union
     } multimedia;
 #endif
 } clk;
+#if !VLC_WINSTORE_APP
+static MMRESULT (WINAPI *timeGetDevCaps_)(LPTIMECAPS ptc,UINT cbtc);
+static DWORD (WINAPI *timeGetTime_)(void);
+#endif
 
 static mtime_t mdate_interrupt (void)
 {
