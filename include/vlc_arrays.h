@@ -277,6 +277,11 @@ static inline const void *vlc_array_item_at_index( const vlc_array_t *ar,
 {
     return ar->pp_elems[idx];
 }
+#else /* C99 */
+static inline void *vlc_array_item_at_index( vlc_array_t *ar, size_t idx )
+{
+    return ar->pp_elems[idx];
+}
 #endif
 
 static inline ssize_t vlc_array_index_of_item( const vlc_array_t *ar,
