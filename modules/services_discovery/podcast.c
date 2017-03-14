@@ -107,7 +107,7 @@ struct services_discovery_sys_t
 /*****************************************************************************
  * Local prototypes
  *****************************************************************************/
-static void *Run( void * );
+noreturn static void *Run( void * );
 static int UrlsChange( vlc_object_t *, char const *, vlc_value_t,
                        vlc_value_t, void * );
 static int Request( vlc_object_t *, char const *, vlc_value_t,
