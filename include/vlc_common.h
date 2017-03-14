@@ -116,7 +116,11 @@
 #else
 # define likely(p)     (!!(p))
 # define unlikely(p)   (!!(p))
+# if defined(_MSC_VER) && !defined(__clang__)
+#  define unreachable()  __assume(0)
+# else
 # define unreachable() ((void)0)
+# endif
 #endif
 
 #define vlc_assert_unreachable() (assert(!"unreachable"), unreachable())
