@@ -38,7 +38,6 @@
 
 #ifdef _WIN32
 #   include <objbase.h>
-#   include <vlc_charset.h>
 #endif
 
 #include <vlc_codecs.h>
