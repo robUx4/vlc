@@ -196,11 +196,11 @@ static es_format_t GetModeSettings(demux_t *demux, IDeckLinkDisplayMode *m)
     video_fmt.video.i_frame_rate_base = frame_duration;
     video_fmt.i_bitrate = video_fmt.video.i_width * video_fmt.video.i_height * video_fmt.video.i_frame_rate * 2 * 8;
 
-    unsigned aspect_num, aspect_den;
-    if (!var_InheritURational(demux, &aspect_num, &aspect_den, "decklink-aspect-ratio") &&
-         aspect_num > 0 && aspect_den > 0) {
-        video_fmt.video.i_sar_num = aspect_num * video_fmt.video.i_height;
-        video_fmt.video.i_sar_den = aspect_den * video_fmt.video.i_width;
+    vlc_urational_t aspect;
+    if (!var_InheritURational(demux, &aspect.num, &aspect.den, "decklink-aspect-ratio") &&
+         aspect.num > 0 && aspect.den > 0) {
+        video_fmt.video.i_sar_num = aspect.num * video_fmt.video.i_height;
+        video_fmt.video.i_sar_den = aspect.den * video_fmt.video.i_width;
     }
 
     sys->dominance_flags = flags;

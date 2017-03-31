@@ -437,10 +437,14 @@ int SetupFormat (vlc_object_t *obj, int fd, uint32_t fourcc,
     struct v4l2_fract best_it = infinity, min_it;
     uint64_t best_area = 0;
 
-    if (var_InheritURational(obj, &min_it.denominator, &min_it.numerator,
+    vlc_urational_t fps;
+    if (var_InheritURational(obj, &fps.den, &fps.num,
                              CFG_PREFIX"fps") == VLC_SUCCESS)
-        msg_Dbg (obj, " requested frame internal: %"PRIu32"/%"PRIu32,
-                 min_it.numerator, min_it.denominator);
+    {
+        msg_Dbg (obj, " requested frame internal: %u/%u", fps.num, fps.den);
+        min_it.numerator   = fps.num;
+        min_it.denominator = fps.den;
+    }
     else
         min_it = zero;
 

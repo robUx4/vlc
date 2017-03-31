@@ -430,16 +430,16 @@ static int OpenDemux(vlc_object_t *object)
         fmt.i_cat = VIDEO_ES;
         fmt.video.i_width  = var_InheritInteger(object, "imem-width");
         fmt.video.i_height = var_InheritInteger(object, "imem-height");
-        unsigned num, den;
-        if (!var_InheritURational(object, &num, &den, "imem-dar") && num > 0 && den > 0) {
+        vlc_urational_t rat;
+        if (!var_InheritURational(object, &rat.num, &rat.den, "imem-dar") && rat.num && rat.den) {
             if (fmt.video.i_width != 0 && fmt.video.i_height != 0) {
-                fmt.video.i_sar_num = num * fmt.video.i_height;
-                fmt.video.i_sar_den = den * fmt.video.i_width;
+                fmt.video.i_sar_num = rat.num * fmt.video.i_height;
+                fmt.video.i_sar_den = rat.den * fmt.video.i_width;
             }
         }
-        if (!var_InheritURational(object, &num, &den, "imem-fps") && num > 0 && den > 0) {
-            fmt.video.i_frame_rate      = num;
-            fmt.video.i_frame_rate_base = den;
+        if (!var_InheritURational(object, &rat.num, &rat.den, "imem-fps") && rat.num && rat.den) {
+            fmt.video.i_frame_rate      = rat.num;
+            fmt.video.i_frame_rate_base = rat.den;
         }
 
         msg_Dbg(object, "Video %4.4s %dx%d  SAR %d:%d frame rate %u/%u",

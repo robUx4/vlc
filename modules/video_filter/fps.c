@@ -137,6 +137,7 @@ static int Open( vlc_object_t *p_this)
 {
     filter_t *p_filter = (filter_t*)p_this;
     filter_sys_t *p_sys;
+    vlc_urational_t fps;
 
     p_sys = p_filter->p_sys = malloc( sizeof( *p_sys ) );
 
@@ -150,12 +151,13 @@ static int Open( vlc_object_t *p_this)
     video_format_Copy( &p_filter->fmt_out.video, &p_filter->fmt_in.video );
 
     /* If we don't have fps option, use filter output values */
-    if( var_InheritURational( p_filter, &p_filter->fmt_out.video.i_frame_rate,
-                                        &p_filter->fmt_out.video.i_frame_rate_base, CFG_PREFIX "fps" ) )
+    if( var_InheritURational( p_filter, &fps.num, &fps.den, CFG_PREFIX "fps" ) )
     {
-        p_filter->fmt_out.video.i_frame_rate = p_filter->fmt_in.video.i_frame_rate;
-        p_filter->fmt_out.video.i_frame_rate_base = p_filter->fmt_in.video.i_frame_rate_base;
+        fps.num = p_filter->fmt_in.video.i_frame_rate;
+        fps.den = p_filter->fmt_in.video.i_frame_rate_base;
     }
+    p_filter->fmt_out.video.i_frame_rate      = fps.num;
+    p_filter->fmt_out.video.i_frame_rate_base = fps.den;
 
     msg_Dbg( p_filter, "Converting fps from %d/%d -> %d/%d",
             p_filter->fmt_in.video.i_frame_rate, p_filter->fmt_in.video.i_frame_rate_base,

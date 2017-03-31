@@ -50,7 +50,7 @@ struct sout_stream_sys_t
     int             i_threads;
     bool            b_high_priority;
     bool            b_hurry_up;
-    unsigned int    fps_num,fps_den;
+    vlc_urational_t  fps;
 
     char            *psz_vf2;
 

@@ -103,22 +103,20 @@ struct preset_t
     const char *psz_ext;
     int i_width;
     int i_height;
-    unsigned u_fps_num;
-    unsigned u_fps_den;
-    unsigned u_ar_num;
-    unsigned u_ar_den;
+    vlc_urational_t fps;
+    vlc_urational_t ar;
     vlc_fourcc_t i_chroma;
 };
 
 static const struct preset_t p_presets[] =
 {
-    { "sqcif", 128, 96, 30000, 1001, 4,3, VLC_CODEC_YV12 },
-    { "qcif", 176, 144, 30000, 1001, 4,3, VLC_CODEC_YV12 },
-    { "cif", 352, 288, 30000, 1001, 4,3, VLC_CODEC_YV12 },
-    { "4cif", 704, 576, 30000, 1001, 4,3, VLC_CODEC_YV12 },
-    { "16cif", 1408, 1152, 30000, 1001, 4,3, VLC_CODEC_YV12 },
-    { "yuv", 176, 144, 25, 1, 4,3, VLC_CODEC_YV12 },
-    { NULL, 0, 0, 0, 0, 0,0, 0 }
+    { "sqcif", 128, 96, {30000, 1001}, {4,3}, VLC_CODEC_YV12 },
+    { "qcif", 176, 144, {30000, 1001}, {4,3}, VLC_CODEC_YV12 },
+    { "cif", 352, 288, {30000, 1001}, {4,3}, VLC_CODEC_YV12 },
+    { "4cif", 704, 576, {30000, 1001}, {4,3}, VLC_CODEC_YV12 },
+    { "16cif", 1408, 1152, {30000, 1001}, {4,3}, VLC_CODEC_YV12 },
+    { "yuv", 176, 144, {25, 1}, {4,3}, VLC_CODEC_YV12 },
+    { NULL, 0, 0, {0, 0}, {0,0}, 0 }
 };
 
 /*****************************************************************************
@@ -129,10 +127,9 @@ static int Open( vlc_object_t * p_this )
     demux_t     *p_demux = (demux_t*)p_this;
     demux_sys_t *p_sys;
     int i_width=-1, i_height=-1;
-    unsigned u_fps_num, u_fps_den;
+    vlc_urational_t fps;
     vlc_fourcc_t i_chroma = 0;
-    unsigned int i_sar_num;
-    unsigned int i_sar_den;
+    vlc_urational_t sar;
     const struct preset_t *p_preset = NULL;
     const uint8_t *p_peek;
     bool b_y4m = false;
@@ -180,10 +177,9 @@ valid:
     {
         i_width = p_preset->i_width;
         i_height = p_preset->i_height;
-        u_fps_num = p_preset->u_fps_num;
-        u_fps_den = p_preset->u_fps_den;
-        i_sar_num = p_preset->u_ar_num * p_preset->i_height;
-        i_sar_den = p_preset->u_ar_den * p_preset->i_width;
+        fps = p_preset->fps;
+        sar.num = p_preset->ar.num * p_preset->i_height;
+        sar.den = p_preset->ar.den * p_preset->i_width;
         i_chroma = p_preset->i_chroma;
     }
 
@@ -225,13 +221,13 @@ valid:
         } } while(0)
         READ_FRAC( " W", i_width, a );
         READ_FRAC( " H", i_height, a );
-        READ_FRAC( " F", u_fps_num, u_fps_den );
+        READ_FRAC( " F", fps.num, fps.den );
         READ_FRAC( " A", a, b );
 #undef READ_FRAC
         if( b != 0 )
         {
-            i_sar_num = a;
-            i_sar_den = b;
+            sar.num = a;
+            sar.den = b;
         }
 
         psz_buf = strstr( psz+9, " C" );
@@ -295,15 +291,15 @@ valid:
         free( psz_tmp );
     }
 
-    if( var_InheritURational( p_demux, &u_fps_num, &u_fps_den, "rawvid-fps" ) )
+    if( var_InheritURational( p_demux, &fps.num, &fps.den, "rawvid-fps" ) )
     {
-        u_fps_num = 0;
-        u_fps_den = 1;
+        fps.num = 0;
+        fps.den = 1;
     }
 
-    if( var_InheritURational( p_demux, &i_sar_num, &i_sar_den,
+    if( var_InheritURational( p_demux, &sar.num, &sar.den,
                               "rawvid-aspect-ratio" ) )
-        i_sar_num = i_sar_den = 1;
+        sar.num = sar.den = 1;
 
     /* moan about anything wrong */
     if( i_width <= 0 || i_height <= 0 )
@@ -312,7 +308,7 @@ valid:
         goto error;
     }
 
-    if( !u_fps_num || !u_fps_den )
+    if( !fps.num || !fps.den )
     {
         msg_Err( p_demux, "invalid or no framerate specified." );
         goto error;
@@ -325,21 +321,21 @@ valid:
     }
 
     /* fixup anything missing with sensible assumptions */
-    if( i_sar_num <= 0 || i_sar_den <= 0 )
+    if( sar.num <= 0 || sar.den <= 0 )
     {
         /* assume 1:1 sar */
-        i_sar_num = 1;
-        i_sar_den = 1;
+        sar.num = 1;
+        sar.den = 1;
     }
 
     es_format_Init( &p_sys->fmt_video, VIDEO_ES, i_chroma );
     video_format_Setup( &p_sys->fmt_video.video, i_chroma,
                         i_width, i_height, i_width, i_height,
-                        i_sar_num, i_sar_den );
+                        sar.num, sar.den );
 
     vlc_ureduce( &p_sys->fmt_video.video.i_frame_rate,
                  &p_sys->fmt_video.video.i_frame_rate_base,
-                 u_fps_num, u_fps_den, 0);
+                 fps.num, fps.den, 0);
     date_Init( &p_sys->pcr, p_sys->fmt_video.video.i_frame_rate,
                p_sys->fmt_video.video.i_frame_rate_base );
     date_Set( &p_sys->pcr, 0 );

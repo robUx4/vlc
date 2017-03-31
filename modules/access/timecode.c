@@ -177,16 +177,16 @@ static int Open (vlc_object_t *obj)
     es_format_Init (&fmt, SPU_ES, VLC_CODEC_ITU_T140);
     sys->es = es_out_Add (demux->out, &fmt);
 
-    unsigned num, den;
-    if (var_InheritURational (demux, &num, &den, "timecode-fps")
-     || !num || !den)
+    vlc_urational_t fps;
+    if (var_InheritURational (demux, &fps.num, &fps.den, "timecode-fps")
+     || !fps.num || !fps.den)
     {
         msg_Err (demux, "invalid frame rate");
         free (sys);
         return VLC_EGENERIC;
     }
 
-    date_Init (&sys->date, num, den);
+    date_Init (&sys->date, fps.num, fps.den);
     date_Set (&sys->date, VLC_TS_0);
     sys->next_time = VLC_TS_INVALID;
 
