@@ -76,8 +76,7 @@ struct demux_sys_t
     es_out_id_t *p_es;
 
     date_t      dts;
-    unsigned    frame_rate_num;
-    unsigned    frame_rate_den;
+    vlc_urational_t frame_rate;
 
     decoder_t *p_packetizer;
 };
@@ -328,8 +327,8 @@ static int GenericOpen( demux_t *p_demux, const char *psz_module,
     p_demux->pf_control= Control;
     p_demux->p_sys     = p_sys = malloc( sizeof( demux_sys_t ) );
     p_sys->p_es        = NULL;
-    p_sys->frame_rate_num = 0;
-    p_sys->frame_rate_den = 0;
+    p_sys->frame_rate.num = 0;
+    p_sys->frame_rate.den = 0;
 
     float f_fps = 0;
     char *psz_fpsvar;
@@ -342,9 +341,9 @@ static int GenericOpen( demux_t *p_demux, const char *psz_module,
     if( f_fps )
     {
         if ( f_fps < 0.001f ) f_fps = 0.001f;
-        p_sys->frame_rate_den = 1000;
-        p_sys->frame_rate_num = 1000 * f_fps;
-        date_Init( &p_sys->dts, p_sys->frame_rate_num, p_sys->frame_rate_den );
+        p_sys->frame_rate.den = 1000;
+        p_sys->frame_rate.num = 1000 * f_fps;
+        date_Init( &p_sys->dts, p_sys->frame_rate.num, p_sys->frame_rate.den );
     }
     else
         date_Init( &p_sys->dts, 25000, 1000 );
@@ -453,31 +452,31 @@ static int Demux( demux_t *p_demux)
             es_out_Send( p_demux->out, p_sys->p_es, p_block_out );
             if( frame )
             {
-                if( !p_sys->frame_rate_den )
+                if( !p_sys->frame_rate.den )
                 {
                     /* Use packetizer's one */
                     if( p_sys->p_packetizer->fmt_out.video.i_frame_rate_base &&
                         p_sys->p_packetizer->fmt_out.video.i_frame_rate )
                     {
-                        p_sys->frame_rate_num = p_sys->p_packetizer->fmt_out.video.i_frame_rate;
-                        p_sys->frame_rate_den = p_sys->p_packetizer->fmt_out.video.i_frame_rate_base;
+                        p_sys->frame_rate.num = p_sys->p_packetizer->fmt_out.video.i_frame_rate;
+                        p_sys->frame_rate.den = p_sys->p_packetizer->fmt_out.video.i_frame_rate_base;
                     }
                     else
                     {
-                        p_sys->frame_rate_num = 25000;
-                        p_sys->frame_rate_den = 1000;
+                        p_sys->frame_rate.num = 25000;
+                        p_sys->frame_rate.den = 1000;
                     }
-                    date_Init( &p_sys->dts, 2 * p_sys->frame_rate_num, p_sys->frame_rate_den );
+                    date_Init( &p_sys->dts, 2 * p_sys->frame_rate.num, p_sys->frame_rate.den );
                     date_Set( &p_sys->dts, VLC_TS_0 );
-                    msg_Dbg( p_demux, "using %.2f fps", (double) p_sys->frame_rate_num / p_sys->frame_rate_den );
+                    msg_Dbg( p_demux, "using %.2f fps", (double) p_sys->frame_rate.num / p_sys->frame_rate.den );
                 }
 
                 es_out_Control( p_demux->out, ES_OUT_SET_PCR, date_Get( &p_sys->dts ) );
                 unsigned i_nb_fields;
                 if( i_frame_length > 0 )
                 {
-                    i_nb_fields = i_frame_length * 2 * p_sys->frame_rate_num /
-                                  ( p_sys->frame_rate_den * CLOCK_FREQ );
+                    i_nb_fields = i_frame_length * 2 * p_sys->frame_rate.num /
+                                  ( p_sys->frame_rate.den * CLOCK_FREQ );
                 }
                 else i_nb_fields = 2;
                 if( i_nb_fields <= 6 ) /* in the legit range */
