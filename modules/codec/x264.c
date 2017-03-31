@@ -1334,7 +1334,7 @@ static int  Open ( vlc_object_t *p_this )
     p_sys->param.i_timebase_num = 1;
     p_sys->param.i_timebase_den = CLOCK_FREQ;
 
-    if( p_enc->fmt_in.video.frame_rate.den > 0 )
+    if( p_enc->fmt_in.video.frame_rate.den )
     {
         p_sys->param.i_fps_num = p_enc->fmt_in.video.frame_rate.num;
         p_sys->param.i_fps_den = p_enc->fmt_in.video.frame_rate.den;

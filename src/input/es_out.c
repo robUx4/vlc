@@ -3069,8 +3069,7 @@ static void EsOutUpdateInfo( es_out_t *out, es_out_id_t *es, const es_format_t *
             info_category_AddInfo( p_cat, _("Buffer dimensions"), "%ux%u",
                                    fmt->video.i_width, fmt->video.i_height );
 
-       if( fmt->video.frame_rate.num > 0 &&
-           fmt->video.frame_rate.den > 0 )
+       if( fmt->video.frame_rate.num && fmt->video.frame_rate.den )
        {
            div = lldiv( (float)fmt->video.frame_rate.num /
                                fmt->video.frame_rate.den * CLOCK_FREQ,

@@ -262,8 +262,7 @@ static OMX_ERRORTYPE SetPortDefinition(decoder_t *p_dec, OmxPort *p_port,
         def->format.video.nFrameHeight = p_fmt->video.i_height;
         if(def->format.video.eCompressionFormat == OMX_VIDEO_CodingUnused)
             def->format.video.nStride = def->format.video.nFrameWidth;
-        if( p_fmt->video.frame_rate.num > 0 &&
-            p_fmt->video.frame_rate.den > 0 )
+        if( p_fmt->video.frame_rate.num && p_fmt->video.frame_rate.den )
             def->format.video.xFramerate = (p_fmt->video.frame_rate.num << 16) /
                 p_fmt->video.frame_rate.den;
 
@@ -595,8 +594,7 @@ static OMX_ERRORTYPE GetPortDefinition(decoder_t *p_dec, OmxPort *p_port,
         p_fmt->video.i_visible_width = def->format.video.nFrameWidth;
         p_fmt->video.i_height = def->format.video.nFrameHeight;
         p_fmt->video.i_visible_height = def->format.video.nFrameHeight;
-        p_fmt->video.frame_rate.num = p_dec->fmt_in.video.frame_rate.num;
-        p_fmt->video.frame_rate.den = p_dec->fmt_in.video.frame_rate.den;
+        p_fmt->video.frame_rate = p_dec->fmt_in.video.frame_rate;
 
         OMX_INIT_STRUCTURE(crop_rect);
         crop_rect.nPortIndex = def->nPortIndex;
