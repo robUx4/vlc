@@ -137,8 +137,7 @@ struct demux_sys_t
     input_title_t **titles;
 
     /* Video */
-    int i_sar_num;
-    int i_sar_den;
+    vlc_urational_t sar;
 
     /* SPU */
     uint32_t clut[16];
@@ -217,8 +216,8 @@ static int Open( vlc_object_t *p_this )
     DEMUX_INIT_COMMON(); p_sys = p_demux->p_sys;
 
     ps_track_init( p_sys->tk );
-    p_sys->i_sar_num = 0;
-    p_sys->i_sar_den = 0;
+    p_sys->sar.num = 0;
+    p_sys->sar.den = 0;
     p_sys->i_title_cur_time = (mtime_t) 0;
     p_sys->i_cell_cur_time = (mtime_t) 0;
     p_sys->i_cell_duration = (mtime_t) 0;
@@ -665,8 +664,8 @@ static void ESNew( demux_t *p_demux, int i_id, int i_lang )
     /* Add a new ES */
     if( tk->fmt.i_cat == VIDEO_ES )
     {
-        tk->fmt.video.i_sar_num = p_sys->i_sar_num;
-        tk->fmt.video.i_sar_den = p_sys->i_sar_den;
+        tk->fmt.video.i_sar_num = p_sys->sar.num;
+        tk->fmt.video.i_sar_den = p_sys->sar.den;
     }
     else if( tk->fmt.i_cat == AUDIO_ES )
     {
@@ -884,16 +883,16 @@ static int DvdReadSetArea( demux_t *p_demux, int i_title, int i_chapter,
         switch( p_attr->display_aspect_ratio )
         {
         case 0:
-            p_sys->i_sar_num = 4 * i_video_height;
-            p_sys->i_sar_den = 3 * i_video_width;
+            p_sys->sar.num = 4 * i_video_height;
+            p_sys->sar.den = 3 * i_video_width;
             break;
         case 3:
-            p_sys->i_sar_num = 16 * i_video_height;
-            p_sys->i_sar_den =  9 * i_video_width;
+            p_sys->sar.num = 16 * i_video_height;
+            p_sys->sar.den =  9 * i_video_width;
             break;
         default:
-            p_sys->i_sar_num = 0;
-            p_sys->i_sar_den = 0;
+            p_sys->sar.num = 0;
+            p_sys->sar.den = 0;
             break;
         }
 
