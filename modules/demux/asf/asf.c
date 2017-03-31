@@ -566,7 +566,7 @@ static void Packet_SetAR( asf_packet_sys_t *p_packetsys, uint8_t i_stream_number
 {
     demux_t *p_demux = p_packetsys->p_demux;
     asf_track_t *tk = p_demux->p_sys->track[i_stream_number];
-    if ( tk->p_fmt->video.i_sar_num == i_ratio_x && tk->p_fmt->video.i_sar_den == i_ratio_y )
+    if ( tk->p_fmt->video.sar.num == i_ratio_x && tk->p_fmt->video.sar.den == i_ratio_y )
         return;
 
     /* Only apply if origin pixel size >= 1x1, due to broken yacast */
@@ -580,8 +580,8 @@ static void Packet_SetAR( asf_packet_sys_t *p_packetsys, uint8_t i_stream_number
             vlc_object_release( p_vout );
         }
     }
-    tk->p_fmt->video.i_sar_num = i_ratio_x;
-    tk->p_fmt->video.i_sar_den = i_ratio_y;
+    tk->p_fmt->video.sar.num = i_ratio_x;
+    tk->p_fmt->video.sar.den = i_ratio_y;
 }
 
 static void Packet_SetSendTime( asf_packet_sys_t *p_packetsys, mtime_t i_time )
@@ -1039,8 +1039,8 @@ static int DemuxInit( demux_t *p_demux )
 
                 if( i_aspect_x && i_aspect_y )
                 {
-                    fmt.video.i_sar_num = i_aspect_x;
-                    fmt.video.i_sar_den = i_aspect_y;
+                    fmt.video.sar.num = i_aspect_x;
+                    fmt.video.sar.den = i_aspect_y;
                 }
             }
 

@@ -87,8 +87,8 @@ static vout_display_t *vout_display_New(vlc_object_t *obj,
 
     /* Picture buffer does not have the concept of aspect ratio */
     video_format_Copy(&vd->fmt, fmt);
-    vd->fmt.i_sar_num = 0;
-    vd->fmt.i_sar_den = 0;
+    vd->fmt.sar.num = 0;
+    vd->fmt.sar.den = 0;
 
     vd->info.is_slow = false;
     vd->info.has_double_click = false;
@@ -164,18 +164,18 @@ void vout_display_GetDefaultDisplaySize(unsigned *width, unsigned *height,
         *height = cfg->display.height;
     } else if (cfg->display.width != 0) {
         *width  = cfg->display.width;
-        *height = (int64_t)source->i_visible_height * source->i_sar_den * cfg->display.width * cfg->display.sar.num /
-            source->i_visible_width / source->i_sar_num / cfg->display.sar.den;
+        *height = (int64_t)source->i_visible_height * source->sar.den * cfg->display.width * cfg->display.sar.num /
+            source->i_visible_width / source->sar.num / cfg->display.sar.den;
     } else if (cfg->display.height != 0) {
-        *width  = (int64_t)source->i_visible_width * source->i_sar_num * cfg->display.height * cfg->display.sar.den /
-            source->i_visible_height / source->i_sar_den / cfg->display.sar.num;
+        *width  = (int64_t)source->i_visible_width * source->sar.num * cfg->display.height * cfg->display.sar.den /
+            source->i_visible_height / source->sar.den / cfg->display.sar.num;
         *height = cfg->display.height;
-    } else if (source->i_sar_num >= source->i_sar_den) {
-        *width  = (int64_t)source->i_visible_width * source->i_sar_num * cfg->display.sar.den / source->i_sar_den / cfg->display.sar.num;
+    } else if (source->sar.num >= source->sar.den) {
+        *width  = (int64_t)source->i_visible_width * source->sar.num * cfg->display.sar.den / source->sar.den / cfg->display.sar.num;
         *height = source->i_visible_height;
     } else {
         *width  = source->i_visible_width;
-        *height = (int64_t)source->i_visible_height * source->i_sar_den * cfg->display.sar.num / source->i_sar_num / cfg->display.sar.den;
+        *height = (int64_t)source->i_visible_height * source->sar.den * cfg->display.sar.num / source->sar.num / cfg->display.sar.den;
     }
 
     *width  = *width  * cfg->zoom.num / cfg->zoom.den;
@@ -228,9 +228,9 @@ void vout_display_PlacePicture(vout_display_place_t *place,
     const unsigned width  = source->i_visible_width;
     const unsigned height = source->i_visible_height;
     /* Compute the height if we use the width to fill up display_width */
-    const int64_t scaled_height = (int64_t)height * display_width  * cfg->display.sar.num * source->i_sar_den / (width  * source->i_sar_num * cfg->display.sar.den);
+    const int64_t scaled_height = (int64_t)height * display_width  * cfg->display.sar.num * source->sar.den / (width  * source->sar.num * cfg->display.sar.den);
     /* And the same but switching width/height */
-    const int64_t scaled_width  = (int64_t)width  * display_height * cfg->display.sar.den * source->i_sar_num / (height * source->i_sar_den * cfg->display.sar.num);
+    const int64_t scaled_width  = (int64_t)width  * display_height * cfg->display.sar.den * source->sar.num / (height * source->sar.den * cfg->display.sar.num);
 
     if (source->projection_mode == PROJECTION_MODE_RECTANGULAR) {
         /* We keep the solution that avoid filling outside the display */
@@ -416,12 +416,12 @@ static int VoutDisplayCreateRender(vout_display_t *vd)
     osys->filters = NULL;
 
     video_format_t v_src = vd->source;
-    v_src.i_sar_num = 0;
-    v_src.i_sar_den = 0;
+    v_src.sar.num = 0;
+    v_src.sar.den = 0;
 
     video_format_t v_dst = vd->fmt;
-    v_dst.i_sar_num = 0;
-    v_dst.i_sar_den = 0;
+    v_dst.sar.num = 0;
+    v_dst.sar.den = 0;
 
     video_format_t v_dst_cmp = v_dst;
     if ((v_src.i_chroma == VLC_CODEC_J420 && v_dst.i_chroma == VLC_CODEC_I420) ||
@@ -761,8 +761,8 @@ static void VoutDisplayCropRatio(int *left, int *top, int *right, int *bottom,
                                  const video_format_t *source,
                                  unsigned num, unsigned den)
 {
-    unsigned scaled_width  = (uint64_t)source->i_visible_height * num * source->i_sar_den / den / source->i_sar_num;
-    unsigned scaled_height = (uint64_t)source->i_visible_width  * den * source->i_sar_num / num / source->i_sar_den;
+    unsigned scaled_width  = (uint64_t)source->i_visible_height * num * source->sar.den / den / source->sar.num;
+    unsigned scaled_height = (uint64_t)source->i_visible_width  * den * source->sar.num / num / source->sar.den;
 
     if (scaled_width < source->i_visible_width) {
         *left   = (source->i_visible_width - scaled_width) / 2;
@@ -943,11 +943,11 @@ bool vout_ManageDisplay(vout_display_t *vd, bool allow_reset_pictures)
             video_format_t source = vd->source;
 
             if (osys->sar.num > 0 && osys->sar.den > 0) {
-                source.i_sar_num = osys->sar.num;
-                source.i_sar_den = osys->sar.den;
+                source.sar.num = osys->sar.num;
+                source.sar.den = osys->sar.den;
             } else {
-                source.i_sar_num = osys->source.i_sar_num;
-                source.i_sar_den = osys->source.i_sar_den;
+                source.sar.num = osys->source.sar.num;
+                source.sar.den = osys->source.sar.den;
             }
 
             if (vout_display_Control(vd, VOUT_DISPLAY_CHANGE_SOURCE_ASPECT, &source)) {
@@ -962,8 +962,8 @@ bool vout_ManageDisplay(vout_display_t *vd, bool allow_reset_pictures)
                 osys->fit_window = 1;
             }
             vd->source = source;
-            osys->sar.num = source.i_sar_num;
-            osys->sar.den = source.i_sar_den;
+            osys->sar.num = source.sar.num;
+            osys->sar.den = source.sar.den;
             osys->ch_sar  = false;
 
             /* If a crop ratio is requested, recompute the parameters */
@@ -978,8 +978,8 @@ bool vout_ManageDisplay(vout_display_t *vd, bool allow_reset_pictures)
             unsigned crop_den = osys->crop.den;
             if (crop_num != 0 && crop_den != 0) {
                 video_format_t fmt = osys->source;
-                fmt.i_sar_num = source.i_sar_num;
-                fmt.i_sar_den = source.i_sar_den;
+                fmt.sar.num = source.sar.num;
+                fmt.sar.den = source.sar.den;
                 VoutDisplayCropRatio(&osys->crop.left,  &osys->crop.top,
                                      &osys->crop.right, &osys->crop.bottom,
                                      &fmt, crop_num, crop_den);
@@ -1094,18 +1094,18 @@ void vout_UpdateDisplaySourceProperties(vout_display_t *vd, const video_format_t
 {
     vout_display_owner_sys_t *osys = vd->owner.sys;
 
-    if (source->i_sar_num * osys->source.i_sar_den !=
-        source->i_sar_den * osys->source.i_sar_num) {
+    if (source->sar.num * osys->source.sar.den !=
+        source->sar.den * osys->source.sar.num) {
 
-        osys->source.i_sar_num = source->i_sar_num;
-        osys->source.i_sar_den = source->i_sar_den;
-        vlc_ureduce(&osys->source.i_sar_num, &osys->source.i_sar_den,
-                    osys->source.i_sar_num, osys->source.i_sar_den, 0);
+        osys->source.sar.num = source->sar.num;
+        osys->source.sar.den = source->sar.den;
+        vlc_ureduce(&osys->source.sar.num, &osys->source.sar.den,
+                    osys->source.sar.num, osys->source.sar.den, 0);
 
         /* FIXME it will override any AR that the user would have forced */
         osys->ch_sar = true;
-        osys->sar.num = osys->source.i_sar_num;
-        osys->sar.den = osys->source.i_sar_den;
+        osys->sar.num = osys->source.sar.num;
+        osys->sar.den = osys->source.sar.den;
     }
     if (source->i_x_offset       != osys->source.i_x_offset ||
         source->i_y_offset       != osys->source.i_y_offset ||
@@ -1268,8 +1268,8 @@ static vout_display_t *DisplayNew(vout_thread_t *vout,
     osys->crop.num = 0;
     osys->crop.den = 0;
 
-    osys->sar.num = osys->sar_initial.num ? osys->sar_initial.num : source->i_sar_num;
-    osys->sar.den = osys->sar_initial.den ? osys->sar_initial.den : source->i_sar_den;
+    osys->sar.num = osys->sar_initial.num ? osys->sar_initial.num : source->sar.num;
+    osys->sar.den = osys->sar_initial.den ? osys->sar_initial.den : source->sar.den;
 
     vout_display_owner_t owner;
     if (owner_ptr) {
@@ -1293,8 +1293,8 @@ static vout_display_t *DisplayNew(vout_thread_t *vout,
     }
 
     /* Setup delayed request */
-    if (osys->sar.num != source->i_sar_num ||
-        osys->sar.den != source->i_sar_den)
+    if (osys->sar.num != source->sar.num ||
+        osys->sar.den != source->sar.den)
         osys->ch_sar = true;
 
     vout_SendEventViewpointChangeable(osys->vout,

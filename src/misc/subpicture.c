@@ -131,8 +131,8 @@ subpicture_t *subpicture_NewFromPicture( vlc_object_t *p_obj,
     p_subpic->i_original_picture_width  = fmt_out.i_width;
     p_subpic->i_original_picture_height = fmt_out.i_height;
 
-    fmt_out.i_sar_num =
-    fmt_out.i_sar_den = 0;
+    fmt_out.sar.num =
+    fmt_out.sar.den = 0;
 
     p_subpic->p_region = subpicture_region_New( &fmt_out );
     if( p_subpic->p_region )

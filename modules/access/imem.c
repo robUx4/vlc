@@ -433,8 +433,8 @@ static int OpenDemux(vlc_object_t *object)
         vlc_urational_t rat = var_InheritURational(object, "imem-dar");
         if (rat.num && rat.den) {
             if (fmt.video.i_width != 0 && fmt.video.i_height != 0) {
-                fmt.video.i_sar_num = rat.num * fmt.video.i_height;
-                fmt.video.i_sar_den = rat.den * fmt.video.i_width;
+                fmt.video.sar.num = rat.num * fmt.video.i_height;
+                fmt.video.sar.den = rat.den * fmt.video.i_width;
             }
         }
         rat = var_InheritURational(object, "imem-fps");
@@ -445,7 +445,7 @@ static int OpenDemux(vlc_object_t *object)
         msg_Dbg(object, "Video %4.4s %dx%d  SAR %d:%d frame rate %u/%u",
                 (const char *)&fmt.i_codec,
                 fmt.video.i_width, fmt.video.i_height,
-                fmt.video.i_sar_num, fmt.video.i_sar_den,
+                fmt.video.sar.num, fmt.video.sar.den,
                 fmt.video.frame_rate.num, fmt.video.frame_rate.den);
         break;
     }

@@ -61,7 +61,7 @@ static void print_media(libvlc_media_t *media)
             case libvlc_track_video:
                 printf("video: %ux%u, sar: %u/%u, fps: %u/%u\n",
                        p_track->video->i_width, p_track->video->i_height,
-                       p_track->video->i_sar_num, p_track->video->i_sar_den,
+                       p_track->video->sar.num, p_track->video->sar.den,
                        p_track->video->i_frame_rate_num, p_track->video->i_frame_rate_den);
                 break;
             case libvlc_track_text:

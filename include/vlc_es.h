@@ -318,8 +318,7 @@ struct video_format_t
 
     unsigned int i_bits_per_pixel;             /**< number of bits per pixel */
 
-    unsigned int i_sar_num;                   /**< sample/pixel aspect ratio */
-    unsigned int i_sar_den;
+    vlc_urational_t sar;                      /**< sample/pixel aspect ratio */
 
     vlc_urational_t frame_rate;                              /**< frame rate */
 

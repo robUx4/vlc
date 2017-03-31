@@ -1007,8 +1007,8 @@ libvlc_media_tracks_get( libvlc_media_t *p_md, libvlc_media_track_t *** pp_es )
             p_mes->i_type = libvlc_track_video;
             p_mes->video->i_height = p_es->video.i_visible_height;
             p_mes->video->i_width = p_es->video.i_visible_width;
-            p_mes->video->i_sar_num = p_es->video.i_sar_num;
-            p_mes->video->i_sar_den = p_es->video.i_sar_den;
+            p_mes->video->i_sar_num = p_es->video.sar.num;
+            p_mes->video->i_sar_den = p_es->video.sar.den;
             p_mes->video->i_frame_rate_num = p_es->video.frame_rate.num;
             p_mes->video->i_frame_rate_den = p_es->video.frame_rate.den;
 

@@ -255,8 +255,8 @@ static subpicture_region_t *DecodeSimpleBitmap(decoder_t *dec,
         .i_visible_width = frame_h,
         .i_height = frame_v,
         .i_visible_height = frame_v,
-        .i_sar_num = 0, /* Use video AR */
-        .i_sar_den = 1,
+        .sar.num = 0, /* Use video AR */
+        .sar.den = 1,
         .p_palette = &palette,
     };
     subpicture_region_t *r = subpicture_region_New(&fmt);

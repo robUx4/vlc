@@ -402,7 +402,7 @@ static int InitVideo (demux_t *demux, int fd, uint32_t caps)
     es_fmt.video.i_height = fmt.fmt.pix.height;
     es_fmt.video.frame_rate.num = parm.parm.capture.timeperframe.denominator;
     es_fmt.video.frame_rate.den = parm.parm.capture.timeperframe.numerator;
-    GetAR (fd, &es_fmt.video.i_sar_num, &es_fmt.video.i_sar_den);
+    GetAR (fd, &es_fmt.video.sar.num, &es_fmt.video.sar.den);
 
     msg_Dbg (demux, "color primaries: %u", fmt.fmt.pix.colorspace);
     switch (fmt.fmt.pix.colorspace)
@@ -544,8 +544,8 @@ static int InitVideo (demux_t *demux, int fd, uint32_t caps)
              es_fmt.video.i_width, es_fmt.video.i_height);
     msg_Dbg (demux, " frame rate: %u/%u", es_fmt.video.frame_rate.num,
              es_fmt.video.frame_rate.den);
-    msg_Dbg (demux, " aspect ratio: %u/%u", es_fmt.video.i_sar_num,
-             es_fmt.video.i_sar_den);
+    msg_Dbg (demux, " aspect ratio: %u/%u", es_fmt.video.sar.num,
+             es_fmt.video.sar.den);
     sys->es = es_out_Add (demux->out, &es_fmt);
 
     /* Init I/O method */

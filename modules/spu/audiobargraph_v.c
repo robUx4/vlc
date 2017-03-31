@@ -393,7 +393,7 @@ static subpicture_t *FilterSub(filter_t *p_filter, mtime_t date)
     /* Create new SPU region */
     memset(&fmt, 0, sizeof(video_format_t));
     fmt.i_chroma = VLC_CODEC_YUVA;
-    fmt.i_sar_num = fmt.i_sar_den = 1;
+    fmt.sar.num = fmt.sar.den = 1;
     fmt.i_width = fmt.i_visible_width = p_pic->p[Y_PLANE].i_visible_pitch;
     fmt.i_height = fmt.i_visible_height = p_pic->p[Y_PLANE].i_visible_lines;
     fmt.i_x_offset = fmt.i_y_offset = 0;

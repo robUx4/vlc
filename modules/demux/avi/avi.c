@@ -632,8 +632,8 @@ static int Open( vlc_object_t * p_this )
                     if( p_vprp->i_video_format_token >= 1 &&
                         p_vprp->i_video_format_token <= 4 )
                         i_frame_aspect_ratio = 0x00040003;
-                    fmt.video.i_sar_num = ((i_frame_aspect_ratio >> 16) & 0xffff) * fmt.video.i_height;
-                    fmt.video.i_sar_den = ((i_frame_aspect_ratio >>  0) & 0xffff) * fmt.video.i_width;
+                    fmt.video.sar.num = ((i_frame_aspect_ratio >> 16) & 0xffff) * fmt.video.i_height;
+                    fmt.video.sar.den = ((i_frame_aspect_ratio >>  0) & 0xffff) * fmt.video.i_width;
                 }
                 /* Extradata is the remainder of the chunk less the BIH */
                 if( p_vids->i_chunk_size <= INT_MAX - sizeof(VLC_BITMAPINFOHEADER) )

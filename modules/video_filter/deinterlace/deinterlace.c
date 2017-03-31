@@ -246,7 +246,7 @@ static void GetOutputFormat( filter_t *p_filter,
         p_dst->i_height /= 2;
         p_dst->i_visible_height /= 2;
         p_dst->i_y_offset /= 2;
-        p_dst->i_sar_den *= 2;
+        p_dst->sar.den *= 2;
     }
 
     if( p_sys->b_double_rate )

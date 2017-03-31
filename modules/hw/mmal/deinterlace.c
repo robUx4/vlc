@@ -146,8 +146,8 @@ static int Open(filter_t *filter)
     sys->input->format->es->video.crop.y = 0;
     sys->input->format->es->video.crop.width = filter->fmt_in.video.i_width;
     sys->input->format->es->video.crop.height = filter->fmt_in.video.i_height;
-    sys->input->format->es->video.par.num = filter->fmt_in.video.i_sar_num;
-    sys->input->format->es->video.par.den = filter->fmt_in.video.i_sar_den;
+    sys->input->format->es->video.par.num = filter->fmt_in.video.sar.num;
+    sys->input->format->es->video.par.den = filter->fmt_in.video.sar.den;
 
     es_format_Copy(&filter->fmt_out, &filter->fmt_in);
     filter->fmt_out.video.frame_rate.num *= 2;

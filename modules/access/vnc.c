@@ -216,7 +216,7 @@ static rfbBool mallocFrameBufferHandler( rfbClient* p_client )
     fmt.video.i_gmask = p_client->format.greenMax << p_client->format.greenShift;
     fmt.video.i_bmask = p_client->format.blueMax << p_client->format.blueShift;
 
-    fmt.video.i_sar_num = fmt.video.i_sar_den = 1;
+    fmt.video.sar.num = fmt.video.sar.den = 1;
 
     /* declare the new es */
     p_sys->es = es_out_Add( p_demux->out, &fmt );

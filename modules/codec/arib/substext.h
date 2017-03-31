@@ -68,15 +68,15 @@ static void SubpictureTextUpdate(subpicture_t *subpic,
     subpicture_updater_sys_t *sys = subpic->updater.p_sys;
     VLC_UNUSED(fmt_src); VLC_UNUSED(ts);
 
-    if (fmt_dst->i_sar_num <= 0 || fmt_dst->i_sar_den <= 0)
+    if (fmt_dst->sar.num <= 0 || fmt_dst->sar.den <= 0)
     {
         return;
     }
 
     video_format_t fmt;
     video_format_Init(&fmt, VLC_CODEC_TEXT);
-    fmt.i_sar_num = 1;
-    fmt.i_sar_den = 1;
+    fmt.sar.num = 1;
+    fmt.sar.den = 1;
 
     subpicture_region_t *r = NULL;
     arib_text_region_t *p_region;

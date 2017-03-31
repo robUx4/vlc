@@ -512,8 +512,8 @@ static int decoder_queue_video( decoder_t *p_dec, picture_t *p_pic,
 
         const unsigned i_fmt_in_aspect =
             (int64_t)VOUT_ASPECT_FACTOR *
-            fmt_in.i_sar_num * fmt_in.i_width /
-            (fmt_in.i_sar_den * fmt_in.i_height);
+            fmt_in.sar.num * fmt_in.i_width /
+            (fmt_in.sar.den * fmt_in.i_height);
         if ( !p_sys->i_height )
         {
             fmt_out.i_width = p_sys->i_width;
@@ -551,8 +551,8 @@ static int decoder_queue_video( decoder_t *p_dec, picture_t *p_pic,
 
         p_new_pic = picture_New( p_pic->format.i_chroma,
                                  p_pic->format.i_width, p_pic->format.i_height,
-                                 p_sys->p_decoder->fmt_out.video.i_sar_num,
-                                 p_sys->p_decoder->fmt_out.video.i_sar_den );
+                                 p_sys->p_decoder->fmt_out.video.sar.num,
+                                 p_sys->p_decoder->fmt_out.video.sar.den );
         if( !p_new_pic )
         {
             picture_Release( p_pic );
@@ -623,13 +623,13 @@ static int video_update_format( vlc_object_t *p_this,
     if( fmt_out->video.i_width != p_sys->video.i_width ||
         fmt_out->video.i_height != p_sys->video.i_height ||
         fmt_out->video.i_chroma != p_sys->video.i_chroma ||
-        (int64_t)fmt_out->video.i_sar_num * p_sys->video.i_sar_den !=
-        (int64_t)fmt_out->video.i_sar_den * p_sys->video.i_sar_num )
+        (int64_t)fmt_out->video.sar.num * p_sys->video.sar.den !=
+        (int64_t)fmt_out->video.sar.den * p_sys->video.sar.num )
     {
-        vlc_ureduce( &fmt_out->video.i_sar_num,
-                     &fmt_out->video.i_sar_den,
-                     fmt_out->video.i_sar_num,
-                     fmt_out->video.i_sar_den, 0 );
+        vlc_ureduce( &fmt_out->video.sar.num,
+                     &fmt_out->video.sar.den,
+                     fmt_out->video.sar.num,
+                     fmt_out->video.sar.den, 0 );
 
         if( !fmt_out->video.i_visible_width ||
             !fmt_out->video.i_visible_height )

@@ -117,8 +117,8 @@ static int Decode (decoder_t *dec, block_t *block)
     video_format_Setup(&dec->fmt_out.video, chroma,
                        ntohl(hdr->pixmap_width), ntohl(hdr->pixmap_height),
                        ntohl(hdr->pixmap_width), ntohl(hdr->pixmap_height),
-                       dec->fmt_in.video.i_sar_num,
-                       dec->fmt_in.video.i_sar_den);
+                       dec->fmt_in.video.sar.num,
+                       dec->fmt_in.video.sar.den);
 
     const size_t copy = dec->fmt_out.video.i_width
                         * (dec->fmt_out.video.i_bits_per_pixel / 8);

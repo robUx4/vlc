@@ -888,8 +888,8 @@ static block_t *asf_header_create( sout_mux_t *p_mux, bool b_broadcast )
     {
         const asf_track_t *p_track = vlc_array_item_at_index( &p_sys->tracks, i );
         if( p_track->i_cat == VIDEO_ES &&
-            p_track->fmt.video.i_sar_num != 0 &&
-            p_track->fmt.video.i_sar_den != 0 )
+            p_track->fmt.video.sar.num != 0 &&
+            p_track->fmt.video.sar.den != 0 )
         {
             i_cm_size = 26 + 2 * (16 + 2 * sizeof("AspectRatio?"));
         }
@@ -994,15 +994,15 @@ static block_t *asf_header_create( sout_mux_t *p_mux, bool b_broadcast )
         {
             tk = vlc_array_item_at_index( &p_sys->tracks, i );
             if( tk->i_cat == VIDEO_ES &&
-                tk->fmt.video.i_sar_num != 0 &&
-                tk->fmt.video.i_sar_den != 0 )
+                tk->fmt.video.sar.num != 0 &&
+                tk->fmt.video.sar.den != 0 )
                 break;
         }
         assert( tk != NULL );
 
         vlc_ureduce( &i_dst_num, &i_dst_den,
-                     tk->fmt.video.i_sar_num,
-                     tk->fmt.video.i_sar_den, 0 );
+                     tk->fmt.video.sar.num,
+                     tk->fmt.video.sar.den, 0 );
 
         msg_Dbg( p_mux, "pixel aspect-ratio: %i/%i", i_dst_num, i_dst_den );
 

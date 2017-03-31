@@ -124,8 +124,8 @@ int screen_InitCapture(demux_t *p_demux)
     p_sys->fmt.video.i_rmask           = 0x00ff0000;
     p_sys->fmt.video.i_gmask           = 0x0000ff00;
     p_sys->fmt.video.i_bmask           = 0x000000ff;
-    p_sys->fmt.video.i_sar_num         =
-    p_sys->fmt.video.i_sar_den         = 1;
+    p_sys->fmt.video.sar.num         =
+    p_sys->fmt.video.sar.den         = 1;
     p_sys->fmt.video.frame_rate.num    = 1000 * p_data->rate;
     p_sys->fmt.video.frame_rate.den    = 1000;
 

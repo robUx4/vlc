@@ -136,8 +136,8 @@ static subpicture_region_t *OSDRegion(int x, int y, int width, int height)
     fmt.i_visible_width  = width;
     fmt.i_height         =
     fmt.i_visible_height = height;
-    fmt.i_sar_num        = 1;
-    fmt.i_sar_den        = 1;
+    fmt.sar.num        = 1;
+    fmt.sar.den        = 1;
     fmt.p_palette        = &palette;
 
     subpicture_region_t *r = subpicture_region_New(&fmt);
@@ -269,11 +269,11 @@ static void OSDWidgetUpdate(subpicture_t *subpic,
     VLC_UNUSED(fmt_src); VLC_UNUSED(ts);
 
     video_format_t fmt = *fmt_dst;
-    fmt.i_width         = fmt.i_width         * fmt.i_sar_num / fmt.i_sar_den;
-    fmt.i_visible_width = fmt.i_visible_width * fmt.i_sar_num / fmt.i_sar_den;
-    fmt.i_x_offset      = fmt.i_x_offset      * fmt.i_sar_num / fmt.i_sar_den;
-    fmt.i_sar_num       = 1;
-    fmt.i_sar_den       = 1;
+    fmt.i_width         = fmt.i_width         * fmt.sar.num / fmt.sar.den;
+    fmt.i_visible_width = fmt.i_visible_width * fmt.sar.num / fmt.sar.den;
+    fmt.i_x_offset      = fmt.i_x_offset      * fmt.sar.num / fmt.sar.den;
+    fmt.sar.num       = 1;
+    fmt.sar.den       = 1;
 
     subpic->i_original_picture_width  = fmt.i_visible_width;
     subpic->i_original_picture_height = fmt.i_visible_height;

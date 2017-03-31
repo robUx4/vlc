@@ -237,8 +237,8 @@ static int Open(vlc_object_t *object)
     sys->input->format->es->video.crop.y = 0;
     sys->input->format->es->video.crop.width = vd->fmt.i_width;
     sys->input->format->es->video.crop.height = vd->fmt.i_height;
-    sys->input->format->es->video.par.num = vd->source.i_sar_num;
-    sys->input->format->es->video.par.den = vd->source.i_sar_den;
+    sys->input->format->es->video.par.num = vd->source.sar.num;
+    sys->input->format->es->video.par.den = vd->source.sar.den;
 
     status = mmal_port_format_commit(sys->input);
     if (status != MMAL_SUCCESS) {
@@ -387,8 +387,8 @@ static int configure_display(vout_display_t *vd, const vout_display_cfg_t *cfg,
         return -EINVAL;
 
     if (fmt) {
-        sys->input->format->es->video.par.num = fmt->i_sar_num;
-        sys->input->format->es->video.par.den = fmt->i_sar_den;
+        sys->input->format->es->video.par.num = fmt->sar.num;
+        sys->input->format->es->video.par.den = fmt->sar.den;
 
         status = mmal_port_format_commit(sys->input);
         if (status != MMAL_SUCCESS) {

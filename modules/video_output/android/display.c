@@ -168,9 +168,9 @@ static int UpdateVideoSize(vout_display_sys_t *sys, video_format_t *p_fmt,
 
     video_format_ApplyRotation(&rot_fmt, p_fmt);
 
-    if (rot_fmt.i_sar_num != 0 && rot_fmt.i_sar_den != 0) {
-        i_sar_num = rot_fmt.i_sar_num;
-        i_sar_den = rot_fmt.i_sar_den;
+    if (rot_fmt.sar.num != 0 && rot_fmt.sar.den != 0) {
+        i_sar_num = rot_fmt.sar.num;
+        i_sar_den = rot_fmt.sar.den;
     }
     if (b_cropped) {
         i_width = rot_fmt.i_visible_width;
@@ -245,11 +245,11 @@ static void FixSubtitleFormat(vout_display_sys_t *sys)
         i_video_height = fmt.i_visible_height;
     }
 
-    if (fmt.i_sar_num > 0 && fmt.i_sar_den > 0) {
-        if (fmt.i_sar_num >= fmt.i_sar_den)
-            i_video_width = i_video_width * fmt.i_sar_num / fmt.i_sar_den;
+    if (fmt.sar.num > 0 && fmt.sar.den > 0) {
+        if (fmt.sar.num >= fmt.sar.den)
+            i_video_width = i_video_width * fmt.sar.num / fmt.sar.den;
         else
-            i_video_height = i_video_height * fmt.i_sar_den / fmt.i_sar_num;
+            i_video_height = i_video_height * fmt.sar.den / fmt.sar.num;
     }
 
     if (sys->p_window->i_angle == 90 || sys->p_window->i_angle == 180) {
@@ -282,8 +282,8 @@ static void FixSubtitleFormat(vout_display_sys_t *sys)
     p_subfmt->i_visible_height = i_height;
     p_subfmt->i_x_offset = 0;
     p_subfmt->i_y_offset = 0;
-    p_subfmt->i_sar_num = 1;
-    p_subfmt->i_sar_den = 1;
+    p_subfmt->sar.num = 1;
+    p_subfmt->sar.den = 1;
     sys->b_sub_invalid = true;
 }
 
@@ -1168,8 +1168,8 @@ static void Display(vout_display_t *vd, picture_t *picture,
 static void CopySourceAspect(video_format_t *p_dest,
                              const video_format_t *p_src)
 {
-    p_dest->i_sar_num = p_src->i_sar_num;
-    p_dest->i_sar_den = p_src->i_sar_den;
+    p_dest->sar.num = p_src->sar.num;
+    p_dest->sar.den = p_src->sar.den;
 }
 
 static int Control(vout_display_t *vd, int query, va_list args)

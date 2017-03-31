@@ -327,8 +327,8 @@ int SetupVideoES( demux_t *p_demux, mp4_track_t *p_track, MP4_Box_t *p_sample )
         /* Work-around buggy muxed files */
         p_vide->i_width != p_track->i_width )
     {
-        p_track->fmt.video.i_sar_num = p_track->i_width  * p_track->fmt.video.i_height;
-        p_track->fmt.video.i_sar_den = p_track->i_height * p_track->fmt.video.i_width;
+        p_track->fmt.video.sar.num = p_track->i_width  * p_track->fmt.video.i_height;
+        p_track->fmt.video.sar.den = p_track->i_height * p_track->fmt.video.i_width;
     }
 
     /* Support for cropping (eg. in H263 files) */
@@ -449,8 +449,8 @@ int SetupVideoES( demux_t *p_demux, mp4_track_t *p_track, MP4_Box_t *p_sample )
     if( p_pasp && BOXDATA(p_pasp) && BOXDATA(p_pasp)->i_horizontal_spacing > 0 &&
                   BOXDATA(p_pasp)->i_vertical_spacing > 0 )
     {
-        p_track->fmt.video.i_sar_num = BOXDATA(p_pasp)->i_horizontal_spacing;
-        p_track->fmt.video.i_sar_den = BOXDATA(p_pasp)->i_vertical_spacing;
+        p_track->fmt.video.sar.num = BOXDATA(p_pasp)->i_horizontal_spacing;
+        p_track->fmt.video.sar.den = BOXDATA(p_pasp)->i_vertical_spacing;
     }
 
     const MP4_Box_t *p_fiel = MP4_BoxGet( p_sample, "fiel" );

@@ -381,8 +381,8 @@ static int vout_update_format( decoder_t *p_dec )
      || p_dec->fmt_out.video.i_x_offset != p_owner->fmt.video.i_x_offset
      || p_dec->fmt_out.video.i_y_offset != p_owner->fmt.video.i_y_offset
      || p_dec->fmt_out.i_codec != p_owner->fmt.video.i_chroma
-     || (int64_t)p_dec->fmt_out.video.i_sar_num * p_owner->fmt.video.i_sar_den !=
-        (int64_t)p_dec->fmt_out.video.i_sar_den * p_owner->fmt.video.i_sar_num ||
+     || (int64_t)p_dec->fmt_out.video.sar.num * p_owner->fmt.video.sar.den !=
+        (int64_t)p_dec->fmt_out.video.sar.den * p_owner->fmt.video.sar.num ||
         p_dec->fmt_out.video.orientation != p_owner->fmt.video.orientation ||
         p_dec->fmt_out.video.multiview_mode != p_owner->fmt.video.multiview_mode )
     {
@@ -433,22 +433,22 @@ static int vout_update_format( decoder_t *p_dec )
             var_CreateGetBool( p_dec, "hdtv-fix" ) )
         {
             fmt.i_visible_height = 1080;
-            if( !(fmt.i_sar_num % 136))
+            if( !(fmt.sar.num % 136))
             {
-                fmt.i_sar_num *= 135;
-                fmt.i_sar_den *= 136;
+                fmt.sar.num *= 135;
+                fmt.sar.den *= 136;
             }
             msg_Warn( p_dec, "Fixing broken HDTV stream (display_height=1088)");
         }
 
-        if( !fmt.i_sar_num || !fmt.i_sar_den )
+        if( !fmt.sar.num || !fmt.sar.den )
         {
-            fmt.i_sar_num = 1;
-            fmt.i_sar_den = 1;
+            fmt.sar.num = 1;
+            fmt.sar.den = 1;
         }
 
-        vlc_ureduce( &fmt.i_sar_num, &fmt.i_sar_den,
-                     fmt.i_sar_num, fmt.i_sar_den, 50000 );
+        vlc_ureduce( &fmt.sar.num, &fmt.sar.den,
+                     fmt.sar.num, fmt.sar.den, 50000 );
 
         video_format_AdjustColorSpace( &fmt );
 

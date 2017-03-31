@@ -1186,8 +1186,8 @@ static subpicture_t *SetupSimpleKateSPU( decoder_t *p_dec, subpicture_t *p_spu,
 
     /* text region */
     video_format_Init( &fmt, VLC_CODEC_TEXT );
-    fmt.i_sar_num = 0;
-    fmt.i_sar_den = 1;
+    fmt.sar.num = 0;
+    fmt.sar.den = 1;
     fmt.i_width = fmt.i_height = 0;
     fmt.i_x_offset = fmt.i_y_offset = 0;
     p_spu->p_region = subpicture_region_New( &fmt );

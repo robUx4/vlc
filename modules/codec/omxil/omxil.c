@@ -419,8 +419,8 @@ static OMX_ERRORTYPE UpdatePixelAspect(decoder_t *p_dec)
     if (omx_err != OMX_ErrorNone) {
         msg_Warn(p_dec, "Failed to retrieve aspect ratio");
     } else {
-        p_dec->fmt_out.video.i_sar_num = pixel_aspect.nX;
-        p_dec->fmt_out.video.i_sar_den = pixel_aspect.nY;
+        p_dec->fmt_out.video.sar.num = pixel_aspect.nX;
+        p_dec->fmt_out.video.sar.den = pixel_aspect.nY;
     }
 
     return omx_err;
@@ -1078,10 +1078,10 @@ static int OpenGeneric( vlc_object_t *p_this, bool b_encode )
         p_dec->fmt_out.i_codec = 0;
 
         /* set default aspect of 1, if parser did not set it */
-        if (p_dec->fmt_out.video.i_sar_num == 0)
-            p_dec->fmt_out.video.i_sar_num = 1;
-        if (p_dec->fmt_out.video.i_sar_den == 0)
-            p_dec->fmt_out.video.i_sar_den = 1;
+        if (p_dec->fmt_out.video.sar.num == 0)
+            p_dec->fmt_out.video.sar.num = 1;
+        if (p_dec->fmt_out.video.sar.den == 0)
+            p_dec->fmt_out.video.sar.den = 1;
     }
     p_sys->b_enc = b_encode;
     InitOmxEventQueue(&p_sys->event_queue);
@@ -1569,12 +1569,12 @@ static int DecodeVideo( decoder_t *p_dec, block_t *p_block )
      * broadcom OMX implementation on RPi), don't let the packetizer values
      * override what the decoder says, if anything - otherwise always update
      * even if it already is set (since it can change within a stream). */
-    if((p_dec->fmt_in.video.i_sar_num != 0 && p_dec->fmt_in.video.i_sar_den != 0) &&
-       (p_dec->fmt_out.video.i_sar_num == 0 || p_dec->fmt_out.video.i_sar_den == 0 ||
+    if((p_dec->fmt_in.video.sar.num != 0 && p_dec->fmt_in.video.sar.den != 0) &&
+       (p_dec->fmt_out.video.sar.num == 0 || p_dec->fmt_out.video.sar.den == 0 ||
              !p_sys->b_aspect_ratio_handled))
     {
-        p_dec->fmt_out.video.i_sar_num = p_dec->fmt_in.video.i_sar_num;
-        p_dec->fmt_out.video.i_sar_den = p_dec->fmt_in.video.i_sar_den;
+        p_dec->fmt_out.video.sar.num = p_dec->fmt_in.video.sar.num;
+        p_dec->fmt_out.video.sar.den = p_dec->fmt_in.video.sar.den;
     }
 
     /* Loop as long as we haven't either got an input buffer (and cleared

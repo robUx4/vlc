@@ -392,8 +392,8 @@ apply_fmt:
     dec->fmt_out.video.i_y_offset = sys->output->format->es->video.crop.y;
     dec->fmt_out.video.i_visible_width = sys->output->format->es->video.crop.width;
     dec->fmt_out.video.i_visible_height = sys->output->format->es->video.crop.height;
-    dec->fmt_out.video.i_sar_num = sys->output->format->es->video.par.num;
-    dec->fmt_out.video.i_sar_den = sys->output->format->es->video.par.den;
+    dec->fmt_out.video.sar.num = sys->output->format->es->video.par.num;
+    dec->fmt_out.video.sar.den = sys->output->format->es->video.par.den;
     dec->fmt_out.video.frame_rate = sys->output->format->es->video.frame_rate;
 
     /* Query interlaced type */

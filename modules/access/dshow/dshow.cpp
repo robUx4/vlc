@@ -704,13 +704,13 @@ static int DemuxOpen( vlc_object_t *p_this )
 
             if( psz_delim )
             {
-                fmt.video.i_sar_num = atoi( psz_aspect ) * fmt.video.i_height;
-                fmt.video.i_sar_den = atoi( psz_delim + 1 ) * fmt.video.i_width;
+                fmt.video.sar.num = atoi( psz_aspect ) * fmt.video.i_height;
+                fmt.video.sar.den = atoi( psz_delim + 1 ) * fmt.video.i_width;
             }
             else
             {
-                fmt.video.i_sar_num = 4 * fmt.video.i_height;
-                fmt.video.i_sar_den = 3 * fmt.video.i_width;
+                fmt.video.sar.num = 4 * fmt.video.i_height;
+                fmt.video.sar.den = 3 * fmt.video.i_width;
             }
             free( psz_aspect );
 

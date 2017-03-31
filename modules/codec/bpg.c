@@ -126,8 +126,8 @@ static int DecodeBlock( decoder_t *p_dec, block_t *p_block )
     p_dec->fmt_out.i_codec = VLC_CODEC_RGB24;
     p_dec->fmt_out.video.i_visible_width  = p_dec->fmt_out.video.i_width  = img_info.width;
     p_dec->fmt_out.video.i_visible_height = p_dec->fmt_out.video.i_height = img_info.height;
-    p_dec->fmt_out.video.i_sar_num = 1;
-    p_dec->fmt_out.video.i_sar_den = 1;
+    p_dec->fmt_out.video.sar.num = 1;
+    p_dec->fmt_out.video.sar.den = 1;
 
     /* Get a new picture */
     if( decoder_UpdateVideoFormat( p_dec ) )

@@ -534,8 +534,8 @@ static int DecodeBlock( decoder_t *p_dec, block_t *p_block )
             p_dec->fmt_out.video.i_height = proc_out.PicInfo.height;
             if( proc_out.PicInfo.height == 1088 )
                 p_dec->fmt_out.video.i_height = 1080;
-#define setAR( a, b, c ) case a: p_dec->fmt_out.video.i_sar_num = b; \
-                                 p_dec->fmt_out.video.i_sar_den = c; break;
+#define setAR( a, b, c ) case a: p_dec->fmt_out.video.sar.num = b; \
+                                 p_dec->fmt_out.video.sar.den = c; break;
             switch( proc_out.PicInfo.aspect_ratio )
             {
                 setAR( vdecAspectRatioSquare, 1, 1 )
@@ -559,8 +559,8 @@ static int DecodeBlock( decoder_t *p_dec, block_t *p_block )
 #undef setAR
             msg_Dbg( p_dec, "Format Change Detected [%i, %i], AR: %i/%i",
                     proc_out.PicInfo.width, proc_out.PicInfo.height,
-                    p_dec->fmt_out.video.i_sar_num,
-                    p_dec->fmt_out.video.i_sar_den );
+                    p_dec->fmt_out.video.sar.num,
+                    p_dec->fmt_out.video.sar.den );
             break;
 
         /* Nothing is documented here... */

@@ -220,10 +220,10 @@ static int Decode(decoder_t *dec, block_t *block)
         v->i_visible_height = dec->fmt_out.video.i_height = img->d_h;
     }
 
-    if( !dec->fmt_out.video.i_sar_num || !dec->fmt_out.video.i_sar_den )
+    if( !dec->fmt_out.video.sar.num || !dec->fmt_out.video.sar.den )
     {
-        dec->fmt_out.video.i_sar_num = 1;
-        dec->fmt_out.video.i_sar_den = 1;
+        dec->fmt_out.video.sar.num = 1;
+        dec->fmt_out.video.sar.den = 1;
     }
 
     v->b_color_range_full = img->range == VPX_CR_FULL_RANGE;
@@ -327,9 +327,9 @@ static int OpenDecoder(vlc_object_t *p_this)
     dec->fmt_out.video.i_width = dec->fmt_in.video.i_width;
     dec->fmt_out.video.i_height = dec->fmt_in.video.i_height;
 
-    if (dec->fmt_in.video.i_sar_num > 0 && dec->fmt_in.video.i_sar_den > 0) {
-        dec->fmt_out.video.i_sar_num = dec->fmt_in.video.i_sar_num;
-        dec->fmt_out.video.i_sar_den = dec->fmt_in.video.i_sar_den;
+    if (dec->fmt_in.video.sar.num > 0 && dec->fmt_in.video.sar.den > 0) {
+        dec->fmt_out.video.sar.num = dec->fmt_in.video.sar.num;
+        dec->fmt_out.video.sar.den = dec->fmt_in.video.sar.den;
     }
 
     return VLC_SUCCESS;

@@ -185,11 +185,11 @@ static int Activate( vlc_object_t *p_this )
         return VLC_EGENERIC;
     }
 
-    if( p_filter->fmt_in.video.i_sar_num )
-        i_fmt_in_aspect = (int64_t)p_filter->fmt_in.video.i_sar_num *
+    if( p_filter->fmt_in.video.sar.num )
+        i_fmt_in_aspect = (int64_t)p_filter->fmt_in.video.sar.num *
                       p_filter->fmt_in.video.i_visible_width *
                       VOUT_ASPECT_FACTOR /
-                      p_filter->fmt_in.video.i_sar_den /
+                      p_filter->fmt_in.video.sar.den /
                       p_filter->fmt_in.video.i_visible_height;
     else
         i_fmt_in_aspect = (int64_t)p_filter->fmt_in.video.i_visible_width *
@@ -352,8 +352,8 @@ static int Activate( vlc_object_t *p_this )
     fmt = *filter_chain_GetFmtOut( p_sys->p_chain );
     es_format_Copy( &p_filter->fmt_out, &fmt );
 
-    vlc_ureduce( &p_filter->fmt_out.video.i_sar_num,
-        &p_filter->fmt_out.video.i_sar_den,
+    vlc_ureduce( &p_filter->fmt_out.video.sar.num,
+        &p_filter->fmt_out.video.sar.den,
         i_canvas_aspect    * p_filter->fmt_out.video.i_visible_height,
         VOUT_ASPECT_FACTOR * p_filter->fmt_out.video.i_visible_width,
         0);

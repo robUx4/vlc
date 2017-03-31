@@ -627,8 +627,8 @@ static int StartVideoToolbox(decoder_t *p_dec)
 
     const unsigned i_video_width = p_dec->fmt_out.video.i_width;
     const unsigned i_video_height = p_dec->fmt_out.video.i_height;
-    const unsigned i_sar_num = p_dec->fmt_out.video.i_sar_num;
-    const unsigned i_sar_den = p_dec->fmt_out.video.i_sar_den;
+    const unsigned i_sar_num = p_dec->fmt_out.video.sar.num;
+    const unsigned i_sar_den = p_dec->fmt_out.video.sar.den;
 
     if( p_dec->fmt_in.video.frame_rate.den && p_dec->fmt_in.video.frame_rate.num )
     {
@@ -872,10 +872,10 @@ static int OpenDecoder(vlc_object_t *p_this)
     /* return our proper VLC internal state */
     p_dec->fmt_out.i_cat = p_dec->fmt_in.i_cat;
     p_dec->fmt_out.video = p_dec->fmt_in.video;
-    if (!p_dec->fmt_out.video.i_sar_num || !p_dec->fmt_out.video.i_sar_den)
+    if (!p_dec->fmt_out.video.sar.num || !p_dec->fmt_out.video.sar.den)
     {
-        p_dec->fmt_out.video.i_sar_num = 1;
-        p_dec->fmt_out.video.i_sar_den = 1;
+        p_dec->fmt_out.video.sar.num = 1;
+        p_dec->fmt_out.video.sar.den = 1;
     }
     if (!p_dec->fmt_out.video.i_visible_width
      || !p_dec->fmt_out.video.i_visible_height)
@@ -1051,8 +1051,8 @@ static int avcCFromAnnexBCreate(decoder_t *p_dec)
     p_dec->fmt_out.video.i_width = i_video_width;
     p_dec->fmt_out.video.i_visible_height =
     p_dec->fmt_out.video.i_height = i_video_height;
-    p_dec->fmt_out.video.i_sar_num = i_sar_num;
-    p_dec->fmt_out.video.i_sar_den = i_sar_den;
+    p_dec->fmt_out.video.sar.num = i_sar_num;
+    p_dec->fmt_out.video.sar.den = i_sar_den;
 
     block_t *p_avcC = h264_helper_get_avcc_config(&p_sys->hh);
     if (!p_avcC)

@@ -614,8 +614,8 @@ int OpenEncoder( vlc_object_t *p_this )
 
         av_reduce( &p_context->sample_aspect_ratio.num,
                    &p_context->sample_aspect_ratio.den,
-                   p_enc->fmt_in.video.i_sar_num,
-                   p_enc->fmt_in.video.i_sar_den, 1 << 30 );
+                   p_enc->fmt_in.video.sar.num,
+                   p_enc->fmt_in.video.sar.den, 1 << 30 );
 
 
         p_enc->fmt_in.i_codec = VLC_CODEC_I420;

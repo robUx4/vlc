@@ -131,7 +131,7 @@ static void SubpictureTextUpdate(subpicture_t *subpic,
     subpicture_updater_sys_t *sys = subpic->updater.p_sys;
     VLC_UNUSED(fmt_src); VLC_UNUSED(ts);
 
-    if (fmt_dst->i_sar_num <= 0 || fmt_dst->i_sar_den <= 0)
+    if (fmt_dst->sar.num <= 0 || fmt_dst->sar.den <= 0)
         return;
 
     video_format_t fmt;
@@ -139,17 +139,17 @@ static void SubpictureTextUpdate(subpicture_t *subpic,
 
     if( sys->region.flags & UPDT_REGION_USES_GRID_COORDINATES )
     {
-        fmt.i_sar_num = 4;
-        fmt.i_sar_den = 3;
-        subpic->i_original_picture_width  = fmt_dst->i_visible_height * fmt.i_sar_num / fmt.i_sar_den;
+        fmt.sar.num = 4;
+        fmt.sar.den = 3;
+        subpic->i_original_picture_width  = fmt_dst->i_visible_height * fmt.sar.num / fmt.sar.den;
         subpic->i_original_picture_height = fmt_dst->i_visible_height;
     }
     else
     {
-        subpic->i_original_picture_width  = fmt_dst->i_width * fmt_dst->i_sar_num / fmt_dst->i_sar_den;
+        subpic->i_original_picture_width  = fmt_dst->i_width * fmt_dst->sar.num / fmt_dst->sar.den;
         subpic->i_original_picture_height = fmt_dst->i_height;
-        fmt.i_sar_num = 1;
-        fmt.i_sar_den = 1;
+        fmt.sar.num = 1;
+        fmt.sar.den = 1;
     }
 
     subpicture_region_t **pp_last_region = &subpic->p_region;

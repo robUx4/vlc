@@ -184,8 +184,8 @@ static int DecodeBlock( decoder_t *p_dec, block_t *p_block )
     p_dec->fmt_out.video.i_height = i_height;
     p_dec->fmt_out.video.i_visible_width  = i_width;
     p_dec->fmt_out.video.i_visible_height = i_height;
-    p_dec->fmt_out.video.i_sar_num = 1;
-    p_dec->fmt_out.video.i_sar_den = 1;
+    p_dec->fmt_out.video.sar.num = 1;
+    p_dec->fmt_out.video.sar.den = 1;
     p_dec->fmt_out.video.i_rmask = 0x80800000; /* Since librsvg v1.0 */
     p_dec->fmt_out.video.i_gmask = 0x0000ff00;
     p_dec->fmt_out.video.i_bmask = 0x000000ff;
@@ -230,8 +230,8 @@ static int DecodeBlock( decoder_t *p_dec, block_t *p_block )
             sw = sh = p_sys->f_scale;
         else
         {
-            double aspect = (double) (dim.width * p_dec->fmt_out.video.i_sar_num) /
-                    (dim.height * p_dec->fmt_out.video.i_sar_den);
+            double aspect = (double) (dim.width * p_dec->fmt_out.video.sar.num) /
+                    (dim.height * p_dec->fmt_out.video.sar.den);
             sw = aspect * i_width / dim.width;
             sh = aspect * i_height / dim.height;
         }

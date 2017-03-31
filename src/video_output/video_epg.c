@@ -58,8 +58,8 @@ static subpicture_region_t * vout_OSDEpgSlider(int x, int y,
     video_format_Init(&fmt, VLC_CODEC_YUVP);
     fmt.i_width  = fmt.i_visible_width  = width;
     fmt.i_height = fmt.i_visible_height = height;
-    fmt.i_sar_num = 1;
-    fmt.i_sar_den = 1;
+    fmt.sar.num = 1;
+    fmt.sar.den = 1;
     fmt.p_palette = &palette;
 
     subpicture_region_t *region = subpicture_region_New(&fmt);
@@ -105,8 +105,8 @@ static subpicture_region_t * vout_OSDEpgText(const char *text,
 
     /* Create a new subpicture region */
     video_format_Init(&fmt, VLC_CODEC_TEXT);
-    fmt.i_sar_num = 1;
-    fmt.i_sar_den = 1;
+    fmt.sar.num = 1;
+    fmt.sar.den = 1;
 
     region = subpicture_region_New(&fmt);
     if (!region)
@@ -253,9 +253,9 @@ static void OSDEpgUpdate(subpicture_t *subpic,
     VLC_UNUSED(fmt_src); VLC_UNUSED(ts);
 
     video_format_t fmt = *fmt_dst;
-    fmt.i_width         = fmt.i_width         * fmt.i_sar_num / fmt.i_sar_den;
-    fmt.i_visible_width = fmt.i_visible_width * fmt.i_sar_num / fmt.i_sar_den;
-    fmt.i_x_offset      = fmt.i_x_offset      * fmt.i_sar_num / fmt.i_sar_den;
+    fmt.i_width         = fmt.i_width         * fmt.sar.num / fmt.sar.den;
+    fmt.i_visible_width = fmt.i_visible_width * fmt.sar.num / fmt.sar.den;
+    fmt.i_x_offset      = fmt.i_x_offset      * fmt.sar.num / fmt.sar.den;
 
     subpic->i_original_picture_width  = fmt.i_width;
     subpic->i_original_picture_height = fmt.i_height;

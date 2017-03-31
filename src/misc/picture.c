@@ -152,7 +152,7 @@ int picture_Setup( picture_t *p_picture, const video_format_t *restrict fmt )
 
     video_format_Setup( &p_picture->format, fmt->i_chroma, fmt->i_width, fmt->i_height,
                         fmt->i_visible_width, fmt->i_visible_height,
-                        fmt->i_sar_num, fmt->i_sar_den );
+                        fmt->sar.num, fmt->sar.den );
 
     const vlc_chroma_description_t *p_dsc =
         vlc_fourcc_GetChromaDescription( p_picture->format.i_chroma );
@@ -208,7 +208,7 @@ picture_t *picture_NewFromResource( const video_format_t *p_fmt, const picture_r
     video_format_Setup( &fmt, p_fmt->i_chroma,
                               p_fmt->i_width, p_fmt->i_height,
                               p_fmt->i_visible_width, p_fmt->i_visible_height,
-                              p_fmt->i_sar_num, p_fmt->i_sar_den );
+                              p_fmt->sar.num, p_fmt->sar.den );
     if( p_fmt->i_x_offset < p_fmt->i_width &&
         p_fmt->i_y_offset < p_fmt->i_height &&
         p_fmt->i_visible_width  > 0 && p_fmt->i_x_offset + p_fmt->i_visible_width  <= p_fmt->i_width &&
@@ -390,17 +390,17 @@ int picture_Export( vlc_object_t *p_obj,
 {
     /* */
     video_format_t fmt_in = p_picture->format;
-    if( fmt_in.i_sar_num <= 0 || fmt_in.i_sar_den <= 0 )
+    if( fmt_in.sar.num <= 0 || fmt_in.sar.den <= 0 )
     {
-        fmt_in.i_sar_num =
-        fmt_in.i_sar_den = 1;
+        fmt_in.sar.num =
+        fmt_in.sar.den = 1;
     }
 
     /* */
     video_format_t fmt_out;
     memset( &fmt_out, 0, sizeof(fmt_out) );
-    fmt_out.i_sar_num =
-    fmt_out.i_sar_den = 1;
+    fmt_out.sar.num =
+    fmt_out.sar.den = 1;
     fmt_out.i_chroma  = i_format;
 
     /* compute original width/height */
@@ -415,15 +415,15 @@ int picture_Export( vlc_object_t *p_obj,
         i_width = fmt_in.i_width;
         i_height = fmt_in.i_height;
     }
-    if( fmt_in.i_sar_num >= fmt_in.i_sar_den )
+    if( fmt_in.sar.num >= fmt_in.sar.den )
     {
-        i_original_width = (int64_t)i_width * fmt_in.i_sar_num / fmt_in.i_sar_den;
+        i_original_width = (int64_t)i_width * fmt_in.sar.num / fmt_in.sar.den;
         i_original_height = i_height;
     }
     else
     {
         i_original_width =  i_width;
-        i_original_height = i_height * fmt_in.i_sar_den / fmt_in.i_sar_num;
+        i_original_height = i_height * fmt_in.sar.den / fmt_in.sar.num;
     }
 
     /* */
@@ -436,12 +436,12 @@ int picture_Export( vlc_object_t *p_obj,
     if( fmt_out.i_height == 0 && fmt_out.i_width > 0 )
     {
         fmt_out.i_height = i_height * fmt_out.i_width
-                         * fmt_in.i_sar_den / fmt_in.i_width / fmt_in.i_sar_num;
+                         * fmt_in.sar.den / fmt_in.i_width / fmt_in.sar.num;
     }
     else if( fmt_out.i_width == 0 && fmt_out.i_height > 0 )
     {
         fmt_out.i_width  = i_width * fmt_out.i_height
-                         * fmt_in.i_sar_num / fmt_in.i_height / fmt_in.i_sar_den;
+                         * fmt_in.sar.num / fmt_in.i_height / fmt_in.sar.den;
     }
 
     image_handler_t *p_image = image_HandlerCreate( p_obj );

@@ -79,17 +79,17 @@ static int VoutValidateFormat(video_format_t *dst,
     if (src->i_width == 0  || src->i_width  > 8192 ||
         src->i_height == 0 || src->i_height > 8192)
         return VLC_EGENERIC;
-    if (src->i_sar_num <= 0 || src->i_sar_den <= 0)
+    if (src->sar.num <= 0 || src->sar.den <= 0)
         return VLC_EGENERIC;
 
     /* */
     video_format_Copy(dst, src);
     dst->i_chroma = vlc_fourcc_GetCodec(VIDEO_ES, src->i_chroma);
-    vlc_ureduce( &dst->i_sar_num, &dst->i_sar_den,
-                 src->i_sar_num,  src->i_sar_den, 50000 );
-    if (dst->i_sar_num <= 0 || dst->i_sar_den <= 0) {
-        dst->i_sar_num = 1;
-        dst->i_sar_den = 1;
+    vlc_ureduce( &dst->sar.num, &dst->sar.den,
+                 src->sar.num,  src->sar.den, 50000 );
+    if (dst->sar.num <= 0 || dst->sar.den <= 0) {
+        dst->sar.num = 1;
+        dst->sar.den = 1;
     }
     video_format_FixRgb(dst);
     return VLC_SUCCESS;
@@ -98,13 +98,13 @@ static void VideoFormatCopyCropAr(video_format_t *dst,
                                   const video_format_t *src)
 {
     video_format_CopyCrop(dst, src);
-    dst->i_sar_num = src->i_sar_num;
-    dst->i_sar_den = src->i_sar_den;
+    dst->sar.num = src->sar.num;
+    dst->sar.den = src->sar.den;
 }
 static bool VideoFormatIsCropArEqual(video_format_t *dst,
                                      const video_format_t *src)
 {
-    return dst->i_sar_num * src->i_sar_den == dst->i_sar_den * src->i_sar_num &&
+    return dst->sar.num * src->sar.den == dst->sar.den * src->sar.num &&
            dst->i_x_offset       == src->i_x_offset &&
            dst->i_y_offset       == src->i_y_offset &&
            dst->i_visible_width  == src->i_visible_width &&
@@ -902,8 +902,8 @@ static int ThreadDisplayRenderPicture(vout_thread_t *vout, bool is_forced)
 
         fmt_spu = vd->source;
         if (fmt_spu.i_width * fmt_spu.i_height < place.width * place.height) {
-            fmt_spu.i_sar_num = vd->cfg->display.sar.num;
-            fmt_spu.i_sar_den = vd->cfg->display.sar.den;
+            fmt_spu.sar.num = vd->cfg->display.sar.num;
+            fmt_spu.sar.den = vd->cfg->display.sar.den;
             fmt_spu.i_width          =
             fmt_spu.i_visible_width  = place.width;
             fmt_spu.i_height         =
@@ -915,8 +915,8 @@ static int ThreadDisplayRenderPicture(vout_thread_t *vout, bool is_forced)
             fmt_spu = vd->source;
         } else {
             fmt_spu = vd->fmt;
-            fmt_spu.i_sar_num = vd->cfg->display.sar.num;
-            fmt_spu.i_sar_den = vd->cfg->display.sar.den;
+            fmt_spu.sar.num = vd->cfg->display.sar.num;
+            fmt_spu.sar.den = vd->cfg->display.sar.den;
         }
         subpicture_chromas = NULL;
 

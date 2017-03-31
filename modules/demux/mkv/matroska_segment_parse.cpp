@@ -514,8 +514,8 @@ void matroska_segment_c::ParseTrackEntry( KaxTrackEntry *m )
 
             if( i_display_height && i_display_width )
             {
-                tk->fmt.video.i_sar_num = i_display_width  * tk->fmt.video.i_height;
-                tk->fmt.video.i_sar_den = i_display_height * tk->fmt.video.i_width;
+                tk->fmt.video.sar.num = i_display_width  * tk->fmt.video.i_height;
+                tk->fmt.video.sar.den = i_display_height * tk->fmt.video.i_width;
             }
 
             tk->fmt.video.i_visible_width   = tk->fmt.video.i_width;

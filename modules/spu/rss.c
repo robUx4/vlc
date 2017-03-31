@@ -509,7 +509,7 @@ static subpicture_t *Filter( filter_t *p_filter, mtime_t date )
         memset( &fmt_out, 0, sizeof(video_format_t) );
 
         fmt_out.i_chroma = VLC_CODEC_YUVA;
-        fmt_out.i_sar_num = fmt_out.i_sar_den = 1;
+        fmt_out.sar.num = fmt_out.sar.den = 1;
         fmt_out.i_width =
             fmt_out.i_visible_width = p_pic->p[Y_PLANE].i_visible_pitch;
         fmt_out.i_height =

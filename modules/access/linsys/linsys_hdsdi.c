@@ -511,9 +511,9 @@ static int InitVideo( demux_t *p_demux )
     fmt.video.frame_rate        = p_sys->frame_rate;
     fmt.video.i_width           = fmt.video.i_visible_width = p_sys->i_width;
     fmt.video.i_height          = fmt.video.i_visible_height = p_sys->i_height;
-    fmt.video.i_sar_num         = p_sys->i_aspect * fmt.video.i_height
+    fmt.video.sar.num         = p_sys->i_aspect * fmt.video.i_height
                                   / fmt.video.i_width;
-    fmt.video.i_sar_den         = VOUT_ASPECT_FACTOR;
+    fmt.video.sar.den         = VOUT_ASPECT_FACTOR;
     p_sys->p_es_video           = es_out_Add( p_demux->out, &fmt );
 
     return VLC_SUCCESS;

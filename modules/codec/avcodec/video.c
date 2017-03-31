@@ -159,18 +159,18 @@ static int lavc_GetVideoFormat(decoder_t *dec, video_format_t *restrict fmt,
     fmt->i_visible_height = ctx->height;
 
     /* If an aspect-ratio was specified in the input format then force it */
-    if (dec->fmt_in.video.i_sar_num > 0 && dec->fmt_in.video.i_sar_den > 0)
+    if (dec->fmt_in.video.sar.num > 0 && dec->fmt_in.video.sar.den > 0)
     {
-        fmt->i_sar_num = dec->fmt_in.video.i_sar_num;
-        fmt->i_sar_den = dec->fmt_in.video.i_sar_den;
+        fmt->sar.num = dec->fmt_in.video.sar.num;
+        fmt->sar.den = dec->fmt_in.video.sar.den;
     }
     else
     {
-        fmt->i_sar_num = ctx->sample_aspect_ratio.num;
-        fmt->i_sar_den = ctx->sample_aspect_ratio.den;
+        fmt->sar.num = ctx->sample_aspect_ratio.num;
+        fmt->sar.den = ctx->sample_aspect_ratio.den;
 
-        if (fmt->i_sar_num == 0 || fmt->i_sar_den == 0)
-            fmt->i_sar_num = fmt->i_sar_den = 1;
+        if (fmt->sar.num == 0 || fmt->sar.den == 0)
+            fmt->sar.num = fmt->sar.den = 1;
     }
 
     if (dec->fmt_in.video.frame_rate.num && dec->fmt_in.video.frame_rate.den)
@@ -1023,18 +1023,18 @@ static picture_t *DecodeBlock( decoder_t *p_dec, block_t **pp_block, bool *error
             picture_Hold( p_pic );
         }
 
-        if( !p_dec->fmt_in.video.i_sar_num || !p_dec->fmt_in.video.i_sar_den )
+        if( !p_dec->fmt_in.video.sar.num || !p_dec->fmt_in.video.sar.den )
         {
             /* Fetch again the aspect ratio in case it changed */
-            p_dec->fmt_out.video.i_sar_num
+            p_dec->fmt_out.video.sar.num
                 = p_context->sample_aspect_ratio.num;
-            p_dec->fmt_out.video.i_sar_den
+            p_dec->fmt_out.video.sar.den
                 = p_context->sample_aspect_ratio.den;
 
-            if( !p_dec->fmt_out.video.i_sar_num || !p_dec->fmt_out.video.i_sar_den )
+            if( !p_dec->fmt_out.video.sar.num || !p_dec->fmt_out.video.sar.den )
             {
-                p_dec->fmt_out.video.i_sar_num = 1;
-                p_dec->fmt_out.video.i_sar_den = 1;
+                p_dec->fmt_out.video.sar.num = 1;
+                p_dec->fmt_out.video.sar.den = 1;
             }
         }
 

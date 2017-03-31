@@ -717,10 +717,10 @@ static block_t *ParseMPEGBlock( decoder_t *p_dec, block_t *p_frag )
              * of aspect ratio change, we're screwed. --Meuuh
              */
 #if 0
-            p_dec->fmt_out.video.i_sar_num =
+            p_dec->fmt_out.video.sar.num =
                 mpeg2_aspect[p_sys->i_aspect_ratio_info][0] *
                 p_dec->fmt_out.video.i_height;
-            p_dec->fmt_out.video.i_sar_den =
+            p_dec->fmt_out.video.sar.den =
                 mpeg2_aspect[p_sys->i_aspect_ratio_info][1] *
                 p_dec->fmt_out.video.i_width;
 #endif

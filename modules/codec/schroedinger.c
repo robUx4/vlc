@@ -627,8 +627,8 @@ static void SetVideoFormat( decoder_t *p_dec )
     p_dec->fmt_out.video.i_height = p_sys->p_format->height;
 
     /* aspect_ratio_[numerator|denominator] describes the pixel aspect ratio */
-    p_dec->fmt_out.video.i_sar_num = p_sys->p_format->aspect_ratio_numerator;
-    p_dec->fmt_out.video.i_sar_den = p_sys->p_format->aspect_ratio_denominator;
+    p_dec->fmt_out.video.sar.num = p_sys->p_format->aspect_ratio_numerator;
+    p_dec->fmt_out.video.sar.den = p_sys->p_format->aspect_ratio_denominator;
 
     p_dec->fmt_out.video.frame_rate.num =
         p_sys->p_format->frame_rate_numerator;
@@ -1154,8 +1154,8 @@ static int OpenEncoder( vlc_object_t *p_this )
     p_sys->p_format->frame_rate_denominator = p_enc->fmt_in.video.frame_rate.den;
     unsigned u_asr_num, u_asr_den;
     vlc_ureduce( &u_asr_num, &u_asr_den,
-                 p_enc->fmt_in.video.i_sar_num,
-                 p_enc->fmt_in.video.i_sar_den, 0 );
+                 p_enc->fmt_in.video.sar.num,
+                 p_enc->fmt_in.video.sar.den, 0 );
     p_sys->p_format->aspect_ratio_numerator   = u_asr_num;
     p_sys->p_format->aspect_ratio_denominator = u_asr_den;
 

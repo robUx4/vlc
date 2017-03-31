@@ -2917,8 +2917,8 @@ static bool Ogg_ReadVP8Header( demux_t *p_demux, logical_stream_t *p_stream,
         p_stream->fmt.video.i_height = GetWBE( &p_oggpacket->packet[10] );
         p_stream->fmt.video.i_visible_width = p_stream->fmt.video.i_width;
         p_stream->fmt.video.i_visible_height = p_stream->fmt.video.i_height;
-        p_stream->fmt.video.i_sar_num = GetDWBE( &p_oggpacket->packet[12 - 1] ) & 0x0FFF;
-        p_stream->fmt.video.i_sar_den = GetDWBE( &p_oggpacket->packet[15 - 1] ) & 0x0FFF;
+        p_stream->fmt.video.sar.num = GetDWBE( &p_oggpacket->packet[12 - 1] ) & 0x0FFF;
+        p_stream->fmt.video.sar.den = GetDWBE( &p_oggpacket->packet[15 - 1] ) & 0x0FFF;
         p_stream->fmt.video.frame_rate.num = GetDWBE( &p_oggpacket->packet[18] );
         p_stream->fmt.video.frame_rate.den = GetDWBE( &p_oggpacket->packet[22] );
         p_stream->fmt.video.frame_rate.den =

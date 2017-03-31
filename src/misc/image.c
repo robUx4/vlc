@@ -198,17 +198,17 @@ static picture_t *ImageRead( image_handler_t *p_image, block_t *p_block,
         p_fmt_out->i_chroma = p_image->p_dec->fmt_out.video.i_chroma;
     if( !p_fmt_out->i_width && p_fmt_out->i_height )
         p_fmt_out->i_width = (int64_t)p_image->p_dec->fmt_out.video.i_width *
-                             p_image->p_dec->fmt_out.video.i_sar_num *
+                             p_image->p_dec->fmt_out.video.sar.num *
                              p_fmt_out->i_height /
                              p_image->p_dec->fmt_out.video.i_height /
-                             p_image->p_dec->fmt_out.video.i_sar_den;
+                             p_image->p_dec->fmt_out.video.sar.den;
 
     if( !p_fmt_out->i_height && p_fmt_out->i_width )
         p_fmt_out->i_height = (int64_t)p_image->p_dec->fmt_out.video.i_height *
-                              p_image->p_dec->fmt_out.video.i_sar_den *
+                              p_image->p_dec->fmt_out.video.sar.den *
                               p_fmt_out->i_width /
                               p_image->p_dec->fmt_out.video.i_width /
-                              p_image->p_dec->fmt_out.video.i_sar_num;
+                              p_image->p_dec->fmt_out.video.sar.num;
     if( !p_fmt_out->i_width )
         p_fmt_out->i_width = p_image->p_dec->fmt_out.video.i_width;
     if( !p_fmt_out->i_height )
@@ -469,17 +469,17 @@ static picture_t *ImageConvert( image_handler_t *p_image, picture_t *p_pic,
     picture_t *p_pif;
 
     if( !p_fmt_out->i_width && !p_fmt_out->i_height &&
-        p_fmt_out->i_sar_num && p_fmt_out->i_sar_den &&
-        p_fmt_out->i_sar_num * p_fmt_in->i_sar_den !=
-        p_fmt_out->i_sar_den * p_fmt_in->i_sar_num )
+        p_fmt_out->sar.num && p_fmt_out->sar.den &&
+        p_fmt_out->sar.num * p_fmt_in->sar.den !=
+        p_fmt_out->sar.den * p_fmt_in->sar.num )
     {
         p_fmt_out->i_width =
-            p_fmt_in->i_sar_num * (int64_t)p_fmt_out->i_sar_den *
-            p_fmt_in->i_width / p_fmt_in->i_sar_den / p_fmt_out->i_sar_num;
+            p_fmt_in->sar.num * (int64_t)p_fmt_out->sar.den *
+            p_fmt_in->i_width / p_fmt_in->sar.den / p_fmt_out->sar.num;
         p_fmt_out->i_visible_width =
-            p_fmt_in->i_sar_num * (int64_t)p_fmt_out->i_sar_den *
-            p_fmt_in->i_visible_width / p_fmt_in->i_sar_den /
-            p_fmt_out->i_sar_num;
+            p_fmt_in->sar.num * (int64_t)p_fmt_out->sar.den *
+            p_fmt_in->i_visible_width / p_fmt_in->sar.den /
+            p_fmt_out->sar.num;
     }
 
     if( !p_fmt_out->i_chroma ) p_fmt_out->i_chroma = p_fmt_in->i_chroma;
@@ -487,8 +487,8 @@ static picture_t *ImageConvert( image_handler_t *p_image, picture_t *p_pic,
         p_fmt_out->i_width = p_fmt_out->i_visible_width = p_fmt_in->i_width;
     if( !p_fmt_out->i_height )
         p_fmt_out->i_height = p_fmt_out->i_visible_height = p_fmt_in->i_height;
-    if( !p_fmt_out->i_sar_num ) p_fmt_out->i_sar_num = p_fmt_in->i_sar_num;
-    if( !p_fmt_out->i_sar_den ) p_fmt_out->i_sar_den = p_fmt_in->i_sar_den;
+    if( !p_fmt_out->sar.num ) p_fmt_out->sar.num = p_fmt_in->sar.num;
+    if( !p_fmt_out->sar.den ) p_fmt_out->sar.den = p_fmt_in->sar.den;
 
     if( p_image->p_filter )
     if( p_image->p_filter->fmt_in.video.i_chroma != p_fmt_in->i_chroma ||
@@ -717,16 +717,16 @@ static encoder_t *CreateEncoder( vlc_object_t *p_this, video_format_t *fmt_in,
                 p_enc->fmt_in.video.i_visible_height = fmt_out->i_height;
             }
         }
-    } else if( fmt_out->i_sar_num && fmt_out->i_sar_den &&
-               fmt_out->i_sar_num * fmt_in->i_sar_den !=
-               fmt_out->i_sar_den * fmt_in->i_sar_num )
+    } else if( fmt_out->sar.num && fmt_out->sar.den &&
+               fmt_out->sar.num * fmt_in->sar.den !=
+               fmt_out->sar.den * fmt_in->sar.num )
     {
         p_enc->fmt_in.video.i_width =
-            fmt_in->i_sar_num * (int64_t)fmt_out->i_sar_den * fmt_in->i_width /
-            fmt_in->i_sar_den / fmt_out->i_sar_num;
+            fmt_in->sar.num * (int64_t)fmt_out->sar.den * fmt_in->i_width /
+            fmt_in->sar.den / fmt_out->sar.num;
         p_enc->fmt_in.video.i_visible_width =
-            fmt_in->i_sar_num * (int64_t)fmt_out->i_sar_den *
-            fmt_in->i_visible_width / fmt_in->i_sar_den / fmt_out->i_sar_num;
+            fmt_in->sar.num * (int64_t)fmt_out->sar.den *
+            fmt_in->i_visible_width / fmt_in->sar.den / fmt_out->sar.num;
     }
 
     p_enc->fmt_in.video.frame_rate.num = 25;

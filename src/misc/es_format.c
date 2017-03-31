@@ -142,7 +142,7 @@ void video_format_Setup( video_format_t *p_fmt, vlc_fourcc_t i_chroma,
     p_fmt->i_visible_height = i_visible_height;
     p_fmt->i_x_offset       =
     p_fmt->i_y_offset       = 0;
-    vlc_ureduce( &p_fmt->i_sar_num, &p_fmt->i_sar_den,
+    vlc_ureduce( &p_fmt->sar.num, &p_fmt->sar.den,
                  i_sar_num, i_sar_den, 0 );
 
     switch( p_fmt->i_chroma )
@@ -240,15 +240,15 @@ void video_format_ScaleCropAr( video_format_t *p_dst, const video_format_t *p_sr
     p_dst->i_visible_width  = (uint64_t)p_src->i_visible_width  * p_dst->i_width  / p_src->i_width;
     p_dst->i_visible_height = (uint64_t)p_src->i_visible_height * p_dst->i_height / p_src->i_height;
 
-    p_dst->i_sar_num *= p_src->i_width;
-    p_dst->i_sar_den *= p_dst->i_width;
-    vlc_ureduce(&p_dst->i_sar_num, &p_dst->i_sar_den,
-                p_dst->i_sar_num, p_dst->i_sar_den, 65536);
+    p_dst->sar.num *= p_src->i_width;
+    p_dst->sar.den *= p_dst->i_width;
+    vlc_ureduce(&p_dst->sar.num, &p_dst->sar.den,
+                p_dst->sar.num, p_dst->sar.den, 65536);
 
-    p_dst->i_sar_num *= p_dst->i_height;
-    p_dst->i_sar_den *= p_src->i_height;
-    vlc_ureduce(&p_dst->i_sar_num, &p_dst->i_sar_den,
-                p_dst->i_sar_num, p_dst->i_sar_den, 65536);
+    p_dst->sar.num *= p_dst->i_height;
+    p_dst->sar.den *= p_src->i_height;
+    vlc_ureduce(&p_dst->sar.num, &p_dst->sar.den,
+                p_dst->sar.num, p_dst->sar.den, 65536);
 }
 
 //Simplify transforms to have something more manageable. Order: angle, hflip.
@@ -358,8 +358,8 @@ void video_format_TransformBy( video_format_t *fmt, video_transform_t transform 
         fmt->i_visible_height = scratch.i_visible_width;
         fmt->i_x_offset = scratch.i_y_offset;
         fmt->i_y_offset = scratch.i_x_offset;
-        fmt->i_sar_num = scratch.i_sar_den;
-        fmt->i_sar_den = scratch.i_sar_num;
+        fmt->sar.num = scratch.sar.den;
+        fmt->sar.den = scratch.sar.num;
     }
 
     fmt->orientation = dst_orient;
@@ -392,7 +392,7 @@ bool video_format_IsSimilar( const video_format_t *f1,
         f1->i_visible_height != f2->i_visible_height ||
         f1->i_x_offset != f2->i_x_offset || f1->i_y_offset != f2->i_y_offset )
         return false;
-    if( f1->i_sar_num * f2->i_sar_den != f2->i_sar_num * f1->i_sar_den )
+    if( f1->sar.num * f2->sar.den != f2->sar.num * f1->sar.den )
         return false;
 
     if( f1->orientation != f2->orientation)
@@ -428,7 +428,7 @@ void video_format_Print( vlc_object_t *p_this,
              fmt->i_width, fmt->i_height, fmt->i_x_offset, fmt->i_y_offset,
              fmt->i_visible_width, fmt->i_visible_height,
              (char*)&fmt->i_chroma,
-             fmt->i_sar_num, fmt->i_sar_den,
+             fmt->sar.num, fmt->sar.den,
              fmt->i_rmask, fmt->i_gmask, fmt->i_bmask );
 }
 

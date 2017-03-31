@@ -202,13 +202,13 @@ static void Display(vout_display_t *vd, picture_t *picture, subpicture_t *subpic
 
     if (ORIENT_IS_SWAP(vd->source.orientation))
     {
-        fmt.i_sar_num = vd->source.i_sar_den;
-        fmt.i_sar_den = vd->source.i_sar_num;
+        fmt.sar.num = vd->source.sar.den;
+        fmt.sar.den = vd->source.sar.num;
     }
     else
     {
-        fmt.i_sar_num = vd->source.i_sar_num;
-        fmt.i_sar_den = vd->source.i_sar_den;
+        fmt.sar.num = vd->source.sar.num;
+        fmt.sar.den = vd->source.sar.den;
     }
 
     /* */
@@ -245,7 +245,7 @@ static void Display(vout_display_t *vd, picture_t *picture, subpicture_t *subpic
                 fmt.i_visible_width, fmt.i_visible_height,
                 fmt.frame_rate.num, fmt.frame_rate.den,
                 type,
-                fmt.i_sar_num, fmt.i_sar_den);
+                fmt.sar.num, fmt.sar.den);
         sys->is_first = true;
     }
 
