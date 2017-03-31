@@ -186,7 +186,7 @@ bool hevc_get_picture_size( const hevc_sequence_parameter_set_t *, unsigned *p_w
                             unsigned *p_vw, unsigned *p_vh );
 bool hevc_get_frame_rate( const hevc_sequence_parameter_set_t *,
                           hevc_video_parameter_set_t ** /* HEVC_MAX_VPS || NULL */,
-                          unsigned *pi_num, unsigned *pi_den );
+                          vlc_urational_t *p_rate );
 bool hevc_get_colorimetry( const hevc_sequence_parameter_set_t *p_sps,
                            video_color_primaries_t *p_primaries,
                            video_transfer_func_t *p_transfer,

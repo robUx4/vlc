@@ -458,13 +458,12 @@ static void ActivateSets(decoder_t *p_dec,
     {
         if(!p_dec->fmt_in.video.frame_rate.num || !p_dec->fmt_in.video.frame_rate.den)
         {
-            unsigned num, den;
-            if(hevc_get_frame_rate( p_sps, p_dec->p_sys->rgi_p_decvps, &num, &den ))
+            vlc_urational_t rate;
+            if(hevc_get_frame_rate( p_sps, p_dec->p_sys->rgi_p_decvps, &rate ))
             {
-                p_dec->fmt_out.video.frame_rate.num = num;
-                p_dec->fmt_out.video.frame_rate.den = den;
-                if(p_sys->dts.i_divider_den != den && p_sys->dts.i_divider_num != 2 * num)
-                    date_Change(&p_sys->dts, 2 * num, den);
+                p_dec->fmt_out.video.frame_rate = rate;
+                if(p_sys->dts.i_divider_den != rate.den && p_sys->dts.i_divider_num != 2 * rate.num)
+                    date_Change(&p_sys->dts, 2 * rate.num, rate.den);
             }
         }
 
