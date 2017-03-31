@@ -2540,8 +2540,7 @@ static bool Ogg_ReadTheoraHeader( logical_stream_t *p_stream,
                                   ogg_packet *p_oggpacket )
 {
     bs_t bitstream;
-    unsigned int i_fps_numerator;
-    unsigned int i_fps_denominator;
+    vlc_urational_t fps;
     int i_keyframe_frequency_force;
     int i_major;
     int i_minor;
@@ -2571,14 +2570,14 @@ static bool Ogg_ReadTheoraHeader( logical_stream_t *p_stream,
     bs_read( &bitstream, 8 ); /* x offset */
     bs_read( &bitstream, 8 ); /* y offset */
 
-    i_fps_numerator = bs_read( &bitstream, 32 );
-    i_fps_denominator = bs_read( &bitstream, 32 );
-    i_fps_denominator = __MAX( i_fps_denominator, 1 );
+    fps.num = bs_read( &bitstream, 32 );
+    fps.den = bs_read( &bitstream, 32 );
+    fps.den = __MAX( fps.den, 1 );
     bs_read( &bitstream, 24 ); /* aspect_numerator */
     bs_read( &bitstream, 24 ); /* aspect_denominator */
 
-    p_stream->fmt.video.i_frame_rate = i_fps_numerator;
-    p_stream->fmt.video.i_frame_rate_base = i_fps_denominator;
+    p_stream->fmt.video.i_frame_rate = fps.num;
+    p_stream->fmt.video.i_frame_rate_base = fps.den;
 
     bs_read( &bitstream, 8 ); /* colorspace */
     p_stream->fmt.i_bitrate = bs_read( &bitstream, 24 );
@@ -2597,7 +2596,7 @@ static bool Ogg_ReadTheoraHeader( logical_stream_t *p_stream,
 
     i_version = i_major * 1000000 + i_minor * 1000 + i_subminor;
     p_stream->i_keyframe_offset = 0;
-    p_stream->f_rate = ((double)i_fps_numerator) / i_fps_denominator;
+    p_stream->f_rate = ((double)fps.num) / fps.den;
     if ( p_stream->f_rate == 0 ) return false;
 
     if ( i_version >= 3002001 )
