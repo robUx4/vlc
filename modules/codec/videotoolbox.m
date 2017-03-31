@@ -1037,13 +1037,14 @@ static int avcCFromAnnexBCreate(decoder_t *p_dec)
         return VLC_EGENERIC;
 
     unsigned i_h264_width, i_h264_height, i_video_width, i_video_height;
-    int i_sar_num, i_sar_den, i_ret;
+    vlc_urational_t sar;
+    int i_ret;
     i_ret = h264_helper_get_current_picture_size(&p_sys->hh,
                                                  &i_h264_width, &i_h264_height,
                                                  &i_video_width, &i_video_height);
     if (i_ret != VLC_SUCCESS)
         return i_ret;
-    i_ret = h264_helper_get_current_sar(&p_sys->hh, &i_sar_num, &i_sar_den);
+    i_ret = h264_helper_get_current_sar(&p_sys->hh, &sar);
     if (i_ret != VLC_SUCCESS)
         return i_ret;
 
@@ -1051,8 +1052,7 @@ static int avcCFromAnnexBCreate(decoder_t *p_dec)
     p_dec->fmt_out.video.i_width = i_video_width;
     p_dec->fmt_out.video.i_visible_height =
     p_dec->fmt_out.video.i_height = i_video_height;
-    p_dec->fmt_out.video.sar.num = i_sar_num;
-    p_dec->fmt_out.video.sar.den = i_sar_den;
+    p_dec->fmt_out.video.sar = sar;
 
     block_t *p_avcC = h264_helper_get_avcc_config(&p_sys->hh);
     if (!p_avcC)

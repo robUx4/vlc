@@ -580,13 +580,12 @@ h264_helper_get_current_picture_size(struct hxxx_helper *hh,
 }
 
 int
-h264_helper_get_current_sar(struct hxxx_helper *hh, int *p_num, int *p_den)
+h264_helper_get_current_sar(struct hxxx_helper *hh, vlc_urational_t *p_sar)
 {
     const struct hxxx_helper_nal *hsps = h264_helper_get_current_sps(hh);
     if (hsps == NULL)
         return VLC_EGENERIC;
-    *p_num = hsps->h264_sps->vui.sar.num;
-    *p_den = hsps->h264_sps->vui.sar.den;
+    *p_sar = hsps->h264_sps->vui.sar;
     return VLC_SUCCESS;
 }
 

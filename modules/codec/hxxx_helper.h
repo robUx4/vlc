@@ -82,7 +82,7 @@ int h264_helper_get_current_picture_size(struct hxxx_helper *hh,
                                          unsigned *p_w, unsigned *p_h,
                                          unsigned *p_vw, unsigned *p_vh);
 
-int h264_helper_get_current_sar(struct hxxx_helper *hh, int *p_num, int *p_den);
+int h264_helper_get_current_sar(struct hxxx_helper *hh, vlc_urational_t *p_sar);
 
 int h264_helper_get_current_dpb_values(struct hxxx_helper *hh,
                                        uint8_t *p_depth, unsigned *pi_delay);
