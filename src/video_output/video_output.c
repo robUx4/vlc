@@ -98,8 +98,7 @@ static void VideoFormatCopyCropAr(video_format_t *dst,
                                   const video_format_t *src)
 {
     video_format_CopyCrop(dst, src);
-    dst->sar.num = src->sar.num;
-    dst->sar.den = src->sar.den;
+    dst->sar = src->sar;
 }
 static bool VideoFormatIsCropArEqual(video_format_t *dst,
                                      const video_format_t *src)
@@ -902,8 +901,7 @@ static int ThreadDisplayRenderPicture(vout_thread_t *vout, bool is_forced)
 
         fmt_spu = vd->source;
         if (fmt_spu.i_width * fmt_spu.i_height < place.width * place.height) {
-            fmt_spu.sar.num = vd->cfg->display.sar.num;
-            fmt_spu.sar.den = vd->cfg->display.sar.den;
+            fmt_spu.sar = vd->cfg->display.sar;
             fmt_spu.i_width          =
             fmt_spu.i_visible_width  = place.width;
             fmt_spu.i_height         =
@@ -915,8 +913,7 @@ static int ThreadDisplayRenderPicture(vout_thread_t *vout, bool is_forced)
             fmt_spu = vd->source;
         } else {
             fmt_spu = vd->fmt;
-            fmt_spu.sar.num = vd->cfg->display.sar.num;
-            fmt_spu.sar.den = vd->cfg->display.sar.den;
+            fmt_spu.sar = vd->cfg->display.sar;
         }
         subpicture_chromas = NULL;
 

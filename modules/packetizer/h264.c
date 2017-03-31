@@ -203,8 +203,7 @@ static void ActivateSets( decoder_t *p_dec, const h264_sequence_parameter_set_t 
 
         if( p_sps->vui.sar.num != 0 && p_sps->vui.sar.den != 0 )
         {
-            p_dec->fmt_out.video.sar.num = p_sps->vui.sar.num;
-            p_dec->fmt_out.video.sar.den = p_sps->vui.sar.den;
+            p_dec->fmt_out.video.sar = p_sps->vui.sar;
         }
 
         if( p_sps->vui.b_valid )

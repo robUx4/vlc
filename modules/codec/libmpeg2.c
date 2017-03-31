@@ -669,8 +669,7 @@ static picture_t *GetNewPicture( decoder_t *p_dec )
     p_dec->fmt_out.video.i_height = p_sys->p_info->sequence->height;
     p_dec->fmt_out.video.i_visible_height =
         p_sys->p_info->sequence->picture_height;
-    p_dec->fmt_out.video.sar.num = p_sys->sar.num;
-    p_dec->fmt_out.video.sar.den = p_sys->sar.den;
+    p_dec->fmt_out.video.sar = p_sys->sar;
 
     if( p_sys->p_info->sequence->frame_period > 0 )
     {
@@ -714,10 +713,7 @@ static void GetAR( decoder_t *p_dec )
     /* Check whether the input gave a particular aspect ratio */
     if( p_dec->fmt_in.video.sar.num > 0 &&
         p_dec->fmt_in.video.sar.den > 0 )
-    {
-        p_sys->sar.num = p_dec->fmt_in.video.sar.num;
-        p_sys->sar.den = p_dec->fmt_in.video.sar.den;
-    }
+        p_sys->sar = p_dec->fmt_in.video.sar;
     /* Use the value provided in the MPEG sequence header */
     else if( p_sys->p_info->sequence->pixel_height > 0 )
     {

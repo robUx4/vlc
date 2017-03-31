@@ -664,8 +664,7 @@ static void ESNew( demux_t *p_demux, int i_id, int i_lang )
     /* Add a new ES */
     if( tk->fmt.i_cat == VIDEO_ES )
     {
-        tk->fmt.video.sar.num = p_sys->sar.num;
-        tk->fmt.video.sar.den = p_sys->sar.den;
+        tk->fmt.video.sar = p_sys->sar;
     }
     else if( tk->fmt.i_cat == AUDIO_ES )
     {

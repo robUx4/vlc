@@ -447,10 +447,8 @@ int OpenDemux( vlc_object_t *p_this )
             psz_type = "video";
             fmt.video.frame_rate.num = s->codec->time_base.num;
             fmt.video.frame_rate.den = s->codec->time_base.den * __MAX( s->codec->ticks_per_frame, 1 );
-            fmt.video.sar.num = s->sample_aspect_ratio.num;
-            if (s->sample_aspect_ratio.num > 0)
-                fmt.video.sar.den = s->sample_aspect_ratio.den;
-            else
+            fmt.video.sar = FromAVRational(s->sample_aspect_ratio);
+            if (s->sample_aspect_ratio.num < 0)
                 fmt.video.sar.den = 0;
             break;
 

@@ -207,8 +207,7 @@ static void Display(vout_display_t *vd, picture_t *picture, subpicture_t *subpic
     }
     else
     {
-        fmt.sar.num = vd->source.sar.num;
-        fmt.sar.den = vd->source.sar.den;
+        fmt.sar = vd->source.sar;
     }
 
     /* */

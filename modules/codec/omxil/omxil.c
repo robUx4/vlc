@@ -1573,8 +1573,7 @@ static int DecodeVideo( decoder_t *p_dec, block_t *p_block )
        (p_dec->fmt_out.video.sar.num == 0 || p_dec->fmt_out.video.sar.den == 0 ||
              !p_sys->b_aspect_ratio_handled))
     {
-        p_dec->fmt_out.video.sar.num = p_dec->fmt_in.video.sar.num;
-        p_dec->fmt_out.video.sar.den = p_dec->fmt_in.video.sar.den;
+        p_dec->fmt_out.video.sar = p_dec->fmt_in.video.sar;
     }
 
     /* Loop as long as we haven't either got an input buffer (and cleared

@@ -563,8 +563,7 @@ static void vd_display(vout_display_t *vd, picture_t *picture,
         picture->b_top_field_first != sys->b_top_field_first) {
         sys->b_top_field_first = picture->b_top_field_first;
         sys->b_progressive = picture->b_progressive;
-        sys->frame_rate.num = picture->format.frame_rate.num;
-        sys->frame_rate.den = picture->format.frame_rate.den;
+        sys->frame_rate = picture->format.frame_rate;
         configure_display(vd, NULL, &picture->format);
     }
 

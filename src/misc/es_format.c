@@ -358,8 +358,7 @@ void video_format_TransformBy( video_format_t *fmt, video_transform_t transform 
         fmt->i_visible_height = scratch.i_visible_width;
         fmt->i_x_offset = scratch.i_y_offset;
         fmt->i_y_offset = scratch.i_x_offset;
-        fmt->sar.num = scratch.sar.den;
-        fmt->sar.den = scratch.sar.num;
+        fmt->sar = scratch.sar;
     }
 
     fmt->orientation = dst_orient;

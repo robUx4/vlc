@@ -1168,8 +1168,7 @@ static void Display(vout_display_t *vd, picture_t *picture,
 static void CopySourceAspect(video_format_t *p_dest,
                              const video_format_t *p_src)
 {
-    p_dest->sar.num = p_src->sar.num;
-    p_dest->sar.den = p_src->sar.den;
+    p_dest->sar = p_src->sar;
 }
 
 static int Control(vout_display_t *vd, int query, va_list args)

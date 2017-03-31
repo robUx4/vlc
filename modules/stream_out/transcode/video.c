@@ -367,10 +367,8 @@ static void transcode_video_filter_init( sout_stream_t *p_stream,
             id->p_encoder->fmt_in.video.i_width;
         id->p_encoder->fmt_out.video.i_height =
             id->p_encoder->fmt_in.video.i_height;
-        id->p_encoder->fmt_out.video.sar.num =
-            id->p_encoder->fmt_in.video.sar.num;
-        id->p_encoder->fmt_out.video.sar.den =
-            id->p_encoder->fmt_in.video.sar.den;
+        id->p_encoder->fmt_out.video.sar =
+            id->p_encoder->fmt_in.video.sar;
     }
 
     /* Keep colorspace etc info along */
@@ -589,10 +587,8 @@ static void transcode_video_sar_init( sout_stream_t *p_stream,
                      0 );
     }
 
-    id->p_encoder->fmt_in.video.sar.num =
-        id->p_encoder->fmt_out.video.sar.num;
-    id->p_encoder->fmt_in.video.sar.den =
-        id->p_encoder->fmt_out.video.sar.den;
+    id->p_encoder->fmt_in.video.sar =
+        id->p_encoder->fmt_out.video.sar;
 
     msg_Dbg( p_stream, "encoder aspect is %i:%i",
              id->p_encoder->fmt_out.video.sar.num * id->p_encoder->fmt_out.video.i_width,
@@ -949,8 +945,9 @@ bool transcode_video_add( sout_stream_t *p_stream, const es_format_t *p_fmt,
 
     if( p_sys->fps.num )
     {
-        id->p_encoder->fmt_in.video.frame_rate.num = id->p_encoder->fmt_out.video.frame_rate.num = p_sys->fps.num;
-        id->p_encoder->fmt_in.video.frame_rate.den = id->p_encoder->fmt_out.video.frame_rate.den = (p_sys->fps.den ? p_sys->fps.den : 1);
+        id->p_encoder->fmt_in.video.frame_rate = id->p_encoder->fmt_out.video.frame_rate = p_sys->fps;
+        if ( !p_sys->fps.den )
+            id->p_encoder->fmt_in.video.frame_rate.den = id->p_encoder->fmt_out.video.frame_rate.den = 1;
     }
 
     return true;

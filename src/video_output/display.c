@@ -942,13 +942,10 @@ bool vout_ManageDisplay(vout_display_t *vd, bool allow_reset_pictures)
         if (osys->ch_sar) {
             video_format_t source = vd->source;
 
-            if (osys->sar.num > 0 && osys->sar.den > 0) {
-                source.sar.num = osys->sar.num;
-                source.sar.den = osys->sar.den;
-            } else {
-                source.sar.num = osys->source.sar.num;
-                source.sar.den = osys->source.sar.den;
-            }
+            if (osys->sar.num > 0 && osys->sar.den > 0)
+                source.sar = osys->sar;
+            else
+                source.sar = osys->source.sar;
 
             if (vout_display_Control(vd, VOUT_DISPLAY_CHANGE_SOURCE_ASPECT, &source)) {
                 /* There nothing much we can do. The only reason a vout display
@@ -962,8 +959,7 @@ bool vout_ManageDisplay(vout_display_t *vd, bool allow_reset_pictures)
                 osys->fit_window = 1;
             }
             vd->source = source;
-            osys->sar.num = source.sar.num;
-            osys->sar.den = source.sar.den;
+            osys->sar = source.sar;
             osys->ch_sar  = false;
 
             /* If a crop ratio is requested, recompute the parameters */
@@ -978,8 +974,7 @@ bool vout_ManageDisplay(vout_display_t *vd, bool allow_reset_pictures)
             unsigned crop_den = osys->crop.den;
             if (crop_num != 0 && crop_den != 0) {
                 video_format_t fmt = osys->source;
-                fmt.sar.num = source.sar.num;
-                fmt.sar.den = source.sar.den;
+                fmt.sar = source.sar;
                 VoutDisplayCropRatio(&osys->crop.left,  &osys->crop.top,
                                      &osys->crop.right, &osys->crop.bottom,
                                      &fmt, crop_num, crop_den);
@@ -1097,15 +1092,13 @@ void vout_UpdateDisplaySourceProperties(vout_display_t *vd, const video_format_t
     if (source->sar.num * osys->source.sar.den !=
         source->sar.den * osys->source.sar.num) {
 
-        osys->source.sar.num = source->sar.num;
-        osys->source.sar.den = source->sar.den;
+        osys->source.sar = source->sar;
         vlc_ureduce(&osys->source.sar.num, &osys->source.sar.den,
                     osys->source.sar.num, osys->source.sar.den, 0);
 
         /* FIXME it will override any AR that the user would have forced */
         osys->ch_sar = true;
-        osys->sar.num = osys->source.sar.num;
-        osys->sar.den = osys->source.sar.den;
+        osys->sar = osys->source.sar;
     }
     if (source->i_x_offset       != osys->source.i_x_offset ||
         source->i_y_offset       != osys->source.i_y_offset ||

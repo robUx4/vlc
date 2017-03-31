@@ -160,14 +160,10 @@ static int lavc_GetVideoFormat(decoder_t *dec, video_format_t *restrict fmt,
 
     /* If an aspect-ratio was specified in the input format then force it */
     if (dec->fmt_in.video.sar.num > 0 && dec->fmt_in.video.sar.den > 0)
-    {
-        fmt->sar.num = dec->fmt_in.video.sar.num;
-        fmt->sar.den = dec->fmt_in.video.sar.den;
-    }
+        fmt->sar = dec->fmt_in.video.sar;
     else
     {
-        fmt->sar.num = ctx->sample_aspect_ratio.num;
-        fmt->sar.den = ctx->sample_aspect_ratio.den;
+        fmt->sar = FromAVRational(ctx->sample_aspect_ratio);
 
         if (fmt->sar.num == 0 || fmt->sar.den == 0)
             fmt->sar.num = fmt->sar.den = 1;

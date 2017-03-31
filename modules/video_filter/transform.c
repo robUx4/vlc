@@ -406,8 +406,7 @@ static int Open(vlc_object_t *object)
         dst->i_visible_width  = src_trans.i_visible_width;
         dst->i_height         = src_trans.i_height;
         dst->i_visible_height = src_trans.i_visible_height;
-        dst->sar.num        = src_trans.sar.num;
-        dst->sar.den        = src_trans.sar.den;
+        dst->sar              = src_trans.sar;
         dst->i_x_offset       = src_trans.i_x_offset;
         dst->i_y_offset       = src_trans.i_y_offset;
     }
