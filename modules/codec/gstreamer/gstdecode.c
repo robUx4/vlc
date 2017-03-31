@@ -404,10 +404,10 @@ static GstStructure* vlc_to_gst_fmt( const es_format_t *p_fmt )
                 "width", G_TYPE_INT, p_vfmt->i_width,
                 "height", G_TYPE_INT, p_vfmt->i_height, NULL );
 
-    if( p_vfmt->i_frame_rate && p_vfmt->i_frame_rate_base )
+    if( p_vfmt->frame_rate.num && p_vfmt->frame_rate.den )
         gst_structure_set( p_str, "framerate", GST_TYPE_FRACTION,
-                p_vfmt->i_frame_rate,
-                p_vfmt->i_frame_rate_base, NULL );
+                p_vfmt->frame_rate.num,
+                p_vfmt->frame_rate.den, NULL );
 
     if( p_vfmt->i_sar_num && p_vfmt->i_sar_den )
         gst_structure_set( p_str, "pixel-aspect-ratio", GST_TYPE_FRACTION,
@@ -698,11 +698,11 @@ static int DecodeBlock( decoder_t *p_dec, block_t *p_block )
             GST_BUFFER_DURATION( p_buf ) = gst_util_uint64_scale(
                     p_block->i_length, GST_SECOND, GST_MSECOND );
 
-        if( p_dec->fmt_in.video.i_frame_rate  &&
-                p_dec->fmt_in.video.i_frame_rate_base )
+        if( p_dec->fmt_in.video.frame_rate.num  &&
+                p_dec->fmt_in.video.frame_rate.den )
             GST_BUFFER_DURATION( p_buf ) = gst_util_uint64_scale( GST_SECOND,
-                    p_dec->fmt_in.video.i_frame_rate_base,
-                    p_dec->fmt_in.video.i_frame_rate );
+                    p_dec->fmt_in.video.frame_rate.den,
+                    p_dec->fmt_in.video.frame_rate.num );
 
         /* Give the input buffer to GStreamer Bin.
          *

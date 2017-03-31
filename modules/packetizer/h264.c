@@ -209,16 +209,16 @@ static void ActivateSets( decoder_t *p_dec, const h264_sequence_parameter_set_t 
 
         if( p_sps->vui.b_valid )
         {
-            if( !p_dec->fmt_in.video.i_frame_rate_base &&
+            if( !p_dec->fmt_in.video.frame_rate.den &&
                  p_sps->vui.b_fixed_frame_rate && p_sps->vui.i_num_units_in_tick > 0 )
             {
                 const unsigned i_rate_base = p_sps->vui.i_num_units_in_tick;
                 const unsigned i_rate = p_sps->vui.i_time_scale >> 1; /* num_clock_ts == 2 */
-                if( i_rate_base != p_dec->fmt_out.video.i_frame_rate_base ||
-                    i_rate != p_dec->fmt_out.video.i_frame_rate )
+                if( i_rate_base != p_dec->fmt_out.video.frame_rate.den ||
+                    i_rate != p_dec->fmt_out.video.frame_rate.num )
                 {
-                    p_dec->fmt_out.video.i_frame_rate_base = i_rate_base;
-                    p_dec->fmt_out.video.i_frame_rate = i_rate;
+                    p_dec->fmt_out.video.frame_rate.den = i_rate_base;
+                    p_dec->fmt_out.video.frame_rate.num = i_rate;
                     date_Change( &p_sys->dts, p_sps->vui.i_time_scale, p_sps->vui.i_num_units_in_tick );
                 }
             }
@@ -353,11 +353,11 @@ static int Open( vlc_object_t *p_this )
     p_dec->fmt_out.i_codec = VLC_CODEC_H264;
     p_dec->fmt_out.b_packetized = true;
 
-    if( p_dec->fmt_in.video.i_frame_rate_base &&
-        p_dec->fmt_in.video.i_frame_rate )
+    if( p_dec->fmt_in.video.frame_rate.den &&
+        p_dec->fmt_in.video.frame_rate.num )
     {
-        date_Change( &p_sys->dts, p_dec->fmt_in.video.i_frame_rate * 2,
-                                  p_dec->fmt_in.video.i_frame_rate_base );
+        date_Change( &p_sys->dts, p_dec->fmt_in.video.frame_rate.num * 2,
+                                  p_dec->fmt_in.video.frame_rate.den );
     }
 
     if( b_avc )

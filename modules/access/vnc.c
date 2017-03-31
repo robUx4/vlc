@@ -208,8 +208,8 @@ static rfbBool mallocFrameBufferHandler( rfbClient* p_client )
     fmt.video.i_visible_height =
             fmt.video.i_height = i_height;
 
-    fmt.video.i_frame_rate_base = 1000;
-    fmt.video.i_frame_rate = 1000 * p_sys->f_fps;
+    fmt.video.frame_rate.den = 1000;
+    fmt.video.frame_rate.num = 1000 * p_sys->f_fps;
 
     fmt.video.i_bits_per_pixel = i_depth;
     fmt.video.i_rmask = p_client->format.redMax << p_client->format.redShift;

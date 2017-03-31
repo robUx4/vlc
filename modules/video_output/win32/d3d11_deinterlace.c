@@ -178,16 +178,16 @@ static int Open(vlc_object_t *obj)
     D3D11_VIDEO_PROCESSOR_CONTENT_DESC processorDesc = {
         .InputFrameFormat = D3D11_VIDEO_FRAME_FORMAT_INTERLACED_TOP_FIELD_FIRST,
         .InputFrameRate = {
-            .Numerator   = fmt->i_frame_rate,
-            .Denominator = fmt->i_frame_rate_base,
+            .Numerator   = fmt->frame_rate.den ? fmt->frame_rate.num : 0,
+            .Denominator = fmt->frame_rate.den,
         },
         .InputWidth   = fmt->i_width,
         .InputHeight  = fmt->i_height,
         .OutputWidth  = dst->format.i_width,
         .OutputHeight = dst->format.i_height,
         .OutputFrameRate = {
-            .Numerator   = dst->format.i_frame_rate,
-            .Denominator = dst->format.i_frame_rate_base,
+            .Numerator   = dst->format.frame_rate.den > 0 ? dst->format.frame_rate.num : 0,
+            .Denominator = dst->format.frame_rate.den,
         },
         .Usage = D3D11_VIDEO_USAGE_PLAYBACK_NORMAL,
     };

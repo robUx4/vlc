@@ -675,10 +675,10 @@ static picture_t *GetNewPicture( decoder_t *p_dec )
 
     if( p_sys->p_info->sequence->frame_period > 0 )
     {
-        p_dec->fmt_out.video.i_frame_rate =
+        p_dec->fmt_out.video.frame_rate.num =
             (uint32_t)( (uint64_t)1001000000 * 27 /
                         p_sys->p_info->sequence->frame_period );
-        p_dec->fmt_out.video.i_frame_rate_base = 1001;
+        p_dec->fmt_out.video.frame_rate.den = 1001;
     }
 
     p_dec->fmt_out.i_codec =

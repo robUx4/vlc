@@ -255,15 +255,15 @@ static int AddStream( sout_mux_t *p_mux, sout_input_t *p_input )
         break;
 
     case VIDEO_ES:
-        if( !fmt->video.i_frame_rate || !fmt->video.i_frame_rate_base ) {
+        if( !fmt->video.frame_rate.num || !fmt->video.frame_rate.den ) {
             msg_Warn( p_mux, "Missing frame rate, assuming 25fps" );
-            fmt->video.i_frame_rate = 25;
-            fmt->video.i_frame_rate_base = 1;
+            fmt->video.frame_rate.num = 25;
+            fmt->video.frame_rate.den = 1;
         } else
             msg_Dbg( p_mux, "Muxing framerate will be %d/%d = %.2f fps",
-                    fmt->video.i_frame_rate,
-                    fmt->video.i_frame_rate_base,
-                    (double)fmt->video.i_frame_rate/(double)fmt->video.i_frame_rate_base );
+                    fmt->video.frame_rate.num,
+                    fmt->video.frame_rate.den,
+                    (double)fmt->video.frame_rate.num/(double)fmt->video.frame_rate.den );
 
         codec->codec_type = AVMEDIA_TYPE_VIDEO;
         codec->width = fmt->video.i_visible_width;
@@ -275,8 +275,8 @@ static int AddStream( sout_mux_t *p_mux, sout_input_t *p_input )
         msg_Dbg(p_mux, "Muxing aspect ratio will be %d/%d",
                 fmt->video.i_sar_num, fmt->video.i_sar_den);
         stream->sample_aspect_ratio = codec->sample_aspect_ratio;
-        stream->time_base.den = fmt->video.i_frame_rate;
-        stream->time_base.num = fmt->video.i_frame_rate_base;
+        stream->time_base.den = fmt->video.frame_rate.num;
+        stream->time_base.num = fmt->video.frame_rate.den;
         if (fmt->i_bitrate == 0) {
             msg_Warn( p_mux, "Missing video bitrate, assuming 512k" );
             fmt->i_bitrate = 512000;

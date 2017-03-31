@@ -126,8 +126,8 @@ int screen_InitCapture(demux_t *p_demux)
     p_sys->fmt.video.i_bmask           = 0x000000ff;
     p_sys->fmt.video.i_sar_num         =
     p_sys->fmt.video.i_sar_den         = 1;
-    p_sys->fmt.video.i_frame_rate      = 1000 * p_data->rate;
-    p_sys->fmt.video.i_frame_rate_base = 1000;
+    p_sys->fmt.video.frame_rate.num    = 1000 * p_data->rate;
+    p_sys->fmt.video.frame_rate.den    = 1000;
 
     return VLC_SUCCESS;
 }

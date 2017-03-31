@@ -672,8 +672,8 @@ static int Open(vlc_object_t *object)
         fps.num      = 10;
         fps.den      = 1;
     }
-    fmt.video.i_frame_rate      = fps.num;
-    fmt.video.i_frame_rate_base = fps.den;
+    fmt.video.frame_rate.num = fps.num;
+    fmt.video.frame_rate.den = fps.den;
 
     /* If loadind failed, we still continue to avoid mis-detection
      * by other demuxers. */
@@ -695,7 +695,7 @@ static int Open(vlc_object_t *object)
     sys->is_realtime = var_InheritBool(demux, "image-realtime");
     sys->pts_origin  = sys->is_realtime ? mdate() : 0;
     sys->pts_next    = VLC_TS_INVALID;
-    date_Init(&sys->pts, fmt.video.i_frame_rate, fmt.video.i_frame_rate_base);
+    date_Init(&sys->pts, fmt.video.frame_rate.num, fmt.video.frame_rate.den);
     date_Set(&sys->pts, 0);
 
     es_format_Clean(&fmt);

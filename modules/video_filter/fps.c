@@ -80,8 +80,8 @@ static picture_t *Filter( filter_t *p_filter, picture_t *p_picture)
         return NULL;
     }
 
-    p_picture->format.i_frame_rate = p_filter->fmt_out.video.i_frame_rate;
-    p_picture->format.i_frame_rate_base = p_filter->fmt_out.video.i_frame_rate_base;
+    p_picture->format.frame_rate.num = p_filter->fmt_out.video.frame_rate.num;
+    p_picture->format.frame_rate.den = p_filter->fmt_out.video.frame_rate.den;
 
     /* First time we get some valid timestamp, we'll take it as base for output
         later on we retake new timestamp if it has jumped too much */
@@ -154,20 +154,20 @@ static int Open( vlc_object_t *p_this)
     fps = var_InheritURational( p_filter, CFG_PREFIX "fps" );
     if (fps.num == 0 || fps.den == 0)
     {
-        fps.num = p_filter->fmt_in.video.i_frame_rate;
-        fps.den = p_filter->fmt_in.video.i_frame_rate_base;
+        fps.num = p_filter->fmt_in.video.frame_rate.num;
+        fps.den = p_filter->fmt_in.video.frame_rate.den;
     }
-    p_filter->fmt_out.video.i_frame_rate      = fps.num;
-    p_filter->fmt_out.video.i_frame_rate_base = fps.den;
+    p_filter->fmt_out.video.frame_rate.num      = fps.num;
+    p_filter->fmt_out.video.frame_rate.den = fps.den;
 
     msg_Dbg( p_filter, "Converting fps from %d/%d -> %d/%d",
-            p_filter->fmt_in.video.i_frame_rate, p_filter->fmt_in.video.i_frame_rate_base,
-            p_filter->fmt_out.video.i_frame_rate, p_filter->fmt_out.video.i_frame_rate_base );
+            p_filter->fmt_in.video.frame_rate.num, p_filter->fmt_in.video.frame_rate.den,
+            p_filter->fmt_out.video.frame_rate.num, p_filter->fmt_out.video.frame_rate.den );
 
-    p_sys->i_output_frame_interval = p_filter->fmt_out.video.i_frame_rate_base * CLOCK_FREQ / p_filter->fmt_out.video.i_frame_rate;
+    p_sys->i_output_frame_interval = p_filter->fmt_out.video.frame_rate.den * CLOCK_FREQ / p_filter->fmt_out.video.frame_rate.num;
 
     date_Init( &p_sys->next_output_pts,
-               p_filter->fmt_out.video.i_frame_rate, p_filter->fmt_out.video.i_frame_rate_base );
+               p_filter->fmt_out.video.frame_rate.num, p_filter->fmt_out.video.frame_rate.den );
 
     date_Set( &p_sys->next_output_pts, VLC_TS_INVALID );
     p_sys->p_previous_pic = NULL;

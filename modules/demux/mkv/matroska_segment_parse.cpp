@@ -495,8 +495,8 @@ void matroska_segment_c::ParseTrackEntry( KaxTrackEntry *m )
 
             if( tk->i_default_duration > 1000 ) /* Broken ffmpeg mux info when non set fps */
             {
-                tk->fmt.video.i_frame_rate_base = static_cast<unsigned>( tk->i_default_duration );
-                tk->fmt.video.i_frame_rate = 1000000;
+                tk->fmt.video.frame_rate.den = static_cast<unsigned>( tk->i_default_duration );
+                tk->fmt.video.frame_rate.num = 1000000;
             }
 
             vars.level += 1;
@@ -1379,8 +1379,8 @@ int32_t matroska_segment_c::TrackInit( mkv_track_t * p_tk )
             if (
                 vars.p_tk->i_extra_data >= 26 && !memcmp(p+4, "VIDORV", 6) && strchr("34", p[10]) && p[11] == '0')
             {
-                vars.p_tk->fmt.video.i_frame_rate      = p[22] << 24 | p[23] << 16 | p[24] << 8 | p[25] << 0;
-                vars.p_tk->fmt.video.i_frame_rate_base = 65536;
+                vars.p_tk->fmt.video.frame_rate.num = p[22] << 24 | p[23] << 16 | p[24] << 8 | p[25] << 0;
+                vars.p_tk->fmt.video.frame_rate.den = 65536;
             }
 
             fill_extra_data( vars.p_tk, 26 );

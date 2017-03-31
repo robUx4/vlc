@@ -793,8 +793,8 @@ static bool SetupProcessor(vlc_va_t *va, const video_format_t *fmt)
     D3D11_VIDEO_PROCESSOR_CONTENT_DESC processorDesc = {
         .InputFrameFormat = D3D11_VIDEO_FRAME_FORMAT_PROGRESSIVE,   /* TODO */
         .InputFrameRate = {
-            .Numerator   = fmt->i_frame_rate_base > 0 ? fmt->i_frame_rate : 0,
-            .Denominator = fmt->i_frame_rate_base,
+            .Numerator   = fmt->frame_rate.den > 0 ? fmt->frame_rate.num : 0,
+            .Denominator = fmt->frame_rate.den,
         },
         .InputWidth   = fmt->i_width,
         .InputHeight  = fmt->i_height,

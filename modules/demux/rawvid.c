@@ -334,11 +334,11 @@ valid:
                         i_width, i_height, i_width, i_height,
                         sar.num, sar.den );
 
-    vlc_ureduce( &p_sys->fmt_video.video.i_frame_rate,
-                 &p_sys->fmt_video.video.i_frame_rate_base,
+    vlc_ureduce( &p_sys->fmt_video.video.frame_rate.num,
+                 &p_sys->fmt_video.video.frame_rate.den,
                  fps.num, fps.den, 0);
-    date_Init( &p_sys->pcr, p_sys->fmt_video.video.i_frame_rate,
-               p_sys->fmt_video.video.i_frame_rate_base );
+    date_Init( &p_sys->pcr, p_sys->fmt_video.video.frame_rate.num,
+               p_sys->fmt_video.video.frame_rate.den );
     date_Set( &p_sys->pcr, 0 );
 
     if( !p_sys->fmt_video.video.i_bits_per_pixel )

@@ -525,8 +525,8 @@ static void SetupJ2KDescriptors( demux_t *p_demux, ts_pes_es_t *p_es, const dvbp
         p_es->fmt.i_level = p_dr->p_data[1];
         p_es->fmt.video.i_width = GetDWBE(&p_dr->p_data[2]);
         p_es->fmt.video.i_height = GetDWBE(&p_dr->p_data[6]);
-        p_es->fmt.video.i_frame_rate_base = GetWBE(&p_dr->p_data[18]);
-        p_es->fmt.video.i_frame_rate = GetWBE(&p_dr->p_data[20]);
+        p_es->fmt.video.frame_rate.den = GetWBE(&p_dr->p_data[18]);
+        p_es->fmt.video.frame_rate.num = GetWBE(&p_dr->p_data[20]);
         p_es->b_interlaced = p_dr->p_data[23] & 0x40;
         if( p_dr->i_length > 24 )
         {

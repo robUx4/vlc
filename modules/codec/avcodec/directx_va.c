@@ -329,8 +329,8 @@ int directx_va_Setup(vlc_va_t *va, directx_sys_t *dx_sys, AVCodecContext *avctx)
     memset(&fmt, 0, sizeof(fmt));
     fmt.i_width = dx_sys->width;
     fmt.i_height = dx_sys->height;
-    fmt.i_frame_rate = avctx->framerate.num;
-    fmt.i_frame_rate_base = avctx->framerate.den;
+    fmt.frame_rate.num = avctx->framerate.num;
+    fmt.frame_rate.den = avctx->framerate.den;
 
     if (dx_sys->pf_create_decoder_surfaces(va, dx_sys->codec_id, &fmt))
         return VLC_EGENERIC;

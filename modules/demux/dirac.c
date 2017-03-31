@@ -229,13 +229,13 @@ static int Control( demux_t *p_demux, int i_query, va_list args )
     }
     else if( DEMUX_GET_FPS == i_query )
     {
-        if( !p_sys->p_packetizer->fmt_out.video.i_frame_rate )
+        if( !p_sys->p_packetizer->fmt_out.video.frame_rate.num )
         {
             return VLC_EGENERIC;
         }
         double *pd = va_arg( args, double * );
-        *pd = (float) p_sys->p_packetizer->fmt_out.video.i_frame_rate
-            / p_sys->p_packetizer->fmt_out.video.i_frame_rate_base;
+        *pd = (float) p_sys->p_packetizer->fmt_out.video.frame_rate.num
+            / p_sys->p_packetizer->fmt_out.video.frame_rate.den;
         return VLC_SUCCESS;
     }
     else

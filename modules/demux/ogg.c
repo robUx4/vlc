@@ -1765,13 +1765,13 @@ static int Ogg_FindLogicalStreams( demux_t *p_demux )
                         msg_Dbg( p_demux, "found video header of type: %.4s",
                                  (char *)&p_stream->fmt.i_codec );
 
-                        p_stream->fmt.video.i_frame_rate = 10000000;
-                        p_stream->fmt.video.i_frame_rate_base =
+                        p_stream->fmt.video.frame_rate.num = 10000000;
+                        p_stream->fmt.video.frame_rate.den =
                             GetQWLE((oggpacket.packet+164));
-                        p_stream->fmt.video.i_frame_rate_base =
-                            __MAX( p_stream->fmt.video.i_frame_rate_base, 1 );
+                        p_stream->fmt.video.frame_rate.den =
+                            __MAX( p_stream->fmt.video.frame_rate.den, 1 );
                         p_stream->f_rate = 10000000.0 /
-                            p_stream->fmt.video.i_frame_rate_base;
+                            p_stream->fmt.video.frame_rate.den;
                         p_stream->fmt.video.i_bits_per_pixel =
                             GetWLE((oggpacket.packet+182));
                         if( !p_stream->fmt.video.i_bits_per_pixel )
@@ -1899,8 +1899,8 @@ static int Ogg_FindLogicalStreams( demux_t *p_demux )
                         msg_Dbg( p_demux, "found video header of type: %.4s",
                                  (char *)&p_stream->fmt.i_codec );
 
-                        p_stream->fmt.video.i_frame_rate = 10000000;
-                        p_stream->fmt.video.i_frame_rate_base = st->time_unit;
+                        p_stream->fmt.video.frame_rate.num = 10000000;
+                        p_stream->fmt.video.frame_rate.den = st->time_unit;
                         if( st->time_unit <= 0 )
                             st->time_unit = 400000;
                         p_stream->f_rate = 10000000.0 / st->time_unit;
@@ -2576,8 +2576,8 @@ static bool Ogg_ReadTheoraHeader( logical_stream_t *p_stream,
     bs_read( &bitstream, 24 ); /* aspect_numerator */
     bs_read( &bitstream, 24 ); /* aspect_denominator */
 
-    p_stream->fmt.video.i_frame_rate = fps.num;
-    p_stream->fmt.video.i_frame_rate_base = fps.den;
+    p_stream->fmt.video.frame_rate.num = fps.num;
+    p_stream->fmt.video.frame_rate.den = fps.den;
 
     bs_read( &bitstream, 8 ); /* colorspace */
     p_stream->fmt.i_bitrate = bs_read( &bitstream, 24 );
@@ -2644,8 +2644,8 @@ static bool Ogg_ReadDaalaHeader( logical_stream_t *p_stream,
     i_timebase_denominator = oggpack_read( &opb, 32 );
     i_timebase_denominator = __MAX( i_timebase_denominator, 1 );
 
-    p_stream->fmt.video.i_frame_rate = i_timebase_numerator;
-    p_stream->fmt.video.i_frame_rate_base = i_timebase_denominator;
+    p_stream->fmt.video.frame_rate.num = i_timebase_numerator;
+    p_stream->fmt.video.frame_rate.den = i_timebase_denominator;
 
     oggpack_adv( &opb, 32 ); /* frame duration */
 
@@ -2919,11 +2919,11 @@ static bool Ogg_ReadVP8Header( demux_t *p_demux, logical_stream_t *p_stream,
         p_stream->fmt.video.i_visible_height = p_stream->fmt.video.i_height;
         p_stream->fmt.video.i_sar_num = GetDWBE( &p_oggpacket->packet[12 - 1] ) & 0x0FFF;
         p_stream->fmt.video.i_sar_den = GetDWBE( &p_oggpacket->packet[15 - 1] ) & 0x0FFF;
-        p_stream->fmt.video.i_frame_rate = GetDWBE( &p_oggpacket->packet[18] );
-        p_stream->fmt.video.i_frame_rate_base = GetDWBE( &p_oggpacket->packet[22] );
-        p_stream->fmt.video.i_frame_rate_base =
-            __MAX( p_stream->fmt.video.i_frame_rate_base, 1 );
-        p_stream->f_rate = (double) p_stream->fmt.video.i_frame_rate / p_stream->fmt.video.i_frame_rate_base;
+        p_stream->fmt.video.frame_rate.num = GetDWBE( &p_oggpacket->packet[18] );
+        p_stream->fmt.video.frame_rate.den = GetDWBE( &p_oggpacket->packet[22] );
+        p_stream->fmt.video.frame_rate.den =
+            __MAX( p_stream->fmt.video.frame_rate.den, 1 );
+        p_stream->f_rate = (double) p_stream->fmt.video.frame_rate.num / p_stream->fmt.video.frame_rate.den;
         if ( p_stream->f_rate == 0 ) return false;
         return true;
     /* METADATA */
@@ -3465,8 +3465,8 @@ static bool Ogg_ReadOggSpotsHeader( logical_stream_t *p_stream,
     }
 
     /* Normalize granulerate */
-    vlc_ureduce(&p_stream->fmt.video.i_frame_rate,
-                &p_stream->fmt.video.i_frame_rate_base,
+    vlc_ureduce(&p_stream->fmt.video.frame_rate.num,
+                &p_stream->fmt.video.frame_rate.den,
                 i_granulerate_numerator, i_granulerate_denominator, 0);
 
     p_stream->i_granule_shift = p_oggpacket->packet[28];

@@ -70,9 +70,9 @@ static picture_t *Deinterlace(filter_t *filter, picture_t *src)
     if (last_pts != VLC_TS_INVALID)
         dst->date = (3 * src->date - last_pts) / 2;
     else
-    if (filter->fmt_in.video.i_frame_rate != 0)
-        dst->date = src->date + ((filter->fmt_in.video.i_frame_rate_base
-                            * CLOCK_FREQ) / filter->fmt_in.video.i_frame_rate);
+    if (filter->fmt_in.video.frame_rate.num != 0)
+        dst->date = src->date + ((filter->fmt_in.video.frame_rate.den
+                            * CLOCK_FREQ) / filter->fmt_in.video.frame_rate.num);
     dst->b_top_field_first = !src->b_top_field_first;
     dst->i_nb_fields = 1;
     src->i_nb_fields = 1;
@@ -118,7 +118,7 @@ static int Open(vlc_object_t *obj)
 
     filter->pf_video_filter = Deinterlace;
     filter->p_sys = sys;
-    filter->fmt_out.video.i_frame_rate *= 2;
+    filter->fmt_out.video.frame_rate.num *= 2;
     return VLC_SUCCESS;
 }
 

@@ -81,9 +81,9 @@ static void flush(filter_t *filter);
 
 static int Open(filter_t *filter)
 {
-    int32_t frame_duration = filter->fmt_in.video.i_frame_rate != 0 ?
-            CLOCK_FREQ * filter->fmt_in.video.i_frame_rate_base /
-            filter->fmt_in.video.i_frame_rate : 0;
+    int32_t frame_duration = filter->fmt_in.video.frame_rate.num != 0 ?
+            CLOCK_FREQ * filter->fmt_in.video.frame_rate.den /
+            filter->fmt_in.video.frame_rate.num : 0;
 
     MMAL_PARAMETER_IMAGEFX_PARAMETERS_T imfx_param = {
             { MMAL_PARAMETER_IMAGE_EFFECT_PARAMETERS, sizeof(imfx_param) },
@@ -150,7 +150,7 @@ static int Open(filter_t *filter)
     sys->input->format->es->video.par.den = filter->fmt_in.video.i_sar_den;
 
     es_format_Copy(&filter->fmt_out, &filter->fmt_in);
-    filter->fmt_out.video.i_frame_rate *= 2;
+    filter->fmt_out.video.frame_rate.num *= 2;
 
     status = mmal_port_format_commit(sys->input);
     if (status != MMAL_SUCCESS) {
@@ -301,8 +301,8 @@ static int send_output_buffer(filter_t *filter)
         ret = -1;
         goto out;
     }
-    picture->format.i_frame_rate = filter->fmt_out.video.i_frame_rate;
-    picture->format.i_frame_rate_base = filter->fmt_out.video.i_frame_rate_base;
+    picture->format.frame_rate.num = filter->fmt_out.video.frame_rate.num;
+    picture->format.frame_rate.den = filter->fmt_out.video.frame_rate.den;
 
     buffer = picture->p_sys->buffer;
     buffer->user_data = picture;

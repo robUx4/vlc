@@ -243,7 +243,7 @@ static void Display(vout_display_t *vd, picture_t *picture, subpicture_t *subpic
         fprintf(sys->f, "%s W%d H%d F%d:%d I%c A%d:%d\n",
                 header,
                 fmt.i_visible_width, fmt.i_visible_height,
-                fmt.i_frame_rate, fmt.i_frame_rate_base,
+                fmt.frame_rate.num, fmt.frame_rate.den,
                 type,
                 fmt.i_sar_num, fmt.i_sar_den);
         sys->is_first = true;

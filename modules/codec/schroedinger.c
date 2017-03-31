@@ -630,9 +630,9 @@ static void SetVideoFormat( decoder_t *p_dec )
     p_dec->fmt_out.video.i_sar_num = p_sys->p_format->aspect_ratio_numerator;
     p_dec->fmt_out.video.i_sar_den = p_sys->p_format->aspect_ratio_denominator;
 
-    p_dec->fmt_out.video.i_frame_rate =
+    p_dec->fmt_out.video.frame_rate.num =
         p_sys->p_format->frame_rate_numerator;
-    p_dec->fmt_out.video.i_frame_rate_base =
+    p_dec->fmt_out.video.frame_rate.den =
         p_sys->p_format->frame_rate_denominator;
 }
 
@@ -1081,7 +1081,7 @@ static int OpenEncoder( vlc_object_t *p_this )
         return VLC_EGENERIC;
     }
 
-    if( !p_enc->fmt_in.video.i_frame_rate || !p_enc->fmt_in.video.i_frame_rate_base ||
+    if( !p_enc->fmt_in.video.frame_rate.num || !p_enc->fmt_in.video.frame_rate.den ||
         !p_enc->fmt_in.video.i_visible_height || !p_enc->fmt_in.video.i_visible_width )
     {
         msg_Err( p_enc, "Framerate and picture dimensions must be non-zero" );
@@ -1121,7 +1121,7 @@ static int OpenEncoder( vlc_object_t *p_this )
         }
         if( schro_format_guess[i].i_height != p_enc->fmt_in.video.i_height )
             continue;
-        int src_fps = p_enc->fmt_in.video.i_frame_rate / p_enc->fmt_in.video.i_frame_rate_base;
+        int src_fps = p_enc->fmt_in.video.frame_rate.num / p_enc->fmt_in.video.frame_rate.den;
         int delta_fps = abs( schro_format_guess[i].i_approx_fps - src_fps );
         if( delta_fps > 2 )
             continue;
@@ -1150,8 +1150,8 @@ static int OpenEncoder( vlc_object_t *p_this )
     /* constants set from the input video format */
     p_sys->p_format->width                  = p_enc->fmt_in.video.i_visible_width;
     p_sys->p_format->height                 = p_enc->fmt_in.video.i_visible_height;
-    p_sys->p_format->frame_rate_numerator   = p_enc->fmt_in.video.i_frame_rate;
-    p_sys->p_format->frame_rate_denominator = p_enc->fmt_in.video.i_frame_rate_base;
+    p_sys->p_format->frame_rate_numerator   = p_enc->fmt_in.video.frame_rate.num;
+    p_sys->p_format->frame_rate_denominator = p_enc->fmt_in.video.frame_rate.den;
     unsigned u_asr_num, u_asr_den;
     vlc_ureduce( &u_asr_num, &u_asr_den,
                  p_enc->fmt_in.video.i_sar_num,
@@ -1456,7 +1456,7 @@ static block_t *Encode( encoder_t *p_enc, picture_t *p_pic )
             }
         }
 
-        date_Init( &date, p_enc->fmt_in.video.i_frame_rate, p_enc->fmt_in.video.i_frame_rate_base );
+        date_Init( &date, p_enc->fmt_in.video.frame_rate.num, p_enc->fmt_in.video.frame_rate.den );
         /* FIXME - Unlike dirac-research codec Schro doesn't have a function that returns the delay in pics yet.
          *   Use a default of 1
          */

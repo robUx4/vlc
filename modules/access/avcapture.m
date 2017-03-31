@@ -417,8 +417,8 @@ static int Demux(demux_t *p_demux)
             }
             else if ( !p_sys->b_es_setup )
             {
-                p_sys->fmt.video.i_frame_rate_base = [(__bridge VLCAVDecompressedVideoOutput *)p_sys->output timeScale];
-                msg_Dbg(p_demux, "using frame rate base: %i", p_sys->fmt.video.i_frame_rate_base);
+                p_sys->fmt.video.frame_rate.den = [(__bridge VLCAVDecompressedVideoOutput *)p_sys->output timeScale];
+                msg_Dbg(p_demux, "using frame rate base: %i", p_sys->fmt.video.frame_rate.den);
                 p_sys->width = p_sys->fmt.video.i_width = [(__bridge VLCAVDecompressedVideoOutput *)p_sys->output width];
                 p_sys->height = p_sys->fmt.video.i_height = [(__bridge VLCAVDecompressedVideoOutput *)p_sys->output height];
                 p_sys->p_es_video = es_out_Add(p_demux->out, &p_sys->fmt);

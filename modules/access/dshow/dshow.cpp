@@ -733,9 +733,8 @@ static int DemuxOpen( vlc_object_t *p_this )
 
             if( p_stream->header.video.AvgTimePerFrame )
             {
-                fmt.video.i_frame_rate = 10000000;
-                fmt.video.i_frame_rate_base =
-                    p_stream->header.video.AvgTimePerFrame;
+                fmt.video.frame_rate.num = 10000000;
+                fmt.video.frame_rate.den = p_stream->header.video.AvgTimePerFrame;
             }
         }
         else if( p_stream->mt.majortype == MEDIATYPE_Audio )

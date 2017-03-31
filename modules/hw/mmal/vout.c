@@ -557,14 +557,14 @@ static void vd_display(vout_display_t *vd, picture_t *picture,
     MMAL_BUFFER_HEADER_T *buffer = pic_sys->buffer;
     MMAL_STATUS_T status;
 
-    if (picture->format.i_frame_rate != sys->frame_rate.num ||
-        picture->format.i_frame_rate_base != sys->frame_rate.den ||
+    if (picture->format.frame_rate.num != sys->frame_rate.num ||
+        picture->format.frame_rate.den != sys->frame_rate.den ||
         picture->b_progressive != sys->b_progressive ||
         picture->b_top_field_first != sys->b_top_field_first) {
         sys->b_top_field_first = picture->b_top_field_first;
         sys->b_progressive = picture->b_progressive;
-        sys->frame_rate.num = picture->format.i_frame_rate;
-        sys->frame_rate.den = picture->format.i_frame_rate_base;
+        sys->frame_rate.num = picture->format.frame_rate.num;
+        sys->frame_rate.den = picture->format.frame_rate.den;
         configure_display(vd, NULL, &picture->format);
     }
 
@@ -772,7 +772,7 @@ static void adjust_refresh_rate(vout_display_t *vd, const video_format_t *fmt)
     TV_SUPPORTED_MODE_NEW_T supported_modes[VC_TV_MAX_MODE_IDS];
     char response[20]; /* answer is hvs_update_fields=%1d */
     int num_modes;
-    double frame_rate = (double)fmt->i_frame_rate / fmt->i_frame_rate_base;
+    double frame_rate = (double)fmt->frame_rate.num / fmt->frame_rate.den;
     int best_id = -1;
     double best_score, score;
     int i;

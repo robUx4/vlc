@@ -192,9 +192,9 @@ static es_format_t GetModeSettings(demux_t *demux, IDeckLinkDisplayMode *m)
     video_fmt.video.i_height = m->GetHeight();
     video_fmt.video.i_sar_num = 1;
     video_fmt.video.i_sar_den = 1;
-    video_fmt.video.i_frame_rate = time_scale;
-    video_fmt.video.i_frame_rate_base = frame_duration;
-    video_fmt.i_bitrate = video_fmt.video.i_width * video_fmt.video.i_height * video_fmt.video.i_frame_rate * 2 * 8;
+    video_fmt.video.frame_rate.num = time_scale;
+    video_fmt.video.frame_rate.den = frame_duration;
+    video_fmt.i_bitrate = video_fmt.video.i_width * video_fmt.video.i_height * video_fmt.video.frame_rate.num * 2 * 8;
 
     vlc_urational_t aspect = var_InheritURational(demux, "decklink-aspect-ratio");
     if (aspect.num != 0 && aspect.den != 0) {

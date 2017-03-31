@@ -1334,10 +1334,10 @@ static int  Open ( vlc_object_t *p_this )
     p_sys->param.i_timebase_num = 1;
     p_sys->param.i_timebase_den = CLOCK_FREQ;
 
-    if( p_enc->fmt_in.video.i_frame_rate_base > 0 )
+    if( p_enc->fmt_in.video.frame_rate.den > 0 )
     {
-        p_sys->param.i_fps_num = p_enc->fmt_in.video.i_frame_rate;
-        p_sys->param.i_fps_den = p_enc->fmt_in.video.i_frame_rate_base;
+        p_sys->param.i_fps_num = p_enc->fmt_in.video.frame_rate.num;
+        p_sys->param.i_fps_den = p_enc->fmt_in.video.frame_rate.den;
         p_sys->param.b_vfr_input = 0;
     }
 
@@ -1593,8 +1593,8 @@ static block_t *Encode( encoder_t *p_enc, picture_t *p_pict )
     {
         /* This isn't really valid for streams with B-frames */
         p_block->i_length = CLOCK_FREQ *
-            p_enc->fmt_in.video.i_frame_rate_base /
-                p_enc->fmt_in.video.i_frame_rate;
+            p_enc->fmt_in.video.frame_rate.den /
+                p_enc->fmt_in.video.frame_rate.num;
     }
 
     /* scale pts-values back*/

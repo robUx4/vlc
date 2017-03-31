@@ -102,14 +102,14 @@ static int OpenCommon( decoder_t *p_dec )
 
     es_format_Copy( &p_dec->fmt_out, &p_dec->fmt_in );
 
-    date_Init( &p_sys->pts, p_dec->fmt_out.video.i_frame_rate,
-               p_dec->fmt_out.video.i_frame_rate_base );
-    if( p_dec->fmt_out.video.i_frame_rate == 0 ||
-        p_dec->fmt_out.video.i_frame_rate_base == 0)
+    date_Init( &p_sys->pts, p_dec->fmt_out.video.frame_rate.num,
+               p_dec->fmt_out.video.frame_rate.den );
+    if( p_dec->fmt_out.video.frame_rate.num == 0 ||
+        p_dec->fmt_out.video.frame_rate.den == 0)
     {
         msg_Warn( p_dec, "invalid frame rate %d/%d, using 25 fps instead",
-                  p_dec->fmt_out.video.i_frame_rate,
-                  p_dec->fmt_out.video.i_frame_rate_base);
+                  p_dec->fmt_out.video.frame_rate.num,
+                  p_dec->fmt_out.video.frame_rate.den);
         date_Init( &p_sys->pts, 25, 1 );
     }
 

@@ -863,8 +863,8 @@ static inline void fillVideoFmt( video_format_t * fmt, unsigned int width, unsig
     fmt->i_height = height;
     /* As input are square pixels let VLC  or decoder fix SAR, origin,
      * and visible area */
-    fmt->i_frame_rate = frame_rate_num;
-    fmt->i_frame_rate_base = frame_rate_denom;
+    fmt->frame_rate.num = frame_rate_num;
+    fmt->frame_rate.den = frame_rate_denom;
 }
 
 /**

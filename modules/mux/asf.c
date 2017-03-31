@@ -961,9 +961,9 @@ static block_t *asf_header_create( sout_mux_t *p_mux, bool b_broadcast )
 
         uint64_t i_avg_duration = 0;
         if( p_fmt->i_cat == VIDEO_ES &&
-            p_fmt->video.i_frame_rate > 0 && p_fmt->video.i_frame_rate_base > 0 )
-            i_avg_duration = ( INT64_C(10000000) * p_fmt->video.i_frame_rate_base +
-                               p_fmt->video.i_frame_rate/2 ) / p_fmt->video.i_frame_rate;
+            p_fmt->video.frame_rate.num > 0 && p_fmt->video.frame_rate.den > 0 )
+            i_avg_duration = ( INT64_C(10000000) * p_fmt->video.frame_rate.den +
+                               p_fmt->video.frame_rate.num/2 ) / p_fmt->video.frame_rate.num;
 
         bo_add_guid ( &bo, &asf_object_extended_stream_properties_guid );
         bo_addle_u64( &bo, 88 );

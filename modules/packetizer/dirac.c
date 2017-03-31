@@ -904,7 +904,7 @@ static int dirac_InspectDataUnit( decoder_t *p_dec, block_t **pp_block, block_t 
         p_es->video.i_width  = p_sys->seq_hdr.u_width;
         p_es->video.i_height = p_sys->seq_hdr.u_height;
 
-        vlc_ureduce( &p_es->video.i_frame_rate, &p_es->video.i_frame_rate_base
+        vlc_ureduce( &p_es->video.frame_rate.num, &p_es->video.frame_rate.den
                    , p_sys->seq_hdr.u_fps_num, p_sys->seq_hdr.u_fps_den, 0 );
 
         /* when field coding, dts needs to be incremented in terms of field periods */
@@ -918,7 +918,7 @@ static int dirac_InspectDataUnit( decoder_t *p_dec, block_t **pp_block, block_t 
         /* TODO: set p_sys->reorder_buf.u_size_max */
         p_sys->i_pts_offset = p_sys->reorder_buf.u_size_max
                             * CLOCK_FREQ
-                            * p_es->video.i_frame_rate_base / p_es->video.i_frame_rate + 1;
+                            * p_es->video.frame_rate.den / p_es->video.frame_rate.num + 1;
 
         /* stash a copy of the seqhdr
          *  - required for ogg muxing

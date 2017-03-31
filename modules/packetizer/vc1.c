@@ -380,12 +380,12 @@ static block_t *ParseIDU( decoder_t *p_dec, bool *pb_ts_used, block_t *p_frag )
             p_sys->i_interpolated_dts = p_pic->i_dts;
 
         /* We can interpolate dts/pts only if we have a frame rate */
-        if( p_dec->fmt_out.video.i_frame_rate != 0 && p_dec->fmt_out.video.i_frame_rate_base != 0 )
+        if( p_dec->fmt_out.video.frame_rate.num != 0 && p_dec->fmt_out.video.frame_rate.den != 0 )
         {
             if( p_sys->i_interpolated_dts > VLC_TS_INVALID )
                 p_sys->i_interpolated_dts += CLOCK_FREQ *
-                                             p_dec->fmt_out.video.i_frame_rate_base /
-                                             p_dec->fmt_out.video.i_frame_rate;
+                                             p_dec->fmt_out.video.frame_rate.den /
+                                             p_dec->fmt_out.video.frame_rate.num;
 
             //msg_Dbg( p_dec, "-------------- XXX0 dts=%"PRId64" pts=%"PRId64" interpolated=%"PRId64,
             //         p_pic->i_dts, p_pic->i_pts, p_sys->i_interpolated_dts );
@@ -570,10 +570,10 @@ static block_t *ParseIDU( decoder_t *p_dec, bool *pb_ts_used, block_t *p_frag )
                     }
                 }
                 if( i_fps_num != 0 && i_fps_den != 0 )
-                    vlc_ureduce( &p_es->video.i_frame_rate, &p_es->video.i_frame_rate_base, i_fps_num, i_fps_den, 0 );
+                    vlc_ureduce( &p_es->video.frame_rate.num, &p_es->video.frame_rate.den, i_fps_num, i_fps_den, 0 );
 
                 if( !p_sys->b_sequence_header )
-                    msg_Dbg( p_dec, "frame rate %d/%d", p_es->video.i_frame_rate, p_es->video.i_frame_rate_base );
+                    msg_Dbg( p_dec, "frame rate %d/%d", p_es->video.frame_rate.num, p_es->video.frame_rate.den );
             }
             if( bs_read1( &s ) ) /* Color Format */
             {

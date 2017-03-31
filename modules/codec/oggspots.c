@@ -238,8 +238,8 @@ static int ProcessHeader(decoder_t* p_dec)
     }
 
     /* Normalize granulerate */
-    vlc_ureduce(&p_dec->fmt_in.video.i_frame_rate,
-                &p_dec->fmt_in.video.i_frame_rate_base,
+    vlc_ureduce(&p_dec->fmt_in.video.frame_rate.num,
+                &p_dec->fmt_in.video.frame_rate.den,
                 i_granulerate_numerator, i_granulerate_denominator, 0);
 
     /* Image format */

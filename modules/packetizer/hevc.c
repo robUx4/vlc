@@ -189,9 +189,9 @@ static int Open(vlc_object_t *p_this)
     p_dec->fmt_out.b_packetized = true;
 
     /* Init timings */
-    if( p_dec->fmt_in.video.i_frame_rate_base > 0 )
-        date_Init( &p_sys->dts, p_dec->fmt_in.video.i_frame_rate * 2,
-                                p_dec->fmt_in.video.i_frame_rate_base );
+    if( p_dec->fmt_in.video.frame_rate.den != 0 )
+        date_Init( &p_sys->dts, p_dec->fmt_in.video.frame_rate.num * 2,
+                                p_dec->fmt_in.video.frame_rate.den );
     else
         date_Init( &p_sys->dts, 2 * 30000, 1001 );
     date_Set( &p_sys->dts, VLC_TS_INVALID );
@@ -456,13 +456,13 @@ static void ActivateSets(decoder_t *p_dec,
     p_sys->p_active_vps = p_vps;
     if(p_sps)
     {
-        if(!p_dec->fmt_in.video.i_frame_rate || !p_dec->fmt_in.video.i_frame_rate_base)
+        if(!p_dec->fmt_in.video.frame_rate.num || !p_dec->fmt_in.video.frame_rate.den)
         {
             unsigned num, den;
             if(hevc_get_frame_rate( p_sps, p_dec->p_sys->rgi_p_decvps, &num, &den ))
             {
-                p_dec->fmt_out.video.i_frame_rate = num;
-                p_dec->fmt_out.video.i_frame_rate_base = den;
+                p_dec->fmt_out.video.frame_rate.num = num;
+                p_dec->fmt_out.video.frame_rate.den = den;
                 if(p_sys->dts.i_divider_den != den && p_sys->dts.i_divider_num != 2 * num)
                     date_Change(&p_sys->dts, 2 * num, den);
             }

@@ -124,8 +124,8 @@ static void output_mode_cb(void *data, struct wl_output *output,
     fmt.video.i_chroma = VLC_CODEC_RGB32;
     fmt.video.i_bits_per_pixel = 32;
     fmt.video.i_sar_num = fmt.video.i_sar_den = 1;
-    fmt.video.i_frame_rate = lroundf(1000.f * sys->rate);
-    fmt.video.i_frame_rate_base = 1000;
+    fmt.video.frame_rate.num = lroundf(1000.f * sys->rate);
+    fmt.video.frame_rate.den = 1000;
     fmt.video.i_width = width;
 
     if (sys->w != 0 && width > sys->w + sys->x)

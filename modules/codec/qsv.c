@@ -414,7 +414,7 @@ static int Open(vlc_object_t *this)
         return VLC_EGENERIC;
 
     if (!enc->fmt_in.video.i_visible_height || !enc->fmt_in.video.i_visible_width ||
-        !enc->fmt_in.video.i_frame_rate || !enc->fmt_in.video.i_frame_rate_base) {
+        !enc->fmt_in.video.frame_rate.num || !enc->fmt_in.video.frame_rate.den) {
         msg_Err(enc, "Framerate and picture dimensions must be non-zero");
         return VLC_EGENERIC;
     }
@@ -452,8 +452,8 @@ static int Open(vlc_object_t *this)
     enc->fmt_in.video.i_bits_per_pixel = 12;
 
     /* Input picture format description */
-    sys->params.mfx.FrameInfo.FrameRateExtN = enc->fmt_in.video.i_frame_rate;
-    sys->params.mfx.FrameInfo.FrameRateExtD = enc->fmt_in.video.i_frame_rate_base;
+    sys->params.mfx.FrameInfo.FrameRateExtN = enc->fmt_in.video.frame_rate.num;
+    sys->params.mfx.FrameInfo.FrameRateExtD = enc->fmt_in.video.frame_rate.den;
     sys->params.mfx.FrameInfo.FourCC        = MFX_FOURCC_NV12;
     sys->params.mfx.FrameInfo.ChromaFormat  = MFX_CHROMAFORMAT_YUV420;
     sys->params.mfx.FrameInfo.Width         = QSV_ALIGN(16, enc->fmt_in.video.i_width);
@@ -698,8 +698,8 @@ static block_t *Encode(encoder_t *this, picture_t *pic)
 
             /* Copied from x264.c: This isn't really valid for streams with B-frames */
             block->i_length = CLOCK_FREQ *
-                enc->fmt_in.video.i_frame_rate_base /
-                enc->fmt_in.video.i_frame_rate;
+                enc->fmt_in.video.frame_rate.den /
+                enc->fmt_in.video.frame_rate.num;
 
             // Buggy DTS (value comes from experiments)
             if (task->bs.DecodeTimeStamp < -10000)

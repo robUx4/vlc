@@ -508,8 +508,8 @@ static int InitVideo( demux_t *p_demux )
     /* Video ES */
     es_format_Init( &fmt, VIDEO_ES, VLC_FOURCC('I','4','2','0') );
     fmt.i_id                    = p_sys->i_id_video;
-    fmt.video.i_frame_rate      = p_sys->i_frame_rate.num;
-    fmt.video.i_frame_rate_base = p_sys->i_frame_rate.den;
+    fmt.video.frame_rate.num    = p_sys->frame_rate.num;
+    fmt.video.frame_rate.den    = p_sys->frame_rate.den;
     fmt.video.i_width           = fmt.video.i_visible_width = p_sys->i_width;
     fmt.video.i_height          = fmt.video.i_visible_height = p_sys->i_height;
     fmt.video.i_sar_num         = p_sys->i_aspect * fmt.video.i_height

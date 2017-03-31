@@ -351,8 +351,8 @@ static int GenericOpen( demux_t *p_demux, const char *psz_module,
 
     /* Load the mpegvideo packetizer */
     es_format_Init( &fmt, VIDEO_ES, i_codec );
-    fmt.video.i_frame_rate = p_sys->dts.i_divider_num;
-    fmt.video.i_frame_rate_base = p_sys->dts.i_divider_den;
+    fmt.video.frame_rate.num = p_sys->dts.i_divider_num;
+    fmt.video.frame_rate.den = p_sys->dts.i_divider_den;
     p_sys->p_packetizer = demux_PacketizerNew( p_demux, &fmt, psz_module );
     if( !p_sys->p_packetizer )
     {
@@ -455,11 +455,11 @@ static int Demux( demux_t *p_demux)
                 if( !p_sys->frame_rate.den )
                 {
                     /* Use packetizer's one */
-                    if( p_sys->p_packetizer->fmt_out.video.i_frame_rate_base &&
-                        p_sys->p_packetizer->fmt_out.video.i_frame_rate )
+                    if( p_sys->p_packetizer->fmt_out.video.frame_rate.den &&
+                        p_sys->p_packetizer->fmt_out.video.frame_rate.num )
                     {
-                        p_sys->frame_rate.num = p_sys->p_packetizer->fmt_out.video.i_frame_rate;
-                        p_sys->frame_rate.den = p_sys->p_packetizer->fmt_out.video.i_frame_rate_base;
+                        p_sys->frame_rate.num = p_sys->p_packetizer->fmt_out.video.frame_rate.num;
+                        p_sys->frame_rate.den = p_sys->p_packetizer->fmt_out.video.frame_rate.den;
                     }
                     else
                     {

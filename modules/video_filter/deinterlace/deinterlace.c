@@ -251,7 +251,7 @@ static void GetOutputFormat( filter_t *p_filter,
 
     if( p_sys->b_double_rate )
     {
-        p_dst->i_frame_rate *= 2;
+        p_dst->frame_rate.num *= 2;
     }
 
     if( p_sys->i_mode == DEINTERLACE_PHOSPHOR  &&

@@ -107,8 +107,8 @@ static block_t *Encode(encoder_t *p_enc, picture_t *p_pict)
 
     /* This isn't really valid for streams with B-frames */
     p_block->i_length = CLOCK_FREQ *
-        p_enc->fmt_in.video.i_frame_rate_base /
-            p_enc->fmt_in.video.i_frame_rate;
+        p_enc->fmt_in.video.frame_rate.den /
+            p_enc->fmt_in.video.frame_rate.num;
 
     p_block->i_pts = p_sys->initial_date + pic.poc * p_block->i_length;
     p_block->i_dts = p_sys->initial_date + p_sys->dts++ * p_block->i_length;
@@ -160,16 +160,16 @@ static int  Open (vlc_object_t *p_this)
     param->maxCUSize = 16; /* use smaller macroblock */
 
 #if X265_BUILD >= 6
-    param->fpsNum = p_enc->fmt_in.video.i_frame_rate;
-    param->fpsDenom = p_enc->fmt_in.video.i_frame_rate_base;
+    param->fpsNum = p_enc->fmt_in.video.frame_rate.num;
+    param->fpsDenom = p_enc->fmt_in.video.frame_rate.den;
     if (!param->fpsNum) {
         param->fpsNum = 25;
         param->fpsDenom = 1;
     }
 #else
-    if (p_enc->fmt_in.video.i_frame_rate_base) {
-        param->frameRate = p_enc->fmt_in.video.i_frame_rate /
-            p_enc->fmt_in.video.i_frame_rate_base;
+    if (p_enc->fmt_in.video.frame_rate.den) {
+        param->frameRate = p_enc->fmt_in.video.frame_rate.num /
+            p_enc->fmt_in.video.frame_rate.den;
     } else {
         param->frameRate = 25;
     }

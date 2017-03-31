@@ -617,8 +617,8 @@ static int Open( vlc_object_t * p_this )
                 fmt.video.i_visible_width = fmt.video.i_width;
                 fmt.video.i_visible_height = fmt.video.i_height;
                 fmt.video.i_bits_per_pixel = p_vids->p_bih->biBitCount;
-                fmt.video.i_frame_rate = tk->i_rate;
-                fmt.video.i_frame_rate_base = tk->i_scale;
+                fmt.video.frame_rate.num = tk->i_rate;
+                fmt.video.frame_rate.den = tk->i_scale;
 
                  /* Uncompresse Bitmap or YUV, YUV being always topdown */
                 if ( fmt.video.i_height > INT32_MAX )

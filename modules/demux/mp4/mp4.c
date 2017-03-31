@@ -2661,12 +2661,12 @@ static int TrackCreateES( demux_t *p_demux, mp4_track_t *p_track,
 
         /* Set frame rate */
         TrackGetESSampleRate( p_demux,
-                              &p_track->fmt.video.i_frame_rate,
-                              &p_track->fmt.video.i_frame_rate_base,
+                              &p_track->fmt.video.frame_rate.num,
+                              &p_track->fmt.video.frame_rate.den,
                               p_track, i_sample_description_index, i_chunk );
 
-        p_demux->p_sys->f_fps = (float)p_track->fmt.video.i_frame_rate /
-                                (float)p_track->fmt.video.i_frame_rate_base;
+        p_demux->p_sys->f_fps = (float)p_track->fmt.video.frame_rate.num /
+                                (float)p_track->fmt.video.frame_rate.den;
 
         break;
 

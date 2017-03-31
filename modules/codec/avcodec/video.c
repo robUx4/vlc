@@ -173,25 +173,25 @@ static int lavc_GetVideoFormat(decoder_t *dec, video_format_t *restrict fmt,
             fmt->i_sar_num = fmt->i_sar_den = 1;
     }
 
-    if (dec->fmt_in.video.i_frame_rate > 0
-     && dec->fmt_in.video.i_frame_rate_base > 0)
+    if (dec->fmt_in.video.frame_rate.num > 0
+     && dec->fmt_in.video.frame_rate.den > 0)
     {
-        fmt->i_frame_rate = dec->fmt_in.video.i_frame_rate;
-        fmt->i_frame_rate_base = dec->fmt_in.video.i_frame_rate_base;
+        fmt->frame_rate.num = dec->fmt_in.video.frame_rate.num;
+        fmt->frame_rate.den = dec->fmt_in.video.frame_rate.den;
     }
     else if (ctx->framerate.num > 0 && ctx->framerate.den > 0)
     {
-        fmt->i_frame_rate = ctx->framerate.num;
-        fmt->i_frame_rate_base = ctx->framerate.den;
+        fmt->frame_rate.num = ctx->framerate.num;
+        fmt->frame_rate.den = ctx->framerate.den;
 # if LIBAVCODEC_VERSION_MICRO <  100
         // for some reason libav don't thinkg framerate presents actually same thing as in ffmpeg
-        fmt->i_frame_rate_base *= __MAX(ctx->ticks_per_frame, 1);
+        fmt->frame_rate.den *= __MAX(ctx->ticks_per_frame, 1);
 # endif
     }
     else if (ctx->time_base.num > 0 && ctx->time_base.den > 0)
     {
-        fmt->i_frame_rate = ctx->time_base.den;
-        fmt->i_frame_rate_base = ctx->time_base.num
+        fmt->frame_rate.num = ctx->time_base.den;
+        fmt->frame_rate.den = ctx->time_base.num
                                  * __MAX(ctx->ticks_per_frame, 1);
     }
 
@@ -681,12 +681,12 @@ static void interpolate_next_pts( decoder_t *p_dec, AVFrame *frame )
         return;
 
     /* interpolate the next PTS */
-    if( p_dec->fmt_in.video.i_frame_rate > 0 &&
-        p_dec->fmt_in.video.i_frame_rate_base > 0 )
+    if( p_dec->fmt_in.video.frame_rate.num > 0 &&
+        p_dec->fmt_in.video.frame_rate.den > 0 )
     {
         p_sys->i_pts += CLOCK_FREQ * (2 + frame->repeat_pict) *
-            p_dec->fmt_in.video.i_frame_rate_base /
-            (2 * p_dec->fmt_in.video.i_frame_rate);
+            p_dec->fmt_in.video.frame_rate.den /
+            (2 * p_dec->fmt_in.video.frame_rate.num);
     }
     else if( p_context->time_base.den > 0 )
     {

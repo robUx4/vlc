@@ -985,8 +985,8 @@ static int DemuxInit( demux_t *p_demux )
 
             if( p_esp && p_esp->i_average_time_per_frame > 0 )
             {
-                fmt.video.i_frame_rate = 10000000;
-                GET_CHECKED( fmt.video.i_frame_rate_base,
+                fmt.video.frame_rate.num = 10000000;
+                GET_CHECKED( fmt.video.frame_rate.den,
                              p_esp->i_average_time_per_frame,
                              UINT_MAX, uint64_t );
             }

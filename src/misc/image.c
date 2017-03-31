@@ -729,8 +729,8 @@ static encoder_t *CreateEncoder( vlc_object_t *p_this, video_format_t *fmt_in,
             fmt_in->i_visible_width / fmt_in->i_sar_den / fmt_out->i_sar_num;
     }
 
-    p_enc->fmt_in.video.i_frame_rate = 25;
-    p_enc->fmt_in.video.i_frame_rate_base = 1;
+    p_enc->fmt_in.video.frame_rate.num = 25;
+    p_enc->fmt_in.video.frame_rate.den = 1;
 
     es_format_Init( &p_enc->fmt_out, VIDEO_ES, fmt_out->i_chroma );
     p_enc->fmt_out.video = *fmt_out;

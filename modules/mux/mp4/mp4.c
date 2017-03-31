@@ -425,17 +425,17 @@ static int AddStream(sout_mux_t *p_mux, sout_input_t *p_input)
         p_stream->mux.i_timescale = p_stream->mux.fmt.audio.i_rate;
         break;
     case VIDEO_ES:
-        if( !p_stream->mux.fmt.video.i_frame_rate ||
-            !p_stream->mux.fmt.video.i_frame_rate_base )
+        if( !p_stream->mux.fmt.video.frame_rate.num ||
+            !p_stream->mux.fmt.video.frame_rate.den )
         {
             msg_Warn( p_mux, "Missing frame rate for stream %d, assuming 25fps",
                       p_sys->i_nb_streams );
-            p_stream->mux.fmt.video.i_frame_rate = 25;
-            p_stream->mux.fmt.video.i_frame_rate_base = 1;
+            p_stream->mux.fmt.video.frame_rate.num = 25;
+            p_stream->mux.fmt.video.frame_rate.den = 1;
         }
 
-        p_stream->mux.i_timescale = p_stream->mux.fmt.video.i_frame_rate *
-                                    p_stream->mux.fmt.video.i_frame_rate_base;
+        p_stream->mux.i_timescale = p_stream->mux.fmt.video.frame_rate.num *
+                                    p_stream->mux.fmt.video.frame_rate.den;
 
         if( p_stream->mux.i_timescale > CLOCK_FREQ )
             p_stream->mux.i_timescale = CLOCK_FREQ;
@@ -633,8 +633,8 @@ static int Mux(sout_mux_t *p_mux)
                     if ( p_stream->mux.fmt.i_cat == VIDEO_ES )
                     {
                         p_data->i_length = CLOCK_FREQ *
-                                           p_stream->mux.fmt.video.i_frame_rate_base /
-                                           p_stream->mux.fmt.video.i_frame_rate;
+                                           p_stream->mux.fmt.video.frame_rate.den /
+                                           p_stream->mux.fmt.video.frame_rate.num;
                         msg_Dbg( p_mux, "video track %u fixup to %"PRId64" for sample %u",
                                  p_stream->mux.i_track_id, p_data->i_length, p_stream->mux.i_entry_count );
                     }
@@ -1276,11 +1276,11 @@ static void WriteFragments(sout_mux_t *p_mux, bool b_flush)
  * This is the end boundary case. */
 static void LengthLocalFixup(sout_mux_t *p_mux, const mp4_stream_t *p_stream, block_t *p_entrydata)
 {
-    if ( p_stream->mux.fmt.i_cat == VIDEO_ES && p_stream->mux.fmt.video.i_frame_rate )
+    if ( p_stream->mux.fmt.i_cat == VIDEO_ES && p_stream->mux.fmt.video.frame_rate.num )
     {
         p_entrydata->i_length = CLOCK_FREQ *
-                p_stream->mux.fmt.video.i_frame_rate_base /
-                p_stream->mux.fmt.video.i_frame_rate;
+                p_stream->mux.fmt.video.frame_rate.den /
+                p_stream->mux.fmt.video.frame_rate.num;
         msg_Dbg(p_mux, "video track %d fixup to %"PRId64" for sample %u",
                 p_stream->mux.i_track_id, p_entrydata->i_length, p_stream->mux.i_entry_count - 1);
     }

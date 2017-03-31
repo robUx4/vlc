@@ -567,8 +567,8 @@ static es_out_id_t *InitES (demux_t *demux, uint_fast16_t width,
     fmt.video.i_chroma = chroma;
     fmt.video.i_bits_per_pixel = *bpp;
     fmt.video.i_sar_num = fmt.video.i_sar_den = 1;
-    fmt.video.i_frame_rate = 1000 * p_sys->rate;
-    fmt.video.i_frame_rate_base = 1000;
+    fmt.video.frame_rate.num = 1000 * p_sys->rate;
+    fmt.video.frame_rate.den = 1000;
     fmt.video.i_visible_width = fmt.video.i_width = width;
     fmt.video.i_visible_height = fmt.video.i_height = height;
 

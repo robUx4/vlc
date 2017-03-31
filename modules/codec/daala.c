@@ -346,8 +346,8 @@ static int ProcessHeaders( decoder_t *p_dec )
 
     if( p_sys->di.timebase_numerator > 0 && p_sys->di.timebase_denominator > 0 )
     {
-        p_dec->fmt_out.video.i_frame_rate = p_sys->di.timebase_numerator;
-        p_dec->fmt_out.video.i_frame_rate_base = p_sys->di.timebase_denominator;
+        p_dec->fmt_out.video.frame_rate.num = p_sys->di.timebase_numerator;
+        p_dec->fmt_out.video.frame_rate.den = p_sys->di.timebase_denominator;
     }
 
     msg_Dbg( p_dec, "%dx%d %.02f fps video, frame content ",
@@ -656,16 +656,16 @@ static int OpenEncoder( vlc_object_t *p_this )
     }
     p_sys->di.frame_duration = 1;
 
-    if( !p_enc->fmt_in.video.i_frame_rate ||
-        !p_enc->fmt_in.video.i_frame_rate_base )
+    if( !p_enc->fmt_in.video.frame_rate.num ||
+        !p_enc->fmt_in.video.frame_rate.den )
     {
         p_sys->di.timebase_numerator = 25;
         p_sys->di.timebase_denominator = 1;
     }
     else
     {
-        p_sys->di.timebase_numerator = p_enc->fmt_in.video.i_frame_rate;
-        p_sys->di.timebase_denominator = p_enc->fmt_in.video.i_frame_rate_base;
+        p_sys->di.timebase_numerator = p_enc->fmt_in.video.frame_rate.num;
+        p_sys->di.timebase_denominator = p_enc->fmt_in.video.frame_rate.den;
     }
 
     if( p_enc->fmt_in.video.i_sar_num > 0 && p_enc->fmt_in.video.i_sar_den > 0 )

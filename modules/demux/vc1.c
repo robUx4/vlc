@@ -178,11 +178,11 @@ static int Demux( demux_t *p_demux)
 
             p_block_out = p_next;
 
-            if( p_sys->p_packetizer->fmt_out.video.i_frame_rate > 0 &&
-                p_sys->p_packetizer->fmt_out.video.i_frame_rate_base > 0 )
+            if( p_sys->p_packetizer->fmt_out.video.frame_rate.num > 0 &&
+                p_sys->p_packetizer->fmt_out.video.frame_rate.den > 0 )
                 p_sys->i_dts += CLOCK_FREQ *
-                    p_sys->p_packetizer->fmt_out.video.i_frame_rate_base /
-                    p_sys->p_packetizer->fmt_out.video.i_frame_rate;
+                    p_sys->p_packetizer->fmt_out.video.frame_rate.den /
+                    p_sys->p_packetizer->fmt_out.video.frame_rate.num;
             else if( p_sys->f_fps > 0.001f )
                 p_sys->i_dts += (int64_t)((float) CLOCK_FREQ / p_sys->f_fps);
             else

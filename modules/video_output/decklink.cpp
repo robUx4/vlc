@@ -529,7 +529,7 @@ static IDeckLinkDisplayMode * MatchDisplayMode(vout_display_t *vd,
                         unsigned int num_stream, den_stream;
                         vlc_ureduce(&num_deck, &den_deck, timescale, frameduration, 0);
                         vlc_ureduce(&num_stream, &den_stream,
-                                    fmt->i_frame_rate, fmt->i_frame_rate_base, 0);
+                                    fmt->frame_rate.num, fmt->frame_rate.den, 0);
 
                         if (num_deck == num_stream && den_deck == den_stream)
                         {
@@ -707,8 +707,8 @@ static int OpenDecklink(vout_display_t *vd, decklink_sys_t *sys)
         fmt->i_sar_num = 0;
         fmt->i_sar_den = 0;
         fmt->i_chroma = !sys->video.tenbits ? VLC_CODEC_UYVY : VLC_CODEC_I422_10L; /* we will convert to v210 */
-        fmt->i_frame_rate = (unsigned) sys->frameduration;
-        fmt->i_frame_rate_base = (unsigned) sys->timescale;
+        fmt->frame_rate.num = (unsigned) sys->frameduration;
+        fmt->frame_rate.den = (unsigned) sys->timescale;
     }
 
     if (/*decklink_sys->i_channels > 0 &&*/ sys->i_rate > 0)

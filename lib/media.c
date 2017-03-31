@@ -1009,8 +1009,8 @@ libvlc_media_tracks_get( libvlc_media_t *p_md, libvlc_media_track_t *** pp_es )
             p_mes->video->i_width = p_es->video.i_visible_width;
             p_mes->video->i_sar_num = p_es->video.i_sar_num;
             p_mes->video->i_sar_den = p_es->video.i_sar_den;
-            p_mes->video->i_frame_rate_num = p_es->video.i_frame_rate;
-            p_mes->video->i_frame_rate_den = p_es->video.i_frame_rate_base;
+            p_mes->video->i_frame_rate_num = p_es->video.frame_rate.num;
+            p_mes->video->i_frame_rate_den = p_es->video.frame_rate.den;
 
             assert( p_es->video.orientation >= ORIENT_TOP_LEFT &&
                     p_es->video.orientation <= ORIENT_RIGHT_BOTTOM );

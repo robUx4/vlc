@@ -1593,11 +1593,11 @@ static es_out_id_t *EsOutAddSlave( es_out_t *out, const es_format_t *fmt, es_out
             es->fmt.video.i_visible_height = es->fmt.video.i_height;
         }
 
-        if( es->fmt.video.i_frame_rate && es->fmt.video.i_frame_rate_base )
-            vlc_ureduce( &es->fmt.video.i_frame_rate,
-                         &es->fmt.video.i_frame_rate_base,
-                         es->fmt.video.i_frame_rate,
-                         es->fmt.video.i_frame_rate_base, 0 );
+        if( es->fmt.video.frame_rate.num && es->fmt.video.frame_rate.den )
+            vlc_ureduce( &es->fmt.video.frame_rate.num,
+                         &es->fmt.video.frame_rate.den,
+                         es->fmt.video.frame_rate.num,
+                         es->fmt.video.frame_rate.den, 0 );
         break;
 
     case SPU_ES:
@@ -3069,11 +3069,11 @@ static void EsOutUpdateInfo( es_out_t *out, es_out_id_t *es, const es_format_t *
             info_category_AddInfo( p_cat, _("Buffer dimensions"), "%ux%u",
                                    fmt->video.i_width, fmt->video.i_height );
 
-       if( fmt->video.i_frame_rate > 0 &&
-           fmt->video.i_frame_rate_base > 0 )
+       if( fmt->video.frame_rate.num > 0 &&
+           fmt->video.frame_rate.den > 0 )
        {
-           div = lldiv( (float)fmt->video.i_frame_rate /
-                               fmt->video.i_frame_rate_base * CLOCK_FREQ,
+           div = lldiv( (float)fmt->video.frame_rate.num /
+                               fmt->video.frame_rate.den * CLOCK_FREQ,
                                CLOCK_FREQ );
            if( div.rem > 0 )
                info_category_AddInfo( p_cat, _("Frame rate"), "%"PRId64".%06u",

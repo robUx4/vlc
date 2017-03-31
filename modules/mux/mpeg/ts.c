@@ -1147,12 +1147,12 @@ static void SetBlockDuration( sout_input_t *p_input, block_t *p_data )
         {
             /* Try rates */
             if( p_input->p_fmt->i_cat == VIDEO_ES &&
-                p_input->p_fmt->video.i_frame_rate &&
-                p_input->p_fmt->video.i_frame_rate_base )
+                p_input->p_fmt->video.frame_rate.num &&
+                p_input->p_fmt->video.frame_rate.den )
             {
                 p_data->i_length = CLOCK_FREQ *
-                                   p_input->p_fmt->video.i_frame_rate /
-                                   p_input->p_fmt->video.i_frame_rate_base;
+                                   p_input->p_fmt->video.frame_rate.num /
+                                   p_input->p_fmt->video.frame_rate.den;
             }
             else if( p_input->p_fmt->i_cat == AUDIO_ES &&
                      p_input->p_fmt->audio.i_bytes_per_frame &&

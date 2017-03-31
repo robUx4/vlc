@@ -243,8 +243,8 @@ bool gst_vlc_set_vout_fmt( GstVideoInfo *p_info, GstVideoAlignment *p_align,
     p_voutfmt->i_x_offset = p_align->padding_left;
     p_voutfmt->i_y_offset = p_align->padding_top;
 
-    p_voutfmt->i_frame_rate = GST_VIDEO_INFO_FPS_N( p_info );
-    p_voutfmt->i_frame_rate_base = GST_VIDEO_INFO_FPS_D( p_info );
+    p_voutfmt->frame_rate.num = GST_VIDEO_INFO_FPS_N( p_info );
+    p_voutfmt->frame_rate.den = GST_VIDEO_INFO_FPS_D( p_info );
 
     return true;
 }

@@ -1393,8 +1393,8 @@ static int CodecVideoParse( demux_t *p_demux, int i_tk_id, const uint8_t *p_data
     fmt.video.i_height= GetWBE( &p_data[14] );
     fmt.video.i_visible_width = fmt.video.i_width;
     fmt.video.i_visible_height = fmt.video.i_height;
-    fmt.video.i_frame_rate = (GetWBE( &p_data[22] ) << 16) | GetWBE( &p_data[24] );
-    fmt.video.i_frame_rate_base = 1 << 16;
+    fmt.video.frame_rate.num = (GetWBE( &p_data[22] ) << 16) | GetWBE( &p_data[24] );
+    fmt.video.frame_rate.den = 1 << 16;
 
     fmt.i_extra = i_data - 26;
     fmt.p_extra = malloc( fmt.i_extra );
