@@ -252,10 +252,7 @@ static void probe_video_frame_rate( encoder_t *p_enc, AVCodecContext *p_context,
     if( p_codec->supported_framerates )
     {
         /* We are finding fps values so 1/time_base */
-        AVRational target = {
-            .num = p_context->time_base.den,
-            .den = p_context->time_base.num
-        };
+        AVRational target = p_context->time_base;
         int idx = av_find_nearest_q_idx(target, p_codec->supported_framerates);
 
         p_context->time_base.num = p_codec->supported_framerates[idx].den ?

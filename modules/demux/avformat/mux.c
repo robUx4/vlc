@@ -274,8 +274,7 @@ static int AddStream( sout_mux_t *p_mux, sout_input_t *p_input )
                    fmt->video.i_sar_den, 1 << 30 /* something big */ );
         msg_Dbg(p_mux, "Muxing aspect ratio will be %d/%d",
                 fmt->video.i_sar_num, fmt->video.i_sar_den);
-        stream->sample_aspect_ratio.den = codec->sample_aspect_ratio.den;
-        stream->sample_aspect_ratio.num = codec->sample_aspect_ratio.num;
+        stream->sample_aspect_ratio = codec->sample_aspect_ratio;
         stream->time_base.den = fmt->video.i_frame_rate;
         stream->time_base.num = fmt->video.i_frame_rate_base;
         if (fmt->i_bitrate == 0) {
