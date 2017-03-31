@@ -144,7 +144,7 @@ struct demux_sys_t
     unsigned int i_abuffer_size;
 
     /* picture decoding */
-    unsigned int i_frame_rate, i_frame_rate_base;
+    vlc_urational_t frame_rate;
     unsigned int i_width, i_height, i_aspect, i_forced_aspect;
     unsigned int i_vblock_size, i_ablock_size;
     mtime_t      i_next_vdate, i_next_adate;
@@ -445,24 +445,24 @@ static int InitVideo( demux_t *p_demux )
     {
     case SDIVIDEO_CTL_BT_601_576I_50HZ:
         /* PAL */
-        p_sys->i_frame_rate      = 25;
-        p_sys->i_frame_rate_base = 1;
+        p_sys->frame_rate.num    = 25;
+        p_sys->frame_rate.den    = 1;
         p_sys->i_width           = 720;
         p_sys->i_height          = 576;
         p_sys->i_aspect          = 4 * VOUT_ASPECT_FACTOR / 3;
         break;
 
     case SDIVIDEO_CTL_SMPTE_296M_720P_50HZ:
-        p_sys->i_frame_rate      = 50;
-        p_sys->i_frame_rate_base = 1;
+        p_sys->frame_rate.num    = 50;
+        p_sys->frame_rate.den    = 1;
         p_sys->i_width           = 1280;
         p_sys->i_height          = 720;
         p_sys->i_aspect          = 16 * VOUT_ASPECT_FACTOR / 9;
         break;
 
     case SDIVIDEO_CTL_SMPTE_296M_720P_60HZ:
-        p_sys->i_frame_rate      = 60;
-        p_sys->i_frame_rate_base = 1;
+        p_sys->frame_rate.num    = 60;
+        p_sys->frame_rate.den    = 1;
         p_sys->i_width           = 1280;
         p_sys->i_height          = 720;
         p_sys->i_aspect          = 16 * VOUT_ASPECT_FACTOR / 9;
@@ -472,24 +472,24 @@ static int InitVideo( demux_t *p_demux )
     case SDIVIDEO_CTL_SMPTE_274M_1080I_50HZ:
     case SDIVIDEO_CTL_SMPTE_274M_1080PSF_25HZ:
         /* 1080i50 or 1080p25 */
-        p_sys->i_frame_rate      = 25;
-        p_sys->i_frame_rate_base = 1;
+        p_sys->frame_rate.num    = 25;
+        p_sys->frame_rate.den    = 1;
         p_sys->i_width           = 1920;
         p_sys->i_height          = 1080;
         p_sys->i_aspect          = 16 * VOUT_ASPECT_FACTOR / 9;
         break;
 
     case SDIVIDEO_CTL_SMPTE_274M_1080I_59_94HZ:
-        p_sys->i_frame_rate      = 30000;
-        p_sys->i_frame_rate_base = 1001;
+        p_sys->frame_rate.num    = 30000;
+        p_sys->frame_rate.den    = 1001;
         p_sys->i_width           = 1920;
         p_sys->i_height          = 1080;
         p_sys->i_aspect          = 16 * VOUT_ASPECT_FACTOR / 9;
         break;
 
     case SDIVIDEO_CTL_SMPTE_274M_1080I_60HZ:
-        p_sys->i_frame_rate      = 30;
-        p_sys->i_frame_rate_base = 1;
+        p_sys->frame_rate.num    = 30;
+        p_sys->frame_rate.den    = 1;
         p_sys->i_width           = 1920;
         p_sys->i_height          = 1080;
         p_sys->i_aspect          = 16 * VOUT_ASPECT_FACTOR / 9;
@@ -501,15 +501,15 @@ static int InitVideo( demux_t *p_demux )
     }
 
     p_sys->i_next_vdate = START_DATE;
-    p_sys->i_incr = CLOCK_FREQ * p_sys->i_frame_rate_base / p_sys->i_frame_rate;
+    p_sys->i_incr = CLOCK_FREQ * p_sys->frame_rate.den / p_sys->frame_rate.num;
     p_sys->i_vblock_size = p_sys->i_width * p_sys->i_height * 3 / 2
                             + sizeof(struct block_extension_t);
 
     /* Video ES */
     es_format_Init( &fmt, VIDEO_ES, VLC_FOURCC('I','4','2','0') );
     fmt.i_id                    = p_sys->i_id_video;
-    fmt.video.i_frame_rate      = p_sys->i_frame_rate;
-    fmt.video.i_frame_rate_base = p_sys->i_frame_rate_base;
+    fmt.video.i_frame_rate      = p_sys->i_frame_rate.num;
+    fmt.video.i_frame_rate_base = p_sys->i_frame_rate.den;
     fmt.video.i_width           = fmt.video.i_visible_width = p_sys->i_width;
     fmt.video.i_height          = fmt.video.i_visible_height = p_sys->i_height;
     fmt.video.i_sar_num         = p_sys->i_aspect * fmt.video.i_height
@@ -550,7 +550,7 @@ static int InitAudio( demux_t *p_demux )
     }
 
     p_sys->i_next_adate = START_DATE;
-    p_sys->i_ablock_size = p_sys->i_sample_rate * 4 * p_sys->i_frame_rate_base / p_sys->i_frame_rate;
+    p_sys->i_ablock_size = p_sys->i_sample_rate * 4 * p_sys->frame_rate.den / p_sys->frame_rate.num;
     p_sys->i_aincr = CLOCK_FREQ * p_sys->i_ablock_size / p_sys->i_sample_rate / 4;
 
     return VLC_SUCCESS;

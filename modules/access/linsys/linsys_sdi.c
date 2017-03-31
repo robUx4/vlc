@@ -171,7 +171,7 @@ struct demux_sys_t
     uint8_t          *p_telx_buffer;
 
     /* picture decoding */
-    unsigned int     i_frame_rate, i_frame_rate_base;
+    vlc_urational_t   frame_rate;
     unsigned int     i_width, i_height, i_aspect, i_forced_aspect;
     unsigned int     i_block_size;
     unsigned int     i_telx_line, i_telx_count;
@@ -433,7 +433,7 @@ static int StartDecode( demux_t *p_demux )
     char *psz_parser;
 
     p_sys->i_next_date = START_DATE;
-    p_sys->i_incr = CLOCK_FREQ * p_sys->i_frame_rate_base / p_sys->i_frame_rate;
+    p_sys->i_incr = CLOCK_FREQ * p_sys->frame_rate.den / p_sys->frame_rate.num;
     p_sys->i_block_size = p_sys->i_width * p_sys->i_height * 3 / 2
                            + sizeof(struct block_extension_t);
     if( NewFrame( p_demux ) != VLC_SUCCESS )
@@ -442,8 +442,8 @@ static int StartDecode( demux_t *p_demux )
     /* Video ES */
     es_format_Init( &fmt, VIDEO_ES, VLC_CODEC_I420 );
     fmt.i_id                    = p_sys->i_id_video;
-    fmt.video.i_frame_rate      = p_sys->i_frame_rate;
-    fmt.video.i_frame_rate_base = p_sys->i_frame_rate_base;
+    fmt.video.i_frame_rate      = p_sys->frame_rate.num;
+    fmt.video.i_frame_rate_base = p_sys->frame_rate.den;
     fmt.video.i_width           = p_sys->i_width;
     fmt.video.i_height          = p_sys->i_height;
     int i_aspect = p_sys->i_forced_aspect ? p_sys->i_forced_aspect
@@ -594,8 +594,8 @@ static void InitVideo( demux_t *p_demux )
     if ( p_sys->i_nb_lines == 625 )
     {
         /* PAL */
-        p_sys->i_frame_rate      = 25;
-        p_sys->i_frame_rate_base = 1;
+        p_sys->frame_rate.num    = 25;
+        p_sys->frame_rate.den    = 1;
         p_sys->i_height          = 576;
         p_sys->i_aspect          = 4 * VOUT_ASPECT_FACTOR / 3;
         p_sys->b_hd              = false;
@@ -603,8 +603,8 @@ static void InitVideo( demux_t *p_demux )
     else if ( p_sys->i_nb_lines == 525 )
     {
         /* NTSC */
-        p_sys->i_frame_rate      = 30000;
-        p_sys->i_frame_rate_base = 1001;
+        p_sys->frame_rate.num    = 30000;
+        p_sys->frame_rate.den    = 1001;
         p_sys->i_height          = 480;
         p_sys->i_aspect          = 4 * VOUT_ASPECT_FACTOR / 3;
         p_sys->b_hd              = false;
@@ -612,8 +612,8 @@ static void InitVideo( demux_t *p_demux )
     else if ( p_sys->i_nb_lines == 1125 && i_total_width == 2640 )
     {
         /* 1080i50 or 1080p25 */
-        p_sys->i_frame_rate      = 25;
-        p_sys->i_frame_rate_base = 1;
+        p_sys->frame_rate.num    = 25;
+        p_sys->frame_rate.den    = 1;
         p_sys->i_height          = 1080;
         p_sys->i_aspect          = 16 * VOUT_ASPECT_FACTOR / 9;
         p_sys->b_hd              = true;
@@ -621,8 +621,8 @@ static void InitVideo( demux_t *p_demux )
     else if ( p_sys->i_nb_lines == 1125 && i_total_width == 2200 )
     {
         /* 1080i60 or 1080p30 */
-        p_sys->i_frame_rate      = 30000;
-        p_sys->i_frame_rate_base = 1001;
+        p_sys->frame_rate.num    = 30000;
+        p_sys->frame_rate.den    = 1001;
         p_sys->i_height          = 1080;
         p_sys->i_aspect          = 16 * VOUT_ASPECT_FACTOR / 9;
         p_sys->b_hd              = true;
@@ -630,8 +630,8 @@ static void InitVideo( demux_t *p_demux )
     else if ( p_sys->i_nb_lines == 750 && i_total_width == 1980 )
     {
         /* 720p50 */
-        p_sys->i_frame_rate      = 50;
-        p_sys->i_frame_rate_base = 1;
+        p_sys->frame_rate.num    = 50;
+        p_sys->frame_rate.den    = 1;
         p_sys->i_height          = 720;
         p_sys->i_aspect          = 16 * VOUT_ASPECT_FACTOR / 9;
         p_sys->b_hd              = true;
@@ -639,8 +639,8 @@ static void InitVideo( demux_t *p_demux )
     else if ( p_sys->i_nb_lines == 750 && i_total_width == 1650 )
     {
         /* 720p60 */
-        p_sys->i_frame_rate      = 60000;
-        p_sys->i_frame_rate_base = 1001;
+        p_sys->frame_rate.num    = 60000;
+        p_sys->frame_rate.den    = 1001;
         p_sys->i_height          = 720;
         p_sys->i_aspect          = 16 * VOUT_ASPECT_FACTOR / 9;
         p_sys->b_hd              = true;
@@ -649,8 +649,8 @@ static void InitVideo( demux_t *p_demux )
     {
         msg_Warn( p_demux, "unable to determine video type" );
         /* Put sensitive defaults */
-        p_sys->i_frame_rate      = 25;
-        p_sys->i_frame_rate_base = 1;
+        p_sys->frame_rate.num    = 25;
+        p_sys->frame_rate.den    = 1;
         p_sys->i_height          = p_sys->i_nb_lines;
         p_sys->i_aspect          = 16 * VOUT_ASPECT_FACTOR / 9;
         p_sys->b_hd              = true;
@@ -857,8 +857,8 @@ static int InitAudio( demux_t *p_demux, sdi_audio_t *p_audio )
                                     fmt.audio.i_bitspersample;
     p_audio->p_es                 = es_out_Add( p_demux->out, &fmt );
 
-    p_audio->i_nb_samples         = p_audio->i_rate * p_sys->i_frame_rate_base
-                                    / p_sys->i_frame_rate;
+    p_audio->i_nb_samples         = p_audio->i_rate * p_sys->frame_rate.den
+                                    / p_sys->frame_rate.num;
     p_audio->i_max_samples        = (float)p_audio->i_nb_samples *
                                     (1.f + SAMPLERATE_TOLERANCE);
 
