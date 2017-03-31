@@ -961,7 +961,7 @@ static block_t *asf_header_create( sout_mux_t *p_mux, bool b_broadcast )
 
         uint64_t i_avg_duration = 0;
         if( p_fmt->i_cat == VIDEO_ES &&
-            p_fmt->video.frame_rate.num > 0 && p_fmt->video.frame_rate.den > 0 )
+            p_fmt->video.frame_rate.num != 0 && p_fmt->video.frame_rate.den != 0 )
             i_avg_duration = ( INT64_C(10000000) * p_fmt->video.frame_rate.den +
                                p_fmt->video.frame_rate.num/2 ) / p_fmt->video.frame_rate.num;
 

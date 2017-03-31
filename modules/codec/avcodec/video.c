@@ -159,7 +159,7 @@ static int lavc_GetVideoFormat(decoder_t *dec, video_format_t *restrict fmt,
     fmt->i_visible_height = ctx->height;
 
     /* If an aspect-ratio was specified in the input format then force it */
-    if (dec->fmt_in.video.sar.num > 0 && dec->fmt_in.video.sar.den > 0)
+    if (dec->fmt_in.video.sar.num != 0 && dec->fmt_in.video.sar.den != 0)
         fmt->sar = dec->fmt_in.video.sar;
     else
     {

@@ -668,7 +668,7 @@ static int OpenEncoder( vlc_object_t *p_this )
         p_sys->di.timebase_denominator = p_enc->fmt_in.video.frame_rate.den;
     }
 
-    if( p_enc->fmt_in.video.sar.num > 0 && p_enc->fmt_in.video.sar.den > 0 )
+    if( p_enc->fmt_in.video.sar.num != 0 && p_enc->fmt_in.video.sar.den != 0 )
     {
         unsigned i_dst_num, i_dst_den;
         vlc_ureduce( &i_dst_num, &i_dst_den,

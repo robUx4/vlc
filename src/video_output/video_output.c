@@ -79,7 +79,7 @@ static int VoutValidateFormat(video_format_t *dst,
     if (src->i_width == 0  || src->i_width  > 8192 ||
         src->i_height == 0 || src->i_height > 8192)
         return VLC_EGENERIC;
-    if (src->sar.num <= 0 || src->sar.den <= 0)
+    if (src->sar.num == 0 || src->sar.den == 0)
         return VLC_EGENERIC;
 
     /* */
@@ -87,7 +87,7 @@ static int VoutValidateFormat(video_format_t *dst,
     dst->i_chroma = vlc_fourcc_GetCodec(VIDEO_ES, src->i_chroma);
     vlc_ureduce( &dst->sar.num, &dst->sar.den,
                  src->sar.num,  src->sar.den, 50000 );
-    if (dst->sar.num <= 0 || dst->sar.den <= 0) {
+    if (dst->sar.num == 0 || dst->sar.den == 0) {
         dst->sar.num = 1;
         dst->sar.den = 1;
     }
@@ -1494,7 +1494,7 @@ static int ThreadReinit(vout_thread_t *vout,
 
     /* FIXME current vout "variables" are not in sync here anymore
      * and I am not sure what to do */
-    if (state.cfg.display.sar.num <= 0 || state.cfg.display.sar.den <= 0) {
+    if (state.cfg.display.sar.num == 0 || state.cfg.display.sar.den == 0) {
         state.cfg.display.sar.num = 1;
         state.cfg.display.sar.den = 1;
     }

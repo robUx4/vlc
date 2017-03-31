@@ -58,7 +58,7 @@ static void OSDTextUpdate(subpicture_t *subpic,
     subpicture_updater_sys_t *sys = subpic->updater.p_sys;
     VLC_UNUSED(fmt_src); VLC_UNUSED(ts);
 
-    if( fmt_dst->sar.num <= 0 || fmt_dst->sar.den <= 0 )
+    if( fmt_dst->sar.num == 0 || fmt_dst->sar.den == 0 )
         return;
 
     subpic->b_absolute = false;

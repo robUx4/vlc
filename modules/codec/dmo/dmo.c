@@ -510,8 +510,8 @@ static int DecOpen( decoder_t *p_dec )
         p_dec->fmt_out.video.i_bits_per_pixel = i_bpp;
 
         /* If an aspect-ratio was specified in the input format then force it */
-        if( p_dec->fmt_in.video.sar.num > 0 &&
-            p_dec->fmt_in.video.sar.den > 0 )
+        if( p_dec->fmt_in.video.sar.num != 0 &&
+            p_dec->fmt_in.video.sar.den != 0 )
         {
             p_dec->fmt_out.video.sar= p_dec->fmt_in.video.sar;
         }

@@ -390,7 +390,7 @@ int picture_Export( vlc_object_t *p_obj,
 {
     /* */
     video_format_t fmt_in = p_picture->format;
-    if( fmt_in.sar.num <= 0 || fmt_in.sar.den <= 0 )
+    if( fmt_in.sar.num == 0 || fmt_in.sar.den == 0 )
     {
         fmt_in.sar.num =
         fmt_in.sar.den = 1;

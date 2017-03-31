@@ -322,7 +322,7 @@ valid:
     }
 
     /* fixup anything missing with sensible assumptions */
-    if( sar.num <= 0 || sar.den <= 0 )
+    if( sar.num == 0 || sar.den == 0 )
     {
         /* assume 1:1 sar */
         sar.num = 1;

@@ -544,8 +544,8 @@ static int ParseVOP( decoder_t *p_dec, block_t *p_vop )
 #endif
 
     if( p_dec->p_sys->fps.num < 5 && /* Work-around buggy streams */
-        p_dec->fmt_in.video.frame_rate.num > 0 &&
-        p_dec->fmt_in.video.frame_rate.den > 0 )
+        p_dec->fmt_in.video.frame_rate.num != 0 &&
+        p_dec->fmt_in.video.frame_rate.den != 0 )
     {
         p_sys->i_interpolated_pts += CLOCK_FREQ *
         p_dec->fmt_in.video.frame_rate.den /

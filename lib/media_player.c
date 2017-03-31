@@ -1697,7 +1697,7 @@ float libvlc_media_player_get_fps( libvlc_media_player_t *p_mi )
     {
         const es_format_t *fmt = item->es[i];
 
-        if( fmt->i_cat == VIDEO_ES && fmt->video.frame_rate.den > 0 )
+        if( fmt->i_cat == VIDEO_ES && fmt->video.frame_rate.den != 0 )
             fps = (float)fmt->video.frame_rate.num
                   / (float)fmt->video.frame_rate.den;
     }

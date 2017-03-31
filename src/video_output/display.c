@@ -942,7 +942,7 @@ bool vout_ManageDisplay(vout_display_t *vd, bool allow_reset_pictures)
         if (osys->ch_sar) {
             video_format_t source = vd->source;
 
-            if (osys->sar.num > 0 && osys->sar.den > 0)
+            if (osys->sar.num != 0 && osys->sar.den != 0)
                 source.sar = osys->sar;
             else
                 source.sar = osys->source.sar;

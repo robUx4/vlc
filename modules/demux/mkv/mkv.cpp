@@ -433,7 +433,7 @@ static int Control( demux_t *p_demux, int i_query, va_list args )
                 {
                     tracks_map_t::mapped_type const& track = it->second;
 
-                    if( track.fmt.i_cat == VIDEO_ES && track.fmt.video.frame_rate.den > 0 )
+                    if( track.fmt.i_cat == VIDEO_ES && track.fmt.video.frame_rate.den != 0 )
                     {
                         *pf = (double)track.fmt.video.frame_rate.num / track.fmt.video.frame_rate.den;
                         break;

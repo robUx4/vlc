@@ -245,7 +245,7 @@ static void FixSubtitleFormat(vout_display_sys_t *sys)
         i_video_height = fmt.i_visible_height;
     }
 
-    if (fmt.sar.num > 0 && fmt.sar.den > 0) {
+    if (fmt.sar.num != 0 && fmt.sar.den != 0) {
         if (fmt.sar.num >= fmt.sar.den)
             i_video_width = i_video_width * fmt.sar.num / fmt.sar.den;
         else

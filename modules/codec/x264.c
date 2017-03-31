@@ -1320,8 +1320,8 @@ static int  Open ( vlc_object_t *p_this )
        p_sys->param.analyse.b_transform_8x8 = var_GetBool( p_enc,
                                     SOUT_CFG_PREFIX "8x8dct" );
 
-    if( p_enc->fmt_in.video.sar.num > 0 &&
-        p_enc->fmt_in.video.sar.den > 0 )
+    if( p_enc->fmt_in.video.sar.num != 0 &&
+        p_enc->fmt_in.video.sar.den != 0 )
     {
         unsigned int i_dst_num, i_dst_den;
         vlc_ureduce( &i_dst_num, &i_dst_den,
