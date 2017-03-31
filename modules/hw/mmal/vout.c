@@ -117,8 +117,7 @@ struct vout_display_sys_t {
     unsigned display_width;
     unsigned display_height;
 
-    int i_frame_rate_base; /* cached framerate to detect changes for rate adjustment */
-    int i_frame_rate;
+    vlc_urational_t frame_rate; /* cached framerate to detect changes for rate adjustment */
 
     int next_phase_check; /* lowpass for phase check frequency */
     int phase_offset; /* currently applied offset to presentation time in ns */
@@ -558,14 +557,14 @@ static void vd_display(vout_display_t *vd, picture_t *picture,
     MMAL_BUFFER_HEADER_T *buffer = pic_sys->buffer;
     MMAL_STATUS_T status;
 
-    if (picture->format.i_frame_rate != sys->i_frame_rate ||
-        picture->format.i_frame_rate_base != sys->i_frame_rate_base ||
+    if (picture->format.i_frame_rate != sys->frame_rate.num ||
+        picture->format.i_frame_rate_base != sys->frame_rate.den ||
         picture->b_progressive != sys->b_progressive ||
         picture->b_top_field_first != sys->b_top_field_first) {
         sys->b_top_field_first = picture->b_top_field_first;
         sys->b_progressive = picture->b_progressive;
-        sys->i_frame_rate = picture->format.i_frame_rate;
-        sys->i_frame_rate_base = picture->format.i_frame_rate_base;
+        sys->frame_rate.num = picture->format.i_frame_rate;
+        sys->frame_rate.den = picture->format.i_frame_rate_base;
         configure_display(vd, NULL, &picture->format);
     }
 
@@ -968,8 +967,8 @@ static void maintain_phase_sync(vout_display_t *vd)
         .hdr = { MMAL_PARAMETER_VIDEO_RENDER_STATS, sizeof(render_stats) },
     };
     int32_t frame_duration = CLOCK_FREQ /
-        ((double)vd->sys->i_frame_rate /
-        vd->sys->i_frame_rate_base);
+        ((double)vd->sys->frame_rate.num /
+        vd->sys->frame_rate.den);
     vout_display_sys_t *sys = vd->sys;
     int32_t phase_offset;
     MMAL_STATUS_T status;
