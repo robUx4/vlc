@@ -147,10 +147,7 @@ struct demux_sys_t
     bool b_spu_change;
 
     /* Aspect ration */
-    struct {
-        unsigned i_num;
-        unsigned i_den;
-    } sar;
+    vlc_urational_t sar;
 
     /* */
     int           i_title;
@@ -204,8 +201,8 @@ static int CommonOpen( vlc_object_t *p_this,
     p_sys->b_reset_pcr = false;
 
     ps_track_init( p_sys->tk );
-    p_sys->sar.i_num = 0;
-    p_sys->sar.i_den = 0;
+    p_sys->sar.num = 0;
+    p_sys->sar.den = 0;
     p_sys->i_mux_rate = 0;
     p_sys->i_pgc_length = 0;
     p_sys->b_spu_change = false;
@@ -956,16 +953,16 @@ static int Demux( demux_t *p_demux )
         switch( dvdnav_get_video_aspect( p_sys->dvdnav ) )
         {
         case 0:
-            p_sys->sar.i_num = 4 * i_height;
-            p_sys->sar.i_den = 3 * i_width;
+            p_sys->sar.num = 4 * i_height;
+            p_sys->sar.den = 3 * i_width;
             break;
         case 3:
-            p_sys->sar.i_num = 16 * i_height;
-            p_sys->sar.i_den =  9 * i_width;
+            p_sys->sar.num = 16 * i_height;
+            p_sys->sar.den =  9 * i_width;
             break;
         default:
-            p_sys->sar.i_num = 0;
-            p_sys->sar.i_den = 0;
+            p_sys->sar.num = 0;
+            p_sys->sar.den = 0;
             break;
         }
 
@@ -1449,8 +1446,8 @@ static void ESNew( demux_t *p_demux, int i_id )
     /* Add a new ES */
     if( tk->fmt.i_cat == VIDEO_ES )
     {
-        tk->fmt.video.sar.num = p_sys->sar.i_num;
-        tk->fmt.video.sar.den = p_sys->sar.i_den;
+        tk->fmt.video.sar.num = p_sys->sar.num;
+        tk->fmt.video.sar.den = p_sys->sar.den;
         b_select = true;
     }
     else if( tk->fmt.i_cat == AUDIO_ES )
