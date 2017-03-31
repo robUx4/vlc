@@ -104,8 +104,7 @@ struct decoder_sys_t
     date_t  prev_iframe_dts;
 
     /* Sequence properties */
-    unsigned    i_frame_rate;
-    unsigned    i_frame_rate_base;
+    vlc_urational_t frame_rate;
     bool  b_seq_progressive;
     bool  b_low_delay;
     int         i_aspect_ratio_info;
@@ -194,8 +193,8 @@ static int Open( vlc_object_t *p_this )
     date_Init( &p_sys->prev_iframe_dts, 1, 1 );
     date_Set( &p_sys->prev_iframe_dts, VLC_TS_INVALID );
 
-    p_sys->i_frame_rate = 2 * 30000;
-    p_sys->i_frame_rate_base = 1001;
+    p_sys->frame_rate.num = 2 * 30000;
+    p_sys->frame_rate.den = 1001;
     p_sys->b_seq_progressive = true;
     p_sys->b_low_delay = true;
     p_sys->i_seq_old = 0;
@@ -610,7 +609,7 @@ static block_t *ParseMPEGBlock( decoder_t *p_dec, block_t *p_frag )
     {
         /* Group start code */
         if( p_sys->p_seq &&
-            p_sys->i_seq_old > p_sys->i_frame_rate/p_sys->i_frame_rate_base )
+            p_sys->i_seq_old > p_sys->frame_rate.num/p_sys->frame_rate.den )
         {
             /* Useful for mpeg1: repeat sequence header every second */
             block_ChainLastAppend( &p_sys->pp_last, block_Duplicate( p_sys->p_seq ) );
@@ -657,19 +656,19 @@ static block_t *ParseMPEGBlock( decoder_t *p_dec, block_t *p_frag )
 
         /* TODO: MPEG1 aspect ratio */
 
-        p_sys->i_frame_rate = code_to_frame_rate[p_frag->p_buffer[7]&0x0f][0];
-        p_sys->i_frame_rate_base =
+        p_sys->frame_rate.num = code_to_frame_rate[p_frag->p_buffer[7]&0x0f][0];
+        p_sys->frame_rate.den =
             code_to_frame_rate[p_frag->p_buffer[7]&0x0f][1];
 
-        if( ( p_sys->i_frame_rate != p_dec->fmt_out.video.i_frame_rate ||
-              p_dec->fmt_out.video.i_frame_rate_base != p_sys->i_frame_rate_base ) &&
-            p_sys->i_frame_rate && p_sys->i_frame_rate_base )
+        if( ( p_sys->frame_rate.num != p_dec->fmt_out.video.i_frame_rate ||
+              p_dec->fmt_out.video.i_frame_rate_base != p_sys->frame_rate.den ) &&
+            p_sys->frame_rate.num && p_sys->frame_rate.den )
         {
-            date_Change( &p_sys->dts, 2 * p_sys->i_frame_rate, p_sys->i_frame_rate_base );
-            date_Change( &p_sys->prev_iframe_dts, 2 * p_sys->i_frame_rate, p_sys->i_frame_rate_base );
+            date_Change( &p_sys->dts, 2 * p_sys->frame_rate.num, p_sys->frame_rate.den );
+            date_Change( &p_sys->prev_iframe_dts, 2 * p_sys->frame_rate.num, p_sys->frame_rate.den );
         }
-        p_dec->fmt_out.video.i_frame_rate = p_sys->i_frame_rate;
-        p_dec->fmt_out.video.i_frame_rate_base = p_sys->i_frame_rate_base;
+        p_dec->fmt_out.video.i_frame_rate = p_sys->frame_rate.num;
+        p_dec->fmt_out.video.i_frame_rate_base = p_sys->frame_rate.den;
 
         p_sys->b_seq_progressive = true;
         p_sys->b_low_delay = true;
@@ -680,7 +679,7 @@ static block_t *ParseMPEGBlock( decoder_t *p_dec, block_t *p_frag )
             msg_Dbg( p_dec, "size %dx%d/%dx%d fps=%.3f",
                  p_dec->fmt_out.video.i_visible_width, p_dec->fmt_out.video.i_visible_height,
                  p_dec->fmt_out.video.i_width, p_dec->fmt_out.video.i_height,
-                 p_sys->i_frame_rate / (float)(p_sys->i_frame_rate_base ? p_sys->i_frame_rate_base : 1) );
+                 p_sys->frame_rate.num / (float)(p_sys->frame_rate.den ? p_sys->frame_rate.den : 1) );
             p_sys->b_inited = 1;
         }
     }
