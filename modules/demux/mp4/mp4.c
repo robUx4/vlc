@@ -2556,20 +2556,20 @@ static int TrackCreateSamplesIndex( demux_t *p_demux,
  * description index
  */
 static void TrackGetESSampleRate( demux_t *p_demux,
-                                  unsigned *pi_num, unsigned *pi_den,
+                                  vlc_urational_t *pi_rate,
                                   const mp4_track_t *p_track,
                                   unsigned i_sd_index,
                                   unsigned i_chunk )
 {
-    *pi_num = 0;
-    *pi_den = 0;
+    pi_rate->num = 0;
+    pi_rate->den = 0;
 
     MP4_Box_t *p_trak = MP4_GetTrakByTrackID( MP4_BoxGet( p_demux->p_sys->p_root, "/moov" ),
                                               p_track->i_track_ID );
     MP4_Box_t *p_mdhd = MP4_BoxGet( p_trak, "mdia/mdhd" );
     if ( p_mdhd && BOXDATA(p_mdhd) )
     {
-        vlc_ureduce( pi_num, pi_den,
+        vlc_ureduce( &pi_rate->num, &pi_rate->den,
                      (uint64_t) BOXDATA(p_mdhd)->i_timescale * p_track->i_sample_count,
                      (uint64_t) BOXDATA(p_mdhd)->i_duration,
                      UINT16_MAX );
@@ -2599,7 +2599,7 @@ static void TrackGetESSampleRate( demux_t *p_demux,
            p_chunk->i_sample_description_index == i_sd_index );
 
     if( i_sample > 0 && i_total_duration )
-        vlc_ureduce( pi_num, pi_den,
+        vlc_ureduce( &pi_rate->num, &pi_rate->den,
                      i_sample * p_track->i_timescale,
                      i_total_duration,
                      UINT16_MAX);
@@ -2661,8 +2661,7 @@ static int TrackCreateES( demux_t *p_demux, mp4_track_t *p_track,
 
         /* Set frame rate */
         TrackGetESSampleRate( p_demux,
-                              &p_track->fmt.video.frame_rate.num,
-                              &p_track->fmt.video.frame_rate.den,
+                              &p_track->fmt.video.frame_rate,
                               p_track, i_sample_description_index, i_chunk );
 
         p_demux->p_sys->f_fps = (float)p_track->fmt.video.frame_rate.num /
