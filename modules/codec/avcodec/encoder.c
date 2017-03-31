@@ -263,12 +263,9 @@ static void probe_video_frame_rate( encoder_t *p_enc, AVCodecContext *p_context,
         /* If we have something reasonable on supported framerates, use that*/
         if( p_context->time_base.den && p_context->time_base.den < CLOCK_FREQ )
         {
-            p_enc->fmt_out.video.frame_rate.den =
-                p_enc->fmt_in.video.frame_rate.den =
-                p_context->time_base.num;
-            p_enc->fmt_out.video.frame_rate.num =
-                p_enc->fmt_in.video.frame_rate.num =
-                p_context->time_base.den;
+            p_enc->fmt_out.video.frame_rate =
+                p_enc->fmt_in.video.frame_rate =
+                FromAVRational(p_context->time_base);
         }
     }
     msg_Dbg( p_enc, "Time base set to %d/%d", p_context->time_base.num, p_context->time_base.den );

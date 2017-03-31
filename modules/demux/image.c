@@ -665,15 +665,13 @@ static int Open(vlc_object_t *object)
     }
     fmt.i_id    = var_InheritInteger(demux, "image-id");
     fmt.i_group = var_InheritInteger(demux, "image-group");
-    vlc_urational_t fps = var_InheritURational(demux, "image-fps");
-    if (!fps.num || !fps.den)
+    fmt.video.frame_rate = var_InheritURational(demux, "image-fps");
+    if (!fmt.video.frame_rate.num || !fmt.video.frame_rate.den)
     {
         msg_Err(demux, "Invalid frame rate, using 10/1 instead");
-        fps.num      = 10;
-        fps.den      = 1;
+        fmt.video.frame_rate.num      = 10;
+        fmt.video.frame_rate.den      = 1;
     }
-    fmt.video.frame_rate.num = fps.num;
-    fmt.video.frame_rate.den = fps.den;
 
     /* If loadind failed, we still continue to avoid mis-detection
      * by other demuxers. */

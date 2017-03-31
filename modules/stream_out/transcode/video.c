@@ -410,10 +410,8 @@ static void transcode_video_framerate_init( sout_stream_t *p_stream,
         if( p_fmt_out->video.frame_rate.num &&
             p_fmt_out->video.frame_rate.den )
         {
-            id->p_encoder->fmt_out.video.frame_rate.num =
-                p_fmt_out->video.frame_rate.num;
-            id->p_encoder->fmt_out.video.frame_rate.den =
-                p_fmt_out->video.frame_rate.den;
+            id->p_encoder->fmt_out.video.frame_rate =
+                p_fmt_out->video.frame_rate;
         }
         else
         {
@@ -423,10 +421,8 @@ static void transcode_video_framerate_init( sout_stream_t *p_stream,
         }
     }
 
-    id->p_encoder->fmt_in.video.frame_rate.num =
-        id->p_encoder->fmt_out.video.frame_rate.num;
-    id->p_encoder->fmt_in.video.frame_rate.den =
-        id->p_encoder->fmt_out.video.frame_rate.den;
+    id->p_encoder->fmt_in.video.frame_rate =
+        id->p_encoder->fmt_out.video.frame_rate;
 
     vlc_ureduce( &id->p_encoder->fmt_in.video.frame_rate.num,
         &id->p_encoder->fmt_in.video.frame_rate.den,

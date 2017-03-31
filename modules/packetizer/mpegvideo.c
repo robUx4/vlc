@@ -667,8 +667,7 @@ static block_t *ParseMPEGBlock( decoder_t *p_dec, block_t *p_frag )
             date_Change( &p_sys->dts, 2 * p_sys->frame_rate.num, p_sys->frame_rate.den );
             date_Change( &p_sys->prev_iframe_dts, 2 * p_sys->frame_rate.num, p_sys->frame_rate.den );
         }
-        p_dec->fmt_out.video.frame_rate.num = p_sys->frame_rate.num;
-        p_dec->fmt_out.video.frame_rate.den = p_sys->frame_rate.den;
+        p_dec->fmt_out.video.frame_rate = p_sys->frame_rate;
 
         p_sys->b_seq_progressive = true;
         p_sys->b_low_delay = true;

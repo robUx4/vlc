@@ -394,8 +394,7 @@ apply_fmt:
     dec->fmt_out.video.i_visible_height = sys->output->format->es->video.crop.height;
     dec->fmt_out.video.i_sar_num = sys->output->format->es->video.par.num;
     dec->fmt_out.video.i_sar_den = sys->output->format->es->video.par.den;
-    dec->fmt_out.video.frame_rate.num = sys->output->format->es->video.frame_rate.num;
-    dec->fmt_out.video.frame_rate.den = sys->output->format->es->video.frame_rate.den;
+    dec->fmt_out.video.frame_rate = sys->output->format->es->video.frame_rate;
 
     /* Query interlaced type */
     interlace_type.hdr.id = MMAL_PARAMETER_VIDEO_INTERLACE_TYPE;

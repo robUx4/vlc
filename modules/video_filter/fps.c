@@ -80,8 +80,7 @@ static picture_t *Filter( filter_t *p_filter, picture_t *p_picture)
         return NULL;
     }
 
-    p_picture->format.frame_rate.num = p_filter->fmt_out.video.frame_rate.num;
-    p_picture->format.frame_rate.den = p_filter->fmt_out.video.frame_rate.den;
+    p_picture->format.frame_rate = p_filter->fmt_out.video.frame_rate;
 
     /* First time we get some valid timestamp, we'll take it as base for output
         later on we retake new timestamp if it has jumped too much */
@@ -137,7 +136,6 @@ static int Open( vlc_object_t *p_this)
 {
     filter_t *p_filter = (filter_t*)p_this;
     filter_sys_t *p_sys;
-    vlc_urational_t fps;
 
     p_sys = p_filter->p_sys = malloc( sizeof( *p_sys ) );
 
@@ -151,14 +149,13 @@ static int Open( vlc_object_t *p_this)
     video_format_Copy( &p_filter->fmt_out.video, &p_filter->fmt_in.video );
 
     /* If we don't have fps option, use filter output values */
-    fps = var_InheritURational( p_filter, CFG_PREFIX "fps" );
-    if (fps.num == 0 || fps.den == 0)
+
+    p_filter->fmt_out.video.frame_rate = var_InheritURational( p_filter, CFG_PREFIX "fps" );
+    if (p_filter->fmt_out.video.frame_rate.num == 0 ||
+        p_filter->fmt_out.video.frame_rate.den == 0)
     {
-        fps.num = p_filter->fmt_in.video.frame_rate.num;
-        fps.den = p_filter->fmt_in.video.frame_rate.den;
+        p_filter->fmt_out.video.frame_rate = p_filter->fmt_in.video.frame_rate;
     }
-    p_filter->fmt_out.video.frame_rate.num      = fps.num;
-    p_filter->fmt_out.video.frame_rate.den = fps.den;
 
     msg_Dbg( p_filter, "Converting fps from %d/%d -> %d/%d",
             p_filter->fmt_in.video.frame_rate.num, p_filter->fmt_in.video.frame_rate.den,

@@ -458,8 +458,7 @@ static int Demux( demux_t *p_demux)
                     if( p_sys->p_packetizer->fmt_out.video.frame_rate.den &&
                         p_sys->p_packetizer->fmt_out.video.frame_rate.num )
                     {
-                        p_sys->frame_rate.num = p_sys->p_packetizer->fmt_out.video.frame_rate.num;
-                        p_sys->frame_rate.den = p_sys->p_packetizer->fmt_out.video.frame_rate.den;
+                        p_sys->frame_rate = p_sys->p_packetizer->fmt_out.video.frame_rate;
                     }
                     else
                     {

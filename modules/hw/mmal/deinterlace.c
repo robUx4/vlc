@@ -301,8 +301,7 @@ static int send_output_buffer(filter_t *filter)
         ret = -1;
         goto out;
     }
-    picture->format.frame_rate.num = filter->fmt_out.video.frame_rate.num;
-    picture->format.frame_rate.den = filter->fmt_out.video.frame_rate.den;
+    picture->format.frame_rate = filter->fmt_out.video.frame_rate;
 
     buffer = picture->p_sys->buffer;
     buffer->user_data = picture;

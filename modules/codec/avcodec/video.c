@@ -176,13 +176,11 @@ static int lavc_GetVideoFormat(decoder_t *dec, video_format_t *restrict fmt,
     if (dec->fmt_in.video.frame_rate.num > 0
      && dec->fmt_in.video.frame_rate.den > 0)
     {
-        fmt->frame_rate.num = dec->fmt_in.video.frame_rate.num;
-        fmt->frame_rate.den = dec->fmt_in.video.frame_rate.den;
+        fmt->frame_rate = dec->fmt_in.video.frame_rate;
     }
     else if (ctx->framerate.num > 0 && ctx->framerate.den > 0)
     {
-        fmt->frame_rate.num = ctx->framerate.num;
-        fmt->frame_rate.den = ctx->framerate.den;
+        fmt->frame_rate = FromAVRational(ctx->framerate);
 # if LIBAVCODEC_VERSION_MICRO <  100
         // for some reason libav don't thinkg framerate presents actually same thing as in ffmpeg
         fmt->frame_rate.den *= __MAX(ctx->ticks_per_frame, 1);
