@@ -576,9 +576,8 @@ static void VoutGetDisplayCfg(vout_thread_t *vout, vout_display_cfg_t *cfg, cons
     cfg->display.width   = display_width > 0  ? display_width  : 0;
     cfg->display.height  = display_height > 0 ? display_height : 0;
     cfg->is_display_filled  = var_GetBool(vout, "autoscale");
-    if (var_InheritURational(vout, &cfg->display.sar.num, &cfg->display.sar.den,
-                             "monitor-par") |
-            !cfg->display.sar.num  || !cfg->display.sar.den) {
+    cfg->display.sar = var_InheritURational(vout, "monitor-par");
+    if (!cfg->display.sar.num  || !cfg->display.sar.den) {
         cfg->display.sar.num = 1;
         cfg->display.sar.den = 1;
     }

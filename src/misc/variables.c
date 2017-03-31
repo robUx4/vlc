@@ -1213,10 +1213,9 @@ int var_Inherit( vlc_object_t *p_this, const char *psz_name, int i_type,
  * It returns an error if the rational number cannot be parsed (0/0 is valid).
  * The rational is already reduced.
  */
-int (var_InheritURational)(vlc_object_t *object,
-                           unsigned *num, unsigned *den,
-                           const char *var)
+vlc_urational_t (var_InheritURational)(vlc_object_t *object, const char *var)
 {
+    vlc_urational_t dst = {.num = 0, .den = 0};
     char *str = var_InheritString(object, var);
     if (str == NULL)
         goto error;
@@ -1260,24 +1259,18 @@ int (var_InheritURational)(vlc_object_t *object,
             goto error;
     }
 
-    free(str);
-
     if (n == 0) {
-        *num = 0;
-        *den = d ? 1 : 0;
+        dst.num = 0;
+        dst.den = d ? 1 : 0;
     } else if (d == 0) {
-        *num = 1;
-        *den = 0;
+        dst.num = 1;
+        dst.den = 0;
     } else
-        vlc_ureduce(num, den, n, d, 0);
-
-    return VLC_SUCCESS;
+        vlc_ureduce(&dst.num, &dst.den, n, d, 0);
 
 error:
     free(str);
-    *num = 0;
-    *den = 0;
-    return VLC_EGENERIC;
+    return dst;
 }
 
 /**

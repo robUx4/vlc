@@ -151,7 +151,8 @@ static int Open( vlc_object_t *p_this)
     video_format_Copy( &p_filter->fmt_out.video, &p_filter->fmt_in.video );
 
     /* If we don't have fps option, use filter output values */
-    if( var_InheritURational( p_filter, &fps.num, &fps.den, CFG_PREFIX "fps" ) )
+    fps = var_InheritURational( p_filter, CFG_PREFIX "fps" );
+    if (fps.num == 0 || fps.den == 0)
     {
         fps.num = p_filter->fmt_in.video.i_frame_rate;
         fps.den = p_filter->fmt_in.video.i_frame_rate_base;

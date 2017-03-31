@@ -291,14 +291,15 @@ valid:
         free( psz_tmp );
     }
 
-    if( var_InheritURational( p_demux, &fps.num, &fps.den, "rawvid-fps" ) )
+    fps = var_InheritURational( p_demux, "rawvid-fps" );
+    if( fps.num == 0 || fps.den == 0 )
     {
         fps.num = 0;
         fps.den = 1;
     }
 
-    if( var_InheritURational( p_demux, &sar.num, &sar.den,
-                              "rawvid-aspect-ratio" ) )
+    sar = var_InheritURational( p_demux, "rawvid-aspect-ratio" );
+    if( sar.num == 0 || sar.den == 0 )
         sar.num = sar.den = 1;
 
     /* moan about anything wrong */

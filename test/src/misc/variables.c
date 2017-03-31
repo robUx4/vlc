@@ -104,63 +104,63 @@ static void test_fracts( libvlc_int_t *p_libvlc )
     vlc_urational_t frac;
 
     var_Create( p_libvlc, name, VLC_VAR_STRING );
-    assert( var_InheritURational( p_libvlc, &frac.num, &frac.den, name ) != 0 );
+    assert( var_InheritURational( p_libvlc, &frac, name ) != 0 );
 
     var_SetString( p_libvlc, name, "123garbage" );
-    assert( var_InheritURational( p_libvlc, &frac.num, &frac.den, name ) != 0 );
+    assert( var_InheritURational( p_libvlc, &frac, name ) != 0 );
 
     var_SetString( p_libvlc, name, "4/5garbage" );
-    assert( var_InheritURational( p_libvlc, &frac.num, &frac.den, name ) != 0 );
+    assert( var_InheritURational( p_libvlc, &frac, name ) != 0 );
 
     var_SetString( p_libvlc, name, "6.7garbage" );
-    assert( var_InheritURational( p_libvlc, &frac.num, &frac.den, name ) != 0 );
+    assert( var_InheritURational( p_libvlc, &frac, name ) != 0 );
 
     var_SetString( p_libvlc, name, "." );
-    assert( var_InheritURational( p_libvlc, &frac.num, &frac.den, name ) == 0 );
+    assert( var_InheritURational( p_libvlc, &frac, name ) == 0 );
     assert( frac.num == 0 && frac.den == 1 );
 
     var_SetString( p_libvlc, name, "010" );
-    assert( var_InheritURational( p_libvlc, &frac.num, &frac.den, name ) == 0 );
+    assert( var_InheritURational( p_libvlc, &frac, name ) == 0 );
     assert( frac.num == 10 && frac.den == 1 );
 
     var_SetString( p_libvlc, name, "30" );
-    assert( var_InheritURational( p_libvlc, &frac.num, &frac.den, name ) == 0 );
+    assert( var_InheritURational( p_libvlc, &frac, name ) == 0 );
     assert( frac.num == 30 && frac.den == 1 );
 
     var_SetString( p_libvlc, name, "30.0" );
-    assert( var_InheritURational( p_libvlc, &frac.num, &frac.den, name ) == 0 );
+    assert( var_InheritURational( p_libvlc, &frac, name ) == 0 );
     assert( frac.num == 30 && frac.den == 1 );
 
     var_SetString( p_libvlc, name, "030.030" );
-    assert( var_InheritURational( p_libvlc, &frac.num, &frac.den, name ) == 0 );
+    assert( var_InheritURational( p_libvlc, &frac, name ) == 0 );
     assert( frac.num == 3003 && frac.den == 100 );
 
     var_SetString( p_libvlc, name, "60/2" );
-    assert( var_InheritURational( p_libvlc, &frac.num, &frac.den, name ) == 0 );
+    assert( var_InheritURational( p_libvlc, &frac, name ) == 0 );
     assert( frac.num == 30 && frac.den == 1 );
 
     var_SetString( p_libvlc, name, "29.97" );
-    assert( var_InheritURational( p_libvlc, &frac.num, &frac.den, name ) == 0 );
+    assert( var_InheritURational( p_libvlc, &frac, name ) == 0 );
     assert( frac.num == 2997 && frac.den == 100 );
 
     var_SetString( p_libvlc, name, "30000/1001" );
-    assert( var_InheritURational( p_libvlc, &frac.num, &frac.den, name ) == 0 );
+    assert( var_InheritURational( p_libvlc, &frac, name ) == 0 );
     assert( frac.num == 30000 && frac.den == 1001 );
 
     var_SetString( p_libvlc, name, ".125" );
-    assert( var_InheritURational( p_libvlc, &frac.num, &frac.den, name ) == 0 );
+    assert( var_InheritURational( p_libvlc, &frac, name ) == 0 );
     assert( frac.num == 1 && frac.den == 8 );
 
     var_SetString( p_libvlc, name, "12:9" );
-    assert( var_InheritURational( p_libvlc, &frac.num, &frac.den, name ) == 0 );
+    assert( var_InheritURational( p_libvlc, &frac, name ) == 0 );
     assert( frac.num == 4 && frac.den == 3 );
 
     var_SetString( p_libvlc, name, "000000/00000000" );
-    assert( var_InheritURational( p_libvlc, &frac.num, &frac.den, name ) == 0 );
+    assert( var_InheritURational( p_libvlc, &frac, name ) == 0 );
     assert( frac.num == 0 && frac.den == 0 );
 
     var_SetString( p_libvlc, name, "12345/0" );
-    assert( var_InheritURational( p_libvlc, &frac.num, &frac.den, name ) == 0 );
+    assert( var_InheritURational( p_libvlc, &frac, name ) == 0 );
     assert( frac.num == 1 && frac.den == 0 );
 
     var_Destroy( p_libvlc, name );
