@@ -53,7 +53,7 @@ struct sout_stream_sys_t
     decoder_t       *p_decoder;
     image_handler_t *p_image; /* filter for resizing */
     int i_height, i_width;
-    unsigned int i_sar_num, i_sar_den;
+    vlc_urational_t sar;
     char *psz_id;
     bool b_inited;
 
@@ -205,22 +205,22 @@ static int Open( vlc_object_t *p_this )
         if( psz_parser )
         {
             *psz_parser++ = '\0';
-            p_sys->i_sar_num = atoi( val.psz_string );
-            p_sys->i_sar_den = atoi( psz_parser );
-            vlc_ureduce( &p_sys->i_sar_num, &p_sys->i_sar_den,
-                         p_sys->i_sar_num, p_sys->i_sar_den, 0 );
+            p_sys->sar.num = atoi( val.psz_string );
+            p_sys->sar.den = atoi( psz_parser );
+            vlc_ureduce( &p_sys->sar.num, &p_sys->sar.den,
+                         p_sys->sar.num, p_sys->sar.den, 0 );
         }
         else
         {
             msg_Warn( p_stream, "bad aspect ratio %s", val.psz_string );
-            p_sys->i_sar_num = p_sys->i_sar_den = 1;
+            p_sys->sar.num = p_sys->sar.den = 1;
         }
 
         free( val.psz_string );
     }
     else
     {
-        p_sys->i_sar_num = p_sys->i_sar_den = 1;
+        p_sys->sar.num = p_sys->sar.den = 1;
     }
 
     p_sys->i_chroma = 0;
@@ -518,14 +518,14 @@ static int decoder_queue_video( decoder_t *p_dec, picture_t *p_pic,
         {
             fmt_out.i_width = p_sys->i_width;
             fmt_out.i_height = (p_sys->i_width * VOUT_ASPECT_FACTOR
-                * p_sys->i_sar_num / p_sys->i_sar_den / i_fmt_in_aspect)
+                * p_sys->sar.num / p_sys->sar.den / i_fmt_in_aspect)
                   & ~0x1;
         }
         else if ( !p_sys->i_width )
         {
             fmt_out.i_height = p_sys->i_height;
             fmt_out.i_width = (p_sys->i_height * i_fmt_in_aspect
-                * p_sys->i_sar_den / p_sys->i_sar_num / VOUT_ASPECT_FACTOR)
+                * p_sys->sar.den / p_sys->sar.num / VOUT_ASPECT_FACTOR)
                   & ~0x1;
         }
         else
