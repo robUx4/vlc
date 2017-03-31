@@ -427,13 +427,13 @@ static bool h264_parse_sequence_parameter_set_rbsp( bs_t *p_bs,
 
             if( w != 0 && h != 0 )
             {
-                p_sps->vui.i_sar_num = w;
-                p_sps->vui.i_sar_den = h;
+                p_sps->vui.sar.num = w;
+                p_sps->vui.sar.den = h;
             }
             else
             {
-                p_sps->vui.i_sar_num = 1;
-                p_sps->vui.i_sar_den = 1;
+                p_sps->vui.sar.num = 1;
+                p_sps->vui.sar.den = 1;
             }
         }
 

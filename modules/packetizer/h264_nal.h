@@ -115,7 +115,7 @@ struct h264_sequence_parameter_set_t
 
     struct {
         bool b_valid;
-        int i_sar_num, i_sar_den;
+        vlc_urational_t sar;
         struct {
             bool b_full_range;
             uint8_t i_colour_primaries;

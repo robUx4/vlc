@@ -585,8 +585,8 @@ h264_helper_get_current_sar(struct hxxx_helper *hh, int *p_num, int *p_den)
     const struct hxxx_helper_nal *hsps = h264_helper_get_current_sps(hh);
     if (hsps == NULL)
         return VLC_EGENERIC;
-    *p_num = hsps->h264_sps->vui.i_sar_num;
-    *p_den = hsps->h264_sps->vui.i_sar_den;
+    *p_num = hsps->h264_sps->vui.sar.num;
+    *p_den = hsps->h264_sps->vui.sar.den;
     return VLC_SUCCESS;
 }
 
