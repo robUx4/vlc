@@ -1092,9 +1092,8 @@ void vout_UpdateDisplaySourceProperties(vout_display_t *vd, const video_format_t
     if (source->sar.num * osys->source.sar.den !=
         source->sar.den * osys->source.sar.num) {
 
-        osys->source.sar = source->sar;
         vlc_ureduce(&osys->source.sar.num, &osys->source.sar.den,
-                    osys->source.sar.num, osys->source.sar.den, 0);
+                    source->sar.num, source->sar.den, 0);
 
         /* FIXME it will override any AR that the user would have forced */
         osys->ch_sar = true;
