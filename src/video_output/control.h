@@ -72,10 +72,6 @@ typedef struct {
         mtime_t *time_ptr;
         char    *string;
         int     integer;
-        struct {
-            int a;
-            int b;
-        } pair;
         vlc_urational_t rational;
         struct {
             bool is_on;
