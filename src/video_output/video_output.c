@@ -461,10 +461,9 @@ int vout_GetSnapshot(vout_thread_t *vout,
     return VLC_SUCCESS;
 }
 
-void vout_ChangeAspectRatio( vout_thread_t *p_vout,
-                             unsigned int i_num, unsigned int i_den )
+void vout_ChangeAspectRatio( vout_thread_t *p_vout, const vlc_urational_t *p_ar )
 {
-    vout_ControlChangeSampleAspectRatio( p_vout, i_num, i_den );
+    vout_ControlChangeSampleAspectRatio( p_vout, p_ar );
 }
 
 /* vout_Control* are usable by anyone at anytime */
@@ -487,17 +486,13 @@ void vout_ControlChangeZoom(vout_thread_t *vout, int num, int den)
     vout_control_PushPair(&vout->p->control, VOUT_CONTROL_ZOOM,
                           num, den);
 }
-void vout_ControlChangeSampleAspectRatio(vout_thread_t *vout,
-                                         unsigned num, unsigned den)
+void vout_ControlChangeSampleAspectRatio(vout_thread_t *vout, const vlc_urational_t *p_ar)
 {
-    vout_control_PushPair(&vout->p->control, VOUT_CONTROL_ASPECT_RATIO,
-                          num, den);
+    vout_control_PushRational(&vout->p->control, VOUT_CONTROL_ASPECT_RATIO, p_ar);
 }
-void vout_ControlChangeCropRatio(vout_thread_t *vout,
-                                 unsigned num, unsigned den)
+void vout_ControlChangeCropRatio(vout_thread_t *vout, const vlc_urational_t *p_ar)
 {
-    vout_control_PushPair(&vout->p->control, VOUT_CONTROL_CROP_RATIO,
-                          num, den);
+    vout_control_PushRational(&vout->p->control, VOUT_CONTROL_CROP_RATIO, p_ar);
 }
 void vout_ControlChangeCropWindow(vout_thread_t *vout,
                                   int x, int y, int width, int height)
@@ -1300,10 +1295,9 @@ static void ThreadChangeZoom(vout_thread_t *vout, int num, int den)
     vout_SetDisplayZoom(vout->p->display.vd, num, den);
 }
 
-static void ThreadChangeAspectRatio(vout_thread_t *vout,
-                                    unsigned num, unsigned den)
+static void ThreadChangeAspectRatio(vout_thread_t *vout, vlc_urational_t *p_rat)
 {
-    vout_SetDisplayAspect(vout->p->display.vd, num, den);
+    vout_SetDisplayAspect(vout->p->display.vd, p_rat);
 }
 
 
@@ -1323,10 +1317,9 @@ static void ThreadExecuteCropBorder(vout_thread_t *vout,
                         left, top, -(int)right, -(int)bottom);
 }
 
-static void ThreadExecuteCropRatio(vout_thread_t *vout,
-                                   unsigned num, unsigned den)
+static void ThreadExecuteCropRatio(vout_thread_t *vout, const vlc_urational_t *p_rat)
 {
-    vout_SetDisplayCrop(vout->p->display.vd, num, den,
+    vout_SetDisplayCrop(vout->p->display.vd, p_rat->num, p_rat->den,
                         0, 0, 0, 0);
 }
 
@@ -1586,10 +1579,10 @@ static int ThreadControl(vout_thread_t *vout, vout_control_cmd_t cmd)
         ThreadChangeZoom(vout, cmd.u.pair.a, cmd.u.pair.b);
         break;
     case VOUT_CONTROL_ASPECT_RATIO:
-        ThreadChangeAspectRatio(vout, cmd.u.pair.a, cmd.u.pair.b);
+        ThreadChangeAspectRatio(vout, &cmd.u.rational);
         break;
     case VOUT_CONTROL_CROP_RATIO:
-        ThreadExecuteCropRatio(vout, cmd.u.pair.a, cmd.u.pair.b);
+        ThreadExecuteCropRatio(vout, &cmd.u.rational);
         break;
     case VOUT_CONTROL_CROP_WINDOW:
         ThreadExecuteCropWindow(vout,

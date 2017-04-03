@@ -56,9 +56,9 @@ enum {
     VOUT_CONTROL_DISPLAY_FILLED,        /* bool */
     VOUT_CONTROL_ZOOM,                  /* pair */
 
-    VOUT_CONTROL_ASPECT_RATIO,          /* pair */
+    VOUT_CONTROL_ASPECT_RATIO,          /* rational */
     VOUT_CONTROL_CROP_BORDER,           /* border */
-    VOUT_CONTROL_CROP_RATIO,            /* pair */
+    VOUT_CONTROL_CROP_RATIO,            /* rational */
     VOUT_CONTROL_CROP_WINDOW,           /* window */
     VOUT_CONTROL_VIEWPOINT,             /* viewpoint */
 };
@@ -76,6 +76,7 @@ typedef struct {
             int a;
             int b;
         } pair;
+        vlc_urational_t rational;
         struct {
             bool is_on;
             mtime_t date;
@@ -132,6 +133,7 @@ void vout_control_PushInteger(vout_control_t *, int type, int integer);
 void vout_control_PushTime(vout_control_t *, int type, mtime_t time);
 void vout_control_PushMessage(vout_control_t *, int type, int channel, const char *string);
 void vout_control_PushPair(vout_control_t *, int type, int a, int b);
+void vout_control_PushRational(vout_control_t *ctrl, int type, const vlc_urational_t *p_rat);
 void vout_control_PushString(vout_control_t *, int type, const char *string);
 void vout_control_Wake(vout_control_t *);
 

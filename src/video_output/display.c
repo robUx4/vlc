@@ -1141,14 +1141,14 @@ void vout_SetDisplayZoom(vout_display_t *vd, unsigned num, unsigned den)
     }
 }
 
-void vout_SetDisplayAspect(vout_display_t *vd, unsigned dar_num, unsigned dar_den)
+void vout_SetDisplayAspect(vout_display_t *vd, const vlc_urational_t *p_dar)
 {
     vout_display_owner_sys_t *osys = vd->owner.sys;
 
     unsigned sar_num, sar_den;
-    if (dar_num > 0 && dar_den > 0) {
-        sar_num = dar_num * osys->source.i_visible_height;
-        sar_den = dar_den * osys->source.i_visible_width;
+    if (p_dar->num != 0 && p_dar->den != 0) {
+        sar_num = p_dar->num * osys->source.i_visible_height;
+        sar_den = p_dar->den * osys->source.i_visible_width;
         vlc_ureduce(&sar_num, &sar_den, sar_num, sar_den, 0);
     } else {
         sar_num = 0;

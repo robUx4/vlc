@@ -576,7 +576,8 @@ static void Packet_SetAR( asf_packet_sys_t *p_packetsys, uint8_t i_stream_number
         if ( p_vout )
         {
             msg_Info( p_demux, "Changing aspect ratio to %i/%i", i_ratio_x, i_ratio_y );
-            vout_ChangeAspectRatio( p_vout, i_ratio_x, i_ratio_y );
+            vlc_urational_t ar = { .num = i_ratio_x, .den = i_ratio_y };
+            vout_ChangeAspectRatio( p_vout, &ar );
             vlc_object_release( p_vout );
         }
     }

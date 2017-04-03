@@ -446,13 +446,13 @@ static int CropCallback( vlc_object_t *object, char const *cmd,
 {
     vout_thread_t *vout = (vout_thread_t *)object;
     VLC_UNUSED(cmd); VLC_UNUSED(oldval); VLC_UNUSED(data);
-    unsigned num, den;
+    vlc_urational_t crop_ratio;
     unsigned y, x;
     unsigned width, height;
     unsigned left, top, right, bottom;
 
-    if (sscanf(newval.psz_string, "%u:%u", &num, &den) == 2) {
-        vout_ControlChangeCropRatio(vout, num, den);
+    if (sscanf(newval.psz_string, "%u:%u", &crop_ratio.num, &crop_ratio.den) == 2) {
+        vout_ControlChangeCropRatio(vout, &crop_ratio);
     } else if (sscanf(newval.psz_string, "%ux%u+%u+%u",
                       &width, &height, &x, &y) == 4) {
         vout_ControlChangeCropWindow(vout, x, y, width, height);
@@ -460,7 +460,8 @@ static int CropCallback( vlc_object_t *object, char const *cmd,
                     &left, &top, &right, &bottom) == 4) {
         vout_ControlChangeCropBorder(vout, left, top, right, bottom);
     } else if (*newval.psz_string == '\0') {
-        vout_ControlChangeCropRatio(vout, 0, 0);
+        crop_ratio.num = crop_ratio.den = 0;
+        vout_ControlChangeCropRatio(vout, &crop_ratio);
     } else {
         msg_Err(object, "Unknown crop format (%s)", newval.psz_string);
     }
@@ -488,13 +489,16 @@ static int AspectCallback( vlc_object_t *object, char const *cmd,
 {
     vout_thread_t *vout = (vout_thread_t *)object;
     VLC_UNUSED(cmd); VLC_UNUSED(oldval); VLC_UNUSED(data);
-    unsigned num, den;
+    vlc_urational_t ar;
 
-    if (sscanf(newval.psz_string, "%u:%u", &num, &den) == 2 &&
-        (num != 0) == (den != 0))
-        vout_ControlChangeSampleAspectRatio(vout, num, den);
+    if (sscanf(newval.psz_string, "%u:%u", &ar.num, &ar.den) == 2 &&
+        (ar.num != 0) == (ar.den != 0))
+        vout_ControlChangeSampleAspectRatio(vout, &ar);
     else if (*newval.psz_string == '\0')
-        vout_ControlChangeSampleAspectRatio(vout, 0, 0);
+    {
+        ar.num = ar.den = 0;
+        vout_ControlChangeSampleAspectRatio(vout, &ar);
+    }
     return VLC_SUCCESS;
 }
 
