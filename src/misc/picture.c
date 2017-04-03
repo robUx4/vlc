@@ -152,7 +152,7 @@ int picture_Setup( picture_t *p_picture, const video_format_t *restrict fmt )
 
     video_format_Setup( &p_picture->format, fmt->i_chroma, fmt->i_width, fmt->i_height,
                         fmt->i_visible_width, fmt->i_visible_height,
-                        fmt->sar.num, fmt->sar.den );
+                        &fmt->sar );
 
     const vlc_chroma_description_t *p_dsc =
         vlc_fourcc_GetChromaDescription( p_picture->format.i_chroma );
@@ -208,7 +208,7 @@ picture_t *picture_NewFromResource( const video_format_t *p_fmt, const picture_r
     video_format_Setup( &fmt, p_fmt->i_chroma,
                               p_fmt->i_width, p_fmt->i_height,
                               p_fmt->i_visible_width, p_fmt->i_visible_height,
-                              p_fmt->sar.num, p_fmt->sar.den );
+                              &p_fmt->sar );
     if( p_fmt->i_x_offset < p_fmt->i_width &&
         p_fmt->i_y_offset < p_fmt->i_height &&
         p_fmt->i_visible_width  > 0 && p_fmt->i_x_offset + p_fmt->i_visible_width  <= p_fmt->i_width &&
@@ -269,13 +269,13 @@ picture_t *picture_NewFromFormat( const video_format_t *p_fmt )
     return picture_NewFromResource( p_fmt, NULL );
 }
 
-picture_t *picture_New( vlc_fourcc_t i_chroma, int i_width, int i_height, int i_sar_num, int i_sar_den )
+picture_t *picture_New( vlc_fourcc_t i_chroma, int i_width, int i_height, const vlc_urational_t *p_sar )
 {
     video_format_t fmt;
 
     memset( &fmt, 0, sizeof(fmt) );
     video_format_Setup( &fmt, i_chroma, i_width, i_height,
-                        i_width, i_height, i_sar_num, i_sar_den );
+                        i_width, i_height, p_sar );
 
     return picture_NewFromFormat( &fmt );
 }

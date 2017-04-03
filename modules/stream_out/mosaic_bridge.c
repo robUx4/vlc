@@ -551,8 +551,7 @@ static int decoder_queue_video( decoder_t *p_dec, picture_t *p_pic,
 
         p_new_pic = picture_New( p_pic->format.i_chroma,
                                  p_pic->format.i_width, p_pic->format.i_height,
-                                 p_sys->p_decoder->fmt_out.video.sar.num,
-                                 p_sys->p_decoder->fmt_out.video.sar.den );
+                                 &p_sys->p_decoder->fmt_out.video.sar );
         if( !p_new_pic )
         {
             picture_Release( p_pic );

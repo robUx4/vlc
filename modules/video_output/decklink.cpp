@@ -439,7 +439,7 @@ static picture_t * CreateNoSignalPicture(vlc_object_t *p_this, const video_forma
     video_format_Init(&in, 0);
     video_format_Setup(&in, 0,
                        fmt->i_width, fmt->i_height,
-                       fmt->i_width, fmt->i_height, 1, 1);
+                       fmt->i_width, fmt->i_height, NULL);
 
     picture_t *png = image_ReadUrl(img, psz_file, &dummy, &in);
     if (png)

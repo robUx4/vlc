@@ -332,7 +332,7 @@ valid:
     es_format_Init( &p_sys->fmt_video, VIDEO_ES, i_chroma );
     video_format_Setup( &p_sys->fmt_video.video, i_chroma,
                         i_width, i_height, i_width, i_height,
-                        sar.num, sar.den );
+                        &sar );
 
     vlc_ureduce( &p_sys->fmt_video.video.frame_rate.num,
                  &p_sys->fmt_video.video.frame_rate.den,

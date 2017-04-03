@@ -237,9 +237,13 @@ bool gst_vlc_set_vout_fmt( GstVideoInfo *p_info, GstVideoAlignment *p_align,
     i_padded_height = GST_VIDEO_INFO_HEIGHT( p_info ) + p_align->padding_top +
         p_align->padding_bottom;
 
+    vlc_urational_t sar = {
+        .num = GST_VIDEO_INFO_PAR_N( p_info ),
+        .den = GST_VIDEO_INFO_PAR_D( p_info )
+    };
     video_format_Setup( p_voutfmt, i_chroma, i_padded_width, i_padded_height,
             GST_VIDEO_INFO_WIDTH( p_info ), GST_VIDEO_INFO_HEIGHT( p_info ),
-            GST_VIDEO_INFO_PAR_N( p_info ), GST_VIDEO_INFO_PAR_D( p_info ));
+            &sar);
     p_voutfmt->i_x_offset = p_align->padding_left;
     p_voutfmt->i_y_offset = p_align->padding_top;
 

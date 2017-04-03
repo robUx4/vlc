@@ -411,15 +411,16 @@ static int Init( filter_t *p_filter )
         else
             p_sys->ctxA = ctx;
     }
+    vlc_urational_t sar = {.num = 0, .den = 1};
     if( p_sys->ctxA )
     {
-        p_sys->p_src_a = picture_New( VLC_CODEC_GREY, i_fmti_visible_width, p_fmti->i_visible_height, 0, 1 );
-        p_sys->p_dst_a = picture_New( VLC_CODEC_GREY, i_fmto_visible_width, p_fmto->i_visible_height, 0, 1 );
+        p_sys->p_src_a = picture_New( VLC_CODEC_GREY, i_fmti_visible_width, p_fmti->i_visible_height, &sar );
+        p_sys->p_dst_a = picture_New( VLC_CODEC_GREY, i_fmto_visible_width, p_fmto->i_visible_height, &sar );
     }
     if( p_sys->i_extend_factor != 1 )
     {
-        p_sys->p_src_e = picture_New( p_fmti->i_chroma, i_fmti_visible_width, p_fmti->i_visible_height, 0, 1 );
-        p_sys->p_dst_e = picture_New( p_fmto->i_chroma, i_fmto_visible_width, p_fmto->i_visible_height, 0, 1 );
+        p_sys->p_src_e = picture_New( p_fmti->i_chroma, i_fmti_visible_width, p_fmti->i_visible_height, &sar );
+        p_sys->p_dst_e = picture_New( p_fmto->i_chroma, i_fmto_visible_width, p_fmto->i_visible_height, &sar );
 
         if( p_sys->p_src_e )
             memset( p_sys->p_src_e->p[0].p_pixels, 0, p_sys->p_src_e->p[0].i_pitch * p_sys->p_src_e->p[0].i_lines );

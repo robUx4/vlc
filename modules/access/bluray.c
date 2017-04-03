@@ -381,7 +381,7 @@ static void startBackground(demux_t *p_demux)
     es_format_t fmt;
     es_format_Init( &fmt, VIDEO_ES, VLC_CODEC_I420 );
     video_format_Setup( &fmt.video, VLC_CODEC_I420,
-                        1920, 1080, 1920, 1080, 1, 1);
+                        1920, 1080, 1920, 1080, NULL);
     fmt.i_priority = ES_PRIORITY_SELECTABLE_MIN;
     fmt.i_id = 4115; /* 4113 = main video. 4114 = MVC. 4115 = unused. */
     fmt.i_group = 1;
@@ -1419,7 +1419,7 @@ static void blurayDrawOverlay(demux_t *p_demux, const BD_OVERLAY* const ov)
     if (!p_reg) {
         video_format_t fmt;
         video_format_Init(&fmt, 0);
-        video_format_Setup(&fmt, VLC_CODEC_YUVP, ov->w, ov->h, ov->w, ov->h, 1, 1);
+        video_format_Setup(&fmt, VLC_CODEC_YUVP, ov->w, ov->h, ov->w, ov->h, NULL);
 
         p_reg = subpicture_region_New(&fmt);
         p_reg->i_x = ov->x;
@@ -1511,7 +1511,7 @@ static void blurayInitArgbOverlay(demux_t *p_demux, int plane, int width, int he
     if (!p_sys->p_overlays[plane]->p_regions) {
         video_format_t fmt;
         video_format_Init(&fmt, 0);
-        video_format_Setup(&fmt, VLC_CODEC_RGBA, width, height, width, height, 1, 1);
+        video_format_Setup(&fmt, VLC_CODEC_RGBA, width, height, width, height, NULL);
 
         p_sys->p_overlays[plane]->p_regions = subpicture_region_New(&fmt);
     }

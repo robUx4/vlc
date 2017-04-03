@@ -638,8 +638,7 @@ static int OpenEncoder( vlc_object_t *p_this )
                 p_enc->fmt_in.video.i_height,
                 p_enc->fmt_in.video.i_visible_width,
                 p_enc->fmt_in.video.i_visible_height,
-                p_enc->fmt_in.video.sar.num,
-                p_enc->fmt_in.video.sar.den);
+                &p_enc->fmt_in.video.sar);
     }
 
     daala_info_init( &p_sys->di );

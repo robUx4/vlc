@@ -108,7 +108,7 @@ static void test(bool zombie)
 
 int main(void)
 {
-    video_format_Setup(&fmt, VLC_CODEC_I420, 320, 200, 320, 200, 1, 1);
+    video_format_Setup(&fmt, VLC_CODEC_I420, 320, 200, 320, 200, NULL);
 
     pool = picture_pool_NewFromFormat(&fmt, PICTURES);
     assert(pool != NULL);

@@ -101,8 +101,10 @@ struct picture_t
  * The picture created will implement a default release management compatible
  * with picture_Hold and picture_Release. This default management will release
  * p_sys, gc.p_sys fields if non NULL.
+ * \param p_sar NULL means a SAR of 1:1
  */
-VLC_API picture_t * picture_New( vlc_fourcc_t i_chroma, int i_width, int i_height, int i_sar_num, int i_sar_den ) VLC_USED;
+VLC_API picture_t * picture_New( vlc_fourcc_t i_chroma, int i_width, int i_height,
+                                 const vlc_urational_t *p_sar ) VLC_USED;
 
 /**
  * This function will create a new picture using the given format.
