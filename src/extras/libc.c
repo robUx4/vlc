@@ -409,7 +409,7 @@ int vlc_iconv_close( vlc_iconv_t cd )
  * reduce a fraction
  *   (adapted from libavcodec, author Michael Niedermayer <michaelni@gmx.at>)
  *****************************************************************************/
-bool vlc_ureduce( unsigned *pi_dst_nom, unsigned *pi_dst_den,
+bool vlc_ureduce( vlc_urational_t *dst,
                         uint64_t i_nom, uint64_t i_den, uint64_t i_max )
 {
     bool b_exact = 1;
@@ -417,8 +417,8 @@ bool vlc_ureduce( unsigned *pi_dst_nom, unsigned *pi_dst_den,
 
     if( i_den == 0 )
     {
-        *pi_dst_nom = 0;
-        *pi_dst_den = 1;
+        dst->num = 0;
+        dst->den = 1;
         return 1;
     }
 
@@ -452,8 +452,8 @@ bool vlc_ureduce( unsigned *pi_dst_nom, unsigned *pi_dst_den,
         i_den = i_a1_den;
     }
 
-    *pi_dst_nom = i_nom;
-    *pi_dst_den = i_den;
+    dst->num = i_nom;
+    dst->den = i_den;
 
     return b_exact;
 }

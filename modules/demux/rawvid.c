@@ -334,8 +334,7 @@ valid:
                         i_width, i_height, i_width, i_height,
                         &sar );
 
-    vlc_ureduce( &p_sys->fmt_video.video.frame_rate.num,
-                 &p_sys->fmt_video.video.frame_rate.den,
+    vlc_ureduce( &p_sys->fmt_video.video.frame_rate,
                  fps.num, fps.den, 0);
     date_Init( &p_sys->pcr, p_sys->fmt_video.video.frame_rate.num,
                p_sys->fmt_video.video.frame_rate.den );

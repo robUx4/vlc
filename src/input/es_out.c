@@ -1594,8 +1594,7 @@ static es_out_id_t *EsOutAddSlave( es_out_t *out, const es_format_t *fmt, es_out
         }
 
         if( es->fmt.video.frame_rate.num && es->fmt.video.frame_rate.den )
-            vlc_ureduce( &es->fmt.video.frame_rate.num,
-                         &es->fmt.video.frame_rate.den,
+            vlc_ureduce( &es->fmt.video.frame_rate,
                          es->fmt.video.frame_rate.num,
                          es->fmt.video.frame_rate.den, 0 );
         break;

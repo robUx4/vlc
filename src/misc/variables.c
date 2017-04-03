@@ -1266,7 +1266,7 @@ vlc_urational_t (var_InheritURational)(vlc_object_t *object, const char *var)
         dst.num = 1;
         dst.den = 0;
     } else
-        vlc_ureduce(&dst.num, &dst.den, n, d, 0);
+        vlc_ureduce(&dst, n, d, 0);
 
 error:
     free(str);

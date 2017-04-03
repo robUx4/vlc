@@ -987,7 +987,7 @@ static block_t *asf_header_create( sout_mux_t *p_mux, bool b_broadcast )
     /* metadata object (part of header extension) */
     if( i_cm_size )
     {
-        unsigned int i_dst_num, i_dst_den;
+        vlc_urational_t dst;
 
         asf_track_t *tk = NULL;
         for( size_t i = 0; i < vlc_array_count( &p_sys->tracks ); i++ )
@@ -1000,11 +1000,11 @@ static block_t *asf_header_create( sout_mux_t *p_mux, bool b_broadcast )
         }
         assert( tk != NULL );
 
-        vlc_ureduce( &i_dst_num, &i_dst_den,
+        vlc_ureduce( &dst,
                      tk->fmt.video.sar.num,
                      tk->fmt.video.sar.den, 0 );
 
-        msg_Dbg( p_mux, "pixel aspect-ratio: %i/%i", i_dst_num, i_dst_den );
+        msg_Dbg( p_mux, "pixel aspect-ratio: %i/%i", dst.num, dst.den );
 
         bo_add_guid ( &bo, &asf_object_metadata_guid );
         bo_addle_u64( &bo, i_cm_size );
@@ -1016,7 +1016,7 @@ static block_t *asf_header_create( sout_mux_t *p_mux, bool b_broadcast )
         bo_addle_u16( &bo, 0x3 /* DWORD */ ); /* data type */
         bo_addle_u32( &bo, 4 ); /* data length */
         bo_addle_str16_nosize( &bo, "AspectRatioX" );
-        bo_addle_u32( &bo, i_dst_num ); /* data */
+        bo_addle_u32( &bo, dst.num ); /* data */
         /* 2nd description record */
         bo_addle_u16( &bo, 0 ); /* reserved */
         bo_addle_u16( &bo, tk->i_id ); /* stream number (0 for the whole file) */
@@ -1024,7 +1024,7 @@ static block_t *asf_header_create( sout_mux_t *p_mux, bool b_broadcast )
         bo_addle_u16( &bo, 0x3 /* DWORD */ ); /* data type */
         bo_addle_u32( &bo, 4 ); /* data length */
         bo_addle_str16_nosize( &bo, "AspectRatioY" );
-        bo_addle_u32( &bo, i_dst_den ); /* data */
+        bo_addle_u32( &bo, dst.den ); /* data */
     }
 
     /* content description header */

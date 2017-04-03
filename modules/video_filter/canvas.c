@@ -352,8 +352,7 @@ static int Activate( vlc_object_t *p_this )
     fmt = *filter_chain_GetFmtOut( p_sys->p_chain );
     es_format_Copy( &p_filter->fmt_out, &fmt );
 
-    vlc_ureduce( &p_filter->fmt_out.video.sar.num,
-        &p_filter->fmt_out.video.sar.den,
+    vlc_ureduce( &p_filter->fmt_out.video.sar,
         i_canvas_aspect    * p_filter->fmt_out.video.i_visible_height,
         VOUT_ASPECT_FACTOR * p_filter->fmt_out.video.i_visible_width,
         0);

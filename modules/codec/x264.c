@@ -1323,12 +1323,12 @@ static int  Open ( vlc_object_t *p_this )
     if( p_enc->fmt_in.video.sar.num != 0 &&
         p_enc->fmt_in.video.sar.den != 0 )
     {
-        unsigned int i_dst_num, i_dst_den;
-        vlc_ureduce( &i_dst_num, &i_dst_den,
+        vlc_urational_t dst;
+        vlc_ureduce( &dst,
                      p_enc->fmt_in.video.sar.num,
                      p_enc->fmt_in.video.sar.den, 0 );
-        p_sys->param.vui.i_sar_width = i_dst_num;
-        p_sys->param.vui.i_sar_height = i_dst_den;
+        p_sys->param.vui.i_sar_width = dst.num;
+        p_sys->param.vui.i_sar_height = dst.den;
     }
 
     p_sys->param.i_timebase_num = 1;

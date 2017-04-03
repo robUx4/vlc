@@ -525,13 +525,13 @@ static IDeckLinkDisplayMode * MatchDisplayMode(vout_display_t *vd,
                     if(i_width >> i_div == p_mode->GetWidth() >> i_div &&
                        i_height >> i_div == p_mode->GetHeight() >> i_div)
                     {
-                        unsigned int num_deck, den_deck;
-                        unsigned int num_stream, den_stream;
-                        vlc_ureduce(&num_deck, &den_deck, timescale, frameduration, 0);
-                        vlc_ureduce(&num_stream, &den_stream,
+                        vlc_urational_t deck;
+                        vlc_urational_t stream;
+                        vlc_ureduce(&deck, timescale, frameduration, 0);
+                        vlc_ureduce(&stream,
                                     fmt->frame_rate.num, fmt->frame_rate.den, 0);
 
-                        if (num_deck == num_stream && den_deck == den_stream)
+                        if (desk.num == stream.num && desk.den == stream.den)
                         {
                             msg_Info(vd, "Matches incoming stream");
                             p_selected = p_mode;

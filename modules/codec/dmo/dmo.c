@@ -513,7 +513,7 @@ static int DecOpen( decoder_t *p_dec )
         if( p_dec->fmt_in.video.sar.num != 0 &&
             p_dec->fmt_in.video.sar.den != 0 )
         {
-            p_dec->fmt_out.video.sar= p_dec->fmt_in.video.sar;
+            p_dec->fmt_out.video.sar = p_dec->fmt_in.video.sar;
         }
         else
         {

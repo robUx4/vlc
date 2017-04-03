@@ -447,8 +447,7 @@ static int vout_update_format( decoder_t *p_dec )
             fmt.sar.den = 1;
         }
 
-        vlc_ureduce( &fmt.sar.num, &fmt.sar.den,
-                     fmt.sar.num, fmt.sar.den, 50000 );
+        vlc_ureduce( &fmt.sar, fmt.sar.num, fmt.sar.den, 50000 );
 
         video_format_AdjustColorSpace( &fmt );
 

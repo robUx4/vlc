@@ -422,8 +422,7 @@ static void transcode_video_framerate_init( sout_stream_t *p_stream,
     id->p_encoder->fmt_in.video.frame_rate =
         id->p_encoder->fmt_out.video.frame_rate;
 
-    vlc_ureduce( &id->p_encoder->fmt_in.video.frame_rate.num,
-        &id->p_encoder->fmt_in.video.frame_rate.den,
+    vlc_ureduce( &id->p_encoder->fmt_in.video.frame_rate,
         id->p_encoder->fmt_in.video.frame_rate.num,
         id->p_encoder->fmt_in.video.frame_rate.den,
         0 );
@@ -572,16 +571,14 @@ static void transcode_video_sar_init( sout_stream_t *p_stream,
     if( id->p_encoder->fmt_out.video.sar.num == 0 ||
         id->p_encoder->fmt_out.video.sar.den == 0 )
     {
-        vlc_ureduce( &id->p_encoder->fmt_out.video.sar.num,
-                     &id->p_encoder->fmt_out.video.sar.den,
+        vlc_ureduce( &id->p_encoder->fmt_out.video.sar,
                      (uint64_t)p_fmt_out->video.sar.num * id->p_encoder->fmt_out.video.i_width * p_fmt_out->video.i_height,
                      (uint64_t)p_fmt_out->video.sar.den * id->p_encoder->fmt_out.video.i_height * p_fmt_out->video.i_width,
                      0 );
     }
     else
     {
-        vlc_ureduce( &id->p_encoder->fmt_out.video.sar.num,
-                     &id->p_encoder->fmt_out.video.sar.den,
+        vlc_ureduce( &id->p_encoder->fmt_out.video.sar,
                      id->p_encoder->fmt_out.video.sar.num,
                      id->p_encoder->fmt_out.video.sar.den,
                      0 );

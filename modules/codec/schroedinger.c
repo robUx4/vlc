@@ -1152,12 +1152,12 @@ static int OpenEncoder( vlc_object_t *p_this )
     p_sys->p_format->height                 = p_enc->fmt_in.video.i_visible_height;
     p_sys->p_format->frame_rate_numerator   = p_enc->fmt_in.video.frame_rate.num;
     p_sys->p_format->frame_rate_denominator = p_enc->fmt_in.video.frame_rate.den;
-    unsigned u_asr_num, u_asr_den;
-    vlc_ureduce( &u_asr_num, &u_asr_den,
+    vlc_urational_t asr;
+    vlc_ureduce( &asr,
                  p_enc->fmt_in.video.sar.num,
                  p_enc->fmt_in.video.sar.den, 0 );
-    p_sys->p_format->aspect_ratio_numerator   = u_asr_num;
-    p_sys->p_format->aspect_ratio_denominator = u_asr_den;
+    p_sys->p_format->aspect_ratio_numerator   = asr.num;
+    p_sys->p_format->aspect_ratio_denominator = asr.den;
 
     config_ChainParse( p_enc, ENC_CFG_PREFIX, ppsz_enc_options, p_enc->p_cfg );
 

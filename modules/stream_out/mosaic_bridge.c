@@ -207,8 +207,7 @@ static int Open( vlc_object_t *p_this )
             *psz_parser++ = '\0';
             p_sys->sar.num = atoi( val.psz_string );
             p_sys->sar.den = atoi( psz_parser );
-            vlc_ureduce( &p_sys->sar.num, &p_sys->sar.den,
-                         p_sys->sar.num, p_sys->sar.den, 0 );
+            vlc_ureduce( &p_sys->sar, p_sys->sar.num, p_sys->sar.den, 0 );
         }
         else
         {
@@ -625,8 +624,7 @@ static int video_update_format( vlc_object_t *p_this,
         (int64_t)fmt_out->video.sar.num * p_sys->video.sar.den !=
         (int64_t)fmt_out->video.sar.den * p_sys->video.sar.num )
     {
-        vlc_ureduce( &fmt_out->video.sar.num,
-                     &fmt_out->video.sar.den,
+        vlc_ureduce( &fmt_out->video.sar,
                      fmt_out->video.sar.num,
                      fmt_out->video.sar.den, 0 );
 

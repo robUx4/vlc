@@ -840,7 +840,7 @@ typedef struct {
     unsigned num, den;
 } vlc_urational_t;
 
-VLC_API bool vlc_ureduce( unsigned *, unsigned *, uint64_t, uint64_t, uint64_t );
+VLC_API bool vlc_ureduce( vlc_urational_t *, uint64_t, uint64_t, uint64_t );
 
 /* Aligned memory allocator */
 

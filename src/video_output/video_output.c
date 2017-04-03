@@ -85,8 +85,7 @@ static int VoutValidateFormat(video_format_t *dst,
     /* */
     video_format_Copy(dst, src);
     dst->i_chroma = vlc_fourcc_GetCodec(VIDEO_ES, src->i_chroma);
-    vlc_ureduce( &dst->sar.num, &dst->sar.den,
-                 src->sar.num,  src->sar.den, 50000 );
+    vlc_ureduce( &dst->sar, src->sar.num,  src->sar.den, 50000 );
     if (dst->sar.num == 0 || dst->sar.den == 0) {
         dst->sar.num = 1;
         dst->sar.den = 1;
@@ -577,7 +576,7 @@ static void VoutGetDisplayCfg(vout_thread_t *vout, vout_display_cfg_t *cfg, cons
     }
     cfg->zoom.den = 1000;
     cfg->zoom.num = 1000 * var_GetFloat(vout, "zoom");
-    vlc_ureduce(&cfg->zoom.num, &cfg->zoom.den, cfg->zoom.num, cfg->zoom.den, 0);
+    vlc_ureduce(&cfg->zoom, cfg->zoom.num, cfg->zoom.den, 0);
     cfg->align.vertical = VOUT_DISPLAY_ALIGN_CENTER;
     cfg->align.horizontal = VOUT_DISPLAY_ALIGN_CENTER;
     const int align_mask = var_GetInteger(vout, "align");

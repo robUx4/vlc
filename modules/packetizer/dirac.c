@@ -904,7 +904,7 @@ static int dirac_InspectDataUnit( decoder_t *p_dec, block_t **pp_block, block_t 
         p_es->video.i_width  = p_sys->seq_hdr.u_width;
         p_es->video.i_height = p_sys->seq_hdr.u_height;
 
-        vlc_ureduce( &p_es->video.frame_rate.num, &p_es->video.frame_rate.den
+        vlc_ureduce( &p_es->video.frame_rate
                    , p_sys->seq_hdr.u_fps_num, p_sys->seq_hdr.u_fps_den, 0 );
 
         /* when field coding, dts needs to be incremented in terms of field periods */

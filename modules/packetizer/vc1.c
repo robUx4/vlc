@@ -523,6 +523,7 @@ static block_t *ParseIDU( decoder_t *p_dec, bool *pb_ts_used, block_t *p_frag )
                     };
                     int i_ar = bs_read( &s, 4 );
                     unsigned i_ar_w, i_ar_h;
+                    vlc_urational_t ar;
 
                     if( i_ar == 15 )
                     {
@@ -534,9 +535,9 @@ static block_t *ParseIDU( decoder_t *p_dec, bool *pb_ts_used, block_t *p_frag )
                         i_ar_w = p_ar[i_ar][0];
                         i_ar_h = p_ar[i_ar][1];
                     }
-                    vlc_ureduce( &i_ar_w, &i_ar_h, i_ar_w, i_ar_h, 0 );
+                    vlc_ureduce( &ar, i_ar_w, i_ar_h, 0 );
                     if( !p_sys->b_sequence_header )
-                        msg_Dbg( p_dec, "aspect ratio %d:%d", i_ar_w, i_ar_h );
+                        msg_Dbg( p_dec, "aspect ratio %d:%d", ar.num, ar.den );
                 }
             }
             if( bs_read( &s, 1 ) )  /* Frame rate */
@@ -570,7 +571,7 @@ static block_t *ParseIDU( decoder_t *p_dec, bool *pb_ts_used, block_t *p_frag )
                     }
                 }
                 if( i_fps_num != 0 && i_fps_den != 0 )
-                    vlc_ureduce( &p_es->video.frame_rate.num, &p_es->video.frame_rate.den, i_fps_num, i_fps_den, 0 );
+                    vlc_ureduce( &p_es->video.frame_rate, i_fps_num, i_fps_den, 0 );
 
                 if( !p_sys->b_sequence_header )
                     msg_Dbg( p_dec, "frame rate %d/%d", p_es->video.frame_rate.num, p_es->video.frame_rate.den );

@@ -145,8 +145,7 @@ void video_format_Setup( video_format_t *p_fmt, vlc_fourcc_t i_chroma,
     if ( p_sar == NULL )
         p_fmt->sar.num = p_fmt->sar.den = 1;
     else
-        vlc_ureduce( &p_fmt->sar.num, &p_fmt->sar.den,
-                     p_sar->num, p_sar->den, 0 );
+        vlc_ureduce( &p_fmt->sar, p_sar->num, p_sar->den, 0 );
 
     switch( p_fmt->i_chroma )
     {
@@ -245,12 +244,12 @@ void video_format_ScaleCropAr( video_format_t *p_dst, const video_format_t *p_sr
 
     p_dst->sar.num *= p_src->i_width;
     p_dst->sar.den *= p_dst->i_width;
-    vlc_ureduce(&p_dst->sar.num, &p_dst->sar.den,
+    vlc_ureduce(&p_dst->sar,
                 p_dst->sar.num, p_dst->sar.den, 65536);
 
     p_dst->sar.num *= p_dst->i_height;
     p_dst->sar.den *= p_src->i_height;
-    vlc_ureduce(&p_dst->sar.num, &p_dst->sar.den,
+    vlc_ureduce(&p_dst->sar,
                 p_dst->sar.num, p_dst->sar.den, 65536);
 }
 

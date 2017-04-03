@@ -1089,7 +1089,7 @@ void vout_UpdateDisplaySourceProperties(vout_display_t *vd, const video_format_t
     if (source->sar.num * osys->source.sar.den !=
         source->sar.den * osys->source.sar.num) {
 
-        vlc_ureduce(&osys->source.sar.num, &osys->source.sar.den,
+        vlc_ureduce(&osys->source.sar,
                     source->sar.num, source->sar.den, 0);
 
         /* FIXME it will override any AR that the user would have forced */
@@ -1123,18 +1123,18 @@ void vout_SetDisplayZoom(vout_display_t *vd, unsigned num, unsigned den)
 {
     vout_display_owner_sys_t *osys = vd->owner.sys;
 
+    vlc_urational_t zoom;
     if (num != 0 && den != 0) {
-        vlc_ureduce(&num, &den, num, den, 0);
+        vlc_ureduce(&zoom, num, den, 0);
     } else {
-        num = 1;
-        den = 1;
+        zoom.num = 1;
+        zoom.den = 1;
     }
 
     if (osys->is_display_filled ||
-        osys->zoom.num != num || osys->zoom.den != den) {
+        osys->zoom.num != zoom.num || osys->zoom.den != zoom.den) {
         osys->ch_zoom = true;
-        osys->zoom.num = num;
-        osys->zoom.den = den;
+        osys->zoom = zoom;
     }
 }
 
@@ -1142,20 +1142,19 @@ void vout_SetDisplayAspect(vout_display_t *vd, const vlc_urational_t *p_dar)
 {
     vout_display_owner_sys_t *osys = vd->owner.sys;
 
-    unsigned sar_num, sar_den;
+    vlc_urational_t sar;
     if (p_dar->num != 0 && p_dar->den != 0) {
-        sar_num = p_dar->num * osys->source.i_visible_height;
-        sar_den = p_dar->den * osys->source.i_visible_width;
-        vlc_ureduce(&sar_num, &sar_den, sar_num, sar_den, 0);
+        sar.num = p_dar->num * osys->source.i_visible_height;
+        sar.den = p_dar->den * osys->source.i_visible_width;
+        vlc_ureduce(&sar, sar.num, sar.den, 0);
     } else {
-        sar_num = 0;
-        sar_den = 0;
+        sar.num = 0;
+        sar.den = 0;
     }
 
-    if (osys->sar.num != sar_num || osys->sar.den != sar_den) {
+    if (osys->sar.num != sar.num || osys->sar.den != sar.den) {
         osys->ch_sar = true;
-        osys->sar.num = sar_num;
-        osys->sar.den = sar_den;
+        osys->sar = sar;
     }
 }
 void vout_SetDisplayCrop(vout_display_t *vd,

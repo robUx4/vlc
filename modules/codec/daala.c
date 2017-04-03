@@ -669,12 +669,12 @@ static int OpenEncoder( vlc_object_t *p_this )
 
     if( p_enc->fmt_in.video.sar.num != 0 && p_enc->fmt_in.video.sar.den != 0 )
     {
-        unsigned i_dst_num, i_dst_den;
-        vlc_ureduce( &i_dst_num, &i_dst_den,
+        vlc_urational_t dst;
+        vlc_ureduce( &dst,
                      p_enc->fmt_in.video.sar.num,
                      p_enc->fmt_in.video.sar.den, 0 );
-        p_sys->di.pixel_aspect_numerator = i_dst_num;
-        p_sys->di.pixel_aspect_denominator = i_dst_den;
+        p_sys->di.pixel_aspect_numerator = dst.num;
+        p_sys->di.pixel_aspect_denominator = dst.den;
     }
     else
     {

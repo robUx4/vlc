@@ -3464,8 +3464,7 @@ static bool Ogg_ReadOggSpotsHeader( logical_stream_t *p_stream,
     }
 
     /* Normalize granulerate */
-    vlc_ureduce(&p_stream->fmt.video.frame_rate.num,
-                &p_stream->fmt.video.frame_rate.den,
+    vlc_ureduce(&p_stream->fmt.video.frame_rate,
                 i_granulerate_numerator, i_granulerate_denominator, 0);
 
     p_stream->i_granule_shift = p_oggpacket->packet[28];

@@ -1036,7 +1036,7 @@ static subpicture_t *SpuRenderSubpictures(spu_t *spu,
             if (region_fmt.sar.num == 0 || region_fmt.sar.den == 0) {
                 region_fmt.sar.num = (int64_t)fmt_dst->i_visible_width  * fmt_dst->sar.num * subpic->i_original_picture_height;
                 region_fmt.sar.den = (int64_t)fmt_dst->i_visible_height * fmt_dst->sar.den * subpic->i_original_picture_width;
-                vlc_ureduce(&region_fmt.sar.num, &region_fmt.sar.den,
+                vlc_ureduce(&region_fmt.sar,
                             region_fmt.sar.num, region_fmt.sar.den, 65536);
             }
 
