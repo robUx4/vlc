@@ -662,7 +662,7 @@ static block_t *ParseMPEGBlock( decoder_t *p_dec, block_t *p_frag )
 
         if( ( p_sys->frame_rate.num != p_dec->fmt_out.video.frame_rate.num ||
               p_dec->fmt_out.video.frame_rate.den != p_sys->frame_rate.den ) &&
-            p_sys->frame_rate.num && p_sys->frame_rate.den )
+            vlc_valid_frame_rate( &p_sys->frame_rate ) )
         {
             date_Change( &p_sys->dts, 2 * p_sys->frame_rate.num, p_sys->frame_rate.den );
             date_Change( &p_sys->prev_iframe_dts, 2 * p_sys->frame_rate.num, p_sys->frame_rate.den );

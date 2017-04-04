@@ -347,7 +347,7 @@ static int Open( vlc_object_t *p_this )
     p_sys->f_scale = var_GetFloat( p_stream, SOUT_CFG_PREFIX "scale" );
 
     p_sys->fps = var_InheritURational( p_stream, SOUT_CFG_PREFIX "fps" );
-    p_sys->b_master_sync = p_sys->fps.num != 0 && p_sys->fps.den != 0;
+    p_sys->b_master_sync = vlc_valid_frame_rate( &p_sys->fps );
 
     p_sys->i_width = var_GetInteger( p_stream, SOUT_CFG_PREFIX "width" );
 

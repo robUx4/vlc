@@ -327,8 +327,7 @@ static int GenericOpen( demux_t *p_demux, const char *psz_module,
     p_demux->pf_control= Control;
     p_demux->p_sys     = p_sys = malloc( sizeof( demux_sys_t ) );
     p_sys->p_es        = NULL;
-    p_sys->frame_rate.num = 0;
-    p_sys->frame_rate.den = 0;
+    vlc_invalidate_frame_rate( &p_sys->frame_rate );
 
     float f_fps = 0;
     char *psz_fpsvar;
@@ -452,7 +451,7 @@ static int Demux( demux_t *p_demux)
             es_out_Send( p_demux->out, p_sys->p_es, p_block_out );
             if( frame )
             {
-                if( !p_sys->frame_rate.den )
+                if( !vlc_valid_frame_rate( &p_sys->frame_rate ) )
                 {
                     /* Use packetizer's one */
                     if (es_format_HasValidFrameRate(&p_sys->p_packetizer->fmt_out))

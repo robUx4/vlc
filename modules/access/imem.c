@@ -438,9 +438,8 @@ static int OpenDemux(vlc_object_t *object)
             }
         }
         rat = var_InheritURational(object, "imem-fps");
-        if (rat.num && rat.den) {
+        if (vlc_valid_frame_rate(&rat))
             fmt.video.frame_rate = rat;
-        }
 
         msg_Dbg(object, "Video %4.4s %dx%d  SAR %d:%d frame rate %u/%u",
                 (const char *)&fmt.i_codec,

@@ -309,7 +309,7 @@ valid:
         goto error;
     }
 
-    if( !fps.num || !fps.den )
+    if( !vlc_valid_frame_rate( &fps ) )
     {
         msg_Err( p_demux, "invalid or no framerate specified." );
         goto error;

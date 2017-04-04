@@ -438,7 +438,7 @@ int SetupFormat (vlc_object_t *obj, int fd, uint32_t fourcc,
     uint64_t best_area = 0;
 
     vlc_urational_t fps = var_InheritURational(obj, CFG_PREFIX"fps");
-    if (fps.num != 0 && fps.den != 0)
+    if (vlc_valid_frame_rate( &fps ))
     {
         msg_Dbg (obj, " requested frame internal: %u/%u", fps.den, fps.num);
         min_it.numerator   = fps.den;

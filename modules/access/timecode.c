@@ -178,7 +178,7 @@ static int Open (vlc_object_t *obj)
     sys->es = es_out_Add (demux->out, &fmt);
 
     vlc_urational_t fps = var_InheritURational (demux, "timecode-fps");
-    if (!fps.num || !fps.den)
+    if (!vlc_valid_frame_rate(&fps))
     {
         msg_Err (demux, "invalid frame rate");
         free (sys);
