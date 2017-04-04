@@ -1081,7 +1081,7 @@ static int OpenEncoder( vlc_object_t *p_this )
         return VLC_EGENERIC;
     }
 
-    if( !p_enc->fmt_in.video.frame_rate.num || !p_enc->fmt_in.video.frame_rate.den ||
+    if( !es_format_HasValidFrameRate( &p_enc->fmt_in ) ||
         !p_enc->fmt_in.video.i_visible_height || !p_enc->fmt_in.video.i_visible_width )
     {
         msg_Err( p_enc, "Framerate and picture dimensions must be non-zero" );

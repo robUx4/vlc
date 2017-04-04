@@ -652,8 +652,7 @@ static int OpenEncoder( vlc_object_t *p_this )
     }
     p_sys->di.frame_duration = 1;
 
-    if( !p_enc->fmt_in.video.frame_rate.num ||
-        !p_enc->fmt_in.video.frame_rate.den )
+    if( !es_format_HasValidFrameRate( &p_enc->fmt_in ) )
     {
         p_sys->di.timebase_numerator = 25;
         p_sys->di.timebase_denominator = 1;

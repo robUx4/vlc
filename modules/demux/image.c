@@ -666,7 +666,7 @@ static int Open(vlc_object_t *object)
     fmt.i_id    = var_InheritInteger(demux, "image-id");
     fmt.i_group = var_InheritInteger(demux, "image-group");
     fmt.video.frame_rate = var_InheritURational(demux, "image-fps");
-    if (!fmt.video.frame_rate.num || !fmt.video.frame_rate.den)
+    if (!es_format_HasValidFrameRate( &fmt ))
     {
         msg_Err(demux, "Invalid frame rate, using 10/1 instead");
         fmt.video.frame_rate.num      = 10;

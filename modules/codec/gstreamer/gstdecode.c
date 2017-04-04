@@ -698,8 +698,7 @@ static int DecodeBlock( decoder_t *p_dec, block_t *p_block )
             GST_BUFFER_DURATION( p_buf ) = gst_util_uint64_scale(
                     p_block->i_length, GST_SECOND, GST_MSECOND );
 
-        if( p_dec->fmt_in.video.frame_rate.num  &&
-                p_dec->fmt_in.video.frame_rate.den )
+        if( es_format_HasValidFrameRate( &p_dec->fmt_in ) )
             GST_BUFFER_DURATION( p_buf ) = gst_util_uint64_scale( GST_SECOND,
                     p_dec->fmt_in.video.frame_rate.den,
                     p_dec->fmt_in.video.frame_rate.num );

@@ -169,10 +169,8 @@ static int lavc_GetVideoFormat(decoder_t *dec, video_format_t *restrict fmt,
             video_format_SetDefaultSar( fmt );
     }
 
-    if (dec->fmt_in.video.frame_rate.num && dec->fmt_in.video.frame_rate.den)
-    {
+    if (es_format_HasValidFrameRate( &dec->fmt_in ))
         fmt->frame_rate = dec->fmt_in.video.frame_rate;
-    }
     else if (ctx->framerate.num > 0 && ctx->framerate.den > 0)
     {
         fmt->frame_rate = FromAVRational(ctx->framerate);
@@ -674,7 +672,7 @@ static void interpolate_next_pts( decoder_t *p_dec, AVFrame *frame )
         return;
 
     /* interpolate the next PTS */
-    if( p_dec->fmt_in.video.frame_rate.num && p_dec->fmt_in.video.frame_rate.den )
+    if( es_format_HasValidFrameRate( &p_dec->fmt_in ) )
     {
         p_sys->i_pts += CLOCK_FREQ * (2 + frame->repeat_pict) *
             p_dec->fmt_in.video.frame_rate.den /

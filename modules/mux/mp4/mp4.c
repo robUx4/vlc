@@ -425,8 +425,7 @@ static int AddStream(sout_mux_t *p_mux, sout_input_t *p_input)
         p_stream->mux.i_timescale = p_stream->mux.fmt.audio.i_rate;
         break;
     case VIDEO_ES:
-        if( !p_stream->mux.fmt.video.frame_rate.num ||
-            !p_stream->mux.fmt.video.frame_rate.den )
+        if( !es_format_HasValidFrameRate( &p_stream->mux.fmt ) )
         {
             msg_Warn( p_mux, "Missing frame rate for stream %d, assuming 25fps",
                       p_sys->i_nb_streams );

@@ -189,7 +189,7 @@ static int Open(vlc_object_t *p_this)
     p_dec->fmt_out.b_packetized = true;
 
     /* Init timings */
-    if( p_dec->fmt_in.video.frame_rate.den != 0 )
+    if( es_format_HasValidFrameRate( &p_dec->fmt_in ) )
         date_Init( &p_sys->dts, p_dec->fmt_in.video.frame_rate.num * 2,
                                 p_dec->fmt_in.video.frame_rate.den );
     else
@@ -456,7 +456,7 @@ static void ActivateSets(decoder_t *p_dec,
     p_sys->p_active_vps = p_vps;
     if(p_sps)
     {
-        if(!p_dec->fmt_in.video.frame_rate.num || !p_dec->fmt_in.video.frame_rate.den)
+        if( !es_format_HasValidFrameRate( &p_dec->fmt_in ) )
         {
             vlc_urational_t rate;
             if(hevc_get_frame_rate( p_sps, p_dec->p_sys->rgi_p_decvps, &rate ))

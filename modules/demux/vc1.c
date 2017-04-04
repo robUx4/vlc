@@ -178,8 +178,7 @@ static int Demux( demux_t *p_demux)
 
             p_block_out = p_next;
 
-            if( p_sys->p_packetizer->fmt_out.video.frame_rate.num &&
-                p_sys->p_packetizer->fmt_out.video.frame_rate.den )
+            if( es_format_HasValidFrameRate( &p_sys->p_packetizer->fmt_out ) )
                 p_sys->i_dts += CLOCK_FREQ *
                     p_sys->p_packetizer->fmt_out.video.frame_rate.den /
                     p_sys->p_packetizer->fmt_out.video.frame_rate.num;

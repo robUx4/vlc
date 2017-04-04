@@ -455,11 +455,8 @@ static int Demux( demux_t *p_demux)
                 if( !p_sys->frame_rate.den )
                 {
                     /* Use packetizer's one */
-                    if( p_sys->p_packetizer->fmt_out.video.frame_rate.den &&
-                        p_sys->p_packetizer->fmt_out.video.frame_rate.num )
-                    {
+                    if (es_format_HasValidFrameRate(&p_sys->p_packetizer->fmt_out))
                         p_sys->frame_rate = p_sys->p_packetizer->fmt_out.video.frame_rate;
-                    }
                     else
                     {
                         p_sys->frame_rate.num = 25000;

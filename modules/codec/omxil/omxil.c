@@ -262,7 +262,7 @@ static OMX_ERRORTYPE SetPortDefinition(decoder_t *p_dec, OmxPort *p_port,
         def->format.video.nFrameHeight = p_fmt->video.i_height;
         if(def->format.video.eCompressionFormat == OMX_VIDEO_CodingUnused)
             def->format.video.nStride = def->format.video.nFrameWidth;
-        if( p_fmt->video.frame_rate.num && p_fmt->video.frame_rate.den )
+        if( es_format_HasValidFrameRate( p_fmt ) )
             def->format.video.xFramerate = (p_fmt->video.frame_rate.num << 16) /
                 p_fmt->video.frame_rate.den;
 

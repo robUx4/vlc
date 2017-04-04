@@ -377,8 +377,7 @@ static int AddStream( sout_mux_t *p_mux, sout_input_t *p_input )
     switch( p_input->p_fmt->i_cat )
     {
     case VIDEO_ES:
-        if( !p_input->p_fmt->video.frame_rate.num ||
-            !p_input->p_fmt->video.frame_rate.den )
+        if( !es_format_HasValidFrameRate( p_input->p_fmt ) )
         {
             msg_Warn( p_mux, "Missing frame rate, assuming 25fps" );
             assert(p_input->p_fmt == &p_input->fmt);

@@ -1147,8 +1147,7 @@ static void SetBlockDuration( sout_input_t *p_input, block_t *p_data )
         {
             /* Try rates */
             if( p_input->p_fmt->i_cat == VIDEO_ES &&
-                p_input->p_fmt->video.frame_rate.num &&
-                p_input->p_fmt->video.frame_rate.den )
+                es_format_HasValidFrameRate( p_input->p_fmt ) )
             {
                 p_data->i_length = CLOCK_FREQ *
                                    p_input->p_fmt->video.frame_rate.num /

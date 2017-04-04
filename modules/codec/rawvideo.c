@@ -104,8 +104,7 @@ static int OpenCommon( decoder_t *p_dec )
 
     date_Init( &p_sys->pts, p_dec->fmt_out.video.frame_rate.num,
                p_dec->fmt_out.video.frame_rate.den );
-    if( p_dec->fmt_out.video.frame_rate.num == 0 ||
-        p_dec->fmt_out.video.frame_rate.den == 0)
+    if( !es_format_HasValidFrameRate( &p_dec->fmt_out ) )
     {
         msg_Warn( p_dec, "invalid frame rate %d/%d, using 25 fps instead",
                   p_dec->fmt_out.video.frame_rate.num,

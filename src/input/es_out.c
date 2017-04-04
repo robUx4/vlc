@@ -1593,7 +1593,7 @@ static es_out_id_t *EsOutAddSlave( es_out_t *out, const es_format_t *fmt, es_out
             es->fmt.video.i_visible_height = es->fmt.video.i_height;
         }
 
-        if( es->fmt.video.frame_rate.num && es->fmt.video.frame_rate.den )
+        if( es_format_HasValidFrameRate( &es->fmt ) )
             vlc_ureduce( &es->fmt.video.frame_rate,
                          es->fmt.video.frame_rate.num,
                          es->fmt.video.frame_rate.den, 0 );
@@ -3068,7 +3068,7 @@ static void EsOutUpdateInfo( es_out_t *out, es_out_id_t *es, const es_format_t *
             info_category_AddInfo( p_cat, _("Buffer dimensions"), "%ux%u",
                                    fmt->video.i_width, fmt->video.i_height );
 
-       if( fmt->video.frame_rate.num && fmt->video.frame_rate.den )
+       if( es_format_HasValidFrameRate( fmt ) )
        {
            div = lldiv( (float)fmt->video.frame_rate.num /
                                fmt->video.frame_rate.den * CLOCK_FREQ,

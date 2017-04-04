@@ -380,7 +380,7 @@ static block_t *ParseIDU( decoder_t *p_dec, bool *pb_ts_used, block_t *p_frag )
             p_sys->i_interpolated_dts = p_pic->i_dts;
 
         /* We can interpolate dts/pts only if we have a frame rate */
-        if( p_dec->fmt_out.video.frame_rate.num != 0 && p_dec->fmt_out.video.frame_rate.den != 0 )
+        if( es_format_HasValidFrameRate( &p_dec->fmt_out ) )
         {
             if( p_sys->i_interpolated_dts > VLC_TS_INVALID )
                 p_sys->i_interpolated_dts += CLOCK_FREQ *

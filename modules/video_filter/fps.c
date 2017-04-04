@@ -151,11 +151,8 @@ static int Open( vlc_object_t *p_this)
     /* If we don't have fps option, use filter output values */
 
     p_filter->fmt_out.video.frame_rate = var_InheritURational( p_filter, CFG_PREFIX "fps" );
-    if (p_filter->fmt_out.video.frame_rate.num == 0 ||
-        p_filter->fmt_out.video.frame_rate.den == 0)
-    {
+    if (!es_format_HasValidFrameRate( &p_filter->fmt_out ))
         p_filter->fmt_out.video.frame_rate = p_filter->fmt_in.video.frame_rate;
-    }
 
     msg_Dbg( p_filter, "Converting fps from %d/%d -> %d/%d",
             p_filter->fmt_in.video.frame_rate.num, p_filter->fmt_in.video.frame_rate.den,

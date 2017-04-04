@@ -175,7 +175,7 @@ static int Open(vlc_object_t *obj)
     dsc.SampleWidth     = dstDesc.Width;
     dsc.SampleHeight    = dstDesc.Height;
     dsc.Format          = dstDesc.Format;
-    if (filter->fmt_in.video.frame_rate.num && filter->fmt_in.video.frame_rate.den) {
+    if (es_format_HasValidFrameRate( &filter->fmt_in )) {
         dsc.InputSampleFreq.Numerator   = filter->fmt_in.video.frame_rate.num;
         dsc.InputSampleFreq.Denominator = filter->fmt_in.video.frame_rate.den;
     } else {

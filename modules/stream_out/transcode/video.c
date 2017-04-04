@@ -402,11 +402,9 @@ static void transcode_video_framerate_init( sout_stream_t *p_stream,
                                             const es_format_t *p_fmt_out )
 {
     /* Handle frame rate conversion */
-    if( !id->p_encoder->fmt_out.video.frame_rate.num ||
-        !id->p_encoder->fmt_out.video.frame_rate.den )
+    if( !es_format_HasValidFrameRate( &id->p_encoder->fmt_out ) )
     {
-        if( p_fmt_out->video.frame_rate.num &&
-            p_fmt_out->video.frame_rate.den )
+        if( es_format_HasValidFrameRate( p_fmt_out ) )
         {
             id->p_encoder->fmt_out.video.frame_rate =
                 p_fmt_out->video.frame_rate;
