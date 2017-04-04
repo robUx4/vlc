@@ -87,8 +87,7 @@ static vout_display_t *vout_display_New(vlc_object_t *obj,
 
     /* Picture buffer does not have the concept of aspect ratio */
     video_format_Copy(&vd->fmt, fmt);
-    vd->fmt.sar.num = 0;
-    vd->fmt.sar.den = 0;
+    video_format_InvalidateSar( &vd->fmt );
 
     vd->info.is_slow = false;
     vd->info.has_double_click = false;
@@ -416,12 +415,10 @@ static int VoutDisplayCreateRender(vout_display_t *vd)
     osys->filters = NULL;
 
     video_format_t v_src = vd->source;
-    v_src.sar.num = 0;
-    v_src.sar.den = 0;
+    video_format_InvalidateSar( &v_src );
 
     video_format_t v_dst = vd->fmt;
-    v_dst.sar.num = 0;
-    v_dst.sar.den = 0;
+    video_format_InvalidateSar( &v_dst );
 
     video_format_t v_dst_cmp = v_dst;
     if ((v_src.i_chroma == VLC_CODEC_J420 && v_dst.i_chroma == VLC_CODEC_I420) ||

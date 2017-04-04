@@ -131,7 +131,7 @@ static void SubpictureTextUpdate(subpicture_t *subpic,
     subpicture_updater_sys_t *sys = subpic->updater.p_sys;
     VLC_UNUSED(fmt_src); VLC_UNUSED(ts);
 
-    if (fmt_dst->sar.num <= 0 || fmt_dst->sar.den <= 0)
+    if (!video_format_HasValidSar( fmt_dst ))
         return;
 
     video_format_t fmt;
@@ -148,8 +148,7 @@ static void SubpictureTextUpdate(subpicture_t *subpic,
     {
         subpic->i_original_picture_width  = fmt_dst->i_width * fmt_dst->sar.num / fmt_dst->sar.den;
         subpic->i_original_picture_height = fmt_dst->i_height;
-        fmt.sar.num = 1;
-        fmt.sar.den = 1;
+        video_format_SetDefaultSar( &fmt );
     }
 
     subpicture_region_t **pp_last_region = &subpic->p_region;

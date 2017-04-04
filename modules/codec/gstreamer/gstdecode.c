@@ -409,7 +409,7 @@ static GstStructure* vlc_to_gst_fmt( const es_format_t *p_fmt )
                 p_vfmt->frame_rate.num,
                 p_vfmt->frame_rate.den, NULL );
 
-    if( p_vfmt->sar.num && p_vfmt->sar.den )
+    if( video_format_HasValidSar( p_vfmt ) )
         gst_structure_set( p_str, "pixel-aspect-ratio", GST_TYPE_FRACTION,
                 p_vfmt->sar.num,
                 p_vfmt->sar.den, NULL );

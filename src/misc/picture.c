@@ -390,17 +390,13 @@ int picture_Export( vlc_object_t *p_obj,
 {
     /* */
     video_format_t fmt_in = p_picture->format;
-    if( fmt_in.sar.num == 0 || fmt_in.sar.den == 0 )
-    {
-        fmt_in.sar.num =
-        fmt_in.sar.den = 1;
-    }
+    if( !video_format_HasValidSar( &fmt_in ) )
+        video_format_SetDefaultSar( &fmt_in );
 
     /* */
     video_format_t fmt_out;
     memset( &fmt_out, 0, sizeof(fmt_out) );
-    fmt_out.sar.num =
-    fmt_out.sar.den = 1;
+    video_format_SetDefaultSar( &fmt_out );
     fmt_out.i_chroma  = i_format;
 
     /* compute original width/height */

@@ -420,11 +420,11 @@ static int RenderYUVP( filter_t *p_filter, subpicture_region_t *p_region,
 
     /* Create a new subpicture region */
     video_format_Init( &fmt, VLC_CODEC_YUVP );
+    video_format_SetDefaultSar( &fmt );
     fmt.i_width          =
     fmt.i_visible_width  = p_bbox->xMax - p_bbox->xMin + 4;
     fmt.i_height         =
     fmt.i_visible_height = p_bbox->yMax - p_bbox->yMin + 4;
-    fmt.sar.num = fmt.sar.den = 1;
 
     assert( !p_region->p_picture );
     p_region->p_picture = picture_NewFromFormat( &fmt );
@@ -823,11 +823,11 @@ static inline int RenderAXYZ( filter_t *p_filter,
     const int i_text_height = p_bbox->yMax - p_bbox->yMin;
     video_format_t fmt;
     video_format_Init( &fmt, i_chroma );
+    video_format_SetDefaultSar( &fmt );
     fmt.i_width          =
     fmt.i_visible_width  = i_text_width  + 2 * i_margin;
     fmt.i_height         =
     fmt.i_visible_height = i_text_height + 2 * i_margin;
-    fmt.sar.num = fmt.sar.den = 1;
 
     picture_t *p_picture = p_region->p_picture = picture_NewFromFormat( &fmt );
     if( !p_region->p_picture )

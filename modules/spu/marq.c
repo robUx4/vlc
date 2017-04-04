@@ -305,10 +305,10 @@ static subpicture_t *Filter( filter_t *p_filter, mtime_t date )
 
     memset( &fmt, 0, sizeof(video_format_t) );
     fmt.i_chroma = VLC_CODEC_TEXT;
+    video_format_SetDefaultSar( &fmt );
     fmt.i_width = fmt.i_height = 0;
     fmt.i_x_offset = 0;
     fmt.i_y_offset = 0;
-    fmt.sar.den = fmt.sar.num = 1;
     p_spu->p_region = subpicture_region_New( &fmt );
     if( !p_spu->p_region )
     {

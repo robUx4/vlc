@@ -285,7 +285,7 @@ static void SavePicture( filter_t *p_filter, picture_t *p_pic )
 
     /* Save snapshot psz_format to a memory zone */
     fmt_in = p_pic->format;
-    fmt_out.sar.num = fmt_out.sar.den = 1;
+    video_format_SetDefaultSar( &fmt_out );
     fmt_out.i_width = p_sys->i_width;
     fmt_out.i_height = p_sys->i_height;
     fmt_out.i_chroma = p_sys->i_format;

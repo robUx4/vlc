@@ -704,8 +704,7 @@ static int OpenDecklink(vout_display_t *vd, decklink_sys_t *sys)
         fmt->i_height = fmt->i_visible_height = p_display_mode->GetHeight();
         fmt->i_x_offset = 0;
         fmt->i_y_offset = 0;
-        fmt->sar.num = 0;
-        fmt->sar.den = 0;
+        video_format_InvalidateSar( fmt );
         fmt->i_chroma = !sys->video.tenbits ? VLC_CODEC_UYVY : VLC_CODEC_I422_10L; /* we will convert to v210 */
         fmt->frame_rate.num = (unsigned) sys->frameduration;
         fmt->frame_rate.den = (unsigned) sys->timescale;

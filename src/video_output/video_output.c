@@ -79,17 +79,15 @@ static int VoutValidateFormat(video_format_t *dst,
     if (src->i_width == 0  || src->i_width  > 8192 ||
         src->i_height == 0 || src->i_height > 8192)
         return VLC_EGENERIC;
-    if (src->sar.num == 0 || src->sar.den == 0)
+    if ( !video_format_HasValidSar( src ) )
         return VLC_EGENERIC;
 
     /* */
     video_format_Copy(dst, src);
     dst->i_chroma = vlc_fourcc_GetCodec(VIDEO_ES, src->i_chroma);
     vlc_ureduce( &dst->sar, src->sar.num,  src->sar.den, 50000 );
-    if (dst->sar.num == 0 || dst->sar.den == 0) {
-        dst->sar.num = 1;
-        dst->sar.den = 1;
-    }
+    if ( !video_format_HasValidSar( dst ) )
+        video_format_SetDefaultSar( dst );
     video_format_FixRgb(dst);
     return VLC_SUCCESS;
 }

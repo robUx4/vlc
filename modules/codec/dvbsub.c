@@ -1656,8 +1656,7 @@ static subpicture_t *render( decoder_t *p_dec )
 
             /* Create new SPU region */
             video_format_Init( &fmt, VLC_CODEC_TEXT );
-            fmt.sar.num = 1;
-            fmt.sar.den = 1;
+            video_format_SetDefaultSar( &fmt );
             fmt.i_width = fmt.i_visible_width = p_region->i_width;
             fmt.i_height = fmt.i_visible_height = p_region->i_height;
             fmt.i_x_offset = fmt.i_y_offset = 0;

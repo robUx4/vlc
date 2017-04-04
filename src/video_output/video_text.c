@@ -58,7 +58,7 @@ static void OSDTextUpdate(subpicture_t *subpic,
     subpicture_updater_sys_t *sys = subpic->updater.p_sys;
     VLC_UNUSED(fmt_src); VLC_UNUSED(ts);
 
-    if( fmt_dst->sar.num == 0 || fmt_dst->sar.den == 0 )
+    if( !video_format_HasValidSar( fmt_dst ) )
         return;
 
     subpic->b_absolute = false;
@@ -67,8 +67,7 @@ static void OSDTextUpdate(subpicture_t *subpic,
 
     video_format_t fmt;
     video_format_Init( &fmt, VLC_CODEC_TEXT);
-    fmt.sar.num = 1;
-    fmt.sar.den = 1;
+    video_format_SetDefaultSar( &fmt );
 
     subpicture_region_t *r = subpic->p_region = subpicture_region_New(&fmt);
     if (!r)

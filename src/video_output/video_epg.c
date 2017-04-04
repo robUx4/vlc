@@ -105,8 +105,7 @@ static subpicture_region_t * vout_OSDEpgText(const char *text,
 
     /* Create a new subpicture region */
     video_format_Init(&fmt, VLC_CODEC_TEXT);
-    fmt.sar.num = 1;
-    fmt.sar.den = 1;
+    video_format_SetDefaultSar( &fmt );
 
     region = subpicture_region_New(&fmt);
     if (!region)

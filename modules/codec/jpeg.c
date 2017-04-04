@@ -528,8 +528,7 @@ static int DecodeBlock(decoder_t *p_dec, block_t *p_block)
     p_dec->fmt_out.i_codec = VLC_CODEC_RGB24;
     p_dec->fmt_out.video.i_visible_width  = p_dec->fmt_out.video.i_width  = p_sys->p_jpeg.output_width;
     p_dec->fmt_out.video.i_visible_height = p_dec->fmt_out.video.i_height = p_sys->p_jpeg.output_height;
-    p_dec->fmt_out.video.sar.num = 1;
-    p_dec->fmt_out.video.sar.den = 1;
+    video_format_SetDefaultSar( &p_dec->fmt_out.video );
 
     int i_otag; /* Orientation tag has valid range of 1-8. 1 is normal orientation, 0 = unspecified = normal */
     i_otag = jpeg_GetOrientation( &p_sys->p_jpeg );

@@ -168,7 +168,7 @@ static int UpdateVideoSize(vout_display_sys_t *sys, video_format_t *p_fmt,
 
     video_format_ApplyRotation(&rot_fmt, p_fmt);
 
-    if (rot_fmt.sar.num != 0 && rot_fmt.sar.den != 0) {
+    if ( video_format_HasValidSar( &rot_fmt ) ) {
         i_sar_num = rot_fmt.sar.num;
         i_sar_den = rot_fmt.sar.den;
     }
@@ -245,7 +245,7 @@ static void FixSubtitleFormat(vout_display_sys_t *sys)
         i_video_height = fmt.i_visible_height;
     }
 
-    if (fmt.sar.num != 0 && fmt.sar.den != 0) {
+    if ( video_format_HasValidSar( &fmt ) ) {
         if (fmt.sar.num >= fmt.sar.den)
             i_video_width = i_video_width * fmt.sar.num / fmt.sar.den;
         else
@@ -282,8 +282,7 @@ static void FixSubtitleFormat(vout_display_sys_t *sys)
     p_subfmt->i_visible_height = i_height;
     p_subfmt->i_x_offset = 0;
     p_subfmt->i_y_offset = 0;
-    p_subfmt->sar.num = 1;
-    p_subfmt->sar.den = 1;
+    video_format_SetDefaultSar( p_subfmt );
     sys->b_sub_invalid = true;
 }
 

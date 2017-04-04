@@ -143,7 +143,7 @@ void video_format_Setup( video_format_t *p_fmt, vlc_fourcc_t i_chroma,
     p_fmt->i_x_offset       =
     p_fmt->i_y_offset       = 0;
     if ( p_sar == NULL )
-        p_fmt->sar.num = p_fmt->sar.den = 1;
+        video_format_SetDefaultSar( p_fmt );
     else
         vlc_ureduce( &p_fmt->sar, p_sar->num, p_sar->den, 0 );
 

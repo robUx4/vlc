@@ -806,7 +806,7 @@ int transcode_video_process( sout_stream_t *p_stream, sout_stream_id_sys_t *id,
             /* Reinitialize filters */
             id->p_encoder->fmt_out.video.i_visible_width  = p_sys->i_width & ~1;
             id->p_encoder->fmt_out.video.i_visible_height = p_sys->i_height & ~1;
-            id->p_encoder->fmt_out.video.sar.num = id->p_encoder->fmt_out.video.sar.den = 0;
+            video_format_InvalidateSar( &id->p_encoder->fmt_out.video );
 
             transcode_video_encoder_init( p_stream, id );
             transcode_video_filter_init( p_stream, id );

@@ -1033,7 +1033,7 @@ static subpicture_t *SpuRenderSubpictures(spu_t *spu,
 
             /* Compute region scale AR */
             video_format_t region_fmt = region->fmt;
-            if (region_fmt.sar.num == 0 || region_fmt.sar.den == 0) {
+            if ( !video_format_HasValidSar( &region_fmt ) ) {
                 region_fmt.sar.num = (int64_t)fmt_dst->i_visible_width  * fmt_dst->sar.num * subpic->i_original_picture_height;
                 region_fmt.sar.den = (int64_t)fmt_dst->i_visible_height * fmt_dst->sar.den * subpic->i_original_picture_width;
                 vlc_ureduce(&region_fmt.sar,

@@ -441,11 +441,8 @@ static int vout_update_format( decoder_t *p_dec )
             msg_Warn( p_dec, "Fixing broken HDTV stream (display_height=1088)");
         }
 
-        if( !fmt.sar.num || !fmt.sar.den )
-        {
-            fmt.sar.num = 1;
-            fmt.sar.den = 1;
-        }
+        if( !video_format_HasValidSar( &fmt ) )
+            video_format_SetDefaultSar( &fmt );
 
         vlc_ureduce( &fmt.sar, fmt.sar.num, fmt.sar.den, 50000 );
 
