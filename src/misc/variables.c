@@ -1215,7 +1215,8 @@ int var_Inherit( vlc_object_t *p_this, const char *psz_name, int i_type,
  */
 vlc_urational_t (var_InheritURational)(vlc_object_t *object, const char *var)
 {
-    vlc_urational_t dst = {.num = 0, .den = 0};
+    vlc_urational_t dst;
+    vlc_urational_invalidate( &dst );
     char *str = var_InheritString(object, var);
     if (str == NULL)
         goto error;

@@ -460,7 +460,7 @@ static int CropCallback( vlc_object_t *object, char const *cmd,
                     &left, &top, &right, &bottom) == 4) {
         vout_ControlChangeCropBorder(vout, left, top, right, bottom);
     } else if (*newval.psz_string == '\0') {
-        crop_ratio.num = crop_ratio.den = 0;
+        vlc_urational_invalidate( &crop_ratio );
         vout_ControlChangeCropRatio(vout, &crop_ratio);
     } else {
         msg_Err(object, "Unknown crop format (%s)", newval.psz_string);
