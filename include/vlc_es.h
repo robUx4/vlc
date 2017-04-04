@@ -358,6 +358,35 @@ struct video_format_t
     uint32_t i_cubemap_padding; /**< padding in pixels of the cube map faces */
 };
 
+static inline bool vlc_valid_aspect_ratio(const vlc_urational_t *p_sar)
+{
+    return p_sar->num != 0 && p_sar->den != 0;
+}
+
+static inline void vlc_set_default_aspect_ratio( vlc_urational_t *p_sar )
+{
+    p_sar->num = p_sar->den = 1;
+}
+
+static inline void vlc_invalidate_aspect_ratio( vlc_urational_t *p_sar )
+{
+    p_sar->num = p_sar->den = 0;
+}
+
+static inline bool video_format_HasValidSar( const video_format_t *p_fmt )
+{
+    return vlc_valid_aspect_ratio( &p_fmt->sar );
+}
+
+static inline void video_format_SetDefaultSar( video_format_t *p_fmt )
+{
+    vlc_set_default_aspect_ratio( &p_fmt->sar );
+}
+
+static inline void video_format_InvalidateSar( video_format_t *p_fmt )
+{
+    vlc_invalidate_aspect_ratio( &p_fmt->sar );
+}
 /**
  * Initialize a video_format_t structure with chroma 'i_chroma'
  * \param p_src pointer to video_format_t structure
@@ -630,5 +659,15 @@ VLC_API void es_format_Clean( es_format_t *fmt );
  * All descriptive fields are ignored.
  */
 VLC_API bool es_format_IsSimilar( const es_format_t *, const es_format_t * );
+
+static inline void es_format_SetDefaultSar( es_format_t *p_fmt )
+{
+    video_format_SetDefaultSar( &p_fmt->video );
+}
+
+static inline bool es_format_HasValidSar( const es_format_t *p_fmt )
+{
+    return video_format_HasValidSar( &p_fmt->video );
+}
 
 #endif
