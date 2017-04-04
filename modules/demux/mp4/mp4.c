@@ -2555,15 +2555,12 @@ static int TrackCreateSamplesIndex( demux_t *p_demux,
  * It computes the sample rate for a video track using the given sample
  * description index
  */
-static void TrackGetESSampleRate( demux_t *p_demux,
+static bool TrackGetESSampleRate( demux_t *p_demux,
                                   vlc_urational_t *pi_rate,
                                   const mp4_track_t *p_track,
                                   unsigned i_sd_index,
                                   unsigned i_chunk )
 {
-    pi_rate->num = 0;
-    pi_rate->den = 0;
-
     MP4_Box_t *p_trak = MP4_GetTrakByTrackID( MP4_BoxGet( p_demux->p_sys->p_root, "/moov" ),
                                               p_track->i_track_ID );
     MP4_Box_t *p_mdhd = MP4_BoxGet( p_trak, "mdia/mdhd" );
@@ -2573,11 +2570,11 @@ static void TrackGetESSampleRate( demux_t *p_demux,
                      (uint64_t) BOXDATA(p_mdhd)->i_timescale * p_track->i_sample_count,
                      (uint64_t) BOXDATA(p_mdhd)->i_duration,
                      UINT16_MAX );
-        return;
+        return true;
     }
 
     if( p_track->i_chunk_count == 0 )
-        return;
+        return false;
 
     /* */
     const mp4_chunk_t *p_chunk = &p_track->chunk[i_chunk];
@@ -2599,10 +2596,14 @@ static void TrackGetESSampleRate( demux_t *p_demux,
            p_chunk->i_sample_description_index == i_sd_index );
 
     if( i_sample > 0 && i_total_duration )
+    {
         vlc_ureduce( pi_rate,
                      i_sample * p_track->i_timescale,
                      i_total_duration,
                      UINT16_MAX);
+        return true;
+    }
+    return false;
 }
 
 /*
@@ -2660,12 +2661,13 @@ static int TrackCreateES( demux_t *p_demux, mp4_track_t *p_track,
             return VLC_EGENERIC;
 
         /* Set frame rate */
-        TrackGetESSampleRate( p_demux,
-                              &p_track->fmt.video.frame_rate,
-                              p_track, i_sample_description_index, i_chunk );
-
-        p_demux->p_sys->f_fps = (float)p_track->fmt.video.frame_rate.num /
-                                (float)p_track->fmt.video.frame_rate.den;
+        if (TrackGetESSampleRate( p_demux,
+                                  &p_track->fmt.video.frame_rate,
+                                  p_track, i_sample_description_index, i_chunk ))
+        {
+            p_demux->p_sys->f_fps = (float)p_track->fmt.video.frame_rate.num /
+                                    (float)p_track->fmt.video.frame_rate.den;
+        }
 
         break;
 
