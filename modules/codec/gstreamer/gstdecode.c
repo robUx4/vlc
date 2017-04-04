@@ -404,7 +404,7 @@ static GstStructure* vlc_to_gst_fmt( const es_format_t *p_fmt )
                 "width", G_TYPE_INT, p_vfmt->i_width,
                 "height", G_TYPE_INT, p_vfmt->i_height, NULL );
 
-    if( p_vfmt->frame_rate.num && p_vfmt->frame_rate.den )
+    if( video_format_HasValidFrameRate( p_vfmt ) )
         gst_structure_set( p_str, "framerate", GST_TYPE_FRACTION,
                 p_vfmt->frame_rate.num,
                 p_vfmt->frame_rate.den, NULL );

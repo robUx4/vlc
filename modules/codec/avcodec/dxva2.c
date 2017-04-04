@@ -752,7 +752,7 @@ static int DxCreateVideoDecoder(vlc_va_t *va, int codec_id, const video_format_t
     dsc.SampleWidth     = fmt->i_width;
     dsc.SampleHeight    = fmt->i_height;
     dsc.Format          = p_sys->render;
-    if (fmt->frame_rate.num && fmt->frame_rate.den) {
+    if (video_format_HasValidFrameRate( fmt )) {
         dsc.InputSampleFreq.Numerator   = fmt->frame_rate.num;
         dsc.InputSampleFreq.Denominator = fmt->frame_rate.den;
     } else {
