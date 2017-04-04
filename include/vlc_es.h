@@ -387,6 +387,22 @@ static inline void video_format_InvalidateSar( video_format_t *p_fmt )
 {
     vlc_invalidate_aspect_ratio( &p_fmt->sar );
 }
+
+static inline void vlc_invalidate_frame_rate( vlc_urational_t *p_frame_rate )
+{
+    p_frame_rate->num = p_frame_rate->den = 0;
+}
+
+static inline bool vlc_valid_frame_rate(const vlc_urational_t *p_frame_rate)
+{
+    return p_frame_rate->num != 0 && p_frame_rate->den != 0;
+}
+
+static inline bool video_format_HasValidFrameRate(const video_format_t *p_fmt)
+{
+    return vlc_valid_frame_rate( &p_fmt->frame_rate );
+}
+
 /**
  * Initialize a video_format_t structure with chroma 'i_chroma'
  * \param p_src pointer to video_format_t structure
@@ -668,6 +684,11 @@ static inline void es_format_SetDefaultSar( es_format_t *p_fmt )
 static inline bool es_format_HasValidSar( const es_format_t *p_fmt )
 {
     return video_format_HasValidSar( &p_fmt->video );
+}
+
+static inline bool es_format_HasValidFrameRate(const es_format_t *p_fmt)
+{
+    return video_format_HasValidFrameRate( &p_fmt->video );
 }
 
 #endif
