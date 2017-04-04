@@ -840,8 +840,18 @@ typedef struct {
     unsigned num, den;
 } vlc_urational_t;
 
-VLC_API bool vlc_ureduce( vlc_urational_t *, uint64_t, uint64_t, uint64_t );
 
+static inline bool vlc_urational_valid(const vlc_urational_t *p_rat)
+{
+    return p_rat->num != 0 && p_rat->den != 0;
+}
+
+static inline void vlc_urational_invalidate(vlc_urational_t *p_rat)
+{
+    p_rat->den = p_rat->num = 0;
+}
+
+VLC_API bool vlc_ureduce( vlc_urational_t *, uint64_t, uint64_t, uint64_t );
 /* Aligned memory allocator */
 
 #ifdef __MINGW32__
