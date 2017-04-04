@@ -87,10 +87,9 @@ static int OpenDecoder ( vlc_object_t *p_this )
 
     /* */
     es_format_Init( &p_dec->fmt_out, VIDEO_ES, VLC_CODEC_I420 );
+    es_format_SetDefaultSar( &p_dec->fmt_out );
     p_dec->fmt_out.video.i_width = 100;
     p_dec->fmt_out.video.i_height = 100;
-    p_dec->fmt_out.video.sar.num = 1;
-    p_dec->fmt_out.video.sar.den = 1;
 
     return VLC_SUCCESS;
 }

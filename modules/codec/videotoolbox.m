@@ -872,11 +872,8 @@ static int OpenDecoder(vlc_object_t *p_this)
     /* return our proper VLC internal state */
     p_dec->fmt_out.i_cat = p_dec->fmt_in.i_cat;
     p_dec->fmt_out.video = p_dec->fmt_in.video;
-    if (!p_dec->fmt_out.video.sar.num || !p_dec->fmt_out.video.sar.den)
-    {
-        p_dec->fmt_out.video.sar.num = 1;
-        p_dec->fmt_out.video.sar.den = 1;
-    }
+    if (!es_format_HasValidSar( &p_dec->fmt_out ))
+        es_format_SetDefaultSar( &p_dec->fmt_out );
     if (!p_dec->fmt_out.video.i_visible_width
      || !p_dec->fmt_out.video.i_visible_height)
     {

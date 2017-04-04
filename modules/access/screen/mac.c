@@ -115,6 +115,7 @@ int screen_InitCapture(demux_t *p_demux)
 
     /* setup format */
     es_format_Init(&p_sys->fmt, VIDEO_ES, VLC_CODEC_RGB32);
+    es_format_SetDefaultSar( &p_sys->fmt );
     p_sys->fmt.video.i_visible_width   =
     p_sys->fmt.video.i_width           = rect.size.width;
     p_sys->fmt.video.i_visible_height  =
@@ -124,8 +125,6 @@ int screen_InitCapture(demux_t *p_demux)
     p_sys->fmt.video.i_rmask           = 0x00ff0000;
     p_sys->fmt.video.i_gmask           = 0x0000ff00;
     p_sys->fmt.video.i_bmask           = 0x000000ff;
-    p_sys->fmt.video.sar.num         =
-    p_sys->fmt.video.sar.den         = 1;
     p_sys->fmt.video.frame_rate.num    = 1000 * p_data->rate;
     p_sys->fmt.video.frame_rate.den    = 1000;
 

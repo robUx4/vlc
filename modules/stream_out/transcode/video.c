@@ -568,8 +568,7 @@ static void transcode_video_sar_init( sout_stream_t *p_stream,
         i_src_visible_height = p_fmt_out->video.i_height;
 
     /* Check whether a particular aspect ratio was requested */
-    if( id->p_encoder->fmt_out.video.sar.num == 0 ||
-        id->p_encoder->fmt_out.video.sar.den == 0 )
+    if( !es_format_HasValidSar( &id->p_encoder->fmt_out ) )
     {
         vlc_ureduce( &id->p_encoder->fmt_out.video.sar,
                      (uint64_t)p_fmt_out->video.sar.num * id->p_encoder->fmt_out.video.i_width * p_fmt_out->video.i_height,

@@ -199,6 +199,7 @@ static rfbBool mallocFrameBufferHandler( rfbClient* p_client )
     /* Now init and fill es format */
     es_format_t fmt;
     es_format_Init( &fmt, VIDEO_ES, i_chroma );
+    es_format_SetDefaultSar( &fmt );
 
     /* Fill input format */
     fmt.video.i_chroma = i_chroma;
@@ -215,8 +216,6 @@ static rfbBool mallocFrameBufferHandler( rfbClient* p_client )
     fmt.video.i_rmask = p_client->format.redMax << p_client->format.redShift;
     fmt.video.i_gmask = p_client->format.greenMax << p_client->format.greenShift;
     fmt.video.i_bmask = p_client->format.blueMax << p_client->format.blueShift;
-
-    fmt.video.sar.num = fmt.video.sar.den = 1;
 
     /* declare the new es */
     p_sys->es = es_out_Add( p_demux->out, &fmt );

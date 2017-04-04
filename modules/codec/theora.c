@@ -322,10 +322,7 @@ static int ProcessHeaders( decoder_t *p_dec )
         p_dec->fmt_out.video.sar.den = p_sys->ti.aspect_denominator;
     }
     else
-    {
-        p_dec->fmt_out.video.sar.num = 1;
-        p_dec->fmt_out.video.sar.den = 1;
-    }
+        es_format_SetDefaultSar( &p_dec->fmt_out );
 
     if( p_sys->ti.fps_numerator > 0 && p_sys->ti.fps_denominator > 0 )
     {
@@ -731,8 +728,7 @@ static int OpenEncoder( vlc_object_t *p_this )
     p_sys->ti.pic_x = 0 /*frame_x_offset*/;
     p_sys->ti.pic_y = 0 /*frame_y_offset*/;
 
-    if( !p_enc->fmt_in.video.frame_rate.num ||
-        !p_enc->fmt_in.video.frame_rate.den )
+    if( !es_format_HasValidFrameRate( &p_enc->fmt_in ) )
     {
         p_sys->ti.fps_numerator = 25;
         p_sys->ti.fps_denominator = 1;
@@ -743,7 +739,7 @@ static int OpenEncoder( vlc_object_t *p_this )
         p_sys->ti.fps_denominator = p_enc->fmt_in.video.frame_rate.den;
     }
 
-    if( p_enc->fmt_in.video.sar.num != 0 && p_enc->fmt_in.video.sar.den != 0 )
+    if( es_format_HasValidSar( &p_enc->fmt_in ) )
     {
         vlc_urational_t dst;
         vlc_ureduce( &dst,

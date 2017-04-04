@@ -187,11 +187,10 @@ static es_format_t GetModeSettings(demux_t *demux, IDeckLinkDisplayMode *m)
     es_format_t video_fmt;
     vlc_fourcc_t chroma; chroma = sys->tenbits ? VLC_CODEC_I422_10L : VLC_CODEC_UYVY;
     es_format_Init(&video_fmt, VIDEO_ES, chroma);
+    es_format_SetDefaultSar( &video_fmt );
 
     video_fmt.video.i_width = m->GetWidth();
     video_fmt.video.i_height = m->GetHeight();
-    video_fmt.video.sar.num = 1;
-    video_fmt.video.sar.den = 1;
     video_fmt.video.frame_rate.num = time_scale;
     video_fmt.video.frame_rate.den = frame_duration;
     video_fmt.i_bitrate = video_fmt.video.i_width * video_fmt.video.i_height * video_fmt.video.frame_rate.num * 2 * 8;

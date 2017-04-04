@@ -184,8 +184,7 @@ static int DecodeBlock( decoder_t *p_dec, block_t *p_block )
     p_dec->fmt_out.video.i_height = i_height;
     p_dec->fmt_out.video.i_visible_width  = i_width;
     p_dec->fmt_out.video.i_visible_height = i_height;
-    p_dec->fmt_out.video.sar.num = 1;
-    p_dec->fmt_out.video.sar.den = 1;
+    es_format_SetDefaultSar( &p_dec->fmt_out );
     p_dec->fmt_out.video.i_rmask = 0x80800000; /* Since librsvg v1.0 */
     p_dec->fmt_out.video.i_gmask = 0x0000ff00;
     p_dec->fmt_out.video.i_bmask = 0x000000ff;

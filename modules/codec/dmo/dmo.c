@@ -510,16 +510,10 @@ static int DecOpen( decoder_t *p_dec )
         p_dec->fmt_out.video.i_bits_per_pixel = i_bpp;
 
         /* If an aspect-ratio was specified in the input format then force it */
-        if( p_dec->fmt_in.video.sar.num != 0 &&
-            p_dec->fmt_in.video.sar.den != 0 )
-        {
+        if( es_format_HasValidSar( &p_dec->fmt_in ) )
             p_dec->fmt_out.video.sar = p_dec->fmt_in.video.sar;
-        }
         else
-        {
-            p_dec->fmt_out.video.sar.num = 1;
-            p_dec->fmt_out.video.sar.den = 1;
-        }
+            es_format_SetDefaultSar( &p_dec->fmt_out );
 
         p_bih = &p_vih->bmiHeader;
         p_bih->biCompression = i_chroma == VLC_CODEC_RGB24 ? BI_RGB : i_chroma;

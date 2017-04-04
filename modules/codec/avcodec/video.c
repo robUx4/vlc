@@ -159,14 +159,14 @@ static int lavc_GetVideoFormat(decoder_t *dec, video_format_t *restrict fmt,
     fmt->i_visible_height = ctx->height;
 
     /* If an aspect-ratio was specified in the input format then force it */
-    if (dec->fmt_in.video.sar.num != 0 && dec->fmt_in.video.sar.den != 0)
+    if (es_format_HasValidSar( &dec->fmt_in ))
         fmt->sar = dec->fmt_in.video.sar;
     else
     {
         fmt->sar = FromAVRational(ctx->sample_aspect_ratio);
 
-        if (fmt->sar.num == 0 || fmt->sar.den == 0)
-            fmt->sar.num = fmt->sar.den = 1;
+        if (!video_format_HasValidSar( fmt ))
+            video_format_SetDefaultSar( fmt );
     }
 
     if (dec->fmt_in.video.frame_rate.num && dec->fmt_in.video.frame_rate.den)
@@ -1019,7 +1019,7 @@ static picture_t *DecodeBlock( decoder_t *p_dec, block_t **pp_block, bool *error
             picture_Hold( p_pic );
         }
 
-        if( !p_dec->fmt_in.video.sar.num || !p_dec->fmt_in.video.sar.den )
+        if( !es_format_HasValidSar( &p_dec->fmt_in ) )
         {
             /* Fetch again the aspect ratio in case it changed */
             p_dec->fmt_out.video.sar.num
@@ -1027,11 +1027,8 @@ static picture_t *DecodeBlock( decoder_t *p_dec, block_t **pp_block, bool *error
             p_dec->fmt_out.video.sar.den
                 = p_context->sample_aspect_ratio.den;
 
-            if( !p_dec->fmt_out.video.sar.num || !p_dec->fmt_out.video.sar.den )
-            {
-                p_dec->fmt_out.video.sar.num = 1;
-                p_dec->fmt_out.video.sar.den = 1;
-            }
+            if( !es_format_HasValidSar( &p_dec->fmt_out ) )
+                es_format_SetDefaultSar( &p_dec->fmt_out );
         }
 
         p_pic->date = i_pts;

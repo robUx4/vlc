@@ -189,11 +189,8 @@ static int Decode(decoder_t *dec, block_t *block)
         v->i_visible_height = img->d_h;
     }
 
-    if( !dec->fmt_out.video.sar.num || !dec->fmt_out.video.sar.den )
-    {
-        dec->fmt_out.video.sar.num = 1;
-        dec->fmt_out.video.sar.den = 1;
-    }
+    if( !es_format_HasValidSar( &dec->fmt_out ))
+        es_format_SetDefaultSar( &dec->fmt_out );
 
     v->b_color_range_full = img->range == AOM_CR_FULL_RANGE;
 

@@ -887,9 +887,7 @@ static block_t *asf_header_create( sout_mux_t *p_mux, bool b_broadcast )
     for( size_t i = 0; i < vlc_array_count( &p_sys->tracks ); i++ )
     {
         const asf_track_t *p_track = vlc_array_item_at_index( &p_sys->tracks, i );
-        if( p_track->i_cat == VIDEO_ES &&
-            p_track->fmt.video.sar.num != 0 &&
-            p_track->fmt.video.sar.den != 0 )
+        if( p_track->i_cat == VIDEO_ES && es_format_HasValidSar( &p_track->fmt ) )
         {
             i_cm_size = 26 + 2 * (16 + 2 * sizeof("AspectRatio?"));
         }
@@ -993,9 +991,7 @@ static block_t *asf_header_create( sout_mux_t *p_mux, bool b_broadcast )
         for( size_t i = 0; i < vlc_array_count( &p_sys->tracks ); i++ )
         {
             tk = vlc_array_item_at_index( &p_sys->tracks, i );
-            if( tk->i_cat == VIDEO_ES &&
-                tk->fmt.video.sar.num != 0 &&
-                tk->fmt.video.sar.den != 0 )
+            if( tk->i_cat == VIDEO_ES && es_format_HasValidSar(&tk->fmt) )
                 break;
         }
         assert( tk != NULL );

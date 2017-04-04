@@ -1078,10 +1078,8 @@ static int OpenGeneric( vlc_object_t *p_this, bool b_encode )
         p_dec->fmt_out.i_codec = 0;
 
         /* set default aspect of 1, if parser did not set it */
-        if (p_dec->fmt_out.video.sar.num == 0)
-            p_dec->fmt_out.video.sar.num = 1;
-        if (p_dec->fmt_out.video.sar.den == 0)
-            p_dec->fmt_out.video.sar.den = 1;
+        if ( !es_format_HasValidSar( &p_dec->fmt_out ) )
+            es_format_SetDefaultSar( &p_dec->fmt_out );
     }
     p_sys->b_enc = b_encode;
     InitOmxEventQueue(&p_sys->event_queue);
@@ -1569,8 +1567,8 @@ static int DecodeVideo( decoder_t *p_dec, block_t *p_block )
      * broadcom OMX implementation on RPi), don't let the packetizer values
      * override what the decoder says, if anything - otherwise always update
      * even if it already is set (since it can change within a stream). */
-    if((p_dec->fmt_in.video.sar.num != 0 && p_dec->fmt_in.video.sar.den != 0) &&
-       (p_dec->fmt_out.video.sar.num == 0 || p_dec->fmt_out.video.sar.den == 0 ||
+    if( es_format_HasValidSar( &p_dec->fmt_in ) &&
+       (!es_format_HasValidSar( &p_dec->fmt_out ) ||
              !p_sys->b_aspect_ratio_handled))
     {
         p_dec->fmt_out.video.sar = p_dec->fmt_in.video.sar;

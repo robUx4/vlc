@@ -259,8 +259,7 @@ static int ProcessHeader(decoder_t* p_dec)
             GetWLE(&p_extra[42]);
 
     /* We assume square pixels */
-    p_dec->fmt_out.video.sar.num = 1;
-    p_dec->fmt_out.video.sar.den = 1;
+    es_format_SetDefaultSar( &p_dec->fmt_out );
 
     /* We don't implement background color, alignment and options at the
      * moment because the former doesn't seem necessary right now and the

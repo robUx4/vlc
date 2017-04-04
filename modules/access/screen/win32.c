@@ -126,12 +126,12 @@ int screen_InitCapture( demux_t *p_demux )
     }
 
     es_format_Init( &p_sys->fmt, VIDEO_ES, i_chroma );
+    es_format_SetDefaultSar( &p_sys->fmt );
     p_sys->fmt.video.i_visible_width  =
     p_sys->fmt.video.i_width          = GetSystemMetrics( SM_CXVIRTUALSCREEN );
     p_sys->fmt.video.i_visible_height =
     p_sys->fmt.video.i_height         = GetSystemMetrics( SM_CYVIRTUALSCREEN );
     p_sys->fmt.video.i_bits_per_pixel = i_bits_per_pixel;
-    p_sys->fmt.video.sar.num = p_sys->fmt.video.sar.den = 1;
     p_sys->fmt.video.i_chroma         = i_chroma;
 
     switch( i_chroma )
