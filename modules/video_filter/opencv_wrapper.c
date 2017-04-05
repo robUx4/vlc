@@ -319,8 +319,6 @@ static void VlcPictureToIplImage( filter_t* p_filter, picture_t* p_in )
     video_format_t fmt_out;
     filter_sys_t* p_sys = p_filter->p_sys;
 
-    memset( &fmt_out, 0, sizeof(video_format_t) );
-
     //do scale / color conversion according to p_sys config
     if ((p_sys->f_scale != 1) || (p_sys->i_internal_chroma != CINPUT))
     {
@@ -365,6 +363,7 @@ static void VlcPictureToIplImage( filter_t* p_filter, picture_t* p_in )
         p_sys->p_proc_image = filter_NewPicture( p_filter ); //p_in
         picture_Copy( p_sys->p_proc_image, p_in );
         p_sys->p_to_be_freed = p_sys->p_proc_image;
+        memset( &fmt_out, 0, sizeof(video_format_t) );
     }
 
     //Convert to the IplImage array that is to be processed.
@@ -428,7 +427,6 @@ static picture_t* Filter( filter_t* p_filter, picture_t* p_pic )
             (p_filter->p_sys->i_internal_chroma != CINPUT) ) {
             //p_filter->p_sys->p_proc_image->format.i_chroma = VLC_CODEC_RGB24;
 
-            memset( &fmt_out, 0, sizeof(video_format_t) );
             fmt_out = p_pic->format;
             //picture_Release( p_outpic );
 
