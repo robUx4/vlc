@@ -55,11 +55,7 @@ static subpicture_region_t * vout_OSDEpgSlider(int x, int y,
     };
 
     video_format_t fmt;
-    video_format_Init(&fmt, VLC_CODEC_YUVP);
-    fmt.i_width  = fmt.i_visible_width  = width;
-    fmt.i_height = fmt.i_visible_height = height;
-    fmt.sar.num = 1;
-    fmt.sar.den = 1;
+    video_format_Setup( &fmt, VLC_CODEC_YUVP, width, height, width, height, NULL);
     fmt.p_palette = &palette;
 
     subpicture_region_t *region = subpicture_region_New(&fmt);

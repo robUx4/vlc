@@ -129,11 +129,7 @@ static int Open( vlc_object_t *p_this )
     const int width  = p_thread->i_width  = var_InheritInteger( p_filter, "goom-width" );
     const int height = p_thread->i_height = var_InheritInteger( p_filter, "goom-height" );
 
-    video_format_Init( &fmt, VLC_CODEC_RGB32 );
-
-    fmt.i_width = fmt.i_visible_width = width;
-    fmt.i_height = fmt.i_visible_height = height;
-    fmt.sar.num = fmt.sar.den = 1;
+    video_format_Setup( &fmt, VLC_CODEC_RGB32, width, height, width, height, NULL);
 
     p_thread->p_vout = aout_filter_RequestVout( p_filter, NULL, &fmt );
     if( p_thread->p_vout == NULL )
