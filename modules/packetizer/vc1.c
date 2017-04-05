@@ -522,20 +522,16 @@ static block_t *ParseIDU( decoder_t *p_dec, bool *pb_ts_used, block_t *p_frag )
                         {64,33}, {160,99},{ 0, 0}, { 0, 0}
                     };
                     int i_ar = bs_read( &s, 4 );
-                    unsigned i_ar_w, i_ar_h;
                     vlc_urational_t ar;
 
                     if( i_ar == 15 )
                     {
-                        i_ar_w = bs_read( &s, 8 );
-                        i_ar_h = bs_read( &s, 8 );
+                        ar.num = bs_read( &s, 8 );
+                        ar.den = bs_read( &s, 8 );
                     }
                     else
-                    {
-                        i_ar_w = p_ar[i_ar].num;
-                        i_ar_h = p_ar[i_ar].den;
-                    }
-                    vlc_ureduce( &ar, i_ar_w, i_ar_h, 0 );
+                        ar = p_ar[i_ar];
+                    vlc_ureduce( &ar, ar.num, ar.den, 0 );
                     if( !p_sys->b_sequence_header )
                         msg_Dbg( p_dec, "aspect ratio %d:%d", ar.num, ar.den );
                 }
