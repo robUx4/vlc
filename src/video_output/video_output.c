@@ -568,10 +568,8 @@ static void VoutGetDisplayCfg(vout_thread_t *vout, vout_display_cfg_t *cfg, cons
     cfg->display.height  = display_height > 0 ? display_height : 0;
     cfg->is_display_filled  = var_GetBool(vout, "autoscale");
     cfg->display.sar = var_InheritURational(vout, "monitor-par");
-    if (!cfg->display.sar.num  || !cfg->display.sar.den) {
-        cfg->display.sar.num = 1;
-        cfg->display.sar.den = 1;
-    }
+    if (!vlc_valid_aspect_ratio( &cfg->display.sar ))
+        vlc_set_default_aspect_ratio( &cfg->display.sar );
     cfg->zoom.den = 1000;
     cfg->zoom.num = 1000 * var_GetFloat(vout, "zoom");
     vlc_ureduce(&cfg->zoom, cfg->zoom.num, cfg->zoom.den, 0);
@@ -1477,15 +1475,12 @@ static int ThreadReinit(vout_thread_t *vout,
         state.cfg.display.width  = 0;
         state.cfg.display.height = 0;
     }
-    state.sar.num = 0;
-    state.sar.den = 0;
+    vlc_invalidate_aspect_ratio( &state.sar );
 
     /* FIXME current vout "variables" are not in sync here anymore
      * and I am not sure what to do */
-    if (state.cfg.display.sar.num == 0 || state.cfg.display.sar.den == 0) {
-        state.cfg.display.sar.num = 1;
-        state.cfg.display.sar.den = 1;
-    }
+    if ( !vlc_valid_aspect_ratio( &state.cfg.display.sar ) )
+        vlc_set_default_aspect_ratio( &state.cfg.display.sar );
     if (state.cfg.zoom.num == 0 || state.cfg.zoom.den == 0) {
         state.cfg.zoom.num = 1;
         state.cfg.zoom.den = 1;

@@ -936,7 +936,7 @@ bool vout_ManageDisplay(vout_display_t *vd, bool allow_reset_pictures)
         if (osys->ch_sar) {
             video_format_t source = vd->source;
 
-            if (osys->sar.num != 0 && osys->sar.den != 0)
+            if ( vlc_valid_aspect_ratio( &osys->sar ) )
                 source.sar = osys->sar;
             else
                 source.sar = osys->source.sar;
@@ -1140,14 +1140,12 @@ void vout_SetDisplayAspect(vout_display_t *vd, const vlc_urational_t *p_dar)
     vout_display_owner_sys_t *osys = vd->owner.sys;
 
     vlc_urational_t sar;
-    if (p_dar->num != 0 && p_dar->den != 0) {
+    if ( vlc_valid_aspect_ratio( p_dar ) ) {
         sar.num = p_dar->num * osys->source.i_visible_height;
         sar.den = p_dar->den * osys->source.i_visible_width;
         vlc_ureduce(&sar, sar.num, sar.den, 0);
-    } else {
-        sar.num = 0;
-        sar.den = 0;
-    }
+    } else
+        vlc_invalidate_aspect_ratio( &sar );
 
     if (osys->sar.num != sar.num || osys->sar.den != sar.den) {
         osys->ch_sar = true;
@@ -1252,8 +1250,10 @@ static vout_display_t *DisplayNew(vout_thread_t *vout,
     osys->crop.num = 0;
     osys->crop.den = 0;
 
-    osys->sar.num = osys->sar_initial.num ? osys->sar_initial.num : source->sar.num;
-    osys->sar.den = osys->sar_initial.den ? osys->sar_initial.den : source->sar.den;
+    if ( vlc_valid_aspect_ratio( &osys->sar_initial ) )
+        osys->sar = osys->sar_initial;
+    else
+        osys->sar = source->sar;
 
     vout_display_owner_t owner;
     if (owner_ptr) {

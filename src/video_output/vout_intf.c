@@ -496,7 +496,7 @@ static int AspectCallback( vlc_object_t *object, char const *cmd,
         vout_ControlChangeSampleAspectRatio(vout, &ar);
     else if (*newval.psz_string == '\0')
     {
-        ar.num = ar.den = 0;
+        vlc_invalidate_aspect_ratio( &ar );
         vout_ControlChangeSampleAspectRatio(vout, &ar);
     }
     return VLC_SUCCESS;

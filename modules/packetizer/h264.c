@@ -201,10 +201,8 @@ static void ActivateSets( decoder_t *p_dec, const h264_sequence_parameter_set_t 
                                       &p_dec->fmt_out.video.i_visible_width,
                                       &p_dec->fmt_out.video.i_visible_height );
 
-        if( p_sps->vui.sar.num != 0 && p_sps->vui.sar.den != 0 )
-        {
+        if( vlc_valid_aspect_ratio( &p_sps->vui.sar ) )
             p_dec->fmt_out.video.sar = p_sps->vui.sar;
-        }
 
         if( p_sps->vui.b_valid )
         {

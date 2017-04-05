@@ -216,8 +216,7 @@ static int Open( vlc_object_t *p_this )
     DEMUX_INIT_COMMON(); p_sys = p_demux->p_sys;
 
     ps_track_init( p_sys->tk );
-    p_sys->sar.num = 0;
-    p_sys->sar.den = 0;
+    vlc_invalidate_aspect_ratio( &p_sys->sar );
     p_sys->i_title_cur_time = (mtime_t) 0;
     p_sys->i_cell_cur_time = (mtime_t) 0;
     p_sys->i_cell_duration = (mtime_t) 0;
@@ -890,8 +889,7 @@ static int DvdReadSetArea( demux_t *p_demux, int i_title, int i_chapter,
             p_sys->sar.den =  9 * i_video_width;
             break;
         default:
-            p_sys->sar.num = 0;
-            p_sys->sar.den = 0;
+            vlc_invalidate_aspect_ratio( &p_sys->sar );
             break;
         }
 

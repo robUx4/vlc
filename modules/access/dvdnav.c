@@ -201,8 +201,7 @@ static int CommonOpen( vlc_object_t *p_this,
     p_sys->b_reset_pcr = false;
 
     ps_track_init( p_sys->tk );
-    p_sys->sar.num = 0;
-    p_sys->sar.den = 0;
+    vlc_invalidate_aspect_ratio( &p_sys->sar );
     p_sys->i_mux_rate = 0;
     p_sys->i_pgc_length = 0;
     p_sys->b_spu_change = false;
@@ -961,8 +960,7 @@ static int Demux( demux_t *p_demux )
             p_sys->sar.den =  9 * i_width;
             break;
         default:
-            p_sys->sar.num = 0;
-            p_sys->sar.den = 0;
+            vlc_invalidate_aspect_ratio( &p_sys->sar );
             break;
         }
 

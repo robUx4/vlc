@@ -321,8 +321,9 @@ valid:
         goto error;
     }
 
+    sar = var_InheritURational( p_demux, "rawvid-aspect-ratio" );
     /* fixup anything missing with sensible assumptions */
-    if( sar.num == 0 || sar.den == 0 )
+    if( !vlc_valid_aspect_ratio( &sar ) )
     {
         /* assume 1:1 sar */
         sar.num = 1;

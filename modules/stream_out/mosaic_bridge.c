@@ -212,15 +212,13 @@ static int Open( vlc_object_t *p_this )
         else
         {
             msg_Warn( p_stream, "bad aspect ratio %s", val.psz_string );
-            p_sys->sar.num = p_sys->sar.den = 1;
+            vlc_set_default_aspect_ratio( &p_sys->sar );
         }
 
         free( val.psz_string );
     }
     else
-    {
-        p_sys->sar.num = p_sys->sar.den = 1;
-    }
+        vlc_set_default_aspect_ratio( &p_sys->sar );
 
     p_sys->i_chroma = 0;
     val.psz_string = var_GetNonEmptyString( p_stream, CFG_PREFIX "chroma" );

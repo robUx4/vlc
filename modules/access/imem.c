@@ -431,7 +431,7 @@ static int OpenDemux(vlc_object_t *object)
         fmt.video.i_width  = var_InheritInteger(object, "imem-width");
         fmt.video.i_height = var_InheritInteger(object, "imem-height");
         vlc_urational_t rat = var_InheritURational(object, "imem-dar");
-        if (rat.num && rat.den) {
+        if (vlc_valid_aspect_ratio(&rat)) {
             if (fmt.video.i_width != 0 && fmt.video.i_height != 0) {
                 fmt.video.sar.num = rat.num * fmt.video.i_height;
                 fmt.video.sar.den = rat.den * fmt.video.i_width;

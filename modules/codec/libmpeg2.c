@@ -178,8 +178,7 @@ static int OpenDecoder( vlc_object_t *p_this )
     p_sys->i_previous_pts = 0;
     p_sys->i_current_dts  = 0;
     p_sys->i_previous_dts = 0;
-    p_sys->sar.num = 0;
-    p_sys->sar.den = 0;
+    vlc_invalidate_aspect_ratio( &p_sys->sar );
     p_sys->b_garbage_pic = false;
     p_sys->b_slice_i  = false;
     p_sys->b_second_field = false;

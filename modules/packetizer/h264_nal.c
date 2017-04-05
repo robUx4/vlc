@@ -431,10 +431,7 @@ static bool h264_parse_sequence_parameter_set_rbsp( bs_t *p_bs,
                 p_sps->vui.sar.den = h;
             }
             else
-            {
-                p_sps->vui.sar.num = 1;
-                p_sps->vui.sar.den = 1;
-            }
+                vlc_set_default_aspect_ratio( &p_sps->vui.sar );
         }
 
         /* overscan */

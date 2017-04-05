@@ -196,7 +196,8 @@ static es_format_t GetModeSettings(demux_t *demux, IDeckLinkDisplayMode *m)
     video_fmt.i_bitrate = video_fmt.video.i_width * video_fmt.video.i_height * video_fmt.video.frame_rate.num * 2 * 8;
 
     vlc_urational_t aspect = var_InheritURational(demux, "decklink-aspect-ratio");
-    if (aspect.num != 0 && aspect.den != 0) {
+
+    if (vlc_valid_aspect_ratio(&aspect)) {
         video_fmt.video.sar.num = aspect.num * video_fmt.video.i_height;
         video_fmt.video.sar.den = aspect.den * video_fmt.video.i_width;
     }
