@@ -1071,14 +1071,14 @@ bool hevc_get_frame_rate( const hevc_sequence_parameter_set_t *p_sps,
     {
         p_rate->den = p_sps->vui.timing.vui_num_units_in_tick;
         p_rate->num = p_sps->vui.timing.vui_time_scale;
-        return (p_rate->den && p_rate->num);
+        return vlc_valid_frame_rate( p_rate );
     }
     else if( pp_vps && pp_vps[p_sps->sps_video_parameter_set_id] &&
              pp_vps[p_sps->sps_video_parameter_set_id]->vps_timing_info_present_flag )
     {
         p_rate->den = pp_vps[p_sps->sps_video_parameter_set_id]->vps_num_units_in_tick;
         p_rate->num = pp_vps[p_sps->sps_video_parameter_set_id]->vps_time_scale;
-        return (p_rate->den && p_rate->num);
+        return vlc_valid_frame_rate( p_rate );
     }
     return false;
 }
