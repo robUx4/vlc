@@ -905,8 +905,7 @@ bool vout_ManageDisplay(vout_display_t *vd, bool allow_reset_pictures)
         if (osys->ch_zoom) {
             vout_display_cfg_t cfg = osys->cfg;
 
-            cfg.zoom.num = osys->zoom.num;
-            cfg.zoom.den = osys->zoom.den;
+            cfg.zoom = osys->zoom;
 
             if (10 * cfg.zoom.num <= cfg.zoom.den) {
                 cfg.zoom.num = 1;
@@ -918,14 +917,12 @@ bool vout_ManageDisplay(vout_display_t *vd, bool allow_reset_pictures)
 
             if (vout_display_Control(vd, VOUT_DISPLAY_CHANGE_ZOOM, &cfg)) {
                 msg_Err(vd, "Failed to change zoom");
-                osys->zoom.num = osys->cfg.zoom.num;
-                osys->zoom.den = osys->cfg.zoom.den;
+                osys->zoom = osys->cfg.zoom;
             } else {
                 osys->fit_window = -1;
             }
 
-            osys->cfg.zoom.num = osys->zoom.num;
-            osys->cfg.zoom.den = osys->zoom.den;
+            osys->cfg.zoom = osys->zoom;
             osys->ch_zoom = false;
         }
 #if defined(_WIN32) || defined(__OS2__)
@@ -1242,8 +1239,7 @@ static vout_display_t *DisplayNew(vout_thread_t *vout,
                                            source, &cfg_windowed);
     }
 
-    osys->zoom.num = cfg->zoom.num;
-    osys->zoom.den = cfg->zoom.den;
+    osys->zoom = cfg->zoom;
 #if defined(_WIN32) || defined(__OS2__)
     osys->wm_state_initial = VOUT_WINDOW_STATE_NORMAL;
     osys->wm_state = state->wm_state;

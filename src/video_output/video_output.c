@@ -575,11 +575,9 @@ static void VoutGetDisplayCfg(vout_thread_t *vout, vout_display_cfg_t *cfg, cons
         cfg->display.sar.num = 1;
         cfg->display.sar.den = 1;
     }
-    unsigned zoom_den = 1000;
-    unsigned zoom_num = zoom_den * var_GetFloat(vout, "zoom");
-    vlc_ureduce(&zoom_num, &zoom_den, zoom_num, zoom_den, 0);
-    cfg->zoom.num = zoom_num;
-    cfg->zoom.den = zoom_den;
+    cfg->zoom.den = 1000;
+    cfg->zoom.num = 1000 * var_GetFloat(vout, "zoom");
+    vlc_ureduce(&cfg->zoom.num, &cfg->zoom.den, cfg->zoom.num, cfg->zoom.den, 0);
     cfg->align.vertical = VOUT_DISPLAY_ALIGN_CENTER;
     cfg->align.horizontal = VOUT_DISPLAY_ALIGN_CENTER;
     const int align_mask = var_GetInteger(vout, "align");
@@ -1491,7 +1489,7 @@ static int ThreadReinit(vout_thread_t *vout,
         state.cfg.display.sar.num = 1;
         state.cfg.display.sar.den = 1;
     }
-    if (state.cfg.zoom.num <= 0 || state.cfg.zoom.den <= 0) {
+    if (state.cfg.zoom.num == 0 || state.cfg.zoom.den == 0) {
         state.cfg.zoom.num = 1;
         state.cfg.zoom.den = 1;
     }
