@@ -1481,10 +1481,8 @@ static int ThreadReinit(vout_thread_t *vout,
      * and I am not sure what to do */
     if ( !vlc_valid_aspect_ratio( &state.cfg.display.sar ) )
         vlc_set_default_aspect_ratio( &state.cfg.display.sar );
-    if (state.cfg.zoom.num == 0 || state.cfg.zoom.den == 0) {
-        state.cfg.zoom.num = 1;
-        state.cfg.zoom.den = 1;
-    }
+    if ( !vout_ValidZoom( &state.cfg.zoom ) )
+        vout_SetDefaultZoom( &state.cfg.zoom );
 
     vout->p->original = original;
     vout->p->dpb_size = cfg->dpb_size;

@@ -40,3 +40,13 @@ void vout_SetDisplayWindowSize(vout_thread_t *, unsigned, unsigned);
 int  vout_HideWindowMouse(vout_thread_t *, bool);
 
 void vout_UpdateDisplaySourceProperties(vout_display_t *vd, const video_format_t *);
+
+static inline bool vout_ValidZoom( const vlc_urational_t *p_zoom )
+{
+    return p_zoom->num !=0 && p_zoom->den != 0;
+}
+
+static inline void vout_SetDefaultZoom( vlc_urational_t *p_zoom )
+{
+    p_zoom->num = p_zoom->den = 1;
+}

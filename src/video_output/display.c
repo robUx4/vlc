@@ -743,8 +743,7 @@ static void VoutDisplayFitWindow(vout_display_t *vd, bool default_size)
         cfg.display.height = 0;
     } else {
         cfg.display.height = osys->height_saved;
-        cfg.zoom.num = 1;
-        cfg.zoom.den = 1;
+        vout_SetDefaultZoom( &cfg.zoom );
     }
 
     unsigned display_width;
@@ -1121,12 +1120,10 @@ void vout_SetDisplayZoom(vout_display_t *vd, const vlc_urational_t *p_zoom)
     vout_display_owner_sys_t *osys = vd->owner.sys;
     vlc_urational_t zoom;
 
-    if (p_zoom->num != 0 && p_zoom->den != 0) {
+    if ( vout_ValidZoom( p_zoom ) )
         vlc_ureduce(&zoom, p_zoom->num, p_zoom->den, 0);
-    } else {
-        zoom.num = 1;
-        zoom.den = 1;
-    }
+    else
+        vout_SetDefaultZoom( &zoom );
 
     if (osys->is_display_filled ||
         osys->zoom.num != zoom.num || osys->zoom.den != zoom.den) {
@@ -1565,8 +1562,7 @@ vout_display_t *vout_NewSplitter(vout_thread_t *vout,
         ostate.cfg.align.horizontal = 0; /* TODO */
         ostate.cfg.align.vertical = 0; /* TODO */
         ostate.cfg.is_display_filled = true;
-        ostate.cfg.zoom.num = 1;
-        ostate.cfg.zoom.den = 1;
+        vout_SetDefaultZoom( &ostate.cfg.zoom );
 
         vout_display_t *vd = DisplayNew(vout, &output->fmt, &ostate,
                                         output->psz_module ? output->psz_module : module,
