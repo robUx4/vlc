@@ -1116,13 +1116,13 @@ void vout_SetDisplayFilled(vout_display_t *vd, bool is_filled)
     }
 }
 
-void vout_SetDisplayZoom(vout_display_t *vd, unsigned num, unsigned den)
+void vout_SetDisplayZoom(vout_display_t *vd, const vlc_urational_t *p_zoom)
 {
     vout_display_owner_sys_t *osys = vd->owner.sys;
-
     vlc_urational_t zoom;
-    if (num != 0 && den != 0) {
-        vlc_ureduce(&zoom, num, den, 0);
+
+    if (p_zoom->num != 0 && p_zoom->den != 0) {
+        vlc_ureduce(&zoom, p_zoom->num, p_zoom->den, 0);
     } else {
         zoom.num = 1;
         zoom.den = 1;

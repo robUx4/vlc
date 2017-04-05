@@ -141,7 +141,7 @@ struct vout_thread_sys_t
 void vout_ControlChangeFullscreen(vout_thread_t *, bool fullscreen);
 void vout_ControlChangeWindowState(vout_thread_t *, unsigned state);
 void vout_ControlChangeDisplayFilled(vout_thread_t *, bool is_filled);
-void vout_ControlChangeZoom(vout_thread_t *, int num, int den);
+void vout_ControlChangeZoom(vout_thread_t *, const vlc_urational_t *p_zoom);
 void vout_ControlChangeSampleAspectRatio(vout_thread_t *, const vlc_urational_t *p_ar);
 void vout_ControlChangeCropRatio(vout_thread_t *, const vlc_urational_t *p_ar);
 void vout_ControlChangeCropWindow(vout_thread_t *, int x, int y, int width, int height);

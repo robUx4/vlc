@@ -85,7 +85,7 @@ bool vout_AreDisplayPicturesInvalid(vout_display_t *);
 bool vout_ManageDisplay(vout_display_t *, bool allow_reset_pictures);
 
 void vout_SetDisplayFilled(vout_display_t *, bool is_filled);
-void vout_SetDisplayZoom(vout_display_t *, unsigned num, unsigned den);
+void vout_SetDisplayZoom(vout_display_t *, const vlc_urational_t *p_zoom);
 void vout_SetDisplayAspect(vout_display_t *, const vlc_urational_t *p_dar);
 void vout_SetDisplayCrop(vout_display_t *, unsigned num, unsigned den,
                          unsigned left, unsigned top, int right, int bottom);

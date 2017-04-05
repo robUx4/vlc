@@ -518,7 +518,8 @@ static int ZoomCallback( vlc_object_t *obj, char const *name,
     vout_thread_t *p_vout = (vout_thread_t *)obj;
 
     (void) name; (void) prev; (void) data;
-    vout_ControlChangeZoom( p_vout, 1000 * cur.f_float, 1000 );
+    vlc_urational_t zoom = { .num = 1000 * cur.f_float, .den = 1000 };
+    vout_ControlChangeZoom( p_vout, &zoom );
     return VLC_SUCCESS;
 }
 

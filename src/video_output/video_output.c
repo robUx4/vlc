@@ -478,10 +478,9 @@ void vout_ControlChangeDisplayFilled(vout_thread_t *vout, bool is_filled)
     vout_control_PushBool(&vout->p->control, VOUT_CONTROL_DISPLAY_FILLED,
                           is_filled);
 }
-void vout_ControlChangeZoom(vout_thread_t *vout, int num, int den)
+void vout_ControlChangeZoom(vout_thread_t *vout, const vlc_urational_t *p_zoom)
 {
-    vout_control_PushPair(&vout->p->control, VOUT_CONTROL_ZOOM,
-                          num, den);
+    vout_control_PushRational(&vout->p->control, VOUT_CONTROL_ZOOM, p_zoom);
 }
 void vout_ControlChangeSampleAspectRatio(vout_thread_t *vout, const vlc_urational_t *p_ar)
 {
@@ -1276,16 +1275,17 @@ static void ThreadChangeDisplayFilled(vout_thread_t *vout, bool is_filled)
     vout_SetDisplayFilled(vout->p->display.vd, is_filled);
 }
 
-static void ThreadChangeZoom(vout_thread_t *vout, int num, int den)
+static void ThreadChangeZoom(vout_thread_t *vout, const vlc_urational_t *p_zoom)
 {
-    if (num * 10 < den) {
-        num = den;
-        den *= 10;
-    } else if (num > den * 10) {
-        num = den * 10;
+    vlc_urational_t zoom = *p_zoom;
+    if (zoom.num * 10 < zoom.den) {
+        zoom.num = zoom.den;
+        zoom.den *= 10;
+    } else if (zoom.num > zoom.den * 10) {
+        zoom.num = zoom.den * 10;
     }
 
-    vout_SetDisplayZoom(vout->p->display.vd, num, den);
+    vout_SetDisplayZoom(vout->p->display.vd, &zoom);
 }
 
 static void ThreadChangeAspectRatio(vout_thread_t *vout, vlc_urational_t *p_rat)
@@ -1566,7 +1566,7 @@ static int ThreadControl(vout_thread_t *vout, vout_control_cmd_t cmd)
         ThreadChangeDisplayFilled(vout, cmd.u.boolean);
         break;
     case VOUT_CONTROL_ZOOM:
-        ThreadChangeZoom(vout, cmd.u.pair.a, cmd.u.pair.b);
+        ThreadChangeZoom(vout, &cmd.u.rational);
         break;
     case VOUT_CONTROL_ASPECT_RATIO:
         ThreadChangeAspectRatio(vout, &cmd.u.rational);
