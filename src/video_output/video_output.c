@@ -1298,7 +1298,7 @@ static void ThreadExecuteCropWindow(vout_thread_t *vout,
                                     unsigned x, unsigned y,
                                     unsigned width, unsigned height)
 {
-    vout_SetDisplayCrop(vout->p->display.vd, 0, 0,
+    vout_SetDisplayCrop(vout->p->display.vd, NULL,
                         x, y, width, height);
 }
 static void ThreadExecuteCropBorder(vout_thread_t *vout,
@@ -1306,13 +1306,13 @@ static void ThreadExecuteCropBorder(vout_thread_t *vout,
                                     unsigned right, unsigned bottom)
 {
     msg_Err(vout, "ThreadExecuteCropBorder %d.%d %dx%d", left, top, right, bottom);
-    vout_SetDisplayCrop(vout->p->display.vd, 0, 0,
+    vout_SetDisplayCrop(vout->p->display.vd, NULL,
                         left, top, -(int)right, -(int)bottom);
 }
 
 static void ThreadExecuteCropRatio(vout_thread_t *vout, const vlc_urational_t *p_rat)
 {
-    vout_SetDisplayCrop(vout->p->display.vd, p_rat->num, p_rat->den,
+    vout_SetDisplayCrop(vout->p->display.vd, p_rat,
                         0, 0, 0, 0);
 }
 

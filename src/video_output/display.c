@@ -362,8 +362,7 @@ typedef struct {
         int      top;
         int      right;
         int      bottom;
-        unsigned num;
-        unsigned den;
+        vlc_urational_t ratio;
     } crop;
 
     bool ch_viewpoint;
@@ -956,15 +955,15 @@ bool vout_ManageDisplay(vout_display_t *vd, bool allow_reset_pictures)
             osys->ch_sar  = false;
 
             /* If a crop ratio is requested, recompute the parameters */
-            if (osys->crop.num != 0 && osys->crop.den != 0)
+            if ( vlc_urational_valid( &osys->crop.ratio ) )
                 osys->ch_crop = true;
         }
         /* */
         if (osys->ch_crop) {
             video_format_t source = vd->source;
 
-            unsigned crop_num = osys->crop.num;
-            unsigned crop_den = osys->crop.den;
+            unsigned crop_num = osys->crop.ratio.num;
+            unsigned crop_den = osys->crop.ratio.den;
             if (crop_num != 0 && crop_den != 0) {
                 video_format_t fmt = osys->source;
                 fmt.sar = source.sar;
@@ -1016,8 +1015,8 @@ bool vout_ManageDisplay(vout_display_t *vd, bool allow_reset_pictures)
                                 (osys->source.i_x_offset + osys->source.i_visible_width);
             osys->crop.bottom = (source.i_y_offset + source.i_visible_height) -
                                 (osys->source.i_y_offset + osys->source.i_visible_height);
-            osys->crop.num    = crop_num;
-            osys->crop.den    = crop_den;
+            osys->crop.ratio.num = crop_num;
+            osys->crop.ratio.den = crop_den;
             osys->ch_crop = false;
         }
         if (osys->ch_viewpoint) {
@@ -1150,22 +1149,24 @@ void vout_SetDisplayAspect(vout_display_t *vd, const vlc_urational_t *p_dar)
     }
 }
 void vout_SetDisplayCrop(vout_display_t *vd,
-                         unsigned crop_num, unsigned crop_den,
+                         const vlc_urational_t *p_crop_ratio,
                          unsigned left, unsigned top, int right, int bottom)
 {
     vout_display_owner_sys_t *osys = vd->owner.sys;
 
     if (osys->crop.left  != (int)left  || osys->crop.top != (int)top ||
         osys->crop.right != right || osys->crop.bottom != bottom ||
-        (crop_num != 0 && crop_den != 0 &&
-         (crop_num != osys->crop.num || crop_den != osys->crop.den))) {
+        (p_crop_ratio != NULL && vlc_urational_valid(p_crop_ratio) &&
+         (p_crop_ratio->num != osys->crop.ratio.num || p_crop_ratio->den != osys->crop.ratio.den))) {
 
         osys->crop.left   = left;
         osys->crop.top    = top;
         osys->crop.right  = right;
         osys->crop.bottom = bottom;
-        osys->crop.num    = crop_num;
-        osys->crop.den    = crop_den;
+        if (p_crop_ratio != NULL)
+            osys->crop.ratio = *p_crop_ratio;
+        else
+            vlc_urational_invalidate( &osys->crop.ratio );
 
         osys->ch_crop = true;
     }
@@ -1244,8 +1245,7 @@ static vout_display_t *DisplayNew(vout_thread_t *vout,
     osys->crop.top    = 0;
     osys->crop.right  = 0;
     osys->crop.bottom = 0;
-    osys->crop.num = 0;
-    osys->crop.den = 0;
+    vlc_urational_invalidate( &osys->crop.ratio );
 
     if ( vlc_valid_aspect_ratio( &osys->sar_initial ) )
         osys->sar = osys->sar_initial;
