@@ -428,12 +428,12 @@ int picture_Export( vlc_object_t *p_obj,
                        i_original_height : (unsigned)i_override_height;
 
     /* scale if only one direction is provided */
-    if( fmt_out.i_height == 0 && fmt_out.i_width > 0 )
+    if( fmt_out.i_height == 0 && fmt_out.i_width != 0 )
     {
         fmt_out.i_height = i_height * fmt_out.i_width
                          * fmt_in.sar.den / fmt_in.i_width / fmt_in.sar.num;
     }
-    else if( fmt_out.i_width == 0 && fmt_out.i_height > 0 )
+    else if( fmt_out.i_width == 0 && fmt_out.i_height != 0 )
     {
         fmt_out.i_width  = i_width * fmt_out.i_height
                          * fmt_in.sar.num / fmt_in.i_height / fmt_in.sar.den;
