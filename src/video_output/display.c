@@ -962,14 +962,13 @@ bool vout_ManageDisplay(vout_display_t *vd, bool allow_reset_pictures)
         if (osys->ch_crop) {
             video_format_t source = vd->source;
 
-            unsigned crop_num = osys->crop.ratio.num;
-            unsigned crop_den = osys->crop.ratio.den;
-            if (crop_num != 0 && crop_den != 0) {
+            vlc_urational_t crop_ratio = osys->crop.ratio;
+            if (vlc_urational_valid( &crop_ratio )) {
                 video_format_t fmt = osys->source;
                 fmt.sar = source.sar;
                 VoutDisplayCropRatio(&osys->crop.left,  &osys->crop.top,
                                      &osys->crop.right, &osys->crop.bottom,
-                                     &fmt, crop_num, crop_den);
+                                     &fmt, crop_ratio.num, crop_ratio.den);
             }
             const int right_max  = osys->source.i_x_offset + osys->source.i_visible_width;
             const int bottom_max = osys->source.i_y_offset + osys->source.i_visible_height;
@@ -999,8 +998,7 @@ bool vout_ManageDisplay(vout_display_t *vd, bool allow_reset_pictures)
                 msg_Err(vd, "Failed to change source crop TODO implement crop at core");
 
                 source = vd->source;
-                crop_num = 0;
-                crop_den = 0;
+                vlc_urational_invalidate( &crop_ratio );
                 /* FIXME implement cropping in the core if not supported by the
                  * vout module (easy)
                  */
@@ -1015,8 +1013,7 @@ bool vout_ManageDisplay(vout_display_t *vd, bool allow_reset_pictures)
                                 (osys->source.i_x_offset + osys->source.i_visible_width);
             osys->crop.bottom = (source.i_y_offset + source.i_visible_height) -
                                 (osys->source.i_y_offset + osys->source.i_visible_height);
-            osys->crop.ratio.num = crop_num;
-            osys->crop.ratio.den = crop_den;
+            osys->crop.ratio  = crop_ratio;
             osys->ch_crop = false;
         }
         if (osys->ch_viewpoint) {
