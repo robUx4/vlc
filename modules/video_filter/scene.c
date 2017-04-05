@@ -281,14 +281,13 @@ static void SavePicture( filter_t *p_filter, picture_t *p_pic )
     int i_ret;
 
     memset( &fmt_in, 0, sizeof(video_format_t) );
-    memset( &fmt_out, 0, sizeof(video_format_t) );
 
     /* Save snapshot psz_format to a memory zone */
     fmt_in = p_pic->format;
+    video_format_Init( &fmt_out, p_sys->i_format );
     video_format_SetDefaultSar( &fmt_out );
     fmt_out.i_width = p_sys->i_width;
     fmt_out.i_height = p_sys->i_height;
-    fmt_out.i_chroma = p_sys->i_format;
 
     /*
      * Save the snapshot to a temporary file and

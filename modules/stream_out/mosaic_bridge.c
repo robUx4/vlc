@@ -498,14 +498,9 @@ static int decoder_queue_video( decoder_t *p_dec, picture_t *p_pic,
         video_format_t fmt_out, fmt_in;
 
         memset( &fmt_in, 0, sizeof(video_format_t) );
-        memset( &fmt_out, 0, sizeof(video_format_t) );
+        video_format_Init( &fmt_out,
+                           p_sys->i_chroma ? p_sys->i_chroma : VLC_CODEC_I420 );
         fmt_in = p_sys->p_decoder->fmt_out.video;
-
-
-        if( p_sys->i_chroma )
-            fmt_out.i_chroma = p_sys->i_chroma;
-        else
-            fmt_out.i_chroma = VLC_CODEC_I420;
 
         const unsigned i_fmt_in_aspect =
             (int64_t)VOUT_ASPECT_FACTOR *

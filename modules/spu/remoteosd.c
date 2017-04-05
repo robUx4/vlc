@@ -1002,8 +1002,7 @@ static subpicture_t *Filter( filter_t *p_filter, mtime_t date )
     p_spu->b_ephemer = true;
 
     /* Create new SPU region */
-    memset( &fmt, 0, sizeof(video_format_t) );
-    fmt.i_chroma = VLC_CODEC_YUVA;
+    video_format_Init( &fmt, VLC_CODEC_YUVA );
     video_format_SetDefaultSar( &fmt );
     fmt.i_width = fmt.i_visible_width = p_pic->p[Y_PLANE].i_visible_pitch;
     fmt.i_height = fmt.i_visible_height = p_pic->p[Y_PLANE].i_visible_lines;

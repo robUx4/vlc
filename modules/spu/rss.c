@@ -506,9 +506,7 @@ static subpicture_t *Filter( filter_t *p_filter, mtime_t date )
         picture_t *p_pic = p_feed->p_pic;
         video_format_t fmt_out;
 
-        memset( &fmt_out, 0, sizeof(video_format_t) );
-
-        fmt_out.i_chroma = VLC_CODEC_YUVA;
+        video_format_Init( &fmt_out, VLC_CODEC_YUVA );
         video_format_SetDefaultSar( &fmt_out );
         fmt_out.i_width =
             fmt_out.i_visible_width = p_pic->p[Y_PLANE].i_visible_pitch;
@@ -559,9 +557,8 @@ static picture_t *LoadImage( filter_t *p_filter, const char *psz_url )
     image_handler_t *p_handler = image_HandlerCreate( p_filter );
 
     memset( &fmt_in, 0, sizeof(video_format_t) );
-    memset( &fmt_out, 0, sizeof(video_format_t) );
+    video_format_Init( &fmt_out, VLC_CODEC_YUVA );
 
-    fmt_out.i_chroma = VLC_CODEC_YUVA;
     p_orig = image_ReadUrl( p_handler, psz_url, &fmt_in, &fmt_out );
 
     if( !p_orig )

@@ -395,9 +395,8 @@ int picture_Export( vlc_object_t *p_obj,
 
     /* */
     video_format_t fmt_out;
-    memset( &fmt_out, 0, sizeof(fmt_out) );
+    video_format_Init( &fmt_out, i_format );
     video_format_SetDefaultSar( &fmt_out );
-    fmt_out.i_chroma  = i_format;
 
     /* compute original width/height */
     unsigned int i_width, i_height, i_original_width, i_original_height;

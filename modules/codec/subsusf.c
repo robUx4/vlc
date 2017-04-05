@@ -508,11 +508,8 @@ static int ParseImageAttachments( decoder_t *p_dec )
 
                     memcpy( p_block->p_buffer, p_attach->p_data, p_attach->i_data );
 
-                    memset( &fmt_in,  0, sizeof( video_format_t));
-                    memset( &fmt_out, 0, sizeof( video_format_t));
-
-                    fmt_in.i_chroma  = type;
-                    fmt_out.i_chroma = VLC_CODEC_YUVA;
+                    video_format_Init( &fmt_in,  type );
+                    video_format_Init( &fmt_out, VLC_CODEC_YUVA );
 
                     /* Find a suitable decoder module */
                     if( module_exists( "sdl_image" ) )
@@ -1125,9 +1122,7 @@ static subpicture_region_t *LoadEmbeddedImage( decoder_t *p_dec,
     }
 
     /* Display the feed's image */
-    memset( &fmt_out, 0, sizeof( video_format_t));
-
-    fmt_out.i_chroma = VLC_CODEC_YUVA;
+    video_format_Init( &fmt_out, VLC_CODEC_YUVA );
     video_format_SetDefaultSar( &fmt_out );
     fmt_out.i_width =
         fmt_out.i_visible_width = p_pic->format.i_visible_width;
