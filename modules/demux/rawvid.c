@@ -298,10 +298,6 @@ valid:
         fps.den = 1;
     }
 
-    sar = var_InheritURational( p_demux, "rawvid-aspect-ratio" );
-    if( sar.num == 0 || sar.den == 0 )
-        sar.num = sar.den = 1;
-
     /* moan about anything wrong */
     if( i_width <= 0 || i_height <= 0 )
     {
