@@ -688,7 +688,7 @@ static block_t *ParseMPEGBlock( decoder_t *p_dec, block_t *p_frag )
         if( i_type == 0x01 )
         {
 #if 0
-            static const int mpeg2_aspect[16][2] =
+            static const vlc_urational_t mpeg2_aspect[16] =
             {
                 {0,1}, {1,1}, {4,3}, {16,9}, {221,100},
                 {0,1}, {0,1}, {0,1}, {0,1}, {0,1}, {0,1}, {0,1}, {0,1}, {0,1},
@@ -716,10 +716,10 @@ static block_t *ParseMPEGBlock( decoder_t *p_dec, block_t *p_frag )
              */
 #if 0
             p_dec->fmt_out.video.sar.num =
-                mpeg2_aspect[p_sys->i_aspect_ratio_info][0] *
+                mpeg2_aspect[p_sys->i_aspect_ratio_info].num *
                 p_dec->fmt_out.video.i_height;
             p_dec->fmt_out.video.sar.den =
-                mpeg2_aspect[p_sys->i_aspect_ratio_info][1] *
+                mpeg2_aspect[p_sys->i_aspect_ratio_info].den *
                 p_dec->fmt_out.video.i_width;
 #endif
 
