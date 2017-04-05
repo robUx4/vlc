@@ -102,15 +102,16 @@ static int OpenCommon( decoder_t *p_dec )
 
     es_format_Copy( &p_dec->fmt_out, &p_dec->fmt_in );
 
-    date_Init( &p_sys->pts, p_dec->fmt_out.video.frame_rate.num,
-               p_dec->fmt_out.video.frame_rate.den );
     if( !es_format_HasValidFrameRate( &p_dec->fmt_out ) )
     {
         msg_Warn( p_dec, "invalid frame rate %d/%d, using 25 fps instead",
                   p_dec->fmt_out.video.frame_rate.num,
                   p_dec->fmt_out.video.frame_rate.den);
-        date_Init( &p_sys->pts, 25, 1 );
+        p_dec->fmt_out.video.frame_rate.num = 25;
+        p_dec->fmt_out.video.frame_rate.den = 1;
     }
+    date_Init( &p_sys->pts, p_dec->fmt_out.video.frame_rate.num,
+               p_dec->fmt_out.video.frame_rate.den );
 
     for( unsigned i = 0; i < dsc->plane_count; i++ )
     {
