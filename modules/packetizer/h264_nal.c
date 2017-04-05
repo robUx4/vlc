@@ -407,28 +407,15 @@ static bool h264_parse_sequence_parameter_set_rbsp( bs_t *p_bs,
                 {  2,  1 },
             };
             int i_sar = bs_read( p_bs, 8 );
-            int w, h;
 
             if( i_sar < 17 )
-            {
-                w = sar[i_sar].num;
-                h = sar[i_sar].den;
-            }
+                p_sps->vui.sar = sar[i_sar];
             else if( i_sar == 255 )
             {
-                w = bs_read( p_bs, 16 );
-                h = bs_read( p_bs, 16 );
-            }
-            else
-            {
-                w = 0;
-                h = 0;
-            }
-
-            if( w != 0 && h != 0 )
-            {
-                p_sps->vui.sar.num = w;
-                p_sps->vui.sar.den = h;
+                p_sps->vui.sar.num = bs_read( p_bs, 16 );
+                p_sps->vui.sar.den = bs_read( p_bs, 16 );
+                if( !vlc_valid_aspect_ratio( &p_sps->vui.sar ) )
+                    vlc_set_default_aspect_ratio( &p_sps->vui.sar );
             }
             else
                 vlc_set_default_aspect_ratio( &p_sps->vui.sar );
