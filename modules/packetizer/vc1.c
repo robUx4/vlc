@@ -516,7 +516,7 @@ static block_t *ParseIDU( decoder_t *p_dec, bool *pb_ts_used, block_t *p_frag )
 
                 if( bs_read( &s, 1 ) )  /* Pixel aspect ratio (PAR/SAR) */
                 {
-                    static const unsigned p_ar[16][2] = {
+                    static const vlc_urational_t p_ar[16] = {
                         { 0, 0}, { 1, 1}, {12,11}, {10,11}, {16,11}, {40,33},
                         {24,11}, {20,11}, {32,11}, {80,33}, {18,11}, {15,11},
                         {64,33}, {160,99},{ 0, 0}, { 0, 0}
@@ -532,8 +532,8 @@ static block_t *ParseIDU( decoder_t *p_dec, bool *pb_ts_used, block_t *p_frag )
                     }
                     else
                     {
-                        i_ar_w = p_ar[i_ar][0];
-                        i_ar_h = p_ar[i_ar][1];
+                        i_ar_w = p_ar[i_ar].num;
+                        i_ar_h = p_ar[i_ar].den;
                     }
                     vlc_ureduce( &ar, i_ar_w, i_ar_h, 0 );
                     if( !p_sys->b_sequence_header )

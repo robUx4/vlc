@@ -398,7 +398,7 @@ static bool h264_parse_sequence_parameter_set_rbsp( bs_t *p_bs,
         i_tmp = bs_read( p_bs, 1 );
         if( i_tmp )
         {
-            static const struct { int w, h; } sar[17] =
+            static const vlc_urational_t sar[17] =
             {
                 { 0,   0 }, { 1,   1 }, { 12, 11 }, { 10, 11 },
                 { 16, 11 }, { 40, 33 }, { 24, 11 }, { 20, 11 },
@@ -411,8 +411,8 @@ static bool h264_parse_sequence_parameter_set_rbsp( bs_t *p_bs,
 
             if( i_sar < 17 )
             {
-                w = sar[i_sar].w;
-                h = sar[i_sar].h;
+                w = sar[i_sar].num;
+                h = sar[i_sar].den;
             }
             else if( i_sar == 255 )
             {
