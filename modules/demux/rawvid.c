@@ -129,7 +129,7 @@ static int Open( vlc_object_t * p_this )
     int i_width=-1, i_height=-1;
     vlc_urational_t fps;
     vlc_fourcc_t i_chroma = 0;
-    vlc_urational_t sar;
+    vlc_urational_t sar, *p_init_sar = &sar;
     const struct preset_t *p_preset = NULL;
     const uint8_t *p_peek;
     bool b_y4m = false;
@@ -322,14 +322,13 @@ valid:
     if( !vlc_valid_aspect_ratio( &sar ) )
     {
         /* assume 1:1 sar */
-        sar.num = 1;
-        sar.den = 1;
+        p_init_sar = NULL;
     }
 
     es_format_Init( &p_sys->fmt_video, VIDEO_ES, i_chroma );
     video_format_Setup( &p_sys->fmt_video.video, i_chroma,
                         i_width, i_height, i_width, i_height,
-                        &sar );
+                        p_init_sar );
 
     vlc_ureduce( &p_sys->fmt_video.video.frame_rate,
                  fps.num, fps.den, 0);
