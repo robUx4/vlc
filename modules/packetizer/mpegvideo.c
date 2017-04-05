@@ -624,7 +624,7 @@ static block_t *ParseMPEGBlock( decoder_t *p_dec, block_t *p_frag )
     else if( p_frag->p_buffer[3] == 0xb3 && p_frag->i_buffer >= 8 )
     {
         /* Sequence header code */
-        static const int code_to_frame_rate[16][2] =
+        static const vlc_urational_t code_to_frame_rate[16] =
         {
             { 1, 1 },  /* invalid */
             { 24000, 1001 }, { 24, 1 }, { 25, 1 },       { 30000, 1001 },
@@ -656,9 +656,7 @@ static block_t *ParseMPEGBlock( decoder_t *p_dec, block_t *p_frag )
 
         /* TODO: MPEG1 aspect ratio */
 
-        p_sys->frame_rate.num = code_to_frame_rate[p_frag->p_buffer[7]&0x0f][0];
-        p_sys->frame_rate.den =
-            code_to_frame_rate[p_frag->p_buffer[7]&0x0f][1];
+        p_sys->frame_rate = code_to_frame_rate[p_frag->p_buffer[7]&0x0f];
 
         if( ( p_sys->frame_rate.num != p_dec->fmt_out.video.frame_rate.num ||
               p_dec->fmt_out.video.frame_rate.den != p_sys->frame_rate.den ) &&
