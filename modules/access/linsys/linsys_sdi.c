@@ -224,21 +224,8 @@ static int DemuxOpen( vlc_object_t *p_this )
     p_sys->i_last_state_change = mdate();
 
     /* SDI AR */
-    char *psz_ar = var_InheritString( p_demux, "linsys-sdi-aspect-ratio" );
-    if ( psz_ar != NULL )
-    {
-        psz_parser = strchr( psz_ar, ':' );
-        if ( psz_parser )
-        {
-            *psz_parser++ = '\0';
-            p_sys->aspect.num = strtol( psz_ar, NULL, 0 );
-            p_sys->aspect.den = strtol( psz_parser, NULL, 0 );
-            p_sys->forced_aspect = p_sys->aspect;
-        }
-        else
-            vlc_invalidate_aspect_ratio( &p_sys->forced_aspect );
-        free( psz_ar );
-    }
+    var_InheritURational( p_demux, &p_sys->forced_aspect, "linsys-sdi-aspect-ratio" );
+    p_sys->aspect = p_sys->forced_aspect;
 
     /* */
     p_sys->i_id_video = var_InheritInteger( p_demux, "linsys-sdi-id-video" );
