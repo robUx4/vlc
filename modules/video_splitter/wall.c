@@ -176,14 +176,8 @@ static int Open( vlc_object_t *p_this )
                                                     CFG_PREFIX "element-aspect" );
     if( psz_aspect )
     {
-        vlc_urational_t ar;
-        if( sscanf( psz_aspect, "%u:%u", &ar.num, &ar.den ) == 2 &&
-            vlc_valid_aspect_ratio( &ar ) )
-        {
-            aspect.num = ar.num * VOUT_ASPECT_FACTOR;
-            aspect.den = ar.den;
-        }
-        else
+        if( sscanf( psz_aspect, "%u:%u", &aspect.num, &aspect.den ) != 2 ||
+            !vlc_valid_aspect_ratio( &aspect ) )
         {
             msg_Warn( p_splitter, "invalid aspect ratio specification" );
         }
@@ -191,16 +185,16 @@ static int Open( vlc_object_t *p_this )
     }
     if( !vlc_valid_aspect_ratio( &aspect ) )
     {
-        aspect.num = 4 * VOUT_ASPECT_FACTOR;
+        aspect.num = 4;
         aspect.den = 3;
     }
 
     /* Compute placements/size of the windows */
     const unsigned w1 = ( p_splitter->fmt.i_width / p_sys->i_col ) & ~1;
-    const unsigned h1 = ( w1 * VOUT_ASPECT_FACTOR * aspect.den / aspect.num ) & ~1;
+    const unsigned h1 = ( w1 * aspect.den / aspect.num ) & ~1;
 
     const unsigned h2 = ( p_splitter->fmt.i_height / p_sys->i_row ) & ~1;
-    const unsigned w2 = ( h2 * aspect.num / (aspect.den * VOUT_ASPECT_FACTOR) ) & ~1;
+    const unsigned w2 = ( h2 * aspect.num / aspect.den ) & ~1;
 
     unsigned i_target_width;
     unsigned i_target_height;
@@ -364,8 +358,8 @@ static int Open( vlc_object_t *p_this )
             p_cfg->fmt.i_width          = p_output->i_width;
             p_cfg->fmt.i_visible_height =
             p_cfg->fmt.i_height         = p_output->i_height;
-            p_cfg->fmt.sar.num        = (int64_t)aspect.num * i_target_height;
-            p_cfg->fmt.sar.den        = VOUT_ASPECT_FACTOR * aspect.den * i_target_width;
+            p_cfg->fmt.sar.num          = aspect.num * i_target_height;
+            p_cfg->fmt.sar.den          = aspect.den * i_target_width;
             p_cfg->window.i_x     = p_output->i_left;
             p_cfg->window.i_y     = p_output->i_top;
             p_cfg->window.i_align = p_output->i_align;
