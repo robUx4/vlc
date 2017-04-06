@@ -609,7 +609,7 @@ static block_t *ParseMPEGBlock( decoder_t *p_dec, block_t *p_frag )
     {
         /* Group start code */
         if( p_sys->p_seq &&
-            p_sys->i_seq_old > p_sys->frame_rate.num/p_sys->frame_rate.den )
+            p_sys->i_seq_old * p_sys->frame_rate.den > p_sys->frame_rate.num )
         {
             /* Useful for mpeg1: repeat sequence header every second */
             block_ChainLastAppend( &p_sys->pp_last, block_Duplicate( p_sys->p_seq ) );
