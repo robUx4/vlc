@@ -145,7 +145,7 @@ static int Activate( vlc_object_t *p_this )
     filter_t *p_filter = (filter_t *)p_this;
     unsigned i_canvas_width; /* visible width of output canvas */
     unsigned i_canvas_height; /* visible height of output canvas */
-    unsigned i_canvas_aspect; /* canvas PictureAspectRatio */
+    vlc_urational_t canvas_aspect; /* canvas PictureAspectRatio */
     es_format_t fmt; /* target format after up/down conversion */
     char psz_croppadd[100];
     int i_padd,i_offset;
@@ -210,7 +210,8 @@ static int Activate( vlc_object_t *p_this )
             msg_Err( p_filter, "Invalid aspect ratio" );
             return VLC_EGENERIC;
         }
-        i_canvas_aspect = aspect.num * VOUT_ASPECT_FACTOR / aspect.den;
+        canvas_aspect.num = aspect.num * VOUT_ASPECT_FACTOR;
+        canvas_aspect.den = aspect.den;
         free( psz_aspect );
     }
     else
@@ -219,10 +220,10 @@ static int Activate( vlc_object_t *p_this )
          * has the same sample aspect ratio as the subpicture */
         /* aspect = subpic_sar * canvas_width / canvas_height
          *  where subpic_sar = subpic_ph * subpic_par / subpic_pw */
-        i_canvas_aspect = (uint64_t) p_filter->fmt_in.video.i_visible_height
+        canvas_aspect.num = (uint64_t) p_filter->fmt_in.video.i_visible_height
                         * fmt_in_aspect.num
-                        * i_canvas_width
-                        / (fmt_in_aspect.den * i_canvas_height * p_filter->fmt_in.video.i_visible_width);
+                        * i_canvas_width;
+        canvas_aspect.den = fmt_in_aspect.den * i_canvas_height * p_filter->fmt_in.video.i_visible_width;
     }
 
     b_padd = var_CreateGetBool( p_filter, CFG_PREFIX "padd" );
@@ -256,7 +257,7 @@ static int Activate( vlc_object_t *p_this )
     if( b_padd )
     {
         /* Padd */
-        if( i_canvas_aspect * fmt_in_aspect.den > fmt_in_aspect.num )
+        if( canvas_aspect.num * fmt_in_aspect.den > canvas_aspect.den * fmt_in_aspect.num )
         {
             /* The canvas has a wider aspect than the subpicture:
              *  ie, pillarbox the [scaled] subpicture */
@@ -265,8 +266,8 @@ static int Activate( vlc_object_t *p_this )
              *  where canvas_sar = canvas_width / (canvas_height * canvas_par)
              * then simplify */
             fmt.video.i_visible_width = i_canvas_width
-                              * fmt_in_aspect.num
-                              / (fmt_in_aspect.den * i_canvas_aspect);
+                              * fmt_in_aspect.num * canvas_aspect.den
+                              / (fmt_in_aspect.den * canvas_aspect.num);
             if( fmt.video.i_visible_width & 1 ) fmt.video.i_visible_width -= 1;
 
             i_padd = (i_canvas_width - fmt.video.i_visible_width) / 2;
@@ -279,8 +280,8 @@ static int Activate( vlc_object_t *p_this )
             /* The canvas has a taller aspect than the subpicture:
              *  ie, letterbox the [scaled] subpicture */
             fmt.video.i_visible_height = i_canvas_height
-                               * i_canvas_aspect * fmt_in_aspect.den
-                               / fmt_in_aspect.num;
+                               * canvas_aspect.num * fmt_in_aspect.den
+                               / (canvas_aspect.den * fmt_in_aspect.num);
             if( fmt.video.i_visible_height & 1 ) fmt.video.i_visible_height -= 1;
 
             i_padd = (i_canvas_height - fmt.video.i_visible_height ) / 2;
@@ -292,13 +293,13 @@ static int Activate( vlc_object_t *p_this )
     else
     {
         /* Crop */
-        if( i_canvas_aspect * fmt_in_aspect.den < fmt_in_aspect.num )
+        if( canvas_aspect.num * fmt_in_aspect.den < canvas_aspect.den * fmt_in_aspect.num )
         {
             /* The canvas has a narrower aspect than the subpicture:
              *  ie, crop the [scaled] subpicture horizontally */
             fmt.video.i_visible_width = i_canvas_width
-                              * fmt_in_aspect.num
-                              / (fmt_in_aspect.den * i_canvas_aspect);
+                              * fmt_in_aspect.num * canvas_aspect.den
+                              / (fmt_in_aspect.den * canvas_aspect.num);
             if( fmt.video.i_visible_width & 1 ) fmt.video.i_visible_width -= 1;
 
             i_padd = (fmt.video.i_visible_width - i_canvas_width) / 2;
@@ -311,8 +312,8 @@ static int Activate( vlc_object_t *p_this )
             /* The canvas has a shorter aspect than the subpicture:
              *  ie, crop the [scaled] subpicture vertically */
             fmt.video.i_visible_height = i_canvas_height
-                               * i_canvas_aspect * fmt_in_aspect.den
-                               / fmt_in_aspect.num;
+                               * canvas_aspect.num * fmt_in_aspect.den
+                               / (canvas_aspect.den * fmt_in_aspect.num);
             if( fmt.video.i_visible_height & 1 ) fmt.video.i_visible_height -= 1;
 
             i_padd = (fmt.video.i_visible_height - i_canvas_height) / 2;
@@ -354,8 +355,8 @@ static int Activate( vlc_object_t *p_this )
     es_format_Copy( &p_filter->fmt_out, &fmt );
 
     vlc_ureduce( &p_filter->fmt_out.video.sar,
-        i_canvas_aspect    * p_filter->fmt_out.video.i_visible_height,
-        VOUT_ASPECT_FACTOR * p_filter->fmt_out.video.i_visible_width,
+        canvas_aspect.num * p_filter->fmt_out.video.i_visible_height,
+        canvas_aspect.den * VOUT_ASPECT_FACTOR * p_filter->fmt_out.video.i_visible_width,
         0);
 
     if( p_filter->fmt_out.video.i_visible_width != i_canvas_width
