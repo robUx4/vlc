@@ -175,11 +175,11 @@ static int Open( vlc_object_t *p_this )
                                                     CFG_PREFIX "element-aspect" );
     if( psz_aspect )
     {
-        int i_ar_num, i_ar_den;
-        if( sscanf( psz_aspect, "%d:%d", &i_ar_num, &i_ar_den ) == 2 &&
-            i_ar_num > 0 && i_ar_den > 0 )
+        vlc_urational_t ar;
+        if( sscanf( psz_aspect, "%u:%u", &ar.num, &ar.den ) == 2 &&
+            ar.num != 0 && ar.den != 0 )
         {
-            i_aspect = i_ar_num * VOUT_ASPECT_FACTOR / i_ar_den;
+            i_aspect = ar.num * VOUT_ASPECT_FACTOR / ar.den;
         }
         else
         {
