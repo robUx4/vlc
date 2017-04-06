@@ -217,10 +217,16 @@ static int Activate( vlc_object_t *p_this )
          * has the same sample aspect ratio as the subpicture */
         /* aspect = subpic_sar * canvas_width / canvas_height
          *  where subpic_sar = subpic_ph * subpic_par / subpic_pw */
-        canvas_aspect.num = (uint64_t) p_filter->fmt_in.video.i_visible_height
-                        * fmt_in_aspect.num
-                        * i_canvas_width;
-        canvas_aspect.den = fmt_in_aspect.den * i_canvas_height * p_filter->fmt_in.video.i_visible_width;
+        if( es_format_HasValidSar( &p_filter->fmt_in ) )
+        {
+            canvas_aspect.num = i_canvas_width  * p_filter->fmt_in.video.sar.num;
+            canvas_aspect.den = i_canvas_height * p_filter->fmt_in.video.sar.den;
+        }
+        else
+        {
+            canvas_aspect.num = i_canvas_width;
+            canvas_aspect.den = i_canvas_height;
+        }
     }
 
     b_padd = var_CreateGetBool( p_filter, CFG_PREFIX "padd" );
