@@ -149,7 +149,7 @@ static int Activate( vlc_object_t *p_this )
     es_format_t fmt; /* target format after up/down conversion */
     char psz_croppadd[100];
     int i_padd,i_offset;
-    char *psz_aspect, *psz_parser;
+    char *psz_aspect;
     bool b_padd;
     unsigned i_fmt_in_aspect;
 
@@ -199,18 +199,15 @@ static int Activate( vlc_object_t *p_this )
     psz_aspect = var_CreateGetNonEmptyString( p_filter, CFG_PREFIX "aspect" );
     if( psz_aspect )
     {
-        psz_parser = strchr( psz_aspect, ':' );
-        int numerator = atoi( psz_aspect );
-        int denominator = psz_parser ? atoi( psz_parser+1 ) : 0;
-        denominator = denominator == 0 ? 1 : denominator;
-        i_canvas_aspect = numerator * VOUT_ASPECT_FACTOR / denominator;
-        free( psz_aspect );
-
-        if( numerator <= 0 || denominator < 0 )
+        vlc_urational_t aspect;
+        if( sscanf( psz_aspect, "%u:%u", &aspect.num, &aspect.den ) != 2 ||
+            !vlc_valid_aspect_ratio( &aspect ) )
         {
-            msg_Err( p_filter, "Aspect ratio must be strictly positive" );
+            msg_Err( p_filter, "Invalid aspect ratio" );
             return VLC_EGENERIC;
         }
+        i_canvas_aspect = aspect.num * VOUT_ASPECT_FACTOR / aspect.den;
+        free( psz_aspect );
     }
     else
     {
