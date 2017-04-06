@@ -1264,7 +1264,7 @@ static block_t *EncodeVideo( encoder_t *p_enc, picture_t *p_pict )
          * frame number */
         if( likely( p_pict->date > VLC_TS_INVALID ) )
             frame->pts = p_pict->date * p_sys->p_context->time_base.den /
-                          CLOCK_FREQ / p_sys->p_context->time_base.num;
+                          (CLOCK_FREQ * p_sys->p_context->time_base.num);
         else
             frame->pts = AV_NOPTS_VALUE;
 

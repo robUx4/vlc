@@ -163,18 +163,18 @@ void vout_display_GetDefaultDisplaySize(unsigned *width, unsigned *height,
         *height = cfg->display.height;
     } else if (cfg->display.width != 0) {
         *width  = cfg->display.width;
-        *height = (int64_t)source->i_visible_height * source->sar.den * cfg->display.width * cfg->display.sar.num /
-            source->i_visible_width / source->sar.num / cfg->display.sar.den;
+        *height = (uint64_t)source->i_visible_height * source->sar.den * cfg->display.width * cfg->display.sar.num /
+            (source->i_visible_width * source->sar.num * cfg->display.sar.den);
     } else if (cfg->display.height != 0) {
-        *width  = (int64_t)source->i_visible_width * source->sar.num * cfg->display.height * cfg->display.sar.den /
-            source->i_visible_height / source->sar.den / cfg->display.sar.num;
+        *width  = (uint64_t)source->i_visible_width * source->sar.num * cfg->display.height * cfg->display.sar.den /
+            (source->i_visible_height * source->sar.den * cfg->display.sar.num);
         *height = cfg->display.height;
     } else if (source->sar.num >= source->sar.den) {
-        *width  = (int64_t)source->i_visible_width * source->sar.num * cfg->display.sar.den / source->sar.den / cfg->display.sar.num;
+        *width  = (uint64_t)source->i_visible_width * source->sar.num * cfg->display.sar.den / (source->sar.den * cfg->display.sar.num);
         *height = source->i_visible_height;
     } else {
         *width  = source->i_visible_width;
-        *height = (int64_t)source->i_visible_height * source->sar.den * cfg->display.sar.num / source->sar.num / cfg->display.sar.den;
+        *height = (uint64_t)source->i_visible_height * source->sar.den * cfg->display.sar.num / (source->sar.num * cfg->display.sar.den);
     }
 
     *width  = *width  * cfg->zoom.num / cfg->zoom.den;
@@ -756,8 +756,8 @@ static void VoutDisplayCropRatio(int *left, int *top, int *right, int *bottom,
                                  const video_format_t *source,
                                  unsigned num, unsigned den)
 {
-    unsigned scaled_width  = (uint64_t)source->i_visible_height * num * source->sar.den / den / source->sar.num;
-    unsigned scaled_height = (uint64_t)source->i_visible_width  * den * source->sar.num / num / source->sar.den;
+    unsigned scaled_width  = (uint64_t)source->i_visible_height * num * source->sar.den / (den * source->sar.num);
+    unsigned scaled_height = (uint64_t)source->i_visible_width  * den * source->sar.num / (num * source->sar.den);
 
     if (scaled_width < source->i_visible_width) {
         *left   = (source->i_visible_width - scaled_width) / 2;

@@ -474,12 +474,11 @@ static picture_t *ImageConvert( image_handler_t *p_image, picture_t *p_pic,
         p_fmt_out->sar.den * p_fmt_in->sar.num )
     {
         p_fmt_out->i_width =
-            p_fmt_in->sar.num * (int64_t)p_fmt_out->sar.den *
-            p_fmt_in->i_width / p_fmt_in->sar.den / p_fmt_out->sar.num;
+            p_fmt_in->sar.num * (uint64_t)p_fmt_out->sar.den *
+            p_fmt_in->i_width / (p_fmt_in->sar.den * p_fmt_out->sar.num);
         p_fmt_out->i_visible_width =
-            p_fmt_in->sar.num * (int64_t)p_fmt_out->sar.den *
-            p_fmt_in->i_visible_width / p_fmt_in->sar.den /
-            p_fmt_out->sar.num;
+            p_fmt_in->sar.num * (uint64_t)p_fmt_out->sar.den *
+            p_fmt_in->i_visible_width / (p_fmt_in->sar.den * p_fmt_out->sar.num);
     }
 
     if( !p_fmt_out->i_chroma ) p_fmt_out->i_chroma = p_fmt_in->i_chroma;
@@ -722,11 +721,11 @@ static encoder_t *CreateEncoder( vlc_object_t *p_this, video_format_t *fmt_in,
                fmt_out->sar.den * fmt_in->sar.num )
     {
         p_enc->fmt_in.video.i_width =
-            fmt_in->sar.num * (int64_t)fmt_out->sar.den * fmt_in->i_width /
-            fmt_in->sar.den / fmt_out->sar.num;
+            fmt_in->sar.num * (uint64_t)fmt_out->sar.den * fmt_in->i_width /
+            (fmt_in->sar.den * fmt_out->sar.num);
         p_enc->fmt_in.video.i_visible_width =
-            fmt_in->sar.num * (int64_t)fmt_out->sar.den *
-            fmt_in->i_visible_width / fmt_in->sar.den / fmt_out->sar.num;
+            fmt_in->sar.num * (uint64_t)fmt_out->sar.den *
+            fmt_in->i_visible_width / (fmt_in->sar.den * fmt_out->sar.num);
     }
 
     p_enc->fmt_in.video.frame_rate.num = 25;

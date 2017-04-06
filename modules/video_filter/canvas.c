@@ -186,11 +186,11 @@ static int Activate( vlc_object_t *p_this )
     }
 
     if( es_format_HasValidSar( &p_filter->fmt_in ) )
-        i_fmt_in_aspect = (int64_t)p_filter->fmt_in.video.sar.num *
+        i_fmt_in_aspect = (uint64_t)p_filter->fmt_in.video.sar.num *
                       p_filter->fmt_in.video.i_visible_width *
                       VOUT_ASPECT_FACTOR /
-                      p_filter->fmt_in.video.sar.den /
-                      p_filter->fmt_in.video.i_visible_height;
+                      (p_filter->fmt_in.video.sar.den *
+                      p_filter->fmt_in.video.i_visible_height);
     else
         i_fmt_in_aspect = (int64_t)p_filter->fmt_in.video.i_visible_width *
                       VOUT_ASPECT_FACTOR /

@@ -510,14 +510,14 @@ static int decoder_queue_video( decoder_t *p_dec, picture_t *p_pic,
         {
             fmt_out.i_width = p_sys->i_width;
             fmt_out.i_height = (p_sys->i_width * VOUT_ASPECT_FACTOR
-                * p_sys->sar.num / p_sys->sar.den / i_fmt_in_aspect)
+                * p_sys->sar.num / (p_sys->sar.den * i_fmt_in_aspect))
                   & ~0x1;
         }
         else if ( !p_sys->i_width )
         {
             fmt_out.i_height = p_sys->i_height;
             fmt_out.i_width = (p_sys->i_height * i_fmt_in_aspect
-                * p_sys->sar.den / p_sys->sar.num / VOUT_ASPECT_FACTOR)
+                * p_sys->sar.den / (p_sys->sar.num * VOUT_ASPECT_FACTOR))
                   & ~0x1;
         }
         else

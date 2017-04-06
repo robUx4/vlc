@@ -456,8 +456,8 @@ static void transcode_video_size_init( sout_stream_t *p_stream,
     /* aspect ratio */
     float f_aspect = (double)p_fmt_out->video.sar.num *
                      p_fmt_out->video.i_width /
-                     p_fmt_out->video.sar.den /
-                     p_fmt_out->video.i_height;
+                     (p_fmt_out->video.sar.den *
+                     p_fmt_out->video.i_height);
 
     msg_Dbg( p_stream, "decoder aspect is %f:1", f_aspect );
 

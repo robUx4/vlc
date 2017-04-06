@@ -431,12 +431,12 @@ int picture_Export( vlc_object_t *p_obj,
     if( fmt_out.i_height == 0 && fmt_out.i_width != 0 )
     {
         fmt_out.i_height = i_height * fmt_out.i_width
-                         * fmt_in.sar.den / fmt_in.i_width / fmt_in.sar.num;
+                         * fmt_in.sar.den / (fmt_in.i_width * fmt_in.sar.num);
     }
     else if( fmt_out.i_width == 0 && fmt_out.i_height != 0 )
     {
         fmt_out.i_width  = i_width * fmt_out.i_height
-                         * fmt_in.sar.num / fmt_in.i_height / fmt_in.sar.den;
+                         * fmt_in.sar.num / (fmt_in.i_height * fmt_in.sar.den);
     }
 
     image_handler_t *p_image = image_HandlerCreate( p_obj );
