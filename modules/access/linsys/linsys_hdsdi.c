@@ -189,7 +189,7 @@ static int Open( vlc_object_t *p_this )
         if ( psz_parser )
         {
             *psz_parser++ = '\0';
-            p_sys->aspect.num = strtol( psz_ar, NULL, 0 ) * VOUT_ASPECT_FACTOR;
+            p_sys->aspect.num = strtol( psz_ar, NULL, 0 );
             p_sys->aspect.den = strtol( psz_parser, NULL, 0 );
             p_sys->forced_aspect = p_sys->aspect;
         }
@@ -450,7 +450,7 @@ static int InitVideo( demux_t *p_demux )
         p_sys->frame_rate.den    = 1;
         p_sys->i_width           = 720;
         p_sys->i_height          = 576;
-        p_sys->aspect.num        = 4 * VOUT_ASPECT_FACTOR;
+        p_sys->aspect.num        = 4;
         p_sys->aspect.den        = 3;
         break;
 
@@ -459,7 +459,7 @@ static int InitVideo( demux_t *p_demux )
         p_sys->frame_rate.den    = 1;
         p_sys->i_width           = 1280;
         p_sys->i_height          = 720;
-        p_sys->aspect.num        = 16 * VOUT_ASPECT_FACTOR;
+        p_sys->aspect.num        = 16;
         p_sys->aspect.den        = 9;
         break;
 
@@ -468,7 +468,7 @@ static int InitVideo( demux_t *p_demux )
         p_sys->frame_rate.den    = 1;
         p_sys->i_width           = 1280;
         p_sys->i_height          = 720;
-        p_sys->aspect.num        = 16 * VOUT_ASPECT_FACTOR;
+        p_sys->aspect.num        = 16;
         p_sys->aspect.den        = 9;
         break;
 
@@ -480,7 +480,7 @@ static int InitVideo( demux_t *p_demux )
         p_sys->frame_rate.den    = 1;
         p_sys->i_width           = 1920;
         p_sys->i_height          = 1080;
-        p_sys->aspect.num        = 16 * VOUT_ASPECT_FACTOR;
+        p_sys->aspect.num        = 16;
         p_sys->aspect.den        = 9;
         break;
 
@@ -489,7 +489,7 @@ static int InitVideo( demux_t *p_demux )
         p_sys->frame_rate.den    = 1001;
         p_sys->i_width           = 1920;
         p_sys->i_height          = 1080;
-        p_sys->aspect.num        = 16 * VOUT_ASPECT_FACTOR;
+        p_sys->aspect.num        = 16;
         p_sys->aspect.den        = 9;
         break;
 
@@ -498,7 +498,7 @@ static int InitVideo( demux_t *p_demux )
         p_sys->frame_rate.den    = 1;
         p_sys->i_width           = 1920;
         p_sys->i_height          = 1080;
-        p_sys->aspect.num        = 16 * VOUT_ASPECT_FACTOR;
+        p_sys->aspect.num        = 16;
         p_sys->aspect.den        = 9;
         break;
 
@@ -518,9 +518,8 @@ static int InitVideo( demux_t *p_demux )
     fmt.video.frame_rate        = p_sys->frame_rate;
     fmt.video.i_width           = fmt.video.i_visible_width = p_sys->i_width;
     fmt.video.i_height          = fmt.video.i_visible_height = p_sys->i_height;
-    fmt.video.sar.num           = p_sys->aspect.num * fmt.video.i_height
-                                  / fmt.video.i_width;
-    fmt.video.sar.den           = p_sys->aspect.den * VOUT_ASPECT_FACTOR;
+    fmt.video.sar.num           = p_sys->aspect.num * fmt.video.i_height;
+    fmt.video.sar.den           = p_sys->aspect.den * fmt.video.i_width;
     p_sys->p_es_video           = es_out_Add( p_demux->out, &fmt );
 
     return VLC_SUCCESS;
@@ -612,8 +611,8 @@ static int HandleVideo( demux_t *p_demux, const uint8_t *p_buffer )
     ext.i_nb_fields = 2;
     ext.b_top_field_first = true;
     ext.i_aspect = vlc_valid_aspect_ratio( &p_sys->forced_aspect ) ?
-                   p_sys->forced_aspect.num / p_sys->forced_aspect.den :
-                   p_sys->aspect.num / p_sys->aspect.den;
+                   (VOUT_ASPECT_FACTOR * p_sys->forced_aspect.num / p_sys->forced_aspect.den) :
+                   (VOUT_ASPECT_FACTOR * p_sys->aspect.num / p_sys->aspect.den);
 
     memcpy( &p_current_picture->p_buffer[p_sys->i_vblock_size
                                           - sizeof(struct block_extension_t)],
