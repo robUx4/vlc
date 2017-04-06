@@ -502,22 +502,20 @@ static int decoder_queue_video( decoder_t *p_dec, picture_t *p_pic,
                            p_sys->i_chroma ? p_sys->i_chroma : VLC_CODEC_I420 );
         fmt_in = p_sys->p_decoder->fmt_out.video;
 
-        const unsigned i_fmt_in_aspect =
-            (int64_t)VOUT_ASPECT_FACTOR *
-            fmt_in.sar.num * fmt_in.i_width /
-            (fmt_in.sar.den * fmt_in.i_height);
         if ( !p_sys->i_height )
         {
             fmt_out.i_width = p_sys->i_width;
-            fmt_out.i_height = (p_sys->i_width * VOUT_ASPECT_FACTOR
-                * p_sys->sar.num / (p_sys->sar.den * i_fmt_in_aspect))
+            fmt_out.i_height = ((uint64_t) fmt_in.i_height *
+                                 p_sys->i_width * p_sys->sar.num * fmt_in.sar.den /
+                                (fmt_in.i_width * p_sys->sar.den * fmt_in.sar.num))
                   & ~0x1;
         }
         else if ( !p_sys->i_width )
         {
             fmt_out.i_height = p_sys->i_height;
-            fmt_out.i_width = (p_sys->i_height * i_fmt_in_aspect
-                * p_sys->sar.den / (p_sys->sar.num * VOUT_ASPECT_FACTOR))
+            fmt_out.i_width = ((uint64_t) fmt_in.i_width *
+                                p_sys->i_height * fmt_in.sar.num * p_sys->sar.den /
+                               (fmt_in.i_height * fmt_in.sar.den * p_sys->sar.num))
                   & ~0x1;
         }
         else
