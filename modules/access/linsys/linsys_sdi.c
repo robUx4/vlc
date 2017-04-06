@@ -172,7 +172,8 @@ struct demux_sys_t
 
     /* picture decoding */
     vlc_urational_t   frame_rate;
-    unsigned int     i_width, i_height, i_aspect, i_forced_aspect;
+    unsigned int     i_width, i_height, i_forced_aspect;
+    vlc_urational_t   aspect;
     unsigned int     i_block_size;
     unsigned int     i_telx_line, i_telx_count;
     char             *psz_telx, *psz_telx_lang;
@@ -230,9 +231,9 @@ static int DemuxOpen( vlc_object_t *p_this )
         if ( psz_parser )
         {
             *psz_parser++ = '\0';
-            p_sys->i_forced_aspect = p_sys->i_aspect =
-                 strtol( psz_ar, NULL, 0 ) * VOUT_ASPECT_FACTOR
-                 / strtol( psz_parser, NULL, 0 );
+            p_sys->aspect.num = strtol( psz_ar, NULL, 0 ) * VOUT_ASPECT_FACTOR;
+            p_sys->aspect.den = strtol( psz_parser, NULL, 0 );
+            p_sys->i_forced_aspect = p_sys->aspect.num / p_sys->aspect.den;
         }
         else
             p_sys->i_forced_aspect = 0;
@@ -445,11 +446,18 @@ static int StartDecode( demux_t *p_demux )
     fmt.video.frame_rate        = p_sys->frame_rate;
     fmt.video.i_width           = p_sys->i_width;
     fmt.video.i_height          = p_sys->i_height;
-    int i_aspect = p_sys->i_forced_aspect ? p_sys->i_forced_aspect
-                                          : p_sys->i_aspect;
-    fmt.video.sar.num = i_aspect * fmt.video.i_height
-                           / fmt.video.i_width;
-    fmt.video.sar.den = VOUT_ASPECT_FACTOR;
+    if (p_sys->i_forced_aspect)
+    {
+        fmt.video.sar.num = p_sys->i_forced_aspect * fmt.video.i_height
+                               / fmt.video.i_width;
+        fmt.video.sar.den = VOUT_ASPECT_FACTOR;
+    }
+    else
+    {
+        fmt.video.sar.num = p_sys->aspect.num * fmt.video.i_height
+                               / fmt.video.i_width;
+        fmt.video.sar.den = p_sys->aspect.den * VOUT_ASPECT_FACTOR;
+    }
     p_sys->p_es_video   = es_out_Add( p_demux->out, &fmt );
 
     if ( p_sys->b_vbi && InitWSS( p_demux ) != VLC_SUCCESS )
@@ -596,7 +604,8 @@ static void InitVideo( demux_t *p_demux )
         p_sys->frame_rate.num    = 25;
         p_sys->frame_rate.den    = 1;
         p_sys->i_height          = 576;
-        p_sys->i_aspect          = 4 * VOUT_ASPECT_FACTOR / 3;
+        p_sys->aspect.num        = 4 * VOUT_ASPECT_FACTOR;
+        p_sys->aspect.den        = 3;
         p_sys->b_hd              = false;
     }
     else if ( p_sys->i_nb_lines == 525 )
@@ -605,7 +614,8 @@ static void InitVideo( demux_t *p_demux )
         p_sys->frame_rate.num    = 30000;
         p_sys->frame_rate.den    = 1001;
         p_sys->i_height          = 480;
-        p_sys->i_aspect          = 4 * VOUT_ASPECT_FACTOR / 3;
+        p_sys->aspect.num        = 4 * VOUT_ASPECT_FACTOR;
+        p_sys->aspect.den        = 3;
         p_sys->b_hd              = false;
     }
     else if ( p_sys->i_nb_lines == 1125 && i_total_width == 2640 )
@@ -614,7 +624,8 @@ static void InitVideo( demux_t *p_demux )
         p_sys->frame_rate.num    = 25;
         p_sys->frame_rate.den    = 1;
         p_sys->i_height          = 1080;
-        p_sys->i_aspect          = 16 * VOUT_ASPECT_FACTOR / 9;
+        p_sys->aspect.num        = 16 * VOUT_ASPECT_FACTOR;
+        p_sys->aspect.den        = 9;
         p_sys->b_hd              = true;
     }
     else if ( p_sys->i_nb_lines == 1125 && i_total_width == 2200 )
@@ -623,7 +634,8 @@ static void InitVideo( demux_t *p_demux )
         p_sys->frame_rate.num    = 30000;
         p_sys->frame_rate.den    = 1001;
         p_sys->i_height          = 1080;
-        p_sys->i_aspect          = 16 * VOUT_ASPECT_FACTOR / 9;
+        p_sys->aspect.num        = 16 * VOUT_ASPECT_FACTOR;
+        p_sys->aspect.den        = 9;
         p_sys->b_hd              = true;
     }
     else if ( p_sys->i_nb_lines == 750 && i_total_width == 1980 )
@@ -632,7 +644,8 @@ static void InitVideo( demux_t *p_demux )
         p_sys->frame_rate.num    = 50;
         p_sys->frame_rate.den    = 1;
         p_sys->i_height          = 720;
-        p_sys->i_aspect          = 16 * VOUT_ASPECT_FACTOR / 9;
+        p_sys->aspect.num        = 16 * VOUT_ASPECT_FACTOR;
+        p_sys->aspect.den        = 9;
         p_sys->b_hd              = true;
     }
     else if ( p_sys->i_nb_lines == 750 && i_total_width == 1650 )
@@ -641,7 +654,8 @@ static void InitVideo( demux_t *p_demux )
         p_sys->frame_rate.num    = 60000;
         p_sys->frame_rate.den    = 1001;
         p_sys->i_height          = 720;
-        p_sys->i_aspect          = 16 * VOUT_ASPECT_FACTOR / 9;
+        p_sys->aspect.num        = 16 * VOUT_ASPECT_FACTOR;
+        p_sys->aspect.den        = 9;
         p_sys->b_hd              = true;
     }
     else
@@ -651,7 +665,8 @@ static void InitVideo( demux_t *p_demux )
         p_sys->frame_rate.num    = 25;
         p_sys->frame_rate.den    = 1;
         p_sys->i_height          = p_sys->i_nb_lines;
-        p_sys->i_aspect          = 16 * VOUT_ASPECT_FACTOR / 9;
+        p_sys->aspect.num        = 16 * VOUT_ASPECT_FACTOR;
+        p_sys->aspect.den        = 9;
         p_sys->b_hd              = true;
     }
     p_sys->b_vbi = !p_sys->b_hd;
@@ -667,7 +682,7 @@ static void DecodeVideo( demux_t *p_demux )
     ext.i_nb_fields       = 2;
     ext.b_top_field_first = true;
     ext.i_aspect = p_sys->i_forced_aspect ? p_sys->i_forced_aspect :
-                   p_sys->i_aspect;
+                   p_sys->aspect.num / p_sys->aspect.den;
 
     memcpy( &p_sys->p_current_picture->p_buffer[p_sys->i_block_size
                                      - sizeof(struct block_extension_t)],
@@ -722,11 +737,12 @@ static void DecodeWSS( demux_t *p_demux )
 
     if ( vbi_raw_decode( &p_sys->rd_wss, p_sys->p_wss_buffer, p_sliced ) == 0 )
     {
-        p_sys->i_aspect = 4 * VOUT_ASPECT_FACTOR / 3;
+        p_sys->aspect.num = 4 * VOUT_ASPECT_FACTOR;
+        p_sys->aspect.den = 3;
     }
     else
     {
-        unsigned int i_old_aspect = p_sys->i_aspect;
+        vlc_urational_t old_aspect = p_sys->aspect;
         uint8_t *p = p_sliced[0].data;
         int i_aspect, i_parity;
 
@@ -739,11 +755,18 @@ static void DecodeWSS( demux_t *p_demux )
         if ( !(i_parity & 1) )
             msg_Warn( p_demux, "WSS parity error" );
         else if ( i_aspect == 7 )
-            p_sys->i_aspect = 16 * VOUT_ASPECT_FACTOR / 9;
+        {
+            p_sys->aspect.num = 16 * VOUT_ASPECT_FACTOR;
+            p_sys->aspect.den = 9;
+        }
         else
-            p_sys->i_aspect = 4 * VOUT_ASPECT_FACTOR / 3;
+        {
+            p_sys->aspect.num = 4 * VOUT_ASPECT_FACTOR;
+            p_sys->aspect.den = 3;
+        }
 
-        if ( p_sys->i_aspect != i_old_aspect )
+        if ( p_sys->aspect.num * old_aspect.den !=
+             p_sys->aspect.den * old_aspect.num )
             msg_Dbg( p_demux, "new WSS information (ra=%x md=%x cod=%x hlp=%x rvd=%x sub=%x pos=%x srd=%x c=%x cp=%x)",
                      i_aspect, (p[0] & 0x10) >> 4, (p[0] & 0x20) >> 5,
                      (p[0] & 0x40) >> 6, (p[0] & 0x80) >> 7, p[1] & 0x01,

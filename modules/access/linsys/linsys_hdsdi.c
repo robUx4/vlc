@@ -145,7 +145,8 @@ struct demux_sys_t
 
     /* picture decoding */
     vlc_urational_t frame_rate;
-    unsigned int i_width, i_height, i_aspect, i_forced_aspect;
+    unsigned int i_width, i_height, i_forced_aspect;
+    vlc_urational_t aspect;
     unsigned int i_vblock_size, i_ablock_size;
     mtime_t      i_next_vdate, i_next_adate;
     int          i_incr, i_aincr;
@@ -188,9 +189,9 @@ static int Open( vlc_object_t *p_this )
         if ( psz_parser )
         {
             *psz_parser++ = '\0';
-            p_sys->i_forced_aspect = p_sys->i_aspect =
-                 strtol( psz_ar, NULL, 0 ) * VOUT_ASPECT_FACTOR
-                 / strtol( psz_parser, NULL, 0 );
+            p_sys->aspect.num = strtol( psz_ar, NULL, 0 ) * VOUT_ASPECT_FACTOR;
+            p_sys->aspect.den = strtol( psz_parser, NULL, 0 );
+            p_sys->i_forced_aspect = p_sys->aspect.num / p_sys->aspect.den;
         }
         else
             p_sys->i_forced_aspect = 0;
@@ -449,7 +450,8 @@ static int InitVideo( demux_t *p_demux )
         p_sys->frame_rate.den    = 1;
         p_sys->i_width           = 720;
         p_sys->i_height          = 576;
-        p_sys->i_aspect          = 4 * VOUT_ASPECT_FACTOR / 3;
+        p_sys->aspect.num        = 4 * VOUT_ASPECT_FACTOR;
+        p_sys->aspect.den        = 3;
         break;
 
     case SDIVIDEO_CTL_SMPTE_296M_720P_50HZ:
@@ -457,7 +459,8 @@ static int InitVideo( demux_t *p_demux )
         p_sys->frame_rate.den    = 1;
         p_sys->i_width           = 1280;
         p_sys->i_height          = 720;
-        p_sys->i_aspect          = 16 * VOUT_ASPECT_FACTOR / 9;
+        p_sys->aspect.num        = 16 * VOUT_ASPECT_FACTOR;
+        p_sys->aspect.den        = 9;
         break;
 
     case SDIVIDEO_CTL_SMPTE_296M_720P_60HZ:
@@ -465,7 +468,8 @@ static int InitVideo( demux_t *p_demux )
         p_sys->frame_rate.den    = 1;
         p_sys->i_width           = 1280;
         p_sys->i_height          = 720;
-        p_sys->i_aspect          = 16 * VOUT_ASPECT_FACTOR / 9;
+        p_sys->aspect.num        = 16 * VOUT_ASPECT_FACTOR;
+        p_sys->aspect.den        = 9;
         break;
 
     case SDIVIDEO_CTL_SMPTE_295M_1080I_50HZ:
@@ -476,7 +480,8 @@ static int InitVideo( demux_t *p_demux )
         p_sys->frame_rate.den    = 1;
         p_sys->i_width           = 1920;
         p_sys->i_height          = 1080;
-        p_sys->i_aspect          = 16 * VOUT_ASPECT_FACTOR / 9;
+        p_sys->aspect.num        = 16 * VOUT_ASPECT_FACTOR;
+        p_sys->aspect.den        = 9;
         break;
 
     case SDIVIDEO_CTL_SMPTE_274M_1080I_59_94HZ:
@@ -484,7 +489,8 @@ static int InitVideo( demux_t *p_demux )
         p_sys->frame_rate.den    = 1001;
         p_sys->i_width           = 1920;
         p_sys->i_height          = 1080;
-        p_sys->i_aspect          = 16 * VOUT_ASPECT_FACTOR / 9;
+        p_sys->aspect.num        = 16 * VOUT_ASPECT_FACTOR;
+        p_sys->aspect.den        = 9;
         break;
 
     case SDIVIDEO_CTL_SMPTE_274M_1080I_60HZ:
@@ -492,7 +498,8 @@ static int InitVideo( demux_t *p_demux )
         p_sys->frame_rate.den    = 1;
         p_sys->i_width           = 1920;
         p_sys->i_height          = 1080;
-        p_sys->i_aspect          = 16 * VOUT_ASPECT_FACTOR / 9;
+        p_sys->aspect.num        = 16 * VOUT_ASPECT_FACTOR;
+        p_sys->aspect.den        = 9;
         break;
 
     default:
@@ -511,9 +518,9 @@ static int InitVideo( demux_t *p_demux )
     fmt.video.frame_rate        = p_sys->frame_rate;
     fmt.video.i_width           = fmt.video.i_visible_width = p_sys->i_width;
     fmt.video.i_height          = fmt.video.i_visible_height = p_sys->i_height;
-    fmt.video.sar.num         = p_sys->i_aspect * fmt.video.i_height
+    fmt.video.sar.num           = p_sys->aspect.num * fmt.video.i_height
                                   / fmt.video.i_width;
-    fmt.video.sar.den         = VOUT_ASPECT_FACTOR;
+    fmt.video.sar.den           = p_sys->aspect.den * VOUT_ASPECT_FACTOR;
     p_sys->p_es_video           = es_out_Add( p_demux->out, &fmt );
 
     return VLC_SUCCESS;
@@ -605,7 +612,7 @@ static int HandleVideo( demux_t *p_demux, const uint8_t *p_buffer )
     ext.i_nb_fields = 2;
     ext.b_top_field_first = true;
     ext.i_aspect = p_sys->i_forced_aspect ? p_sys->i_forced_aspect :
-                   p_sys->i_aspect;
+                   p_sys->aspect.num / p_sys->aspect.den;
 
     memcpy( &p_current_picture->p_buffer[p_sys->i_vblock_size
                                           - sizeof(struct block_extension_t)],
