@@ -598,9 +598,9 @@ static int HandleVideo( demux_t *p_demux, const uint8_t *p_buffer )
     ext.b_progressive = false;
     ext.i_nb_fields = 2;
     ext.b_top_field_first = true;
-    ext.i_aspect = vlc_valid_aspect_ratio( &p_sys->forced_aspect ) ?
-                   (VOUT_ASPECT_FACTOR * p_sys->forced_aspect.num / p_sys->forced_aspect.den) :
-                   (VOUT_ASPECT_FACTOR * p_sys->aspect.num / p_sys->aspect.den);
+    const vlc_urational_t *p_ar = vlc_valid_aspect_ratio(&p_sys->forced_aspect) ?
+                &p_sys->forced_aspect : &p_sys->aspect;
+    ext.i_aspect = VOUT_ASPECT_FACTOR * p_ar->num / p_ar->den;
 
     memcpy( &p_current_picture->p_buffer[p_sys->i_vblock_size
                                           - sizeof(struct block_extension_t)],

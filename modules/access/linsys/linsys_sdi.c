@@ -433,16 +433,10 @@ static int StartDecode( demux_t *p_demux )
     fmt.video.frame_rate        = p_sys->frame_rate;
     fmt.video.i_width           = p_sys->i_width;
     fmt.video.i_height          = p_sys->i_height;
-    if ( vlc_valid_aspect_ratio( &p_sys->forced_aspect ) )
-    {
-        fmt.video.sar.num = p_sys->forced_aspect.num * fmt.video.i_height
-        fmt.video.sar.den = p_sys->forced_aspect.den * fmt.video.i_width;
-    }
-    else
-    {
-        fmt.video.sar.num = p_sys->aspect.num * fmt.video.i_height;
-        fmt.video.sar.den = p_sys->aspect.den * fmt.video.i_width;
-    }
+    const vlc_urational_t *p_ar = vlc_valid_aspect_ratio(&p_sys->forced_aspect) ?
+                &p_sys->forced_aspect : &p_sys->aspect;
+    fmt.video.sar.num           = p_ar->num * fmt.video.i_height
+    fmt.video.sar.den           = p_ar->den * fmt.video.i_width;
     p_sys->p_es_video   = es_out_Add( p_demux->out, &fmt );
 
     if ( p_sys->b_vbi && InitWSS( p_demux ) != VLC_SUCCESS )
@@ -666,9 +660,9 @@ static void DecodeVideo( demux_t *p_demux )
     ext.b_progressive     = false;
     ext.i_nb_fields       = 2;
     ext.b_top_field_first = true;
-    ext.i_aspect = vlc_valid_aspect_ratio( &p_sys->forced_aspect ) ?
-                   (VOUT_ASPECT_FACTOR * p_sys->forced_aspect.num / p_sys->forced_aspect.den) :
-                   (VOUT_ASPECT_FACTOR * p_sys->aspect.num / p_sys->aspect.den);
+    const vlc_urational_t *p_ar = vlc_valid_aspect_ratio(&p_sys->forced_aspect) ?
+                &p_sys->forced_aspect : &p_sys->aspect;
+    ext.i_aspect = VOUT_ASPECT_FACTOR * p_ar->num / p_ar->den;
 
     memcpy( &p_sys->p_current_picture->p_buffer[p_sys->i_block_size
                                      - sizeof(struct block_extension_t)],
