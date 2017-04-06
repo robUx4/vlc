@@ -188,15 +188,13 @@ static int Activate( vlc_object_t *p_this )
     if( es_format_HasValidSar( &p_filter->fmt_in ) )
     {
         fmt_in_aspect.num = (uint64_t)p_filter->fmt_in.video.sar.num *
-                      p_filter->fmt_in.video.i_visible_width *
-                      VOUT_ASPECT_FACTOR;
+                      p_filter->fmt_in.video.i_visible_width;
         fmt_in_aspect.den = p_filter->fmt_in.video.sar.den *
                       p_filter->fmt_in.video.i_visible_height;
     }
     else
     {
-        fmt_in_aspect.num = (int64_t)p_filter->fmt_in.video.i_visible_width *
-                      VOUT_ASPECT_FACTOR;
+        fmt_in_aspect.num = p_filter->fmt_in.video.i_visible_width;
         fmt_in_aspect.den = p_filter->fmt_in.video.i_visible_height;
     }
 
@@ -210,8 +208,7 @@ static int Activate( vlc_object_t *p_this )
             msg_Err( p_filter, "Invalid aspect ratio" );
             return VLC_EGENERIC;
         }
-        canvas_aspect.num = aspect.num * VOUT_ASPECT_FACTOR;
-        canvas_aspect.den = aspect.den;
+        canvas_aspect = aspect;
         free( psz_aspect );
     }
     else
@@ -356,7 +353,7 @@ static int Activate( vlc_object_t *p_this )
 
     vlc_ureduce( &p_filter->fmt_out.video.sar,
         canvas_aspect.num * p_filter->fmt_out.video.i_visible_height,
-        canvas_aspect.den * VOUT_ASPECT_FACTOR * p_filter->fmt_out.video.i_visible_width,
+        canvas_aspect.den * p_filter->fmt_out.video.i_visible_width,
         0);
 
     if( p_filter->fmt_out.video.i_visible_width != i_canvas_width
