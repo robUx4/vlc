@@ -145,8 +145,8 @@ struct demux_sys_t
 
     /* picture decoding */
     vlc_urational_t frame_rate;
-    unsigned int i_width, i_height, i_forced_aspect;
-    vlc_urational_t aspect;
+    unsigned int i_width, i_height;
+    vlc_urational_t aspect, forced_aspect;
     unsigned int i_vblock_size, i_ablock_size;
     mtime_t      i_next_vdate, i_next_adate;
     int          i_incr, i_aincr;
@@ -191,10 +191,10 @@ static int Open( vlc_object_t *p_this )
             *psz_parser++ = '\0';
             p_sys->aspect.num = strtol( psz_ar, NULL, 0 ) * VOUT_ASPECT_FACTOR;
             p_sys->aspect.den = strtol( psz_parser, NULL, 0 );
-            p_sys->i_forced_aspect = p_sys->aspect.num / p_sys->aspect.den;
+            p_sys->forced_aspect = p_sys->aspect;
         }
         else
-            p_sys->i_forced_aspect = 0;
+            vlc_invalidate_aspect_ratio( &p_sys->forced_aspect );
         free( psz_ar );
     }
 
@@ -611,7 +611,8 @@ static int HandleVideo( demux_t *p_demux, const uint8_t *p_buffer )
     ext.b_progressive = false;
     ext.i_nb_fields = 2;
     ext.b_top_field_first = true;
-    ext.i_aspect = p_sys->i_forced_aspect ? p_sys->i_forced_aspect :
+    ext.i_aspect = vlc_valid_aspect_ratio( &p_sys->forced_aspect ) ?
+                   p_sys->forced_aspect.num / p_sys->forced_aspect.den :
                    p_sys->aspect.num / p_sys->aspect.den;
 
     memcpy( &p_current_picture->p_buffer[p_sys->i_vblock_size

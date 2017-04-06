@@ -172,8 +172,8 @@ struct demux_sys_t
 
     /* picture decoding */
     vlc_urational_t   frame_rate;
-    unsigned int     i_width, i_height, i_forced_aspect;
-    vlc_urational_t   aspect;
+    unsigned int     i_width, i_height;
+    vlc_urational_t   aspect, forced_aspect;
     unsigned int     i_block_size;
     unsigned int     i_telx_line, i_telx_count;
     char             *psz_telx, *psz_telx_lang;
@@ -233,10 +233,10 @@ static int DemuxOpen( vlc_object_t *p_this )
             *psz_parser++ = '\0';
             p_sys->aspect.num = strtol( psz_ar, NULL, 0 ) * VOUT_ASPECT_FACTOR;
             p_sys->aspect.den = strtol( psz_parser, NULL, 0 );
-            p_sys->i_forced_aspect = p_sys->aspect.num / p_sys->aspect.den;
+            p_sys->forced_aspect = p_sys->aspect;
         }
         else
-            p_sys->i_forced_aspect = 0;
+            vlc_invalidate_aspect_ratio( &p_sys->forced_aspect );
         free( psz_ar );
     }
 
@@ -446,11 +446,11 @@ static int StartDecode( demux_t *p_demux )
     fmt.video.frame_rate        = p_sys->frame_rate;
     fmt.video.i_width           = p_sys->i_width;
     fmt.video.i_height          = p_sys->i_height;
-    if (p_sys->i_forced_aspect)
+    if ( vlc_valid_aspect_ratio( &p_sys->forced_aspect ) )
     {
-        fmt.video.sar.num = p_sys->i_forced_aspect * fmt.video.i_height
+        fmt.video.sar.num = p_sys->forced_aspect.num * fmt.video.i_height
                                / fmt.video.i_width;
-        fmt.video.sar.den = VOUT_ASPECT_FACTOR;
+        fmt.video.sar.den = p_sys->forced_aspect.den * VOUT_ASPECT_FACTOR;
     }
     else
     {
@@ -681,7 +681,8 @@ static void DecodeVideo( demux_t *p_demux )
     ext.b_progressive     = false;
     ext.i_nb_fields       = 2;
     ext.b_top_field_first = true;
-    ext.i_aspect = p_sys->i_forced_aspect ? p_sys->i_forced_aspect :
+    ext.i_aspect = vlc_valid_aspect_ratio( &p_sys->forced_aspect ) ?
+                   p_sys->forced_aspect.num / p_sys->forced_aspect.den :
                    p_sys->aspect.num / p_sys->aspect.den;
 
     memcpy( &p_sys->p_current_picture->p_buffer[p_sys->i_block_size
@@ -767,8 +768,8 @@ static void DecodeWSS( demux_t *p_demux )
 
         if ( p_sys->aspect.num * old_aspect.den !=
              p_sys->aspect.den * old_aspect.num )
-            msg_Dbg( p_demux, "new WSS information (ra=%x md=%x cod=%x hlp=%x rvd=%x sub=%x pos=%x srd=%x c=%x cp=%x)",
-                     i_aspect, (p[0] & 0x10) >> 4, (p[0] & 0x20) >> 5,
+            msg_Dbg( p_demux, "new WSS information (ra=%x:%x md=%x cod=%x hlp=%x rvd=%x sub=%x pos=%x srd=%x c=%x cp=%x)",
+                     i_aspect.num, i_aspect.den, (p[0] & 0x10) >> 4, (p[0] & 0x20) >> 5,
                      (p[0] & 0x40) >> 6, (p[0] & 0x80) >> 7, p[1] & 0x01,
                      (p[1] >> 1) & 3, (p[1] & 0x08) >> 3, (p[1] & 0x10) >> 4,
                      (p[1] & 0x20) >> 5 );
