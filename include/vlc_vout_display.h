@@ -92,7 +92,7 @@ typedef struct {
         unsigned  height;
 
         /* Display SAR */
-        vlc_rational_t sar;
+        vlc_urational_t sar;
     } display;
 
     /* Alignment of the picture inside the display */

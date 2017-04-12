@@ -838,7 +838,7 @@ static inline void SetQWLE (void *p, uint64_t qw)
 
 typedef struct {
     unsigned num, den;
-} vlc_rational_t;
+} vlc_urational_t;
 
 VLC_API bool vlc_ureduce( unsigned *, unsigned *, uint64_t, uint64_t, uint64_t );
 

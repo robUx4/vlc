@@ -337,7 +337,7 @@ typedef struct {
 
     /* */
     vout_display_cfg_t cfg;
-    vlc_rational_t sar_initial;
+    vlc_urational_t sar_initial;
 
     /* */
     unsigned width_saved;
@@ -348,14 +348,14 @@ typedef struct {
     bool is_display_filled;
 
     bool ch_zoom;
-    vlc_rational_t zoom;
+    vlc_urational_t zoom;
 #if defined(_WIN32) || defined(__OS2__)
     bool ch_wm_state;
     unsigned wm_state;
     unsigned wm_state_initial;
 #endif
     bool ch_sar;
-    vlc_rational_t sar;
+    vlc_urational_t sar;
 
     bool ch_crop;
     struct {

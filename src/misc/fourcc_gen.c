@@ -31,7 +31,7 @@
 #define VLC_API
 #define VLC_USED
 typedef uint32_t vlc_fourcc_t;
-typedef struct { unsigned num, den; } vlc_rational_t;
+typedef struct { unsigned num, den; } vlc_urational_t;
 #include "../include/vlc_fourcc.h"
 
 #define VLC_FOURCC(a,b,c,d) { a, b, c, d }
