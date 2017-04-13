@@ -110,7 +110,7 @@ static void deNoise(unsigned char *Frame,        // mpi->planes[x]
                     unsigned char *FrameDest,    // dmpi->planes[x]
                     unsigned int *LineAnt,      // vf->priv->Line (width bytes)
                     unsigned short **FrameAntPtr,
-                    int W, int H, int sStride, int dStride,
+                    unsigned W, unsigned H, int sStride, int dStride,
                     int *Horizontal, int *Vertical, int *Temporal)
 {
     long sLineOffs = 0, dLineOffs = 0;
@@ -122,7 +122,7 @@ static void deNoise(unsigned char *Frame,        // mpi->planes[x]
         (*FrameAntPtr)=FrameAnt=malloc(W*H*sizeof(unsigned short));
         if(!FrameAnt)
             return;
-        for (long Y = 0; Y < H; Y++){
+        for (unsigned Y = 0; Y < H; Y++){
             unsigned short* dst=&FrameAnt[Y*W];
             unsigned char* src=Frame+Y*sStride;
             for (long X = 0; X < W; X++) dst[X]=src[X]<<8;
@@ -148,14 +148,14 @@ static void deNoise(unsigned char *Frame,        // mpi->planes[x]
 
     /* First line has no top neighbor. Only left one for each pixel and
      * last frame */
-    for (long X = 1; X < W; X++){
+    for (unsigned X = 1; X < W; X++){
         LineAnt[X] = PixelAnt = LowPassMul(PixelAnt, Frame[X]<<16, Horizontal);
         PixelDst = LowPassMul(FrameAnt[X]<<8, PixelAnt, Temporal);
         FrameAnt[X] = ((PixelDst+0x1000007F)>>8);
         FrameDest[X]= ((PixelDst+0x10007FFF)>>16);
     }
 
-    for (long Y = 1; Y < H; Y++){
+    for (unsigned Y = 1; Y < H; Y++){
         unsigned int PixelAnt;
         unsigned short* LinePrev=&FrameAnt[Y*W];
         sLineOffs += sStride, dLineOffs += dStride;
@@ -166,7 +166,7 @@ static void deNoise(unsigned char *Frame,        // mpi->planes[x]
         LinePrev[0] = ((PixelDst+0x1000007F)>>8);
         FrameDest[dLineOffs]= ((PixelDst+0x10007FFF)>>16);
 
-        for (long X = 1; X < W; X++){
+        for (unsigned X = 1; X < W; X++){
             unsigned int PixelDst;
             /* The rest are normal */
             PixelAnt = LowPassMul(PixelAnt, Frame[sLineOffs+X]<<16, Horizontal);

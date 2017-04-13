@@ -90,7 +90,7 @@ static const char *const filter_options[] = {
 struct filter_sys_t
 {
     const vlc_chroma_description_t *chroma;
-    int w[3], h[3];
+    unsigned w[3], h[3];
 
     struct vf_priv_s cfg;
     bool   b_recalc_coefs;
