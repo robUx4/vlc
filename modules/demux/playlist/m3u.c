@@ -212,7 +212,7 @@ static int Demux( demux_t *p_demux )
                 FREENULL( psz_artist );
                 parseEXTINF( psz_parse, &psz_artist, &psz_name, &i_parsed_duration );
                 if( i_parsed_duration >= 0 )
-                    i_duration = i_parsed_duration * INT64_C(1000000);
+                    i_duration = i_parsed_duration * CLOCK_FREQ;
                 if( psz_name )
                     psz_name = pf_dup( psz_name );
                 if( psz_artist )

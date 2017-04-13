@@ -353,7 +353,7 @@ static int Demux( demux_t *p_demux )
         }
         /* Re-estimate bitrate */
         if( p_sys->b_estimate_bitrate && p_sys->i_pts > INT64_C(500000) )
-            p_sys->i_bitrate_avg = 8*INT64_C(1000000)*p_sys->i_bytes/(p_sys->i_pts-1);
+            p_sys->i_bitrate_avg = 8*CLOCK_FREQ*p_sys->i_bytes/(p_sys->i_pts-1);
         p_sys->i_bytes += p_block_out->i_buffer;
 
 

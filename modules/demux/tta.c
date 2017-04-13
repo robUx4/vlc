@@ -207,7 +207,7 @@ static int Demux( demux_t *p_demux )
     p_data = vlc_stream_Block( p_demux->s,
                                p_sys->pi_seektable[p_sys->i_currentframe] );
     if( p_data == NULL ) return 0;
-    p_data->i_dts = p_data->i_pts = VLC_TS_0 + (int64_t)(INT64_C(1000000) * p_sys->i_currentframe) * TTA_FRAMETIME;
+    p_data->i_dts = p_data->i_pts = VLC_TS_0 + (int64_t)(CLOCK_FREQ * p_sys->i_currentframe) * TTA_FRAMETIME;
 
     p_sys->i_currentframe++;
 
@@ -264,12 +264,12 @@ static int Control( demux_t *p_demux, int i_query, va_list args )
 
         case DEMUX_GET_LENGTH:
             pi64 = va_arg( args, int64_t * );
-            *pi64 = INT64_C(1000000) * p_sys->i_totalframes * TTA_FRAMETIME;
+            *pi64 = CLOCK_FREQ * p_sys->i_totalframes * TTA_FRAMETIME;
             return VLC_SUCCESS;
 
         case DEMUX_GET_TIME:
             pi64 = va_arg( args, int64_t * );
-            *pi64 = INT64_C(1000000) * p_sys->i_currentframe * TTA_FRAMETIME;
+            *pi64 = CLOCK_FREQ * p_sys->i_currentframe * TTA_FRAMETIME;
             return VLC_SUCCESS;
 
         default:
