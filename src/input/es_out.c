@@ -2920,7 +2920,6 @@ static void EsOutUpdateInfo( es_out_t *out, es_out_id_t *es, const es_format_t *
     es_out_sys_t   *p_sys = out->p_sys;
     input_thread_t *p_input = p_sys->p_input;
     const es_format_t *p_fmt_es = &es->fmt;
-    lldiv_t         div;
 
     if( es->fmt.i_cat == fmt->i_cat )
     {
@@ -3070,15 +3069,11 @@ static void EsOutUpdateInfo( es_out_t *out, es_out_id_t *es, const es_format_t *
 
        if( es_format_HasValidFrameRate( fmt ) )
        {
-           div = lldiv( (float)fmt->video.frame_rate.num /
-                               fmt->video.frame_rate.den * CLOCK_FREQ,
-                               CLOCK_FREQ );
-           if( div.rem > 0 )
-               info_category_AddInfo( p_cat, _("Frame rate"), "%"PRId64".%06u",
-                                      div.quot, (unsigned int )div.rem );
-           else
-               info_category_AddInfo( p_cat, _("Frame rate"), "%"PRId64,
-                                      div.quot );
+           info_category_AddInfo( p_cat, _("Frame rate"), "%.6f (%d:%d)",
+                                  (float)fmt->video.frame_rate.num /
+                                  fmt->video.frame_rate.den,
+                                  fmt->video.frame_rate.num,
+                                  fmt->video.frame_rate.den );
        }
        if( fmt->i_codec != p_fmt_es->i_codec )
        {
