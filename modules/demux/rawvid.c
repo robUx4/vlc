@@ -292,11 +292,6 @@ valid:
     }
 
     fps = var_InheritURational( p_demux, "rawvid-fps" );
-    if( fps.num == 0 || fps.den == 0 )
-    {
-        fps.num = 0;
-        fps.den = 1;
-    }
 
     /* moan about anything wrong */
     if( i_width <= 0 || i_height <= 0 )
