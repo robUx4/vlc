@@ -421,7 +421,6 @@ static int StartDecode( demux_t *p_demux )
     char *psz_parser;
 
     p_sys->i_next_date = START_DATE;
-    p_sys->i_incr = CLOCK_FREQ * p_sys->frame_rate.den / p_sys->frame_rate.num;
     p_sys->i_block_size = p_sys->i_width * p_sys->i_height * 3 / 2
                            + sizeof(struct block_extension_t);
     if( NewFrame( p_demux ) != VLC_SUCCESS )
@@ -437,6 +436,7 @@ static int StartDecode( demux_t *p_demux )
                 &p_sys->forced_aspect : &p_sys->aspect;
     fmt.video.sar.num           = p_ar->num * fmt.video.i_height
     fmt.video.sar.den           = p_ar->den * fmt.video.i_width;
+    p_sys->i_incr               = es_format_FramesDuration( 1, &fmt );
     p_sys->p_es_video   = es_out_Add( p_demux->out, &fmt );
 
     if ( p_sys->b_vbi && InitWSS( p_demux ) != VLC_SUCCESS )

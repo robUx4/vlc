@@ -496,7 +496,6 @@ static int InitVideo( demux_t *p_demux )
     }
 
     p_sys->i_next_vdate = START_DATE;
-    p_sys->i_incr = CLOCK_FREQ * p_sys->frame_rate.den / p_sys->frame_rate.num;
     p_sys->i_vblock_size = p_sys->i_width * p_sys->i_height * 3 / 2
                             + sizeof(struct block_extension_t);
 
@@ -508,6 +507,7 @@ static int InitVideo( demux_t *p_demux )
     fmt.video.i_height          = fmt.video.i_visible_height = p_sys->i_height;
     fmt.video.sar.num           = p_sys->aspect.num * fmt.video.i_height;
     fmt.video.sar.den           = p_sys->aspect.den * fmt.video.i_width;
+    p_sys->i_incr               = es_format_FramesDuration( 1, &fmt );
     p_sys->p_es_video           = es_out_Add( p_demux->out, &fmt );
 
     return VLC_SUCCESS;

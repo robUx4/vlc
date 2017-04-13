@@ -1591,9 +1591,7 @@ static block_t *Encode( encoder_t *p_enc, picture_t *p_pict )
     if( !p_sys->param.b_vfr_input )
     {
         /* This isn't really valid for streams with B-frames */
-        p_block->i_length = CLOCK_FREQ *
-            p_enc->fmt_in.video.frame_rate.den /
-                p_enc->fmt_in.video.frame_rate.num;
+        p_block->i_length = es_format_FramesDuration( 1, &p_enc->fmt_in );
     }
 
     /* scale pts-values back*/

@@ -917,8 +917,7 @@ static int dirac_InspectDataUnit( decoder_t *p_dec, block_t **pp_block, block_t 
 
         /* TODO: set p_sys->reorder_buf.u_size_max */
         p_sys->i_pts_offset = p_sys->reorder_buf.u_size_max
-                            * CLOCK_FREQ
-                            * p_es->video.frame_rate.den / p_es->video.frame_rate.num + 1;
+                            * es_format_FramesDuration( 1, p_es ) + 1;
 
         /* stash a copy of the seqhdr
          *  - required for ogg muxing

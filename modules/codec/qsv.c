@@ -697,9 +697,7 @@ static block_t *Encode(encoder_t *this, picture_t *pic)
             /*         task->bs.FrameType, task->bs.TimeStamp, task->bs.DecodeTimeStamp); */
 
             /* Copied from x264.c: This isn't really valid for streams with B-frames */
-            block->i_length = CLOCK_FREQ *
-                enc->fmt_in.video.frame_rate.den /
-                enc->fmt_in.video.frame_rate.num;
+            block->i_length = es_format_FramesDuration( 1, &enc->fmt_in );
 
             // Buggy DTS (value comes from experiments)
             if (task->bs.DecodeTimeStamp < -10000)

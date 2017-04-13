@@ -546,9 +546,7 @@ static int ParseVOP( decoder_t *p_dec, block_t *p_vop )
     if( p_dec->p_sys->fps.num < 5 && /* Work-around buggy streams */
         es_format_HasValidFrameRate( &p_dec->fmt_in ) )
     {
-        p_sys->i_interpolated_pts += CLOCK_FREQ *
-        p_dec->fmt_in.video.frame_rate.den /
-        p_dec->fmt_in.video.frame_rate.num;
+        p_sys->i_interpolated_pts += es_format_FramesDuration( 1, &p_dec->fmt_in );
     }
     else if( p_dec->p_sys->fps.num )
         p_sys->i_interpolated_pts +=

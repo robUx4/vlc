@@ -158,7 +158,7 @@ static int Open( vlc_object_t *p_this)
             p_filter->fmt_in.video.frame_rate.num, p_filter->fmt_in.video.frame_rate.den,
             p_filter->fmt_out.video.frame_rate.num, p_filter->fmt_out.video.frame_rate.den );
 
-    p_sys->i_output_frame_interval = p_filter->fmt_out.video.frame_rate.den * CLOCK_FREQ / p_filter->fmt_out.video.frame_rate.num;
+    p_sys->i_output_frame_interval = es_format_FramesDuration( 1, &p_filter->fmt_out );
 
     date_Init( &p_sys->next_output_pts,
                p_filter->fmt_out.video.frame_rate.num, p_filter->fmt_out.video.frame_rate.den );

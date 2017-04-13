@@ -631,9 +631,7 @@ static int Mux(sout_mux_t *p_mux)
                 { /* we have no way to know real length except by decoding */
                     if ( p_stream->mux.fmt.i_cat == VIDEO_ES )
                     {
-                        p_data->i_length = CLOCK_FREQ *
-                                           p_stream->mux.fmt.video.frame_rate.den /
-                                           p_stream->mux.fmt.video.frame_rate.num;
+                        p_data->i_length = es_format_FramesDuration( 1, &p_stream->mux.fmt );
                         msg_Dbg( p_mux, "video track %u fixup to %"PRId64" for sample %u",
                                  p_stream->mux.i_track_id, p_data->i_length, p_stream->mux.i_entry_count );
                     }
@@ -1277,9 +1275,7 @@ static void LengthLocalFixup(sout_mux_t *p_mux, const mp4_stream_t *p_stream, bl
 {
     if ( p_stream->mux.fmt.i_cat == VIDEO_ES && p_stream->mux.fmt.video.frame_rate.num )
     {
-        p_entrydata->i_length = CLOCK_FREQ *
-                p_stream->mux.fmt.video.frame_rate.den /
-                p_stream->mux.fmt.video.frame_rate.num;
+        p_entrydata->i_length = es_format_FramesDuration( 1, &p_stream->mux.fmt );
         msg_Dbg(p_mux, "video track %d fixup to %"PRId64" for sample %u",
                 p_stream->mux.i_track_id, p_entrydata->i_length, p_stream->mux.i_entry_count - 1);
     }

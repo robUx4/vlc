@@ -71,8 +71,7 @@ static picture_t *Deinterlace(filter_t *filter, picture_t *src)
         dst->date = (3 * src->date - last_pts) / 2;
     else
     if (filter->fmt_in.video.frame_rate.num != 0)
-        dst->date = src->date + ((filter->fmt_in.video.frame_rate.den
-                            * CLOCK_FREQ) / filter->fmt_in.video.frame_rate.num);
+        dst->date = src->date + es_format_FramesDuration( 1, &filter->fmt_in );
     dst->b_top_field_first = !src->b_top_field_first;
     dst->i_nb_fields = 1;
     src->i_nb_fields = 1;

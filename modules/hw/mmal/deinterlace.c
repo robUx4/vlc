@@ -82,8 +82,7 @@ static void flush(filter_t *filter);
 static int Open(filter_t *filter)
 {
     int32_t frame_duration = filter->fmt_in.video.frame_rate.num != 0 ?
-            CLOCK_FREQ * filter->fmt_in.video.frame_rate.den /
-            filter->fmt_in.video.frame_rate.num : 0;
+            es_format_FramesDuration( 1, &filter->fmt_in ) : 0;
 
     MMAL_PARAMETER_IMAGEFX_PARAMETERS_T imfx_param = {
             { MMAL_PARAMETER_IMAGE_EFFECT_PARAMETERS, sizeof(imfx_param) },

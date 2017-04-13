@@ -106,9 +106,7 @@ static block_t *Encode(encoder_t *p_enc, picture_t *p_pict)
     memcpy(p_block->p_buffer, nal[0].payload, i_out);
 
     /* This isn't really valid for streams with B-frames */
-    p_block->i_length = CLOCK_FREQ *
-        p_enc->fmt_in.video.frame_rate.den /
-            p_enc->fmt_in.video.frame_rate.num;
+    p_block->i_length = es_format_FramesDuration( 1, &p_enc->fmt_in );
 
     p_block->i_pts = p_sys->initial_date + pic.poc * p_block->i_length;
     p_block->i_dts = p_sys->initial_date + p_sys->dts++ * p_block->i_length;

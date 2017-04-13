@@ -422,8 +422,7 @@ static int AddStream( sout_mux_t *p_mux, sout_input_t *p_input )
             }
             p_stream->p_oggds_header->i_size = 0 ;
             p_stream->p_oggds_header->i_time_unit =
-                     CLOCK_FREQ * p_input->p_fmt->video.frame_rate.den /
-                     (int64_t)p_input->p_fmt->video.frame_rate.num;
+                     es_format_FramesDuration( 1, p_input->p_fmt );
             p_stream->p_oggds_header->i_samples_per_unit = 1;
             p_stream->p_oggds_header->i_default_len = 1 ; /* ??? */
             p_stream->p_oggds_header->i_buffer_size = 1024*1024;
@@ -1436,9 +1435,7 @@ static bool AllocateIndex( sout_mux_t *p_mux, sout_input_t *p_input )
         {
             /* optimize for fps < 1 */
             i_interval= __MAX( i_interval,
-                       GRANULE_PER_CLOCK * CLOCK_FREQ *
-                       p_input->p_fmt->video.frame_rate.den /
-                       p_input->p_fmt->video.frame_rate.num );
+                               es_format_FramesDuration( GRANULE_PER_CLOCK, &p_input->p_fmt ) );
         }
 
         size_t i_tuple_size = 0;
@@ -1642,8 +1639,8 @@ static int MuxBlock( sout_mux_t *p_mux, sout_input_t *p_input )
                 p_stream->i_last_keyframe = p_stream->i_num_frames;
 
                 /* presentation time */
-                i_time = CLOCK_FREQ * ( p_stream->i_num_frames - 1 ) *
-                         p_input->p_fmt->video.frame_rate.den /  p_input->p_fmt->video.frame_rate.num;
+                i_time = es_format_FramesDuration( p_stream->i_num_frames - 1,
+                                                   p_input->p_fmt );
                 AddIndexEntry( p_mux, i_time, p_input );
             }
 
@@ -1710,8 +1707,8 @@ static int MuxBlock( sout_mux_t *p_mux, sout_input_t *p_input )
                 p_stream->i_last_keyframe = p_stream->i_num_frames;
 
                 /* presentation time */
-                i_time = CLOCK_FREQ * ( p_stream->i_num_frames - 1 ) *
-                         p_input->p_fmt->video.frame_rate.den /  p_input->p_fmt->video.frame_rate.num;
+                i_time =  es_format_FramesDuration( p_stream->i_num_frames - 1,
+                                                    p_input->p_fmt );
                 AddIndexEntry( p_mux, i_time, p_input );
             }
             op.granulepos = ( ((int64_t)p_stream->i_num_frames) << 32 ) |
