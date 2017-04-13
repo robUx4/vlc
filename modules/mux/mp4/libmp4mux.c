@@ -1608,7 +1608,7 @@ bo_t * mp4mux_GetMoovBox(vlc_object_t *p_obj, mp4mux_trackinfo_t **pp_tracks, un
             bo_add_32be(tkhd, 0);                 // width (presentation)
             bo_add_32be(tkhd, 0);                 // height(presentation)
         } else if (p_stream->fmt.i_cat == VIDEO_ES) {
-            int i_width = p_stream->fmt.video.i_width << 16;
+            unsigned i_width = p_stream->fmt.video.i_width << 16;
             if (es_format_HasValidSar( &p_stream->fmt )) {
                 i_width = (int64_t)p_stream->fmt.video.sar.num *
                           ((int64_t)p_stream->fmt.video.i_width << 16) /
@@ -1619,7 +1619,7 @@ bo_t * mp4mux_GetMoovBox(vlc_object_t *p_obj, mp4mux_trackinfo_t **pp_tracks, un
             // height(presentation)
             bo_add_32be(tkhd, p_stream->fmt.video.i_height << 16);
         } else {
-            int i_width = 320 << 16;
+            unsigned i_width = 320 << 16;
             int i_height = 200;
             for (unsigned int i = 0; i < i_tracks; i++) {
                 mp4mux_trackinfo_t *tk = pp_tracks[i];
