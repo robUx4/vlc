@@ -719,7 +719,7 @@ static void OggGetSkeletonIndex( uint8_t **pp_buffer, long *pi_size, ogg_stream_
     memcpy( p_buffer, "index", 6 );
     SetDWLE( &p_buffer[6], p_stream->i_serial_no );
     SetQWLE( &p_buffer[10], p_stream->skeleton.i_index_count ); /* num keypoints */
-    SetQWLE( &p_buffer[18], 1000000 );
+    SetQWLE( &p_buffer[18], CLOCK_FREQ );
     SetQWLE( &p_buffer[34], p_stream->i_length );
     memcpy( p_buffer + INDEX_BASE_SIZE, p_stream->skeleton.p_index, p_stream->skeleton.i_index_payload );
     *pi_size = INDEX_BASE_SIZE + p_stream->skeleton.i_index_size;
@@ -1444,7 +1444,7 @@ static bool AllocateIndex( sout_mux_t *p_mux, sout_input_t *p_input )
         /* estimate length of pos value */
         if ( p_input->p_fmt->i_bitrate )
         {
-            i = i_interval * p_input->p_fmt->i_bitrate / 1000000;
+            i = i_interval * p_input->p_fmt->i_bitrate / CLOCK_FREQ;
             while ( i <<= 1 ) i_tuple_size++;
         }
         else

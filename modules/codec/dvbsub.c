@@ -1510,7 +1510,7 @@ static subpicture_t *render( decoder_t *p_dec )
     //p_spu->i_stop = (mtime_t) 0;
     p_spu->b_ephemer = true;
     //p_spu->b_fade = true;
-    //p_spu->i_stop = p_spu->i_start + (mtime_t) (i_timeout * 1000000);
+    //p_spu->i_stop = p_spu->i_start + i_timeout * CLOCK_FREQ;
     p_spu->b_subtitle = true;
 
     /* Correct positioning of SPU */
@@ -2128,7 +2128,7 @@ static void encode_page_composition( encoder_t *p_enc, bs_t *s,
     if( p_subpic && !p_subpic->b_ephemer &&
         ( p_subpic->i_stop > p_subpic->i_start ) )
     {
-        i_timeout = (p_subpic->i_stop - p_subpic->i_start) / 1000000;
+        i_timeout = (p_subpic->i_stop - p_subpic->i_start) / CLOCK_FREQ;
     }
 
     bs_write( s, 8, i_timeout ); /* Timeout */

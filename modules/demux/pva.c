@@ -329,7 +329,7 @@ static int Control( demux_t *p_demux, int i_query, va_list args )
             pi64 = va_arg( args, int64_t * );
             if( p_sys->i_mux_rate > 0 )
             {
-                *pi64 = (int64_t)1000000 * ( stream_Size( p_demux->s ) / 50 ) / p_sys->i_mux_rate;
+                *pi64 = CLOCK_FREQ * ( stream_Size( p_demux->s ) / 50 ) / p_sys->i_mux_rate;
                 return VLC_SUCCESS;
             }
             *pi64 = 0;
@@ -338,7 +338,7 @@ static int Control( demux_t *p_demux, int i_query, va_list args )
 #endif
         case DEMUX_GET_FPS:
             pf = va_arg( args, double * );
-            *pf = (double)1000000.0 / (double)p_sys->i_pcr_inc;
+            *pf = (double)CLOCK_FREQ / (double)p_sys->i_pcr_inc;
             return VLC_SUCCESS;
 #endif
         case DEMUX_SET_TIME:

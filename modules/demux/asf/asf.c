@@ -356,7 +356,7 @@ static int SeekIndex( demux_t *p_demux, mtime_t i_date, float f_pos )
     asf_object_index_t *p_index;
 
     msg_Dbg( p_demux, "seek with index: %i seconds, position %f",
-             i_date >= 0 ? (int)(i_date/1000000) : -1, f_pos );
+             i_date >= 0 ? (int)(i_date/CLOCK_FREQ) : -1, f_pos );
 
     if( i_date < 0 )
         i_date = p_sys->i_length * f_pos;
@@ -1246,7 +1246,7 @@ static int DemuxInit( demux_t *p_demux )
 
         if( p_sys->i_length > 0 )
         {
-            p_sys->i_bitrate = 8 * i_size * 1000000 / p_sys->i_length;
+            p_sys->i_bitrate = 8 * i_size * CLOCK_FREQ / p_sys->i_length;
         }
     }
 

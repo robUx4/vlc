@@ -955,7 +955,7 @@ static const float f_min_window_height = 307.;
     if (mt_duration < 1)
         return @"";
 
-    mt_duration = mt_duration / 1000000;
+    mt_duration = mt_duration / CLOCK_FREQ;
 
     NSDate *date = [NSDate dateWithTimeIntervalSince1970:mt_duration];
     NSDateFormatter *formatter = [[NSDateFormatter alloc] init];

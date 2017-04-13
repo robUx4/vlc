@@ -57,7 +57,7 @@ bool Chromaprint::enqueue( input_item_t *p_item )
     fingerprint_request_t *p_r = fingerprint_request_New( p_item );
     if ( ! p_r ) return false;
     mtime_t t = input_item_GetDuration( p_item );
-    if ( t ) p_r->i_duration = (unsigned int) ( t / 1000000 );
+    if ( t ) p_r->i_duration = (unsigned int) ( t / CLOCK_FREQ );
     p_fingerprinter->pf_enqueue( p_fingerprinter, p_r );
     return true;
 }

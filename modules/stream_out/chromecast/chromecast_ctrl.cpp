@@ -42,7 +42,7 @@
 #define PING_WAIT_TIME 6000
 #define PING_WAIT_RETRIES 1
 
-static const mtime_t SEEK_FORWARD_OFFSET = 1000000;
+static const mtime_t SEEK_FORWARD_OFFSET = (1*CLOCK_FREQ);
 
 static const char* StateToStr( States s )
 {
@@ -605,7 +605,7 @@ void intf_sys_t::requestPlayerSeek(mtime_t pos)
         m_ts_local_start = pos;
     char current_time[32];
     mtime_t seek_request_time = mdate() + SEEK_FORWARD_OFFSET;
-    if( snprintf( current_time, sizeof(current_time), "%.3f", double( seek_request_time ) / 1000000.0 ) >= (int)sizeof(current_time) )
+    if( snprintf( current_time, sizeof(current_time), "%.3f", double( seek_request_time ) / CLOCK_FREQ ) >= (int)sizeof(current_time) )
     {
         msg_Err( m_module, "snprintf() truncated string for mediaSessionId" );
         current_time[sizeof(current_time) - 1] = '\0';

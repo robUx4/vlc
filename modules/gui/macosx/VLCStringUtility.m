@@ -132,7 +132,7 @@ NSString *const kVLCMediaUnknown = @"Unknown";
         mtime_t remaining = 0;
         if (dur > t)
             remaining = dur - t;
-        return [NSString stringWithFormat: @"-%s", secstotimestr(psz_time, (remaining / 1000000))];
+        return [NSString stringWithFormat: @"-%s", secstotimestr(psz_time, (remaining / CLOCK_FREQ))];
     } else
         return toNSStr(secstotimestr(psz_time, t / CLOCK_FREQ ));
 }

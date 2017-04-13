@@ -131,8 +131,8 @@
     input_thread_t * p_input = pl_CurrentInput(getIntf());
 
     if (p_input) {
-        [_av_advanceTextField setDoubleValue: var_GetInteger(p_input, "audio-delay") / 1000000.];
-        [_sv_advanceTextField setDoubleValue: var_GetInteger(p_input, "spu-delay") / 1000000.];
+        [_av_advanceTextField setDoubleValue: var_GetInteger(p_input, "audio-delay") / CLOCK_FREQ];
+        [_sv_advanceTextField setDoubleValue: var_GetInteger(p_input, "spu-delay") / CLOCK_FREQ];
         [_sv_speedTextField setFloatValue: var_GetFloat(p_input, "sub-fps")];
         vlc_object_release(p_input);
     }
@@ -151,7 +151,7 @@
     input_thread_t * p_input = pl_CurrentInput(getIntf());
 
     if (p_input) {
-        var_SetInteger(p_input, "audio-delay", [_av_advanceTextField doubleValue] * 1000000.);
+        var_SetInteger(p_input, "audio-delay", [_av_advanceTextField doubleValue] * CLOCK_FREQ);
         vlc_object_release(p_input);
     }
 }
@@ -166,7 +166,7 @@
     input_thread_t * p_input = pl_CurrentInput(getIntf());
 
     if (p_input) {
-        var_SetInteger(p_input, "spu-delay", [_sv_advanceTextField doubleValue] * 1000000.);
+        var_SetInteger(p_input, "spu-delay", [_sv_advanceTextField doubleValue] * CLOCK_FREQ);
         vlc_object_release(p_input);
     }
 }

@@ -250,7 +250,7 @@ void vout_SetInterlacingState(vout_thread_t *vout, bool is_interlaced)
                                  - (!!vout->p->interlacing.is_interlaced);
     if (interlacing_change == 1 ||
         (interlacing_change == -1 &&
-        vout->p->interlacing.date + 30000000 < mdate()))
+        (vout->p->interlacing.date + 30*CLOCK_FREQ) < mdate()))
     {
         msg_Dbg(vout, "Detected %s video",
                  is_interlaced ? "interlaced" : "progressive");

@@ -917,7 +917,7 @@ static int dirac_InspectDataUnit( decoder_t *p_dec, block_t **pp_block, block_t 
 
         /* TODO: set p_sys->reorder_buf.u_size_max */
         p_sys->i_pts_offset = p_sys->reorder_buf.u_size_max
-                            * 1000000
+                            * CLOCK_FREQ
                             * p_es->video.i_frame_rate_base / p_es->video.i_frame_rate + 1;
 
         /* stash a copy of the seqhdr

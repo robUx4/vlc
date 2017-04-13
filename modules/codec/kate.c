@@ -824,7 +824,7 @@ static int TigerValidateSubpicture( subpicture_t *p_subpic,
     PROFILE_START( TigerValidateSubpicture );
 
     /* time in seconds from the start of the stream */
-    kate_float t = (p_subpic->updater.p_sys->i_start + ts - p_subpic->i_start ) / 1000000.0f;
+    kate_float t = (kate_float)(p_subpic->updater.p_sys->i_start + ts - p_subpic->i_start ) / CLOCK_FREQ;
 
     /* it is likely that the current region (if any) can be kept as is; test for this */
     vlc_mutex_lock( &p_sys->lock );
@@ -864,7 +864,7 @@ static void TigerUpdateSubpicture( subpicture_t *p_subpic,
 
 
     /* time in seconds from the start of the stream */
-    t = (p_subpic->updater.p_sys->i_start + ts - p_subpic->i_start ) / 1000000.0f;
+    t = (kate_float)(p_subpic->updater.p_sys->i_start + ts - p_subpic->i_start ) / CLOCK_FREQ;
 
     PROFILE_START( TigerUpdateSubpicture );
 

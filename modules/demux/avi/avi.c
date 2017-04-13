@@ -1768,7 +1768,7 @@ static mtime_t AVI_PTSToByte( avi_track_t *tk, mtime_t i_pts )
     return (mtime_t)((int64_t)i_pts *
                      (int64_t)tk->i_rate /
                      (int64_t)tk->i_scale /
-                     (int64_t)1000000 *
+                     CLOCK_FREQ *
                      (int64_t)tk->i_samplesize );
 }
 
@@ -1779,7 +1779,7 @@ static mtime_t AVI_GetDPTS( avi_track_t *tk, int64_t i_count )
     if( !tk->i_rate )
         return i_dpts;
 
-    i_dpts = (mtime_t)( (int64_t)1000000 *
+    i_dpts = (mtime_t)( CLOCK_FREQ *
                         (int64_t)i_count *
                         (int64_t)tk->i_scale /
                         (int64_t)tk->i_rate );

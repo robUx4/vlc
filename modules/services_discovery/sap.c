@@ -578,7 +578,7 @@ static void *Run( void *data )
         /* Check for items that need deletion */
         for( i = 0; i < p_sd->p_sys->i_announces; i++ )
         {
-            mtime_t i_timeout = ( mtime_t ) 1000000 * p_sd->p_sys->i_timeout;
+            mtime_t i_timeout = CLOCK_FREQ * p_sd->p_sys->i_timeout;
             sap_announce_t * p_announce = p_sd->p_sys->pp_announces[i];
             mtime_t i_last_period = now - p_announce->i_last;
 

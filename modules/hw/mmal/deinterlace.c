@@ -82,7 +82,7 @@ static void flush(filter_t *filter);
 static int Open(filter_t *filter)
 {
     int32_t frame_duration = filter->fmt_in.video.i_frame_rate != 0 ?
-            (int64_t)1000000 * filter->fmt_in.video.i_frame_rate_base /
+            CLOCK_FREQ * filter->fmt_in.video.i_frame_rate_base /
             filter->fmt_in.video.i_frame_rate : 0;
 
     MMAL_PARAMETER_IMAGEFX_PARAMETERS_T imfx_param = {

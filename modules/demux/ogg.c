@@ -808,7 +808,7 @@ static int Control( demux_t *p_demux, int i_query, va_list args )
             if( p_sys->i_length > 0 )
             {
                 *pf =  (double) p_sys->i_pcr /
-                       (double) ( p_sys->i_length * (mtime_t)1000000 );
+                       (double) ( p_sys->i_length * CLOCK_FREQ );
             }
             else if( stream_Size( p_demux->s ) > 0 )
             {
@@ -862,7 +862,7 @@ static int Control( demux_t *p_demux, int i_query, va_list args )
                 return demux_vaControlHelper( p_demux->s, 0, -1, p_sys->i_bitrate,
                                               1, i_query, args );
             pi64 = va_arg( args, int64_t * );
-            *pi64 = p_sys->i_length * 1000000;
+            *pi64 = p_sys->i_length * CLOCK_FREQ;
             return VLC_SUCCESS;
 
         case DEMUX_GET_TITLE_INFO:

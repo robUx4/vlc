@@ -3073,8 +3073,8 @@ static void EsOutUpdateInfo( es_out_t *out, es_out_id_t *es, const es_format_t *
            fmt->video.i_frame_rate_base > 0 )
        {
            div = lldiv( (float)fmt->video.i_frame_rate /
-                               fmt->video.i_frame_rate_base * 1000000,
-                               1000000 );
+                               fmt->video.i_frame_rate_base * CLOCK_FREQ,
+                               CLOCK_FREQ );
            if( div.rem > 0 )
                info_category_AddInfo( p_cat, _("Frame rate"), "%"PRId64".%06u",
                                       div.quot, (unsigned int )div.rem );

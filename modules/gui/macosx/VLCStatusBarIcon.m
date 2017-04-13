@@ -266,7 +266,7 @@
             [totalField setStringValue:@"∞"];
         } else {
             /* Not unknown, update displayed duration */
-            totalTime = [[VLCStringUtility sharedInstance] stringForTime:(dur/1000000)];
+            totalTime = [[VLCStringUtility sharedInstance] stringForTime:(dur/CLOCK_FREQ)];
             [progressField setStringValue:(showTimeElapsed) ? elapsedTime : remainingTime];
             [totalField setStringValue:totalTime];
         }
