@@ -115,10 +115,10 @@ static int OpenCommon( decoder_t *p_dec )
 
     for( unsigned i = 0; i < dsc->plane_count; i++ )
     {
-        unsigned pitch = p_dec->fmt_in.video.i_width * dsc->pixel_size
-                         * dsc->p[i].w.num / dsc->p[i].w.den;
-        unsigned lines = p_dec->fmt_in.video.i_height
-                         * dsc->p[i].h.num / dsc->p[i].h.den;
+        unsigned pitch = vlc_urational_mult( p_dec->fmt_in.video.i_width * dsc->pixel_size,
+                                              &dsc->p[i].w );
+        unsigned lines = vlc_urational_mult( p_dec->fmt_in.video.i_height,
+                                              &dsc->p[i].h );
 
         p_sys->pitches[i] = pitch;
         p_sys->lines[i] = lines;

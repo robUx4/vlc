@@ -513,9 +513,9 @@ static void GetPixels( uint8_t *pp_pixel[4], int pi_pitch[4],
             p = p_picture->p + 3 - i;
 
         pp_pixel[i] = p->p_pixels
-            + (((fmt->i_x_offset * desc->p[i].w.num) / desc->p[i].w.den)
+            + (vlc_urational_mult( fmt->i_x_offset, &desc->p[i].w )
                 * p->i_pixel_pitch)
-            + (((fmt->i_y_offset * desc->p[i].h.num) / desc->p[i].h.den)
+            + (vlc_urational_mult( fmt->i_y_offset, &desc->p[i].h )
                 * p->i_pitch);
         pi_pitch[i] = p->i_pitch;
     }

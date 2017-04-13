@@ -859,8 +859,7 @@ static int InitAudio( demux_t *p_demux, sdi_audio_t *p_audio )
                                     fmt.audio.i_bitspersample;
     p_audio->p_es                 = es_out_Add( p_demux->out, &fmt );
 
-    p_audio->i_nb_samples         = p_audio->i_rate * p_sys->frame_rate.den
-                                    / p_sys->frame_rate.num;
+    p_audio->i_nb_samples         = vlc_urational_div( p_audio->i_rate, &p_sys->frame_rate.den );
     p_audio->i_max_samples        = (float)p_audio->i_nb_samples *
                                     (1.f + SAMPLERATE_TOLERANCE);
 

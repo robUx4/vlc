@@ -191,10 +191,10 @@ static int Open( vlc_object_t *p_this )
 
     /* Compute placements/size of the windows */
     const unsigned w1 = ( p_splitter->fmt.i_width / p_sys->i_col ) & ~1;
-    const unsigned h1 = ( w1 * aspect.den / aspect.num ) & ~1;
+    const unsigned h1 = vlc_urational_div( w1, &aspect ) & ~1;
 
     const unsigned h2 = ( p_splitter->fmt.i_height / p_sys->i_row ) & ~1;
-    const unsigned w2 = ( h2 * aspect.num / aspect.den ) & ~1;
+    const unsigned w2 = vlc_urational_mult( h2, &aspect ) & ~1;
 
     unsigned i_target_width;
     unsigned i_target_height;

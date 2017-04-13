@@ -247,9 +247,9 @@ static void FixSubtitleFormat(vout_display_sys_t *sys)
 
     if ( video_format_HasValidSar( &fmt ) ) {
         if (fmt.sar.num >= fmt.sar.den)
-            i_video_width = i_video_width * fmt.sar.num / fmt.sar.den;
+            i_video_width = vlc_urational_mult( i_video_width, &fmt.sar );
         else
-            i_video_height = i_video_height * fmt.sar.den / fmt.sar.num;
+            i_video_height = vlc_urational_div( i_video_height, &fmt.sar );
     }
 
     if (sys->p_window->i_angle == 90 || sys->p_window->i_angle == 180) {

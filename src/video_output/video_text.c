@@ -62,7 +62,7 @@ static void OSDTextUpdate(subpicture_t *subpic,
         return;
 
     subpic->b_absolute = false;
-    subpic->i_original_picture_width  = fmt_dst->i_visible_width * fmt_dst->sar.num / fmt_dst->sar.den;
+    subpic->i_original_picture_width  = vlc_urational_mult( fmt_dst->i_visible_width, &fmt_dst->sar);
     subpic->i_original_picture_height = fmt_dst->i_visible_height;
 
     video_format_t fmt;

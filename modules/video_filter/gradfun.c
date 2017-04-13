@@ -203,10 +203,10 @@ static picture_t *Filter(filter_t *filter, picture_t *src)
         plane_t       *dstp = &dst->p[i];
 
         const vlc_chroma_description_t *chroma = sys->chroma;
-        unsigned w = fmt->i_width  * chroma->p[i].w.num / chroma->p[i].w.den;
-        unsigned h = fmt->i_height * chroma->p[i].h.num / chroma->p[i].h.den;
-        unsigned r = (cfg->radius  * chroma->p[i].w.num / chroma->p[i].w.den +
-                 cfg->radius  * chroma->p[i].h.num / chroma->p[i].h.den) / 2;
+        unsigned w = vlc_urational_mult( fmt->i_width, &chroma->p[i].w );
+        unsigned h = vlc_urational_mult( fmt->i_height, &chroma->p[i].h );
+        unsigned r = (vlc_urational_mult( cfg->radius, &chroma->p[i].w ) +
+                      vlc_urational_mult( cfg->radius, &chroma->p[i].h )) / 2;
         r = VLC_CLIP((r + 1) & ~1, RADIUS_MIN, RADIUS_MAX);
         if (__MIN(w, h) > 2 * r && cfg->buf) {
             filter_plane(cfg, dstp->p_pixels, srcp->p_pixels,

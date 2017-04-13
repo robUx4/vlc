@@ -134,9 +134,9 @@ static int Open(vlc_object_t *this)
     sys->chroma = chroma;
 
     for (int i = 0; i < 3; ++i) {
-        sys->w[i] = fmt_in->i_width  * chroma->p[i].w.num / chroma->p[i].w.den;
+        sys->w[i] = vlc_urational_mult( fmt_in->i_width, &chroma->p[i].w );
         if (sys->w[i] > wmax) wmax = sys->w[i];
-        sys->h[i] = fmt_out->i_height * chroma->p[i].h.num / chroma->p[i].h.den;
+        sys->h[i] = vlc_urational_mult( fmt_out->i_height, &chroma->p[i].h );
     }
     cfg->Line = malloc(wmax*sizeof(unsigned int));
     if (!cfg->Line) {

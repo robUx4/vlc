@@ -965,9 +965,7 @@ static void maintain_phase_sync(vout_display_t *vd)
     MMAL_PARAMETER_VIDEO_RENDER_STATS_T render_stats = {
         .hdr = { MMAL_PARAMETER_VIDEO_RENDER_STATS, sizeof(render_stats) },
     };
-    int32_t frame_duration = CLOCK_FREQ /
-        ((double)vd->sys->frame_rate.num /
-        vd->sys->frame_rate.den);
+    int32_t frame_duration = vlc_urational_div( CLOCK_FREQ, &vd->sys->frame_rate );
     vout_display_sys_t *sys = vd->sys;
     int32_t phase_offset;
     MMAL_STATUS_T status;

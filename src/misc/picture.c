@@ -184,10 +184,10 @@ int picture_Setup( picture_t *p_picture, const video_format_t *restrict fmt )
     {
         plane_t *p = &p_picture->p[i];
 
-        p->i_lines         = (i_height_aligned + i_height_extra ) * p_dsc->p[i].h.num / p_dsc->p[i].h.den;
-        p->i_visible_lines = fmt->i_visible_height * p_dsc->p[i].h.num / p_dsc->p[i].h.den;
-        p->i_pitch         = i_width_aligned * p_dsc->p[i].w.num / p_dsc->p[i].w.den * p_dsc->pixel_size;
-        p->i_visible_pitch = fmt->i_visible_width * p_dsc->p[i].w.num / p_dsc->p[i].w.den * p_dsc->pixel_size;
+        p->i_lines         = vlc_urational_mult( i_height_aligned + i_height_extra, &p_dsc->p[i].h );
+        p->i_visible_lines = vlc_urational_mult( fmt->i_visible_height,             &p_dsc->p[i].h );
+        p->i_pitch         = vlc_urational_mult( i_width_aligned,      &p_dsc->p[i].w ) * p_dsc->pixel_size;
+        p->i_visible_pitch = vlc_urational_mult( fmt->i_visible_width, &p_dsc->p[i].w ) * p_dsc->pixel_size;
         p->i_pixel_pitch   = p_dsc->pixel_size;
 
         assert( (p->i_pitch % 16) == 0 );
@@ -412,13 +412,13 @@ int picture_Export( vlc_object_t *p_obj,
     }
     if( fmt_in.sar.num >= fmt_in.sar.den )
     {
-        i_original_width = (int64_t)i_width * fmt_in.sar.num / fmt_in.sar.den;
+        i_original_width = vlc_urational_mult( i_width, &fmt_in.sar );
         i_original_height = i_height;
     }
     else
     {
         i_original_width =  i_width;
-        i_original_height = i_height * fmt_in.sar.den / fmt_in.sar.num;
+        i_original_height = vlc_urational_div( i_height, &fmt_in.sar );
     }
 
     /* */

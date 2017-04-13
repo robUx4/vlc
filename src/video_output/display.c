@@ -177,8 +177,8 @@ void vout_display_GetDefaultDisplaySize(unsigned *width, unsigned *height,
         *height = (uint64_t)source->i_visible_height * source->sar.den * cfg->display.sar.num / (source->sar.num * cfg->display.sar.den);
     }
 
-    *width  = *width  * cfg->zoom.num / cfg->zoom.den;
-    *height = *height * cfg->zoom.num / cfg->zoom.den;
+    *width  = vlc_urational_mult( *width,  &cfg->zoom );
+    *height = vlc_urational_mult( *height, &cfg->zoom );
 
     if (ORIENT_IS_SWAP(source->orientation)) {
 

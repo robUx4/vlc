@@ -141,12 +141,12 @@ static void SubpictureTextUpdate(subpicture_t *subpic,
     {
         fmt.sar.num = 4;
         fmt.sar.den = 3;
-        subpic->i_original_picture_width  = fmt_dst->i_visible_height * fmt.sar.num / fmt.sar.den;
+        subpic->i_original_picture_width  = vlc_urational_mult( fmt_dst->i_visible_height, &fmt.sar );
         subpic->i_original_picture_height = fmt_dst->i_visible_height;
     }
     else
     {
-        subpic->i_original_picture_width  = fmt_dst->i_width * fmt_dst->sar.num / fmt_dst->sar.den;
+        subpic->i_original_picture_width  = vlc_urational_mult( fmt_dst->i_width, &fmt_dst->sar );
         subpic->i_original_picture_height = fmt_dst->i_height;
         video_format_SetDefaultSar( &fmt );
     }
