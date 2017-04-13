@@ -30,7 +30,7 @@
 
 struct vf_priv_s {
     int thresh;
-    int radius;
+    unsigned radius;
     uint16_t *buf;
     void (*filter_line)(uint8_t *dst, uint8_t *src, uint16_t *dc,
                         int width, int thresh, const uint16_t *dithers);

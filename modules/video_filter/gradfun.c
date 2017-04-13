@@ -185,7 +185,7 @@ static picture_t *Filter(filter_t *filter, picture_t *src)
 
     vlc_mutex_lock(&sys->lock);
     float strength = VLC_CLIP(sys->strength, STRENGTH_MIN, STRENGTH_MAX);
-    int   radius   = VLC_CLIP((sys->radius + 1) & ~1, RADIUS_MIN, RADIUS_MAX);
+    unsigned radius   = VLC_CLIP((sys->radius + 1) & ~1, RADIUS_MIN, RADIUS_MAX);
     vlc_mutex_unlock(&sys->lock);
 
     const video_format_t *fmt = &filter->fmt_in.video;
@@ -203,9 +203,9 @@ static picture_t *Filter(filter_t *filter, picture_t *src)
         plane_t       *dstp = &dst->p[i];
 
         const vlc_chroma_description_t *chroma = sys->chroma;
-        int w = fmt->i_width  * chroma->p[i].w.num / chroma->p[i].w.den;
-        int h = fmt->i_height * chroma->p[i].h.num / chroma->p[i].h.den;
-        int r = (cfg->radius  * chroma->p[i].w.num / chroma->p[i].w.den +
+        unsigned w = fmt->i_width  * chroma->p[i].w.num / chroma->p[i].w.den;
+        unsigned h = fmt->i_height * chroma->p[i].h.num / chroma->p[i].h.den;
+        unsigned r = (cfg->radius  * chroma->p[i].w.num / chroma->p[i].w.den +
                  cfg->radius  * chroma->p[i].h.num / chroma->p[i].h.den) / 2;
         r = VLC_CLIP((r + 1) & ~1, RADIUS_MIN, RADIUS_MAX);
         if (__MIN(w, h) > 2 * r && cfg->buf) {
