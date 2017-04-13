@@ -851,6 +851,18 @@ static inline void vlc_urational_invalidate(vlc_urational_t *p_rat)
     p_rat->den = p_rat->num = 0;
 }
 
+static inline unsigned vlc_urational_mult( unsigned value,
+                                           const vlc_urational_t *p_rat )
+{
+    return (unsigned)(((uint64_t)value * p_rat->num) / p_rat->den);
+}
+
+static inline unsigned vlc_urational_div( unsigned value,
+                                           const vlc_urational_t *p_rat )
+{
+    return (unsigned)(((uint64_t)value * p_rat->den) / p_rat->num);
+}
+
 VLC_API bool vlc_ureduce( vlc_urational_t *, uint64_t, uint64_t, uint64_t );
 /* Aligned memory allocator */
 
