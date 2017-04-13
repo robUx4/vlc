@@ -41,6 +41,8 @@
 
 #include <ogg/ogg.h>
 
+#define GRANULE_PER_CLOCK   10
+
 /*****************************************************************************
  * Module descriptor
  *****************************************************************************/
@@ -420,7 +422,7 @@ static int AddStream( sout_mux_t *p_mux, sout_input_t *p_input )
             }
             p_stream->p_oggds_header->i_size = 0 ;
             p_stream->p_oggds_header->i_time_unit =
-                     INT64_C(10000000) * p_input->p_fmt->video.frame_rate.den /
+                     CLOCK_FREQ * p_input->p_fmt->video.frame_rate.den /
                      (int64_t)p_input->p_fmt->video.frame_rate.num;
             p_stream->p_oggds_header->i_samples_per_unit = 1;
             p_stream->p_oggds_header->i_default_len = 1 ; /* ??? */
@@ -505,7 +507,7 @@ static int AddStream( sout_mux_t *p_mux, sout_input_t *p_input )
             snprintf( buf, sizeof(buf), "%"PRIx16, i_tag );
             strncpy( p_stream->p_oggds_header->sub_type, buf, 4 );
 
-            p_stream->p_oggds_header->i_time_unit = INT64_C(10000000);
+            p_stream->p_oggds_header->i_time_unit = CLOCK_FREQ;
             p_stream->p_oggds_header->i_default_len = 1;
             p_stream->p_oggds_header->i_buffer_size = 30*1024 ;
             p_stream->p_oggds_header->i_samples_per_unit = p_input->p_fmt->audio.i_rate;
@@ -881,7 +883,7 @@ static int32_t OggFillDsHeader( uint8_t *p_buffer, oggds_header_t *p_oggds_heade
     uint8_t *p_isize = &p_buffer[index];
     index += 4;
 
-    SetQWLE( &p_buffer[index], p_oggds_header->i_time_unit );
+    SetQWLE( &p_buffer[index], p_oggds_header->i_time_unit * GRANULE_PER_CLOCK );
     index += 8;
     SetQWLE( &p_buffer[index], p_oggds_header->i_samples_per_unit );
     index += 8;
@@ -1433,8 +1435,8 @@ static bool AllocateIndex( sout_mux_t *p_mux, sout_input_t *p_input )
                 p_input->p_fmt->video.frame_rate.num )
         {
             /* optimize for fps < 1 */
-            i_interval= __MAX( p_mux->p_sys->skeleton.i_index_intvl * 1000,
-                       INT64_C(10000000) *
+            i_interval= __MAX( i_interval,
+                       GRANULE_PER_CLOCK * CLOCK_FREQ *
                        p_input->p_fmt->video.frame_rate.den /
                        p_input->p_fmt->video.frame_rate.num );
         }
@@ -1716,7 +1718,7 @@ static int MuxBlock( sout_mux_t *p_mux, sout_input_t *p_input )
             ( ( ( p_stream->i_num_frames - p_stream->i_last_keyframe ) & 0x07FFFFFF ) << 3 );
         }
         else if( p_stream->p_oggds_header )
-            op.granulepos = ( p_data->i_dts - p_sys->i_start_dts ) * INT64_C(10) /
+            op.granulepos = ( p_data->i_dts - p_sys->i_start_dts ) /
                 p_stream->p_oggds_header->i_time_unit;
     }
     else if( p_stream->i_cat == SPU_ES )
