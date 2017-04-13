@@ -691,4 +691,11 @@ static inline bool es_format_HasValidFrameRate(const es_format_t *p_fmt)
     return video_format_HasValidFrameRate( &p_fmt->video );
 }
 
+static inline mtime_t es_format_FramesDuration(uint64_t frames,
+                                               const es_format_t *p_fmt)
+{
+    return (frames * CLOCK_FREQ * p_fmt->video.frame_rate.den) /
+            p_fmt->video.frame_rate.num;
+}
+
 #endif
