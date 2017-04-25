@@ -1,0 +1,23 @@
+--- libgpg-error/configure.ac	2017-02-28 14:45:50.000000000 +0100
++++ libgpg-error/configure.ac.fileh	2017-04-25 12:54:21.216679900 +0200
+@@ -156,7 +156,7 @@ AM_GNU_GETTEXT([external])
+ 
+ # Checks for header files.
+ AC_HEADER_STDC
+-AC_CHECK_HEADERS([stdlib.h locale.h stdint.h sys/select.h sys/time.h])
++AC_CHECK_HEADERS([stdlib.h locale.h stdint.h sys/select.h sys/time.h sys/file.h])
+ AC_FUNC_STRERROR_R
+ case "${host_os}" in
+      solaris*)
+--- libgpg-error/src/estream.c	2017-02-28 10:11:05.000000000 +0100
++++ libgpg-error/src/estream.c.fileh	2017-04-25 12:55:34.333251500 +0200
+@@ -74,7 +74,9 @@
+ # include <sys/time.h>
+ #endif
+ #include <sys/types.h>
++#ifdef HAVE_SYS_FILE_H
+ #include <sys/file.h>
++#endif
+ #include <sys/stat.h>
+ #include <stdio.h>
+ #include <stdlib.h>
