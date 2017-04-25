@@ -1,0 +1,23 @@
+--- libgcrypt/configure.ac	2017-04-25 13:06:39.594089100 +0200
++++ libgcrypt/configure.ac.timeh	2017-04-25 13:07:07.297996900 +0200
+@@ -767,7 +767,7 @@ AC_SEARCH_LIBS(setsockopt, [nsl])
+ ##################################
+ 
+ AC_HEADER_STDC
+-AC_CHECK_HEADERS(unistd.h sys/select.h sys/msg.h)
++AC_CHECK_HEADERS(unistd.h sys/select.h sys/time.h)
+ INSERT_SYS_SELECT_H=
+ if test x"$ac_cv_header_sys_select_h" = xyes; then
+   INSERT_SYS_SELECT_H=" include <sys/select.h>"
+--- libgcrypt/random/random-csprng.c	2017-04-25 11:30:34.003915600 +0200
++++ libgcrypt/random/random-csprng.c.timeh	2017-04-25 13:27:06.242547800 +0200
+@@ -37,7 +37,9 @@
+ #include <stdlib.h>
+ #include <errno.h>
+ #include <string.h>
++#ifdef HAVE_SYS_TIME_H
+ #include <sys/time.h>
++#endif
+ #include <sys/types.h>
+ #include <sys/stat.h>
+ #include <unistd.h>
