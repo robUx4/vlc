@@ -38,6 +38,6 @@ endif
 		(cd $</$$d && $(AUTORECONF) -fiv -I unix $(ACLOCAL_AMFLAGS)) || exit $$? ; \
 	done
 	cd $< && $(HOSTVARS) ./configure $(SIDPLAY2_CONF)
-	cd $< && $(MAKE) install
+	cd $< && $(MAKE) -j1 install
 	cp -- $(PREFIX)/lib/sidplay/builders/* "$(PREFIX)/lib/"
 	touch $@
