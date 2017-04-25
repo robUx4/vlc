@@ -16,6 +16,7 @@ ifdef HAVE_WINSTORE
 endif
 endif
 	$(APPLY) $(SRC)/gpg-error/missing-unistd-include.patch
+	$(APPLY) $(SRC)/gpg-error/missing-file-h.patch
 	$(APPLY) $(SRC)/gpg-error/no-executable.patch
 	$(APPLY) $(SRC)/gpg-error/win32-unicode.patch
 ifdef HAVE_VISUALSTUDIO
