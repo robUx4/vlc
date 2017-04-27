@@ -53,3 +53,8 @@ build*
 contrib-*
 install-*
 
+#qtcreator
+/*.config
+/*.creator
+/*.files
+/*.includes
