@@ -1,4 +1,5 @@
 #ifdef _MSC_VER /* help visual studio compile vlc headers */
+/* common header for cl.exe and clang.exe */
 
 #include <basetsd.h>
 typedef SSIZE_T ssize_t;
@@ -37,6 +38,10 @@ typedef unsigned int mode_t;
 #define	S_IWUSR		_S_IWUSR
 #define	S_IRUSR		_S_IRUSR
 #define	_S_IRUSR	_S_IREAD
+
+#define SHUT_RD      SD_RECEIVE
+#define SHUT_WR      SD_SEND
+#define SHUT_RDWR    SD_BOTH
 
 #define O_RDONLY  _O_RDONLY
 #define O_WRONLY  _O_WRONLY
