@@ -1,5 +1,10 @@
 #ifndef _WINSTORE_WINCRYPT_H
 #define _WINSTORE_WINCRYPT_H
+
+#if defined(__clang__) && __has_include_next(<wincrypt.h>)
+#  include_next <wincrypt.h>
+#else /* no wincrypt.h */
+
 #include <windows.h>
 #include <winapifamily.h>
 
@@ -443,5 +448,7 @@ CryptUnprotectData(
     );
 
 #endif /* WINAPI_FAMILY */
+
+#endif /* no wincrypt */
 
 #endif /* _WINSTORE_WINCRYPT_H */
