@@ -326,6 +326,8 @@ DLL adaptive_plugin
   SOURCE adaptive/logic/AlwaysLowestAdaptationLogic.cpp
   HEADER adaptive/logic/AlwaysLowestAdaptationLogic.hpp
   HEADER adaptive/logic/IDownloadRateObserver.h
+  SOURCE adaptive/logic/NearOptimalAdaptationLogic.cpp
+  HEADER adaptive/logic/NearOptimalAdaptationLogic.hpp
   HEADER adaptive/logic/PredictiveAdaptationLogic.hpp
   SOURCE adaptive/logic/PredictiveAdaptationLogic.cpp
   HEADER adaptive/logic/RateBasedAdaptationLogic.h
