@@ -22,6 +22,9 @@
 #define static_assert _Static_assert
 #endif /* __cplusplus */
 
+#define __declspec(noreturn)  __attribute__ ((noreturn))
+#define DECLSPEC_NORETURN     __attribute__ ((noreturn))
+
 #if 0 /* TODO */
 
 //#define stat _stat64
