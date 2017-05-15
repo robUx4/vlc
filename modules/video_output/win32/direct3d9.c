@@ -52,15 +52,11 @@
 #endif
 #include "../../video_chroma/d3d9_fmt.h"
 
-#ifdef _MSC_VER
-#define ID3DXBuffer_GetBufferPointer(This)	\
-    ( (This)->lpVtbl -> GetBufferPointer(This) ) 
-#define ID3DXBuffer_Release(This)	\
-    ( (This)->lpVtbl -> Release(This) ) 
-#endif
-
 #include "common.h"
 #include "builtin_shaders.h"
+
+#define COBJMACROS
+#include <d3d10.h>
 
 #include <assert.h>
 
@@ -1336,20 +1332,20 @@ static int Direct3D9CompileShader(vout_display_t *vd, const char *shader_source,
     if (FAILED(hr)) {
         msg_Warn(vd, "D3DXCompileShader Error (hr=0x%0lx)", hr);
         if (error_msgs) {
-            msg_Warn(vd, "HLSL Compilation Error: %s", (char*)ID3DXBuffer_GetBufferPointer(error_msgs));
-            ID3DXBuffer_Release(error_msgs);
+            msg_Warn(vd, "HLSL Compilation Error: %s", (char*)ID3D10Blob_GetBufferPointer(error_msgs));
+            ID3D10Blob_Release(error_msgs);
     }
         return VLC_EGENERIC;
     }
 
     hr = IDirect3DDevice9_CreatePixelShader(sys->d3ddev,
-            ID3DXBuffer_GetBufferPointer(compiled_shader),
+            ID3D10Blob_GetBufferPointer(compiled_shader),
             &sys->d3dx_shader);
 
     if (compiled_shader)
-        ID3DXBuffer_Release(compiled_shader);
+        ID3D10Blob_Release(compiled_shader);
     if (error_msgs)
-        ID3DXBuffer_Release(error_msgs);
+        ID3D10Blob_Release(error_msgs);
 
     if (FAILED(hr)) {
         msg_Warn(vd, "IDirect3DDevice9_CreatePixelShader error (hr=0x%0lx)", hr);
