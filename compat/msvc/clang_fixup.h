@@ -16,9 +16,11 @@
 #define restrict
 #define NOMINMAX
 #else /* __cplusplus */
+#if !__has_feature(c_static_assert)
 #define STATIC_ASSERT_CONCAT_(a, b) a##b
 #define STATIC_ASSERT_CONCAT(a, b) STATIC_ASSERT_CONCAT_(a, b)
 #define _Static_assert(x, s) extern char STATIC_ASSERT_CONCAT(static_assert_, __LINE__)[sizeof(struct { unsigned:-!(x); })]
+#endif
 #define static_assert _Static_assert
 #endif /* __cplusplus */
 
