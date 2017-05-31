@@ -118,8 +118,8 @@ int intf_Create( playlist_t *playlist, const char *chain )
     }
 
     vlc_mutex_lock( &lock );
-    p_intf->p_next = pl_priv( playlist )->interface;
-    pl_priv( playlist )->interface = p_intf;
+    p_intf->p_next = pl_priv( playlist )->linked_interface;
+    pl_priv( playlist )->linked_interface = p_intf;
     vlc_mutex_unlock( &lock );
 
     return VLC_SUCCESS;
@@ -247,7 +247,7 @@ void intf_DestroyAll(libvlc_int_t *libvlc)
     playlist = libvlc_priv(libvlc)->playlist;
     if (playlist != NULL)
     {
-        intf_thread_t *intf, **pp = &(pl_priv(playlist)->interface);
+        intf_thread_t *intf, **pp = &(pl_priv(playlist)->linked_interface);
 
         while ((intf = *pp) != NULL)
         {
