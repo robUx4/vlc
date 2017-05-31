@@ -174,12 +174,12 @@ endif
 ifdef HAVE_WIN32
 ifndef HAVE_VISUALSTUDIO
 DEPS_ffmpeg += d3d11
+FFMPEGCONF += --enable-w32threads
 ifndef HAVE_MINGW_W64
 DEPS_ffmpeg += directx
 endif
 endif
 FFMPEGCONF += --target-os=mingw32
-FFMPEGCONF += --enable-w32threads
 ifndef HAVE_WINSTORE
 FFMPEGCONF += --enable-dxva2
 else
