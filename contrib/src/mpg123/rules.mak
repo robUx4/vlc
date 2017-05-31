@@ -41,6 +41,9 @@ endif
 ifdef HAVE_WINSTORE
 	$(APPLY) $(SRC)/mpg123/winstore.patch
 endif
+ifdef HAVE_VISUALSTUDIO
+	$(APPLY) $(SRC)/mpg123/mpg123-msvc.patch
+endif
 	$(MOVE)
 
 .mpg123: mpg123
