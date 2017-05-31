@@ -22,7 +22,7 @@ $(TARBALLS)/fluidlite-$(FLUID_HASH).tar.xz:
 	$(call check_githash,$(FLUID_HASH))
 	touch $@
 
-DEPS_fluidlite = ogg $(DEPS_ogg)
+DEPS_fluidlite = ogg $(DEPS_ogg) vorbis $(DEPS_vorbis)
 
 fluidlite: fluidlite-$(FLUID_HASH).tar.xz .sum-fluidlite
 	$(UNPACK)
