@@ -83,14 +83,6 @@ typedef struct tagMSG MSG, *LPMSG;
 #define _USE_MATH_DEFINES
 #endif /* _USE_MATH_DEFINES */
 
-#ifndef UNICODE
-#define UNICODE
-#endif /* UNICODE */
-
-#ifndef _UNICODE
-#define _UNICODE
-#endif /* _UNICODE */
-
 #define PATH_MAX MAX_PATH
 
 /* avoid compilation issues in ARM */

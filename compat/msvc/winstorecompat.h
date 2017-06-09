@@ -1,6 +1,14 @@
 #ifndef WINSTORECOMPAT_H__
 # define WINSTORECOMPAT_H__
 
+#ifndef UNICODE
+#define UNICODE
+#endif /* UNICODE */
+
+#ifndef _UNICODE
+#define _UNICODE
+#endif /* _UNICODE */
+
 #if _MSC_VER < 1900
 #pragma warning(push)
 #pragma warning(disable:4255)    /* no function prototype given */
