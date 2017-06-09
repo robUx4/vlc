@@ -6,7 +6,7 @@
 #define WIN32_LEAN_AND_MEAN
 #endif /* WIN32_LEAN_AND_MEAN */
 
-#include "mscver_fixup.h"
+#include "ms_fixup.h"
 
 #if 0
 #ifndef NOUSER
