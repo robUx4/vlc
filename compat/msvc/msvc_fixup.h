@@ -72,7 +72,9 @@ typedef struct tagMSG MSG, *LPMSG;
 #define PATH_MAX MAX_PATH
 
 /* avoid compilation issues in ARM */
+#ifndef _ARM_WINAPI_PARTITION_DESKTOP_SDK_AVAILABLE
 #define _ARM_WINAPI_PARTITION_DESKTOP_SDK_AVAILABLE 1
+#endif
 
 #if defined(_DEBUG) && 0
 #define _CRTDBG_MAP_ALLOC
