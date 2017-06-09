@@ -13,7 +13,7 @@ $(TARBALLS)/libvpx-$(VPX_VERSION).tar.bz2:
 
 .sum-vpx: libvpx-$(VPX_VERSION).tar.bz2
 
-libvpx: libvpx-$(VPX_VERSION).tar.bz2 .sum-vpx
+vpx: libvpx-$(VPX_VERSION).tar.bz2 .sum-vpx
 	$(UNPACK)
 	$(APPLY) $(SRC)/vpx/libvpx-mac.patch
 	$(APPLY) $(SRC)/vpx/libvpx-ios.patch
@@ -126,7 +126,7 @@ ifndef WITH_OPTIMIZATION
 VPX_CONF += --enable-debug --disable-optimizations
 endif
 
-.vpx: libvpx
+.vpx: vpx
 	cd $< && LDFLAGS="$(VPX_LDFLAGS)" CROSS=$(VPX_CROSS) ./configure --target=$(VPX_TARGET) \
 		$(VPX_CONF) --prefix=$(PREFIX)
 	cd $< && $(MAKE)

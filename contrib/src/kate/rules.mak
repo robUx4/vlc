@@ -13,13 +13,13 @@ $(TARBALLS)/libkate-$(KATE_VERSION).tar.gz:
 
 .sum-kate: libkate-$(KATE_VERSION).tar.gz
 
-libkate: libkate-$(KATE_VERSION).tar.gz .sum-kate
+kate: libkate-$(KATE_VERSION).tar.gz .sum-kate
 	$(UNPACK)
 	$(MOVE)
 
 DEPS_kate = ogg $(DEPS_ogg)
 
-.kate: libkate
+.kate: kate
 	cd $< && $(HOSTVARS) ./configure $(HOSTCONF) \
 		--disable-valgrind \
 		--disable-doc

@@ -13,13 +13,13 @@ $(TARBALLS)/libmodplug-$(MODPLUG_VERSION).tar.gz:
 
 .sum-modplug: libmodplug-$(MODPLUG_VERSION).tar.gz
 
-libmodplug: libmodplug-$(MODPLUG_VERSION).tar.gz .sum-modplug
+modplug: libmodplug-$(MODPLUG_VERSION).tar.gz .sum-modplug
 	$(UNPACK)
 	$(APPLY) $(SRC)/modplug/modplug-win32-static.patch
 	$(call pkg_static,"libmodplug.pc.in")
 	$(MOVE)
 
-.modplug: libmodplug
+.modplug: modplug
 	$(RECONF)
 	cd $< && $(HOSTVARS) ./configure $(HOSTCONF)
 	cd $< && $(MAKE) install

@@ -18,7 +18,7 @@ $(TARBALLS)/libshout-$(SHOUT_VERSION).tar.gz:
 .sum-shout: libshout-$(SHOUT_VERSION).tar.gz
 
 # TODO: fix socket stuff on POSIX and Linux
-libshout: libshout-$(SHOUT_VERSION).tar.gz .sum-shout
+shout: libshout-$(SHOUT_VERSION).tar.gz .sum-shout
 	$(UNPACK)
 	$(APPLY) $(SRC)/shout/bsd.patch
 	$(APPLY) $(SRC)/shout/libshout-arpa.patch
@@ -39,7 +39,7 @@ ifdef HAVE_ANDROID
 SHOUT_CONF += "--disable-thread"
 endif
 
-.shout: libshout
+.shout: shout
 	$(RECONF)
 	cd $< && $(HOSTVARS) ./configure --without-openssl $(SHOUT_CONF) $(HOSTCONF)
 	cd $< && $(MAKE) install

@@ -15,14 +15,14 @@ $(TARBALLS)/libogg-$(OGG_VERSION).tar.xz:
 
 .sum-ogg: libogg-$(OGG_VERSION).tar.xz
 
-libogg: libogg-$(OGG_VERSION).tar.xz .sum-ogg
+ogg: libogg-$(OGG_VERSION).tar.xz .sum-ogg
 	$(UNPACK)
 	$(APPLY) $(SRC)/ogg/libogg-1.1.patch
 	$(APPLY) $(SRC)/ogg/libogg-disable-check.patch
 	$(UPDATE_AUTOCONFIG)
 	$(MOVE)
 
-.ogg: libogg
+.ogg: ogg
 	$(RECONF)
 	cd $< && $(HOSTVARS) ./configure $(HOSTCONF)
 	cd $< && $(MAKE) install

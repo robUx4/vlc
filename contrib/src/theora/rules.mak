@@ -13,7 +13,7 @@ $(TARBALLS)/libtheora-$(THEORA_VERSION).tar.xz:
 
 .sum-theora: libtheora-$(THEORA_VERSION).tar.xz
 
-libtheora: libtheora-$(THEORA_VERSION).tar.xz .sum-theora
+theora: libtheora-$(THEORA_VERSION).tar.xz .sum-theora
 	$(UNPACK)
 	$(APPLY) $(SRC)/theora/libtheora-compiler-differentiation.patch
 	$(APPLY) $(SRC)/theora/libtheora-no-forceaddr.patch
@@ -45,7 +45,7 @@ endif
 
 DEPS_theora = ogg $(DEPS_ogg)
 
-.theora: libtheora
+.theora: theora
 	cd $< && $(HOSTVARS) ./configure $(THEORACONF)
 	cd $< && $(MAKE) install
 	touch $@

@@ -12,7 +12,7 @@ $(TARBALLS)/sidplay-libs-$(SID_VERSION).tar.gz:
 
 .sum-sidplay2: sidplay-libs-$(SID_VERSION).tar.gz
 
-sidplay-libs: sidplay-libs-$(SID_VERSION).tar.gz .sum-sidplay2
+sidplay2: sidplay-libs-$(SID_VERSION).tar.gz .sum-sidplay2
 	$(UNPACK)
 	$(APPLY) $(SRC)/sidplay2/sidplay2-openmode.patch
 	$(APPLY) $(SRC)/sidplay2/sidplay2-endian.patch
@@ -21,7 +21,7 @@ sidplay-libs: sidplay-libs-$(SID_VERSION).tar.gz .sum-sidplay2
 	$(APPLY) $(SRC)/sidplay2/sidplay2-string.patch
 	$(MOVE)
 
-.sidplay2: sidplay-libs
+.sidplay2: sidplay2
 	for d in . libsidplay builders resid builders/resid-builder \
 			builders/hardsid-builder libsidutils ; \
 	do \

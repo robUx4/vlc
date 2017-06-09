@@ -13,14 +13,14 @@ $(TARBALLS)/libdvbpsi-$(DVBPSI_VERSION).tar.bz2:
 
 .sum-dvbpsi: libdvbpsi-$(DVBPSI_VERSION).tar.bz2
 
-libdvbpsi: libdvbpsi-$(DVBPSI_VERSION).tar.bz2 .sum-dvbpsi
+dvbpsi: libdvbpsi-$(DVBPSI_VERSION).tar.bz2 .sum-dvbpsi
 	$(UNPACK)
 	$(UPDATE_AUTOCONFIG) && cd $(UNPACK_DIR) && mv config.guess config.sub .auto
 	$(APPLY) $(SRC)/dvbpsi/dvbpsi-noexamples.patch
 	$(APPLY) $(SRC)/dvbpsi/dvbpsi-sys-types.patch
 	$(MOVE)
 
-.dvbpsi: libdvbpsi
+.dvbpsi: dvbpsi
 	cd $< && $(HOSTVARS) ./configure $(HOSTCONF)
 	cd $< && $(MAKE) install
 	touch $@

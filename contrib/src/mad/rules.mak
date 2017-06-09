@@ -15,7 +15,7 @@ $(TARBALLS)/libmad-$(MAD_VERSION).tar.gz:
 
 .sum-mad: libmad-$(MAD_VERSION).tar.gz
 
-libmad: libmad-$(MAD_VERSION).tar.gz .sum-mad
+mad: libmad-$(MAD_VERSION).tar.gz .sum-mad
 	$(UNPACK)
 ifdef HAVE_DARWIN_OS
 	cd $@-$(MAD_VERSION) && sed \
@@ -33,7 +33,7 @@ endif
 	$(APPLY) $(SRC)/mad/check-bitstream-length.patch
 	$(MOVE)
 
-.mad: libmad
+.mad: mad
 	$(RECONF)
 ifdef HAVE_IOS
 	cd $< && $(HOSTVARS) CCAS="$(AS)" CFLAGS="$(CFLAGS) -O3" ./configure $(HOSTCONF) $(MAD_CONF)

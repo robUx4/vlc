@@ -24,7 +24,7 @@ $(TARBALLS)/musepack_src_r$(MUSE_REV).tar.gz:
 #	$(warning $@ not implemented)
 #	touch $@
 
-musepack: musepack_src_r$(MUSE_REV).tar.gz .sum-mpcdec
+mpcdec: musepack_src_r$(MUSE_REV).tar.gz .sum-mpcdec
 	$(UNPACK)
 	$(APPLY) $(SRC)/mpcdec/musepack-no-cflags-clobber.patch
 	$(APPLY) $(SRC)/mpcdec/musepack-no-binaries.patch
@@ -34,15 +34,15 @@ endif
 	sed -i.orig \
 		-e 's,^add_subdirectory(mpcgain),,g' \
 		-e 's,^add_subdirectory(mpcchap),,g' \
-		$@_src_r$(MUSE_REV)/CMakeLists.txt
+		musepack_src_r$(MUSE_REV)/CMakeLists.txt
 ifdef HAVE_MACOSX
 	cd musepack_src_r$(MUSE_REV) && \
 	sed -e 's%-O3 -Wall%-O3 -Wall $(CFLAGS)%' CMakeLists.txt
 endif
-	mv $@_src_r$(MUSE_REV) $@
+	mv musepack_src_r$(MUSE_REV) $@
 	touch $@
 
-.mpcdec: musepack toolchain.cmake
+.mpcdec: mpcdec toolchain.cmake
 	cd $< && $(HOSTVARS_PIC) $(CMAKE) -DSHARED=OFF .
 	cd $< && $(MAKE) install
 	mkdir -p -- "$(PREFIX)/lib"
