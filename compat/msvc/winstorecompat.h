@@ -176,6 +176,7 @@ static COMPAT_INLINE HANDLE CreateMutexW(LPSECURITY_ATTRIBUTES lpMutexAttributes
 #define CreateMutex CreateMutexW
 #endif
 
+#if 0 /* supported in SDK 15063 */
 static COMPAT_INLINE UINT GetACP(void)
 {
     DWORD acp;
@@ -183,6 +184,7 @@ static COMPAT_INLINE UINT GetACP(void)
         return acp;
     return CP_UTF8; /* utf-8 */
 }
+#endif
 
 #if _WIN32_WINNT < 0x0A00 || !defined(__clang__)
 static COMPAT_INLINE DWORD GetFileAttributesW(LPCWSTR lpFileName)
