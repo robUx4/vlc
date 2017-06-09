@@ -5,6 +5,7 @@ CRYSTAL_HEADERS_URL := http://www.broadcom.com/docs/support/crystalhd/crystalhd_
 ifdef HAVE_WIN32
 PKGS += crystalhd
 endif
+EXPANDS_crystalhd = .crystalhd
 
 $(TARBALLS)/crystalhd_lgpl_includes_v1.zip:
 	$(call download_pkg,$(CRYSTAL_HEADERS_URL),crystalhd)

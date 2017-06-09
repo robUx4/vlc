@@ -6,6 +6,7 @@ else
 #ugly way to get the default location of standard idl files
 IDL_INC_PATH = /`echo $(MSYSTEM) | tr A-Z a-z`/$(BUILD)/include
 endif
+EXPANDS_d3d11 = .d3d11
 
 D3D11_COMMIT_ID := a0cd5afeb60be3be0860e9a203314c10485bb9b8
 DXGI12_COMMIT_ID := 790a6544347b53c314b9c6f1ea757a2d5504c67e
