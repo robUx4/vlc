@@ -396,6 +396,7 @@ PKGS := $(sort $(PKGS_MANUAL) $(PKGS_DEPS))
 
 fetch: $(PKGS:%=.sum-%)
 fetch-all: $(PKGS_ALL:%=.sum-%)
+expand: $(PKGS:%=.expand-%)
 install: $(PKGS:%=.%)
 
 mostlyclean:
@@ -458,7 +459,7 @@ list:
 help:
 	@cat $(SRC)/help.txt
 
-.PHONY: all fetch fetch-all install mostlyclean clean distclean package list help prebuilt
+.PHONY: all fetch fetch-all expand install mostlyclean clean distclean package list help prebuilt
 
 # CMake toolchain
 toolchain.cmake:
@@ -518,6 +519,16 @@ endif
 # Default pattern rules
 .sum-%: $(SRC)/%/SHA512SUMS
 	$(CHECK_SHA512)
+	touch $@
+
+.expand-%:
+	$(eval MODULE := $(subst .expand-,,$@))
+	$(eval VARNAME := EXPANDS_$(MODULE))
+	$(eval BUILD1 := $(EXPANDS_$(MODULE)))
+	@if test ! -z $(BUILD1); \
+    then ${MAKE} $(BUILD1);\
+    else ${MAKE} $(MODULE);\
+    fi
 	touch $@
 
 .sum-%:
