@@ -7,7 +7,7 @@ $(TARBALLS)/libgpg-error-$(GPGERROR_VERSION).tar.bz2:
 
 .sum-gpg-error: libgpg-error-$(GPGERROR_VERSION).tar.bz2
 
-libgpg-error: libgpg-error-$(GPGERROR_VERSION).tar.bz2 .sum-gpg-error
+gpg-error: libgpg-error-$(GPGERROR_VERSION).tar.bz2 .sum-gpg-error
 	$(UNPACK)
 ifdef HAVE_WIN32
 	$(APPLY) $(SRC)/gpg-error/windres-make.patch
@@ -46,7 +46,7 @@ else
 endif
 endif
 
-.gpg-error: libgpg-error
+.gpg-error: gpg-error
 	$(RECONF)
 	cd $< && $(HOSTVARS) ./configure $(HOSTCONF) --disable-nls --disable-shared --disable-languages --disable-tests
 	cd $< && $(MAKE) install

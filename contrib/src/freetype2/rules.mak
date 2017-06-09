@@ -13,7 +13,7 @@ $(TARBALLS)/freetype-$(FREETYPE2_VERSION).tar.gz:
 
 .sum-freetype2: freetype-$(FREETYPE2_VERSION).tar.gz
 
-freetype: freetype-$(FREETYPE2_VERSION).tar.gz .sum-freetype2
+freetype2: freetype-$(FREETYPE2_VERSION).tar.gz .sum-freetype2
 	$(UNPACK)
 	$(call pkg_static, "builds/unix/freetype2.in")
 	$(MOVE)
@@ -27,7 +27,7 @@ FREETYPE_CFLAGS += -DFT_CONFIG_OPTION_NO_ASSEMBLER
 endif
 endif
 
-.freetype2: freetype
+.freetype2: freetype2
 	cd $< && cp builds/unix/install-sh .
 	sed -i.orig s/-ansi// $</builds/unix/configure
 	cd $< && GNUMAKE=$(MAKE) $(HOSTVARS) ./configure --with-harfbuzz=no --with-zlib=yes --without-png --with-bzip2=no $(HOSTCONF) CFLAGS="$(FREETYPE_CFLAGS)"

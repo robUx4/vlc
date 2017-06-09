@@ -8,7 +8,7 @@ $(TARBALLS)/libebml-$(EBML_VERSION).tar.bz2:
 
 .sum-ebml: libebml-$(EBML_VERSION).tar.bz2
 
-libebml: libebml-$(EBML_VERSION).tar.bz2 .sum-ebml
+ebml: libebml-$(EBML_VERSION).tar.bz2 .sum-ebml
 	$(UNPACK)
 	$(MOVE)
 
@@ -18,7 +18,7 @@ ifdef HAVE_ANDROID
 EBML_EXTRA_FLAGS += CPPFLAGS=""
 endif
 
-.ebml: libebml
+.ebml: ebml
 	cd $< && $(HOSTVARS) ./configure $(HOSTCONF) $(EBML_EXTRA_FLAGS)
 	cd $< && $(MAKE) install
 	touch $@

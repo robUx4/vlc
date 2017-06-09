@@ -39,7 +39,7 @@ $(TARBALLS)/libass-$(ASS_VERSION).tar.gz:
 
 .sum-ass: libass-$(ASS_VERSION).tar.gz
 
-libass: libass-$(ASS_VERSION).tar.gz .sum-ass
+ass: libass-$(ASS_VERSION).tar.gz .sum-ass
 	$(UNPACK)
 	$(APPLY) $(SRC)/ass/ass-macosx.patch
 ifdef HAVE_WIN32
@@ -83,7 +83,7 @@ else
 ASS_CFLAGS += -g
 endif
 
-.ass: libass
+.ass: ass
 	$(RECONF)
 	cd $< && $(HOSTVARS) CFLAGS="$(CFLAGS) $(ASS_CFLAGS)" ./configure $(HOSTCONF) $(ASS_CONF)
 	cd $< && $(MAKE) install

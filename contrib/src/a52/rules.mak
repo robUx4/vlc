@@ -12,7 +12,7 @@ $(TARBALLS)/a52dec-$(A52DEC_VERSION).tar.gz:
 
 .sum-a52: a52dec-$(A52DEC_VERSION).tar.gz
 
-a52dec: a52dec-$(A52DEC_VERSION).tar.gz .sum-a52
+a52: a52dec-$(A52DEC_VERSION).tar.gz .sum-a52
 	$(UNPACK)
 	$(APPLY) $(SRC)/a52/liba52-pic.patch
 	$(APPLY) $(SRC)/a52/liba52-silence.patch
@@ -22,7 +22,7 @@ ifndef HAVE_FPU
 endif
 	$(MOVE)
 
-.a52: a52dec
+.a52: a52
 	$(RECONF)
 	cd $< && $(HOSTVARS) ./configure $(HOSTCONF)
 	cd $< && $(MAKE) -C liba52 install
