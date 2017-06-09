@@ -47,7 +47,9 @@
 VLC_API void vlc_testcancel(void);
 
 #if defined (_WIN32)
-# include <process.h>
+# if !defined(__clang__) /* contains unsupport __declspec(noreturn) */
+#  include <process.h>
+# endif 
 # ifndef ETIMEDOUT
 #  define ETIMEDOUT 10060 /* This is the value in winsock.h. */
 # endif
