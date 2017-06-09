@@ -6,6 +6,7 @@ else
 #ugly way to get the default location of standard idl files
 IDL_INC_PATH = /`echo $(MSYSTEM) | tr A-Z a-z`/$(BUILD)/include
 endif
+EXPANDS_d3d9 = .d3d9
 
 D3D9CAPS_COMMIT_ID := 477108e5706e73421634436c21cb76e1795b3609
 DXVA2API_COMMIT_ID := 67bb96f54d720ca9e5aaa5da7d385348e0bfac31
