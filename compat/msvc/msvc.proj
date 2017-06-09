@@ -1,7 +1,7 @@
 GROUP(COMPILER_MSVC) msvc_compat
 {
   INCLUDE .
-  INCLUDE(!COMPILER_CLANG) includes
+  INCLUDE includes
   
   DEFINE(COMPILER_CLANG) "__STDC_HOSTED__=1"
   
@@ -12,8 +12,10 @@ GROUP(COMPILER_MSVC) msvc_compat
   HEADER stdatomic.h
   HEADER unistd.h
   HEADER(WINSTORE_APP) winstorecompat.h
-  HEADER(!COMPILER_CLANG) stdalign.h
-  HEADER(!COMPILER_CLANG) sys/time.h
+  HEADER includes/stdalign.h
+  HEADER includes/sys/file.h
+  HEADER includes/sys/socket.h
+  HEADER includes/sys/time.h
 }
 
 GROUP(COMPILER_CLANG) clang_cpp_fixup
