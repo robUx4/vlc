@@ -14,9 +14,12 @@ DLL(!WINSTORE_APP) direct3d9_plugin /* HAVE_WIN32_DESKTOP */
   HEADER win32/common.h
   SOURCE win32/events.c
   HEADER win32/events.h
+  //SOURCE win32/sensors.cpp
   HEADER win32/builtin_shaders.h
   SOURCE win32/win32touch.c
   HEADER win32/win32touch.h
+  SOURCE ../video_chroma/copy.c
+  HEADER ../video_chroma/copy.h
   
   DEFINE MODULE_NAME_IS_direct3d9
   LIBS advapi32.lib
@@ -24,6 +27,7 @@ DLL(!WINSTORE_APP) direct3d9_plugin /* HAVE_WIN32_DESKTOP */
   LIBS ole32.lib
   LIBS shell32.lib
   LIBS user32.lib
+  //LIBS sensorsapi.lib
 }
 
 DLL direct3d11_plugin
@@ -36,7 +40,10 @@ DLL direct3d11_plugin
   HEADER ../video_chroma/dxgi_fmt.h
   SOURCE win32/common.c
   HEADER win32/common.h
-  
+  //SOURCE win32/sensors.cpp
+  SOURCE ../video_chroma/copy.c
+  HEADER ../video_chroma/copy.h
+
   DEFINE MODULE_NAME_IS_direct3d11
   
   IF !HAVE_WINSTORE
@@ -53,6 +60,7 @@ DLL direct3d11_plugin
   LIBS(!WINSTORE_APP) ole32.lib
   LIBS(!WINSTORE_APP) shell32.lib
   LIBS(!WINSTORE_APP) user32.lib
+  //LIBS sensorsapi.lib
 }
 
 DLL(TARGET_WIN) drawable_plugin
