@@ -7,7 +7,7 @@ GROUP(COMPILER_MSVC) msvc_compat
   
   HEADER_FORCE(!COMPILER_CLANG) msvc_fixup.h
   HEADER_FORCE(COMPILER_CLANG)  clang_fixup.h
-  HEADER mscver_fixup.h
+  HEADER ms_fixup.h
   HEADER dirent.h
   HEADER stdatomic.h
   HEADER unistd.h

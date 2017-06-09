@@ -4,7 +4,7 @@
 #error Clang compatibility header
 #endif
 
-#include "mscver_fixup.h"
+#include "ms_fixup.h"
 
 #define _CRT_DECLARE_NONSTDC_NAMES 1
 #include <corecrt.h>
