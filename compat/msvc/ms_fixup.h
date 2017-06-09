@@ -66,6 +66,24 @@ typedef unsigned int mode_t;
 # define S_ISDIR(mode)  (((mode) & S_IFMT) == S_IFDIR)
 #endif
 
+/* Values for the second argument to access.
+   These may be OR'd together.  */
+#ifndef R_OK
+# define R_OK    4       /* Test for read permission.  */
+#endif
+
+#ifndef W_OK
+# define W_OK    2       /* Test for write permission.  */
+#endif
+
+#ifndef F_OK
+# define F_OK    0       /* Test for existence.  */
+#endif
+
+#define STDIN_FILENO  _fileno(stdin)
+#define STDOUT_FILENO _fileno(stdout)
+#define STDERR_FILENO _fileno(stderr)
+
 #ifndef strcasecmp
 # define HAVE_STRCASECMP  /* bogus autoconf detection using a define */
 # define strcasecmp _stricmp
@@ -88,6 +106,14 @@ typedef unsigned int mode_t;
 #endif
 
 /* make sure math.h defines the values we want */
+#ifndef _USE_MATH_DEFINES
 #define _USE_MATH_DEFINES
+#endif
+
+#include <winapifamily.h>
+
+#if (WINAPI_FAMILY == WINAPI_FAMILY_PC_APP || WINAPI_FAMILY == WINAPI_FAMILY_PHONE_APP)
+#include "winstorecompat.h"
+#endif /* WINAPI_FAMILY_PC_APP || WINAPI_FAMILY_PHONE_APP */
 
 #endif /* _MSC_VER */
