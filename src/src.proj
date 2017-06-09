@@ -59,7 +59,6 @@ DLL libvlccore
   SOURCE input/clock.c
   SOURCE input/control.c
   SOURCE input/decoder.c
-  SOURCE input/decoder_synchro.c
   SOURCE input/demux.c
   SOURCE input/demux_chained.c
   SOURCE input/es_out.c
