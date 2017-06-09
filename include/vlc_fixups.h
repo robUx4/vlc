@@ -85,6 +85,9 @@ typedef struct
 
 #if !defined (HAVE_REWIND) || \
     !defined (HAVE_GETDELIM)
+# if defined(__cplusplus) && defined(__clang__)
+#  define _NO_CRT_STDIO_INLINE /* define sscanf() in compat */
+# endif
 # include <stdio.h> /* FILE */
 #endif
 
