@@ -41,7 +41,7 @@ extern DIRENT_WINBASEAPI DIRENT_DWORD DIRENT_WINAPI GetLastError(void);
 extern DIRENT_WINBASEAPI DIRENT_DWORD DIRENT_WINAPI GetFileAttributesW(const wchar_t *lpFileName);
 #define dirent_GetFileAttributes  GetFileAttributesW
 #else
-extern DIRENT_WINBASEAPI DIRENT_DWORD DIRENT_WINAPI GetFileAttributesW(const char *lpFileName);
+extern DIRENT_WINBASEAPI DIRENT_DWORD DIRENT_WINAPI GetFileAttributesA(const char *lpFileName);
 #define dirent_GetFileAttributes  GetFileAttributesA
 #endif // !UNICODE
 
