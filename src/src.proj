@@ -142,6 +142,8 @@ DLL libvlccore
   SOURCE misc/probe.c
   SOURCE misc/rand.c
   SOURCE misc/mtime.c
+  SOURCE misc/background_worker.c
+  HEADER misc/background_worker.h
   SOURCE misc/block.c
   SOURCE misc/fifo.c
   SOURCE misc/fourcc.c
