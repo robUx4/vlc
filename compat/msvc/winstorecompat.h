@@ -13,14 +13,13 @@
 #pragma warning(push)
 #pragma warning(disable:4255)    /* no function prototype given */
 #endif /* _MSV_VER */
+#ifdef __cplusplus
+#define NOMINMAX /* messes with std::min/max */
+#endif
 #include <Windows.h>
 #if _MSC_VER < 1900
 #pragma warning(pop)
 #endif /* _MSV_VER */
-
-#if defined(__clang__)
-#define __PRFCHWINTRIN_H /* workaround for an SDK incompatibility when building AMD64 */
-#endif /*__clang__ */
 
 /* not detected properly by autoconf due to early forced include */
 #define HAVE_WCSCPY 1
