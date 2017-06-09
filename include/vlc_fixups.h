@@ -143,7 +143,7 @@ typedef struct {
   long double ld;
 } max_align_t;
 #endif
-#ifdef _MSC_VER
+#if defined(_MSC_VER) && !defined(__clang__)
 #define alignas(x)  __declspec(align( x ))
 #endif
 
