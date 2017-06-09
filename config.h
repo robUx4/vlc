@@ -130,7 +130,7 @@
 #define HAVE_ATOLL 1
 
 /* Support for __attribute__((packed)) for structs */
-/* #undef HAVE_ATTRIBUTE_PACKED */
+#define HAVE_ATTRIBUTE_PACKED 1
 
 /* Define to 1 if you have the <audio_io.h> header file. */
 /* #undef HAVE_AUDIO_IO_H */
@@ -160,6 +160,8 @@
 
 /* Define to 1 if you have the <d3d9.h> header file. */
 #define HAVE_D3D9_H 1
+
+/* #undef HAVE_D3DX9EFFECT_H */
 
 /* Define to 1 if you have the `daemon' function. */
 /* #undef HAVE_DAEMON */
@@ -614,7 +616,7 @@
 /* #undef HAVE_SYS_SHM_H */
 
 /* Define to 1 if you have the <sys/socket.h> header file. */
-/* #undef HAVE_SYS_SOCKET_H */
+#define HAVE_SYS_SOCKET_H 1
 
 /* Define to 1 if you have the <sys/soundcard.h> header file. */
 /* #undef HAVE_SYS_SOUNDCARD_H */
