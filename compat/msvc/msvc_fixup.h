@@ -57,20 +57,6 @@ typedef struct tagMSG MSG, *LPMSG;
 
 #define NOMINMAX
 
-/* Values for the second argument to access.
-   These may be OR'd together.  */
-#ifndef R_OK
-# define R_OK    4       /* Test for read permission.  */
-#endif
-
-#ifndef W_OK
-# define W_OK    2       /* Test for write permission.  */
-#endif
-
-#ifndef F_OK
-# define F_OK    0       /* Test for existence.  */
-#endif
-
 #ifndef _CRT_SECURE_NO_WARNINGS
 #define _CRT_SECURE_NO_WARNINGS
 #endif /* _CRT_SECURE_NO_WARNINGS */
@@ -97,16 +83,6 @@ typedef struct tagMSG MSG, *LPMSG;
 //#define DEBUG_NEW new(_NORMAL_BLOCK, __FILE__, __LINE__)
 //#define new DEBUG_NEW
 #endif
-
-#define STDIN_FILENO  _fileno(stdin)
-#define STDOUT_FILENO _fileno(stdout)
-#define STDERR_FILENO _fileno(stderr)
-
-#include <winapifamily.h>
-
-#if (WINAPI_FAMILY == WINAPI_FAMILY_PC_APP || WINAPI_FAMILY == WINAPI_FAMILY_PHONE_APP)
-#include "winstorecompat.h"
-#endif /* WINAPI_FAMILY_PC_APP || WINAPI_FAMILY_PHONE_APP */
 
 #if _MSC_VER < 1900
 #pragma warning(disable:4201) /* nameless structs */
