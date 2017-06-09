@@ -1,5 +1,9 @@
 #if !defined(__cplusplus) && defined(_MSC_VER)
 
+#if 0 && defined(__clang__) && __has_include_next(<stdatomic.h>)
+#  include_next <stdatomic.h>
+#else /* no stdatomic.h */
+
 #include <windows.h>
 
 #define  memory_order_relaxed 0
@@ -98,5 +102,7 @@ typedef     uint_least32_t atomic_uint_least32_t;
 
 #  define atomic_init(obj, value) \
     do { *(obj) = (value); } while(0)
+    
+#endif /* no stdatomic.h */
 
 #endif /* __cplusplus */
