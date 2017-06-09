@@ -67,7 +67,9 @@ typedef int pid_t;
 
 #define SetThreadErrorMode(x,y) 
 
+#ifndef CreateEvent
 #define CreateEvent CreateEventW
+#endif
 
 #if _WIN32_WINNT < 0x0A00
 static COMPAT_INLINE HANDLE CreateEventW(LPSECURITY_ATTRIBUTES lpEventAttributes, BOOL bManualReset, BOOL bInitialState, LPCWSTR lpName)
@@ -126,9 +128,13 @@ static COMPAT_INLINE HANDLE CreateSemaphoreA(LPSECURITY_ATTRIBUTES lpSemaphoreAt
     return CreateSemaphoreW(lpSemaphoreAttributes, lInitialCount, lMaximumCount, lpwName );
 }
 #endif
+#ifndef CreateSemaphore
 #define CreateSemaphore    CreateSemaphoreW
+#endif
 
+#ifndef GetModuleFileName
 #define GetModuleFileName  GetModuleFileNameW
+#endif
 #define GetModuleFileNameA(h,f,s)                          (0)
 #define GetModuleFileNameW(h,f,s)                          (0)
 #define GetModuleHandleA(x)                             (NULL)
@@ -166,7 +172,9 @@ static COMPAT_INLINE HANDLE CreateMutexW(LPSECURITY_ATTRIBUTES lpMutexAttributes
     return CreateMutexExW(lpMutexAttributes, lpName, flags, EVENT_ALL_ACCESS);
 }
 #endif /* _WIN32_WINNT */
+#ifndef CreateMutex
 #define CreateMutex CreateMutexW
+#endif
 
 static COMPAT_INLINE UINT GetACP(void)
 {
@@ -185,7 +193,9 @@ static COMPAT_INLINE DWORD GetFileAttributesW(LPCWSTR lpFileName)
     else
         return INVALID_FILE_ATTRIBUTES;
 }
+#ifndef GetFileAttributes
 #define GetFileAttributes GetFileAttributesW
+#endif
 #endif
 
 static COMPAT_INLINE HMODULE LoadLibraryW(LPCWSTR lpFileName)
