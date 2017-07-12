@@ -2295,7 +2295,7 @@ static void Direct3D11DestroyPool(vout_display_t *vd)
  * Vertex 0 should be assigned coordinates at index 2 from the
  * unrotated order and so on, thus yielding order: 2 3 0 1.
  */
-static void orientationVertexOrder(video_orientation_t orientation, int vertex_order[static 4])
+static void orientationVertexOrder(video_orientation_t orientation, int vertex_order[4])
 {
     switch (orientation) {
         case ORIENT_ROTATED_90:
