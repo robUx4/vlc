@@ -1,6 +1,6 @@
---- ffmpeg-0768aaec1d683226e613e692080a588359c31334/configure	2017-04-08 14:29:06.000000000 +0200
-+++ ffmpeg-0768aaec1d683226e613e692080a588359c31334/configure.msvc	2017-04-14 15:55:39.493138300 +0200
-@@ -3636,6 +3636,8 @@ case "$toolchain" in
+--- ffmpeg-a82468514048fb87d9bf38689866bc3b9aaccd02/configure	2017-07-17 16:47:39.876555700 +0200
++++ ffmpeg-a82468514048fb87d9bf38689866bc3b9aaccd02/configure.msvc	2017-07-17 16:47:26.205318400 +0200
+@@ -3685,6 +3685,8 @@ case "$toolchain" in
          ld_default="$source_path/compat/windows/mslink"
          nm_default="dumpbin -symbols"
          ar_default="lib"
@@ -9,14 +9,14 @@
          case "$arch" in
          arm*)
              as_default="armasm"
-@@ -3839,12 +3841,12 @@ msvc_common_flags(){
+@@ -3896,12 +3898,12 @@ msvc_common_flags(){
              -fPIC)                ;;
              -mthumb)              ;;
              -march=*)             ;;
 -            -lz)                  echo zlib.lib ;;
 +            -lz)                  echo z.lib ;;
-             -lavicap32)           echo vfw32.lib user32.lib ;;
              -lx264)               echo libx264.lib ;;
+             -lstdc++)             ;;
              -l*)                  echo ${flag#-l}.lib ;;
              -LARGEADDRESSAWARE)   echo $flag ;;
 -            -L*)                  echo -libpath:${flag#-L} ;;
@@ -24,7 +24,7 @@
              *)                    echo $flag ;;
          esac
      done
-@@ -4226,6 +4228,10 @@ host_ldflags_filter=$_flags_filter
+@@ -4288,6 +4290,10 @@ host_ldflags_filter=$_flags_filter
  add_host_ldflags $_flags $_ldflags
  HOSTLD_O=${_ld_o-$HOSTLD_O}
  
