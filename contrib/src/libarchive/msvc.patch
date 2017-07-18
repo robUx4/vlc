@@ -1,0 +1,12 @@
+--- libarchive/libarchive/archive_windows.h	2017-07-18 15:27:24.843261000 +0200
++++ libarchive/libarchive/archive_windows.h.msvc	2017-07-18 15:17:17.654936400 +0200
+@@ -133,6 +133,9 @@
+ #define	waitpid		__la_waitpid
+ #define	write		__la_write
+ #endif
++#ifdef _MSC_VER
++typedef int pid_t;
++#endif
+ 
+ #if !defined(__WATCOMC__)
+ 
