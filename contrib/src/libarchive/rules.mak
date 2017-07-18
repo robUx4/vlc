@@ -9,6 +9,11 @@ endif
 
 DEPS_libarchive = zlib
 
+LIBARCHIVE_CFLAGS := $(CFLAGS) -DLIBARCHIVE_STATIC
+ifdef HAVE_WIN32
+LIBARCHIVE_CFLAGS += -DLIBARCHIVE_STATIC
+endif
+
 $(TARBALLS)/libarchive-$(LIBARCHIVE_VERSION).tar.gz:
 	$(call download_pkg,$(LIBARCHIVE_URL),libarchive)
 
@@ -32,7 +37,7 @@ endif
 ifdef HAVE_WINSTORE
 	$(RECONF)
 endif
-	cd $< && $(HOSTVARS) ./configure $(HOSTCONF) \
+	cd $< && $(HOSTVARS) CFLAGS="$(LIBARCHIVE_CFLAGS)" ./configure $(HOSTCONF) \
 		--disable-bsdcpio --disable-bsdtar --disable-bsdcat \
 		--without-nettle \
 		--without-xml2 --without-lzma --without-iconv --without-expat
