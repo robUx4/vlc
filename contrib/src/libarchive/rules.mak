@@ -30,6 +30,9 @@ ifdef HAVE_WINSTORE
 	$(APPLY) $(SRC)/libarchive/winrt.patch
 endif
 	$(APPLY) $(SRC)/libarchive/fix-types.patch
+ifdef HAVE_VISUALSTUDIO
+	$(APPLY) $(SRC)/libarchive/msvc.patch
+endif
 	$(call pkg_static,"build/pkgconfig/libarchive.pc.in")
 	$(MOVE)
 
