@@ -29,6 +29,9 @@ endif
 	$(MOVE)
 
 .libarchive: libarchive
+ifdef HAVE_WINSTORE
+	$(RECONF)
+endif
 	cd $< && $(HOSTVARS) ./configure $(HOSTCONF) \
 		--disable-bsdcpio --disable-bsdtar --disable-bsdcat \
 		--without-nettle \
