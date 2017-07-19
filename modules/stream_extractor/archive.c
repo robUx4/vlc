@@ -32,6 +32,10 @@
 #include <vlc_dialog.h>
 #include <vlc_input_item.h>
 
+#ifdef _WIN32
+#define LIBARCHIVE_STATIC
+#endif
+
 #include <assert.h>
 #include <archive.h>
 #include <archive_entry.h>
