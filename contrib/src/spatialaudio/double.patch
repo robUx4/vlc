@@ -1,0 +1,10 @@
+--- spatialaudio/CMakeLists.txt	2017-07-21 16:06:24.971010000 +0200
++++ spatialaudio/CMakeLists.txt.double	2017-07-21 16:06:08.913264100 +0200
+@@ -75,7 +75,6 @@ endif(${MYSOFA_FOUND})
+ 
+ option(HAVE_MIT_HRTF "Should MIT HRTF be built-in" ON)
+ 
+-set(HAVE_MYSOFA ${MYSOFA_FOUND})
+ configure_file(
+   "${CMAKE_CURRENT_SOURCE_DIR}/include/config.h.in"
+   "${CMAKE_CURRENT_BINARY_DIR}/config.h"
