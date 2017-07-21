@@ -1,0 +1,11 @@
+--- spatialaudio/CMakeLists.txt	2017-07-21 16:07:15.873242400 +0200
++++ spatialaudio/CMakeLists.txt.cmake-msvc	2017-07-21 16:06:58.122391700 +0200
+@@ -59,7 +59,7 @@ list(APPEND sources
+ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/Modules/")
+ 
+ find_package(MySofa QUIET)
+-set(HAVE_MYSOFA ${MYSOFA_FOUND})
++set(HAVE_MYSOFA 1)
+ 
+ include_directories(include include/hrtf source source/kiss_fft ${PROJECT_BINARY_DIR})
+ 
