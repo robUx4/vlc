@@ -18,6 +18,7 @@ $(TARBALLS)/spatialaudio-$(SPATIALAUDIO_VERSION).tar.bz2:
 
 spatialaudio: spatialaudio-$(SPATIALAUDIO_VERSION).tar.bz2 .sum-spatialaudio
 	$(UNPACK)
+	$(APPLY) $(SRC)/spatialaudio/stdmin.patch
 	$(MOVE)
 
 .spatialaudio: spatialaudio toolchain.cmake

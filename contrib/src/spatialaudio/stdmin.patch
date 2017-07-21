@@ -1,0 +1,10 @@
+--- spatialaudio/source/AmbisonicZoomer.cpp	2017-07-21 15:23:31.450084900 +0200
++++ spatialaudio/source/AmbisonicZoomer.cpp.stdmin	2017-07-21 15:22:37.094177600 +0200
+@@ -17,6 +17,7 @@
+ #include "AmbisonicZoomer.h"
+ 
+ #include <iostream>
++#include <algorithm>
+ 
+ CAmbisonicZoomer::CAmbisonicZoomer()
+ {
