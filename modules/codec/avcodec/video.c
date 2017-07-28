@@ -1490,6 +1490,14 @@ static enum PixelFormat ffmpeg_GetFormat( AVCodecContext *p_context,
             can_hwaccel = true;
     }
 
+    char * var = var_InheritString(p_dec, "avcodec-hw");
+    if (var == NULL || !strcmp( var, "none" ))
+    {
+        msg_Dbg( p_dec, "disable hardware decoders" );
+        can_hwaccel = false;
+    }
+    free(var);
+
     /* If the format did not actually change (e.g. seeking), try to reuse the
      * existing output format, and if present, hardware acceleration back-end.
      * This avoids resetting the pipeline downstream. This also avoids
