@@ -1490,11 +1490,47 @@ static enum PixelFormat ffmpeg_GetFormat( AVCodecContext *p_context,
             can_hwaccel = true;
     }
 
+    enum PixelFormat fmts[3];
     char * var = var_InheritString(p_dec, "avcodec-hw");
     if (var == NULL || !strcmp( var, "none" ))
     {
         msg_Dbg( p_dec, "disable hardware decoders" );
         can_hwaccel = false;
+    }
+    else
+    {
+        enum PixelFormat hwfmt = AV_PIX_FMT_NONE;
+        if (!strcmp( var, "d3d11va" ))
+            hwfmt = AV_PIX_FMT_D3D11VA_VLD;
+        else if (!strcmp( var, "dxva2" ))
+            hwfmt = AV_PIX_FMT_DXVA2_VLD;
+        else if (!strcmp( var, "vdpau" ))
+            hwfmt = AV_PIX_FMT_VDPAU;
+        else if (!strcmp( var, "vaapi" ))
+            hwfmt = AV_PIX_FMT_VAAPI_VLD;
+        else if (strcmp( var, "any" ))
+        {
+            msg_Dbg( p_dec, "Unknown hardware decoder %s", var );
+        }
+
+        if (hwfmt != AV_PIX_FMT_NONE)
+        {
+            size_t j;
+            for( j = 0; pi_fmt[j] != AV_PIX_FMT_NONE; j++ )
+            {
+                if (pi_fmt[j] == hwfmt)
+                {
+                    fmts[0] = hwfmt;
+                    fmts[1] = swfmt;
+                    fmts[2] = AV_PIX_FMT_NONE;
+                    break;
+                }
+            }
+            if (pi_fmt[j] == AV_PIX_FMT_NONE)
+                can_hwaccel = false; /* no hardware flavor possible anyway */
+            else
+                pi_fmt = (const enum PixelFormat *)&fmts;
+        }
     }
     free(var);
 
