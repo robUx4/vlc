@@ -475,5 +475,20 @@ VLC_API void vout_display_PlacePicture(vout_display_place_t *place, const video_
 VLC_API void vout_display_SendMouseMovedDisplayCoordinates(vout_display_t *vd, video_orientation_t orient_display, int m_x, int m_y,
                                                            vout_display_place_t *place);
 
+
+static inline bool vlc_fourcc_IsOpaque(vlc_fourcc_t fourcc)
+{
+    switch (fourcc)
+    {
+    case VLC_CODEC_D3D9_OPAQUE:
+    case VLC_CODEC_D3D9_OPAQUE_10B:
+    case VLC_CODEC_D3D11_OPAQUE:
+    case VLC_CODEC_D3D11_OPAQUE_10B:
+        return true;
+    default:
+        return false;
+    }
+}
+
 /** @} */
 #endif /* VLC_VOUT_DISPLAY_H */

@@ -89,6 +89,10 @@ static int Control (vout_display_t *, int, va_list);
 static int Open (vlc_object_t *obj)
 {
     vout_display_t *vd = (vout_display_t *)obj;
+
+    if ( !vd->obj.force && vlc_fourcc_IsOpaque( vd->source.i_chroma ) )
+        return VLC_EGENERIC; /* let other modules deal with it */
+
     vout_display_sys_t *sys = malloc (sizeof (*sys));
     if (unlikely(sys == NULL))
         return VLC_ENOMEM;

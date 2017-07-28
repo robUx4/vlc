@@ -513,6 +513,11 @@ static int Open(vlc_object_t *object)
 {
     vout_display_t *vd = (vout_display_t *)object;
 
+    if ( !vd->obj.force && vd->source.i_chroma != VLC_CODEC_D3D11_OPAQUE &&
+         vd->source.i_chroma != VLC_CODEC_D3D11_OPAQUE_10B &&
+         vlc_fourcc_IsOpaque( vd->source.i_chroma ) )
+        return VLC_EGENERIC; /* let other modules deal with it */
+
 #if !VLC_WINSTORE_APP
     int ret = OpenHwnd(vd);
 #else
