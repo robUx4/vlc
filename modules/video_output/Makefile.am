@@ -465,6 +465,8 @@ vout_LTLIBRARIES += \
 	libvmem_plugin.la \
 	libyuv_plugin.la
 
+if !HAVE_WINSTORE
 libevent_thread_la_SOURCES = \
 	video_output/event_thread.c video_output/event_thread.h
 noinst_LTLIBRARIES += libevent_thread.la
+endif
