@@ -82,7 +82,7 @@ GROUP access
   USE dummy_plugin
   USE imem_plugin
   USE access_imem_plugin
-  USE rar_plugin
+  //USE rar_plugin
   USE sdp_plugin
   USE timecode_plugin
   USE vdr_plugin
