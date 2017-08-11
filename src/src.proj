@@ -23,7 +23,6 @@ DLL libvlccore
   SOURCE config/file.c
   SOURCE config/help.c
   SOURCE config/intf.c
-  SOURCE config/keys.c
   SOURCE config/cmdline.c
   SOURCE config/getopt.c
   HEADER config/vlc_getopt.h
@@ -137,6 +136,7 @@ DLL libvlccore
   SOURCE text/filesystem.c
   SOURCE text/iso_lang.c
   HEADER text/iso-639_def.h
+  SOURCE misc/actions.c
   SOURCE misc/md5.c
   SOURCE misc/probe.c
   SOURCE misc/rand.c
@@ -148,6 +148,7 @@ DLL libvlccore
   SOURCE misc/fourcc.c
   HEADER misc/fourcc_list.h
   SOURCE misc/es_format.c
+  SOURCE misc/objres.c
   SOURCE misc/picture.c
   HEADER misc/picture.h
   SOURCE misc/picture_fifo.c
