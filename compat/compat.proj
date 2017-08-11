@@ -7,6 +7,7 @@ LIB vlc_compat
 
   LIBS(TARGET_WIN) ws2_32.lib
 
+  SOURCE(!HAVE_ALIGNED_ALLOC) aligned_alloc.c
   SOURCE(!HAVE_ASPRINTF) asprintf.c
   SOURCE(!HAVE_STRNDUP) strndup.c
   SOURCE(!HAVE_STRSEP) strsep.c
