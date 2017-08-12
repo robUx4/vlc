@@ -1,6 +1,6 @@
-#include "*/*.proj"
-
 CONFIG_FILE config.h { NO_INCLUDE . }
+
+#include "*/*.proj"
 
 GROUP libmatroska_coremake_automake
 {
