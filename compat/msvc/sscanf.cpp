@@ -1,4 +1,3 @@
-#define _NO_CRT_STDIO_INLINE
 #include <cstdio>
 
 int __CRTDECL sscanf(

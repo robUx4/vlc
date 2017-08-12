@@ -16,7 +16,7 @@
 #ifdef __cplusplus
 //#undef _NO_CRT_STDIO_INLINE
 //#define _CRT_STDIO_INLINE
-//#define _NO_CRT_STDIO_INLINE
+#define _NO_CRT_STDIO_INLINE
 #define _ALLOW_KEYWORD_MACROS
 #define _ENABLE_ATOMIC_ALIGNMENT_FIX
 #define restrict
