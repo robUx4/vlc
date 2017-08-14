@@ -36,11 +36,35 @@ DLL imem_plugin
   SOURCE imem-access.c
 }
 
+DLL access_concat_plugin
+{
+  USE modules_access_automake
+
+  SOURCE concat.c
+}
+
 DLL access_imem_plugin
 {
   USE modules_access_automake
 
   SOURCE imem.c
+}
+
+DLL access_mms_plugin
+{
+  USE modules_access_automake
+
+  SOURCE mms/mms.c
+  HEADER mms/mms.h
+  SOURCE mms/mmsh.c
+  HEADER mms/mmsh.h
+  SOURCE mms/mmstu.c
+  HEADER mms/mmstu.h
+  SOURCE mms/buffer.c
+  HEADER mms/buffer.h
+  HEADER mms/asf.h
+  SOURCE mms/asf.c
+  HEADER ../demux/asf/libasf_guid.h
 }
 
 DLL rar_plugin
@@ -77,11 +101,13 @@ DLL vdr_plugin
 
 GROUP access
 {
+  USE access_concat_plugin
+  USE access_imem_plugin
+  USE access_mms_plugin
   USE attachment_plugin
   USE filesystem_plugin
   USE dummy_plugin
   USE imem_plugin
-  USE access_imem_plugin
   //USE rar_plugin
   USE sdp_plugin
   USE timecode_plugin
