@@ -11,3 +11,4 @@ Other targets:
  * make clean        clean everything
  * make package      prepare prebuilt packages
  * make help         show this text
+ * make expand       download and extract all the necessary packages
