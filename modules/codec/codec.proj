@@ -1,0 +1,20 @@
+GROUP modules_codec_automake
+{
+  USE modules_automake
+  INCLUDE .
+}
+
+DLL a52_plugin
+{
+  USE modules_codec_automake
+  USE a52
+
+  DEFINE USE_A52DEC_TREE
+  SOURCE a52.c
+}
+
+
+GROUP codec
+{
+  USE a52_plugin
+}
