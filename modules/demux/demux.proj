@@ -161,7 +161,7 @@ DLL caf_plugin
 DLL mkv_plugin
 {
   USE modules_demux_automake
-  USE clang_cpp_fixup
+  USE msvcpp_compat
   USE matroska
 
   HEADER mkv/util.hpp
@@ -285,7 +285,7 @@ DLL(HAVE_DVBPSI) ts_plugin
 DLL adaptive_plugin
 {
   USE modules_demux_automake
-  USE clang_cpp_fixup
+  USE msvcpp_compat
 
   SOURCE adaptive/playlist/AbstractPlaylist.cpp
   HEADER adaptive/playlist/AbstractPlaylist.hpp

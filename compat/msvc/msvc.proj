@@ -18,7 +18,8 @@ GROUP(COMPILER_MSVC) msvc_compat
   HEADER includes/sys/time.h
 }
 
-GROUP(COMPILER_CLANG) clang_cpp_fixup
+GROUP(COMPILER_CLANG) msvcpp_compat
 {
+  // necessary counter part to forcing _NO_CRT_STDIO_INLINE for C++ files
   SOURCE sscanf.cpp
 }
