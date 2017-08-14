@@ -1,0 +1,27 @@
+GROUP modules_misc_automake
+{
+  USE modules_automake
+  INCLUDE .
+}
+
+DLL addonsfsstorage_plugin
+{
+  USE modules_misc_automake
+
+  SOURCE addons/fsstorage.c
+  HEADER addons/xmlreading.h
+}
+
+DLL addonsvorepository_plugin
+{
+  USE modules_misc_automake
+
+  SOURCE addons/vorepository.c
+  HEADER addons/xmlreading.h
+}
+
+GROUP misc
+{
+  USE(ENABLE_ADDONMANAGERMODULES) addonsfsstorage_plugin
+  USE(ENABLE_ADDONMANAGERMODULES) addonsvorepository_plugin
+}
