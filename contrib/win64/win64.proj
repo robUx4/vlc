@@ -1,9 +1,94 @@
 WORKSPACE contribs
 {
+  USE a52
+  USE aribb24
+  USE aribb25
+  USE ass
+  USE bluray
+  USE caca
+  USE cddb
+  USE chromaprint
+  USE d3d11
+  USE dca
+  USE dvbpsi
+  USE dvdcss
+  USE dvdnav
+  USE dvdread
+  USE dxgi12
+  USE dxva2api
   USE ebml
-  USE matroska
+  USE faad2
+  USE ffmpeg  
+  USE flac
+  USE fluidlite
+  USE fontconfig
+  USE freetype2
+  USE fribidi
+  USE gcrypt
+  USE gettext
+  USE glew
+  USE gme
+  USE gmp
+  USE gnutls
+  USE goom
+  USE gpg-error
+  USE gsm
+  USE harfbuzz
   USE iconv
+  USE jpeg
+  USE kate
+  USE lame
+  USE libarchive
+  USE libmpeg2
+  USE libtasn1
+  USE libxml2
+  USE live555
+  USE lua
+  USE luac
+  USE mad
+  USE matroska
+  USE mfx
+  USE microdns
+  USE modplug
+  USE mpcdec
+  USE mpg123
+  USE mysofa
+  USE nettle
+  USE nfs
+  USE ogg
+  USE openjpeg
+  USE opus
+  USE orc
+  USE png
+  USE postproc
+  USE projectM
+  USE protobuf
+  USE pthreads
+  USE qt
+  USE regex
+  USE samplerate
+  USE schroedinger
+  USE sdl
+  USE SDL_image
+  USE shout
+  USE sidplay2
+  USE sidplay-libs
+  USE spatialaudio
+  USE speex
+  USE speexdsp
+  USE ssh2
+  USE taglib
+  USE theora
+  USE tiff
+  USE twolame
+  USE upnp
+  USE vncclient
+  USE vorbis
+  USE vpx
+  USE x264
+  USE x265
   USE zlib
+  USE zvbi
 }
 
 #include "*/*.proj"
