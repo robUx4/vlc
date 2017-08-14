@@ -67,6 +67,22 @@ DLL access_mms_plugin
   HEADER ../demux/asf/libasf_guid.h
 }
 
+DLL access_realrtsp_plugin
+{
+  USE modules_access_automake
+
+  SOURCE rtsp/access.c
+  SOURCE rtsp/rtsp.c
+  HEADER access/rtsp/rtsp.h
+  SOURCE rtsp/real.c
+  HEADER access/rtsp/real.h
+  SOURCE rtsp/real_rmff.c
+  HEADER access/rtsp/real_rmff.h
+  SOURCE rtsp/real_sdpplin.c
+  HEADER access/rtsp/real_sdpplin.h
+  SOURCE rtsp/real_asmrp.c
+}
+
 DLL rar_plugin
 {
   USE modules_access_automake
@@ -104,6 +120,7 @@ GROUP access
   USE access_concat_plugin
   USE access_imem_plugin
   USE access_mms_plugin
+  USE access_realrtsp_plugin
   USE attachment_plugin
   USE filesystem_plugin
   USE dummy_plugin
