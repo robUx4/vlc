@@ -1,0 +1,17 @@
+GROUP modules_stream_filter_automake
+{
+  USE modules_automake
+  INCLUDE .
+}
+
+DLL adf_plugin
+{
+  USE modules_stream_filter_automake
+
+  SOURCE adf.c
+}
+
+GROUP stream_filter
+{
+  USE adf_plugin
+}
