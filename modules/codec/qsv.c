@@ -318,7 +318,7 @@ static int qsv_frame_pool_Init(qsv_frame_pool_t *pool,
 
     for (size_t i = 0; i < size; i++) {
         memcpy(&pool->frames[i].Info, &request->Info, sizeof(request->Info));
-        pool->frames[i].Data.Pitch = QSV_ALIGN(32, request->Info.Width);
+        pool->frames[i].Data.Pitch = QSV_ALIGN(16, request->Info.Width);
     }
 
     return VLC_SUCCESS;
@@ -484,7 +484,7 @@ static int Open(vlc_object_t *this)
     sys->params.mfx.FrameInfo.FourCC        = MFX_FOURCC_NV12;
     sys->params.mfx.FrameInfo.ChromaFormat  = MFX_CHROMAFORMAT_YUV420;
     sys->params.mfx.FrameInfo.Width         = QSV_ALIGN(16, enc->fmt_in.video.i_width);
-    sys->params.mfx.FrameInfo.Height        = QSV_ALIGN(32, enc->fmt_in.video.i_height);
+    sys->params.mfx.FrameInfo.Height        = QSV_ALIGN(16, enc->fmt_in.video.i_height);
     sys->params.mfx.FrameInfo.CropW         = enc->fmt_in.video.i_visible_width;
     sys->params.mfx.FrameInfo.CropH         = enc->fmt_in.video.i_visible_height;
     sys->params.mfx.FrameInfo.PicStruct     = MFX_PICSTRUCT_PROGRESSIVE;
