@@ -682,26 +682,26 @@ static void qsv_set_block_ts(encoder_t *enc, encoder_sys_t *sys, block_t *block,
                      " and that you have the last version of Intel's drivers installed.");
 }
 
-static block_t *qsv_synchronize_block(encoder_t *enc, QSVpacket *task)
+static block_t *qsv_synchronize_block(encoder_t *enc, QSVpacket *qsv_pkt)
 {
     encoder_sys_t *sys = enc->p_sys;
 
     /* Synchronize and fill block_t. If the SyncOperation fails we leak :-/ (or we can segfault, ur choice) */
-    if (MFXVideoCORE_SyncOperation(sys->session, task->syncp, QSV_SYNCPOINT_WAIT) != MFX_ERR_NONE) {
+    if (MFXVideoCORE_SyncOperation(sys->session, qsv_pkt->syncp, QSV_SYNCPOINT_WAIT) != MFX_ERR_NONE) {
         msg_Err(enc, "SyncOperation failed, outputting garbage data. "
                 "Updating your drivers and/or changing the encoding settings might resolve this");
         return NULL;
     }
-    block_t *block = task->block;
-    block->i_buffer = task->bs.DataLength;
-    block->p_buffer += task->bs.DataOffset;
+    block_t *block = qsv_pkt->block;
+    block->i_buffer = qsv_pkt->bs.DataLength;
+    block->p_buffer += qsv_pkt->bs.DataOffset;
 
-    qsv_set_block_ts(enc, sys, block, &task->bs);
-    qsv_set_block_flags(block, task->bs.FrameType);
+    qsv_set_block_ts(enc, sys, block, &qsv_pkt->bs);
+    qsv_set_block_flags(block, qsv_pkt->bs.FrameType);
 
     /* msg_Dbg(enc, "block->i_pts = %lld, block->i_dts = %lld", block->i_pts, block->i_dts); */
     /* msg_Dbg(enc, "FrameType = %#.4x, TimeStamp (pts) = %lld, DecodeTimeStamp = %lld", */
-    /*         task->bs.FrameType, task->bs.TimeStamp, task->bs.DecodeTimeStamp); */
+    /*         qsv_pkt->bs.FrameType, qsv_pkt->bs.TimeStamp, qsv_pkt->bs.DecodeTimeStamp); */
 
     /* Copied from x264.c: This isn't really valid for streams with B-frames */
     block->i_length = CLOCK_FREQ *
@@ -709,13 +709,13 @@ static block_t *qsv_synchronize_block(encoder_t *enc, QSVpacket *task)
         enc->fmt_in.video.i_frame_rate;
 
     // Buggy DTS (value comes from experiments)
-    if (task->bs.DecodeTimeStamp < -10000)
+    if (qsv_pkt->bs.DecodeTimeStamp < -10000)
         block->i_dts = sys->last_dts + block->i_length;
     sys->last_dts = block->i_dts;
     return block;
 }
 
-static void qsv_queue_encode_picture(encoder_t *enc, QSVpacket *task,
+static void qsv_queue_encode_picture(encoder_t *enc, QSVpacket *qsv_pkt,
                                      picture_t *pic)
 {
     encoder_sys_t *sys = enc->p_sys;
@@ -737,16 +737,16 @@ static void qsv_queue_encode_picture(encoder_t *enc, QSVpacket *task,
     }
 
     /* Allocate block_t and prepare mfxBitstream for encoder */
-    if (!(task->block = block_Alloc(sys->params.mfx.BufferSizeInKB * 1000))) {
+    if (!(qsv_pkt->block = block_Alloc(sys->params.mfx.BufferSizeInKB * 1000))) {
         msg_Err(enc, "Unable to allocate block for encoder output");
         return;
     }
-    memset(&task->bs, 0, sizeof(task->bs));
-    task->bs.MaxLength = task->block->i_buffer;
-    task->bs.Data = task->block->p_buffer;
+    memset(&qsv_pkt->bs, 0, sizeof(qsv_pkt->bs));
+    qsv_pkt->bs.MaxLength = qsv_pkt->block->i_buffer;
+    qsv_pkt->bs.Data = qsv_pkt->block->p_buffer;
 
     for (;;) {
-        sts = MFXVideoENCODE_EncodeFrameAsync(sys->session, 0, frame, &task->bs, &task->syncp);
+        sts = MFXVideoENCODE_EncodeFrameAsync(sys->session, 0, frame, &qsv_pkt->bs, &qsv_pkt->syncp);
         if (sts != MFX_WRN_DEVICE_BUSY)
             break;
         if (sys->busy_warn_counter++ % 16 == 0)
@@ -754,7 +754,7 @@ static void qsv_queue_encode_picture(encoder_t *enc, QSVpacket *task,
         msleep(QSV_BUSYWAIT_TIME);
     }
 
-    // msg_Dbg(enc, "Encode async status: %d, Syncpoint = %tx", sts, (ptrdiff_t)task->syncp);
+    // msg_Dbg(enc, "Encode async status: %d, Syncpoint = %tx", sts, (ptrdiff_t)qsv_pkt->syncp);
 
     if (sts == MFX_ERR_MORE_DATA)
         if (pic)
@@ -778,32 +778,32 @@ static block_t *Encode(encoder_t *this, picture_t *pic)
 {
     encoder_t     *enc = (encoder_t *)this;
     encoder_sys_t *sys = enc->p_sys;
-    QSVpacket     *task = NULL;
+    QSVpacket     *qsv_pkt = NULL;
     block_t       *block = NULL;
 
     if (pic) {
         /* Finds an available SyncPoint */
         for (size_t i = 0; i < sys->async_depth; i++)
             if ((sys->tasks + (i + sys->first_task) % sys->async_depth)->syncp == 0) {
-                task = sys->tasks + (i + sys->first_task) % sys->async_depth;
+                qsv_pkt = sys->tasks + (i + sys->first_task) % sys->async_depth;
                 break;
             }
     } else
         /* If !pic, we are emptying encoder and tasks, so we force the SyncOperation */
         msg_Dbg(enc, "Emptying encoder");
 
-    /* There is no available task, we need to synchronize */
-    if (!task) {
-        task = sys->tasks + sys->first_task;
+    /* There is no available qsv_pkt, we need to synchronize */
+    if (!qsv_pkt) {
+        qsv_pkt = sys->tasks + sys->first_task;
 
-        block = qsv_synchronize_block( enc, task );
+        block = qsv_synchronize_block( enc, qsv_pkt );
 
         /* Reset the task now it has been synchronized and advances first_task pointer */
-        task->syncp = 0;
+        qsv_pkt->syncp = 0;
         sys->first_task = (sys->first_task + 1) % sys->async_depth;
     }
 
-    qsv_queue_encode_picture( enc, task, pic );
+    qsv_queue_encode_picture( enc, qsv_pkt, pic );
 
     return block;
 }
