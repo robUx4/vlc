@@ -751,11 +751,12 @@ static void qsv_queue_encode_picture(encoder_t *enc, QSVpacket *qsv_pkt,
 
     for (;;) {
         sts = MFXVideoENCODE_EncodeFrameAsync(sys->session, 0, frame, &qsv_pkt->bs, &qsv_pkt->syncp);
-        if (sts != MFX_WRN_DEVICE_BUSY)
+        if (sts != MFX_WRN_DEVICE_BUSY && sts != MFX_WRN_IN_EXECUTION)
             break;
         if (sys->busy_warn_counter++ % 16 == 0)
             msg_Dbg(enc, "Device is busy, let's wait and retry");
-        msleep(QSV_BUSYWAIT_TIME);
+        if (sts == MFX_WRN_DEVICE_BUSY)
+            msleep(QSV_BUSYWAIT_TIME);
     }
 
     // msg_Dbg(enc, "Encode async status: %d, Syncpoint = %tx", sts, (ptrdiff_t)qsv_pkt->syncp);
