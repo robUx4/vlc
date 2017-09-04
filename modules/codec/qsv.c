@@ -267,12 +267,12 @@ typedef struct qsv_frame_pool_t
     size_t                size;           // The number of frame in the pool.
 } qsv_frame_pool_t;
 
-typedef struct async_task_t
+typedef struct QSVpacket
 {
     mfxBitstream     bs;                  // Intel's bitstream structure.
     mfxSyncPoint     syncp;               // Async Task Sync Point.
     block_t          *block;              // VLC's block structure to be returned by Encode.
-} async_task_t;
+} QSVpacket;
 
 struct encoder_sys_t
 {
@@ -283,7 +283,7 @@ struct encoder_sys_t
     uint64_t         busy_warn_counter;   // Device Bussy warning counter for rate-limiting of msg;
     uint64_t         async_depth;         // Number of parallel encoding operations.
     uint64_t         first_task;          // The next sync point to be synchronized.
-    async_task_t     *tasks;              // The async encoding tasks.
+    QSVpacket        *tasks;              // The async encoding tasks.
     mtime_t          offset_pts;          // The pts of the first frame, to avoid conversion overflow.
     mtime_t          last_dts;            // The dts of the last frame, to interpolate over buggy dts
 };
@@ -617,7 +617,7 @@ static int Open(vlc_object_t *this)
     enc->fmt_out.i_extra = i_extra;
 
     sys->async_depth = sys->params.AsyncDepth;
-    sys->tasks = calloc(sys->async_depth, sizeof(async_task_t));
+    sys->tasks = calloc(sys->async_depth, sizeof(QSVpacket));
     if (unlikely(!sys->tasks))
         goto nomem;
 
@@ -682,7 +682,7 @@ static void qsv_set_block_ts(encoder_t *enc, encoder_sys_t *sys, block_t *block,
                      " and that you have the last version of Intel's drivers installed.");
 }
 
-static block_t *qsv_synchronize_block(encoder_t *enc, async_task_t *task)
+static block_t *qsv_synchronize_block(encoder_t *enc, QSVpacket *task)
 {
     encoder_sys_t *sys = enc->p_sys;
 
@@ -715,7 +715,7 @@ static block_t *qsv_synchronize_block(encoder_t *enc, async_task_t *task)
     return block;
 }
 
-static void qsv_queue_encode_picture(encoder_t *enc, async_task_t *task,
+static void qsv_queue_encode_picture(encoder_t *enc, QSVpacket *task,
                                      picture_t *pic)
 {
     encoder_sys_t *sys = enc->p_sys;
@@ -778,7 +778,7 @@ static block_t *Encode(encoder_t *this, picture_t *pic)
 {
     encoder_t     *enc = (encoder_t *)this;
     encoder_sys_t *sys = enc->p_sys;
-    async_task_t  *task = NULL;
+    QSVpacket     *task = NULL;
     block_t       *block = NULL;
 
     if (pic) {
