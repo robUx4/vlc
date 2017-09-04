@@ -729,14 +729,28 @@ static block_t *qsv_synchronize_block(encoder_t *enc, QSVpacket *qsv_pkt)
     return block;
 }
 
-static QSVpacket *qsv_encode_picture(encoder_t *enc, picture_t *pic)
+static QSVpacket *encode_frame(encoder_t *enc, picture_t *pic)
 {
     encoder_sys_t *sys = enc->p_sys;
     mfxStatus sts = MFX_ERR_MEMORY_ALLOC;
-    mfxFrameSurface1 *frame = NULL;
+    mfxFrameSurface1 *surf = NULL;
     QSVpacket *qsv_pkt = calloc(1, sizeof(*qsv_pkt));
     if (unlikely(qsv_pkt == NULL))
         goto done;
+
+    if (pic) {
+        /* To avoid qsv -> vlc timestamp conversion overflow, we use timestamp relative
+           to the first picture received. That way, vlc will overflow before us.
+           (Thanks to funman for the idea) */
+        if (!sys->offset_pts) // First frame
+            sys->offset_pts = pic->date;
+
+        surf = qsv_frame_pool_Get(sys, pic);
+        if (!surf) {
+            msg_Warn(enc, "Unable to find an unlocked surface in the pool");
+            goto done;
+        }
+    }
 
     /* Allocate block_t and prepare mfxBitstream for encoder */
     if (!(qsv_pkt->block = block_Alloc(sys->params.mfx.BufferSizeInKB * 1000))) {
@@ -752,22 +766,8 @@ static QSVpacket *qsv_encode_picture(encoder_t *enc, picture_t *pic)
         goto done;
     }
 
-    if (pic) {
-        /* To avoid qsv -> vlc timestamp conversion overflow, we use timestamp relative
-           to the first picture received. That way, vlc will overflow before us.
-           (Thanks to funman for the idea) */
-        if (!sys->offset_pts) // First frame
-            sys->offset_pts = pic->date;
-
-        frame = qsv_frame_pool_Get(sys, pic);
-        if (!frame) {
-            msg_Warn(enc, "Unable to find an unlocked surface in the pool");
-            goto done;
-        }
-    }
-
     for (;;) {
-        sts = MFXVideoENCODE_EncodeFrameAsync(sys->session, 0, frame, &qsv_pkt->bs, qsv_pkt->syncp);
+        sts = MFXVideoENCODE_EncodeFrameAsync(sys->session, 0, surf, &qsv_pkt->bs, qsv_pkt->syncp);
         if (sts != MFX_WRN_DEVICE_BUSY && sts != MFX_WRN_IN_EXECUTION)
             break;
         if (sys->busy_warn_counter++ % 16 == 0)
@@ -813,7 +813,7 @@ static block_t *Encode(encoder_t *this, picture_t *pic)
     QSVpacket     *qsv_pkt;
     block_t       *block = NULL;
 
-    qsv_pkt = qsv_encode_picture( enc, pic );
+    qsv_pkt = encode_frame( enc, pic );
     if (likely(qsv_pkt != NULL))
         qsvpacket_fifo_Put(&sys->packets, qsv_pkt);
 
