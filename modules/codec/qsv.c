@@ -720,12 +720,14 @@ static block_t *qsv_synchronize_block(encoder_t *enc, QSVpacket *qsv_pkt)
     return block;
 }
 
-static void qsv_queue_encode_picture(encoder_t *enc, QSVpacket *qsv_pkt,
-                                     picture_t *pic)
+static void qsv_queue_encode_picture(encoder_t *enc, picture_t *pic)
 {
     encoder_sys_t *sys = enc->p_sys;
     mfxStatus sts;
     mfxFrameSurface1 *frame = NULL;
+    QSVpacket *qsv_pkt = calloc(1, sizeof(*qsv_pkt));
+    if (unlikely(qsv_pkt == NULL))
+        return;
 
     if (pic) {
         /* To avoid qsv -> vlc timestamp conversion overflow, we use timestamp relative
@@ -786,23 +788,18 @@ static block_t *Encode(encoder_t *this, picture_t *pic)
 {
     encoder_t     *enc = (encoder_t *)this;
     encoder_sys_t *sys = enc->p_sys;
-    QSVpacket     *qsv_pkt = NULL;
     block_t       *block = NULL;
 
-    qsv_pkt = calloc(1, sizeof(*qsv_pkt));
-    if (likely(qsv_pkt != NULL))
-    {
-        qsv_queue_encode_picture( enc, qsv_pkt, pic );
+    qsv_queue_encode_picture( enc, pic );
 
-        if ( qsvpacket_fifo_GetCount(&sys->packets) == sys->async_depth ||
-             (!pic && qsvpacket_fifo_GetCount(&sys->packets)))
+    if ( qsvpacket_fifo_GetCount(&sys->packets) == sys->async_depth ||
+         (!pic && qsvpacket_fifo_GetCount(&sys->packets)))
+    {
+        if (qsvpacket_fifo_Show(&sys->packets)->syncp != 0)
         {
-            if (qsvpacket_fifo_Show(&sys->packets)->syncp != 0)
-            {
-                qsv_pkt = qsvpacket_fifo_Get(&sys->packets);
-                block = qsv_synchronize_block( enc, qsv_pkt );
-                free(qsv_pkt);
-            }
+            QSVpacket *qsv_pkt = qsvpacket_fifo_Get(&sys->packets);
+            block = qsv_synchronize_block( enc, qsv_pkt );
+            free(qsv_pkt);
         }
     }
 
