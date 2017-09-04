@@ -273,7 +273,7 @@ typedef struct QSVpacket
 {
     fifo_item_t      fifo;
     mfxBitstream     bs;                  // Intel's bitstream structure.
-    mfxSyncPoint     syncp;               // Async Task Sync Point.
+    mfxSyncPoint     *syncp;              // Async Task Sync Point.
     block_t          *block;              // VLC's block structure to be returned by Encode.
 } QSVpacket;
 
@@ -699,7 +699,7 @@ static block_t *qsv_synchronize_block(encoder_t *enc, QSVpacket *qsv_pkt)
 
     /* Synchronize and fill block_t. If the SyncOperation fails we leak :-/ (or we can segfault, ur choice) */
     do {
-        sts = MFXVideoCORE_SyncOperation(sys->session, qsv_pkt->syncp, QSV_SYNCPOINT_WAIT);
+        sts = MFXVideoCORE_SyncOperation(sys->session, *qsv_pkt->syncp, QSV_SYNCPOINT_WAIT);
     } while (sts == MFX_WRN_IN_EXECUTION);
     if (sts != MFX_ERR_NONE) {
         msg_Err(enc, "SyncOperation failed, outputting garbage data. "
@@ -747,6 +747,11 @@ static QSVpacket *qsv_encode_picture(encoder_t *enc, picture_t *pic)
     qsv_pkt->bs.MaxLength = qsv_pkt->block->i_buffer;
     qsv_pkt->bs.Data = qsv_pkt->block->p_buffer;
 
+    if (!(qsv_pkt->syncp = calloc(1, sizeof(*qsv_pkt->syncp)))) {
+        msg_Err(enc, "Unable to allocate syncpoint for encoder output");
+        goto done;
+    }
+
     if (pic) {
         /* To avoid qsv -> vlc timestamp conversion overflow, we use timestamp relative
            to the first picture received. That way, vlc will overflow before us.
@@ -762,7 +767,7 @@ static QSVpacket *qsv_encode_picture(encoder_t *enc, picture_t *pic)
     }
 
     for (;;) {
-        sts = MFXVideoENCODE_EncodeFrameAsync(sys->session, 0, frame, &qsv_pkt->bs, &qsv_pkt->syncp);
+        sts = MFXVideoENCODE_EncodeFrameAsync(sys->session, 0, frame, &qsv_pkt->bs, qsv_pkt->syncp);
         if (sts != MFX_WRN_DEVICE_BUSY && sts != MFX_WRN_IN_EXECUTION)
             break;
         if (sys->busy_warn_counter++ % 16 == 0)
@@ -784,9 +789,10 @@ static QSVpacket *qsv_encode_picture(encoder_t *enc, picture_t *pic)
     }
 
 done:
-    if (sts < MFX_ERR_NONE || (qsv_pkt != NULL && !qsv_pkt->syncp)) {
+    if (sts < MFX_ERR_NONE || (qsv_pkt != NULL && !*qsv_pkt->syncp)) {
         if (qsv_pkt->block != NULL)
             block_Release(qsv_pkt->block);
+        free(qsv_pkt->syncp);
         free(qsv_pkt);
         qsv_pkt = NULL;
     }
@@ -814,10 +820,11 @@ static block_t *Encode(encoder_t *this, picture_t *pic)
     if ( qsvpacket_fifo_GetCount(&sys->packets) == sys->async_depth ||
          (!pic && qsvpacket_fifo_GetCount(&sys->packets)))
     {
-        if (qsvpacket_fifo_Show(&sys->packets)->syncp != 0)
+        if (*qsvpacket_fifo_Show(&sys->packets)->syncp != 0)
         {
             QSVpacket *qsv_pkt = qsvpacket_fifo_Get(&sys->packets);
             block = qsv_synchronize_block( enc, qsv_pkt );
+            free(qsv_pkt->syncp);
             free(qsv_pkt);
         }
     }
