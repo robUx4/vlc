@@ -33,6 +33,8 @@
 #include <vlc_picture.h>
 #include <vlc_codec.h>
 
+#include <vlc_fifo_helper.h>
+
 #include <mfx/mfxvideo.h>
 
 #define SOUT_CFG_PREFIX     "sout-qsv-"
@@ -269,10 +271,13 @@ typedef struct qsv_frame_pool_t
 
 typedef struct QSVpacket
 {
+    fifo_item_t      fifo;
     mfxBitstream     bs;                  // Intel's bitstream structure.
     mfxSyncPoint     syncp;               // Async Task Sync Point.
     block_t          *block;              // VLC's block structure to be returned by Encode.
 } QSVpacket;
+
+TYPED_FIFO(QSVpacket, qsvpacket)
 
 struct encoder_sys_t
 {
@@ -282,8 +287,7 @@ struct encoder_sys_t
     uint64_t         dts_warn_counter;    // DTS warning counter for rate-limiting of msg;
     uint64_t         busy_warn_counter;   // Device Bussy warning counter for rate-limiting of msg;
     uint64_t         async_depth;         // Number of parallel encoding operations.
-    uint64_t         first_task;          // The next sync point to be synchronized.
-    QSVpacket        *tasks;              // The async encoding tasks.
+    fifo_t           packets;             // FIFO of queued packets
     mtime_t          offset_pts;          // The pts of the first frame, to avoid conversion overflow.
     mtime_t          last_dts;            // The dts of the last frame, to interpolate over buggy dts
 };
@@ -617,9 +621,7 @@ static int Open(vlc_object_t *this)
     enc->fmt_out.i_extra = i_extra;
 
     sys->async_depth = sys->params.AsyncDepth;
-    sys->tasks = calloc(sys->async_depth, sizeof(QSVpacket));
-    if (unlikely(!sys->tasks))
-        goto nomem;
+    qsvpacket_fifo_Init(&sys->packets);
 
     enc->pf_encode_video = Encode;
 
@@ -644,8 +646,7 @@ static void Close(vlc_object_t *this)
     /*     free(enc->fmt_out.p_extra); */
     if (sys->frames.size)
         qsv_frame_pool_Destroy(&sys->frames);
-    if (sys->tasks)
-        free(sys->tasks);
+    qsvpacket_fifo_Release(&sys->packets);
     free(sys);
 }
 
@@ -766,6 +767,8 @@ static void qsv_queue_encode_picture(encoder_t *enc, QSVpacket *qsv_pkt,
             msg_Dbg(enc, "Encoder feeding phase, more data is needed.");
         else
             msg_Dbg(enc, "Encoder is empty");
+    else if (sts == MFX_ERR_NONE)
+        qsvpacket_fifo_Put(&sys->packets, qsv_pkt);
     else if (sts < MFX_ERR_NONE) {
         msg_Err(enc, "Encoder not ready or error (%d), trying a reset...", sts);
         MFXVideoENCODE_Reset(sys->session, &sys->params);
@@ -786,29 +789,22 @@ static block_t *Encode(encoder_t *this, picture_t *pic)
     QSVpacket     *qsv_pkt = NULL;
     block_t       *block = NULL;
 
-    if (pic) {
-        /* Finds an available SyncPoint */
-        for (size_t i = 0; i < sys->async_depth; i++)
-            if ((sys->tasks + (i + sys->first_task) % sys->async_depth)->syncp == 0) {
-                qsv_pkt = sys->tasks + (i + sys->first_task) % sys->async_depth;
-                break;
+    qsv_pkt = calloc(1, sizeof(*qsv_pkt));
+    if (likely(qsv_pkt != NULL))
+    {
+        qsv_queue_encode_picture( enc, qsv_pkt, pic );
+
+        if ( qsvpacket_fifo_GetCount(&sys->packets) == sys->async_depth ||
+             (!pic && qsvpacket_fifo_GetCount(&sys->packets)))
+        {
+            if (qsvpacket_fifo_Show(&sys->packets)->syncp != 0)
+            {
+                qsv_pkt = qsvpacket_fifo_Get(&sys->packets);
+                block = qsv_synchronize_block( enc, qsv_pkt );
+                free(qsv_pkt);
             }
-    } else
-        /* If !pic, we are emptying encoder and tasks, so we force the SyncOperation */
-        msg_Dbg(enc, "Emptying encoder");
-
-    /* There is no available qsv_pkt, we need to synchronize */
-    if (!qsv_pkt) {
-        qsv_pkt = sys->tasks + sys->first_task;
-
-        block = qsv_synchronize_block( enc, qsv_pkt );
-
-        /* Reset the task now it has been synchronized and advances first_task pointer */
-        qsv_pkt->syncp = 0;
-        sys->first_task = (sys->first_task + 1) % sys->async_depth;
+        }
     }
-
-    qsv_queue_encode_picture( enc, qsv_pkt, pic );
 
     return block;
 }
