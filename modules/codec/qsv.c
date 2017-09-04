@@ -720,14 +720,23 @@ static block_t *qsv_synchronize_block(encoder_t *enc, QSVpacket *qsv_pkt)
     return block;
 }
 
-static void qsv_queue_encode_picture(encoder_t *enc, picture_t *pic)
+static QSVpacket *qsv_encode_picture(encoder_t *enc, picture_t *pic)
 {
     encoder_sys_t *sys = enc->p_sys;
-    mfxStatus sts;
+    mfxStatus sts = MFX_ERR_MEMORY_ALLOC;
     mfxFrameSurface1 *frame = NULL;
     QSVpacket *qsv_pkt = calloc(1, sizeof(*qsv_pkt));
     if (unlikely(qsv_pkt == NULL))
-        return;
+        goto done;
+
+    /* Allocate block_t and prepare mfxBitstream for encoder */
+    if (!(qsv_pkt->block = block_Alloc(sys->params.mfx.BufferSizeInKB * 1000))) {
+        msg_Err(enc, "Unable to allocate block for encoder output");
+        goto done;
+    }
+    memset(&qsv_pkt->bs, 0, sizeof(qsv_pkt->bs));
+    qsv_pkt->bs.MaxLength = qsv_pkt->block->i_buffer;
+    qsv_pkt->bs.Data = qsv_pkt->block->p_buffer;
 
     if (pic) {
         /* To avoid qsv -> vlc timestamp conversion overflow, we use timestamp relative
@@ -739,18 +748,9 @@ static void qsv_queue_encode_picture(encoder_t *enc, picture_t *pic)
         frame = qsv_frame_pool_Get(sys, pic);
         if (!frame) {
             msg_Warn(enc, "Unable to find an unlocked surface in the pool");
-            return;
+            goto done;
         }
     }
-
-    /* Allocate block_t and prepare mfxBitstream for encoder */
-    if (!(qsv_pkt->block = block_Alloc(sys->params.mfx.BufferSizeInKB * 1000))) {
-        msg_Err(enc, "Unable to allocate block for encoder output");
-        return;
-    }
-    memset(&qsv_pkt->bs, 0, sizeof(qsv_pkt->bs));
-    qsv_pkt->bs.MaxLength = qsv_pkt->block->i_buffer;
-    qsv_pkt->bs.Data = qsv_pkt->block->p_buffer;
 
     for (;;) {
         sts = MFXVideoENCODE_EncodeFrameAsync(sys->session, 0, frame, &qsv_pkt->bs, &qsv_pkt->syncp);
@@ -769,12 +769,19 @@ static void qsv_queue_encode_picture(encoder_t *enc, picture_t *pic)
             msg_Dbg(enc, "Encoder feeding phase, more data is needed.");
         else
             msg_Dbg(enc, "Encoder is empty");
-    else if (sts == MFX_ERR_NONE)
-        qsvpacket_fifo_Put(&sys->packets, qsv_pkt);
     else if (sts < MFX_ERR_NONE) {
         msg_Err(enc, "Encoder not ready or error (%d), trying a reset...", sts);
         MFXVideoENCODE_Reset(sys->session, &sys->params);
     }
+
+done:
+    if (sts < MFX_ERR_NONE || (qsv_pkt != NULL && !qsv_pkt->syncp)) {
+        if (qsv_pkt->block != NULL)
+            block_Release(qsv_pkt->block);
+        free(qsv_pkt);
+        qsv_pkt = NULL;
+    }
+    return qsv_pkt;
 }
 
 /*
@@ -788,9 +795,12 @@ static block_t *Encode(encoder_t *this, picture_t *pic)
 {
     encoder_t     *enc = (encoder_t *)this;
     encoder_sys_t *sys = enc->p_sys;
+    QSVpacket     *qsv_pkt;
     block_t       *block = NULL;
 
-    qsv_queue_encode_picture( enc, pic );
+    qsv_pkt = qsv_encode_picture( enc, pic );
+    if (likely(qsv_pkt != NULL))
+        qsvpacket_fifo_Put(&sys->packets, qsv_pkt);
 
     if ( qsvpacket_fifo_GetCount(&sys->packets) == sys->async_depth ||
          (!pic && qsvpacket_fifo_GetCount(&sys->packets)))
