@@ -284,7 +284,13 @@ protected:
 private slots:
     void showFSC();
     void planHideFSC();
-    void hideFSC() { hide(); }
+    void hideFSC() {
+#if HAVE_TRANSPARENCY
+        setWindowOpacity( 0.01 );
+#else
+        hide();
+#endif
+    }
 #if HAVE_TRANSPARENCY
     void slowHideFSC();
 #endif
