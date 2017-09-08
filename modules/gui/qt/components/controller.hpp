@@ -285,7 +285,9 @@ private slots:
     void showFSC();
     void planHideFSC();
     void hideFSC() { hide(); }
+#if HAVE_TRANSPARENCY
     void slowHideFSC();
+#endif
     void restoreFSC();
     void centerFSC( int );
 
