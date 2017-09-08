@@ -42,6 +42,8 @@
 #include "chroma.h"
 #include "avcommon.h"
 
+#define AVLOG_IN_VLC 0
+
 /****************************************************************************
  * Local prototypes
  ****************************************************************************/
@@ -247,6 +249,36 @@ vlc_module_begin ()
 #endif
 vlc_module_end ()
 
+#if AVLOG_IN_VLC
+static decoder_t *p_dec_log = NULL;
+
+static void AvCodecLog(void *ptr, int level, const char* psz_log, va_list args)
+{
+    AVClass* avc = ptr ? *(AVClass **) ptr : NULL;
+    decoder_t *p_dec;
+    int prio;
+
+    if (avc == NULL || avc->category == AV_CLASS_CATEGORY_NA)
+        p_dec = p_dec_log;
+    else
+        p_dec = ((AVCodecContext *)ptr)->opaque;
+
+    switch (level)
+    {
+    case AV_LOG_PANIC:
+    case AV_LOG_FATAL:
+    case AV_LOG_ERROR:   prio = VLC_MSG_ERR; break;
+    case AV_LOG_WARNING: prio = VLC_MSG_WARN; break;
+    default:
+    case AV_LOG_INFO:
+    case AV_LOG_VERBOSE:
+    case AV_LOG_DEBUG:   prio = VLC_MSG_DBG; break;
+    }
+
+    msg_GenericVa(p_dec, prio, psz_log, args);
+}
+#endif
+
 AVCodecContext *ffmpeg_AllocContext( decoder_t *p_dec,
                                      const AVCodec **restrict codecp )
 {
@@ -293,6 +325,11 @@ AVCodecContext *ffmpeg_AllocContext( decoder_t *p_dec,
     AVCodecContext *avctx = avcodec_alloc_context3(p_codec);
     if( unlikely(avctx == NULL) )
         return NULL;
+
+#if AVLOG_IN_VLC
+    p_dec_log = p_dec;
+    av_log_set_callback(AvCodecLog);
+#endif
 
     avctx->debug = var_InheritInteger( p_dec, "avcodec-debug" );
     avctx->opaque = p_dec;
