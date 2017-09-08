@@ -925,6 +925,7 @@ void FullscreenControllerWidget::planHideFSC()
 #endif
 }
 
+#if HAVE_TRANSPARENCY
 /**
  * Hidding fullscreen controller slowly
  * Linux: need composite manager
@@ -932,7 +933,6 @@ void FullscreenControllerWidget::planHideFSC()
  */
 void FullscreenControllerWidget::slowHideFSC()
 {
-#if HAVE_TRANSPARENCY
     if( b_slow_hide_begin )
     {
         b_slow_hide_begin = false;
@@ -954,8 +954,8 @@ void FullscreenControllerWidget::slowHideFSC()
          if ( windowOpacity() <= 0.0 )
              p_slowHideTimer->stop();
     }
-#endif
 }
+#endif
 
 void FullscreenControllerWidget::updateFullwidthGeometry( int number )
 {
