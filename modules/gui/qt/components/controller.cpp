@@ -944,14 +944,14 @@ void FullscreenControllerWidget::slowHideFSC()
     }
     else
     {
-         if ( windowOpacity() > 0.0 )
+         if ( windowOpacity() > 0.03 )
          {
              /* we should use 0.01 because of 100 pieces ^^^
                 but than it cannt be done in time */
              setWindowOpacity( windowOpacity() - 0.02 );
          }
 
-         if ( windowOpacity() <= 0.0 )
+         if ( windowOpacity() <= 0.01 )
              p_slowHideTimer->stop();
     }
 }
