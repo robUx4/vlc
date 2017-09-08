@@ -753,7 +753,7 @@ static void update_late_frame_count( decoder_t *p_dec, block_t *p_block, mtime_t
            p_sys->i_late_frames_start = current_time;
 
    }
-   else
+   else if (p_sys->i_late_frames)
    {
        p_sys->i_late_frames = 0;
    }
@@ -923,7 +923,10 @@ static picture_t *DecodeBlock( decoder_t *p_dec, block_t **pp_block, bool *error
     /* Change skip_frame config only if hurry_up is enabled */
     if( p_sys->b_hurry_up )
     {
-        p_context->skip_frame = p_sys->i_skip_frame;
+        if (p_context->skip_frame != p_sys->i_skip_frame)
+        {
+            p_context->skip_frame = p_sys->i_skip_frame;
+        }
 
         /* Check also if we should/can drop the block and move to next block
             as trying to catchup the speed*/
