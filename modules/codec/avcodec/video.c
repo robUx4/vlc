@@ -593,6 +593,7 @@ int InitVideoDec( vlc_object_t *obj )
 
     /* ***** init this codec with special data ***** */
     ffmpeg_InitCodec( p_dec );
+    p_dec->b_frame_drop_allowed = false;
 
     /* ***** Open the codec ***** */
     if( OpenVideoCodec( p_dec ) < 0 )
