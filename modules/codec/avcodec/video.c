@@ -684,6 +684,7 @@ static bool check_block_being_late( decoder_t *p_dec, block_t *block, mtime_t cu
 
     if( current_time - p_sys->i_late_frames_start > (5*CLOCK_FREQ))
     {
+        msg_Warn( p_dec, "frame way too late, dropping block");
         date_Set( &p_sys->pts, VLC_TS_INVALID ); /* To make sure we recover properly */
         block_Release( block );
         p_sys->i_late_frames--;
@@ -757,7 +758,7 @@ static void update_late_frame_count( decoder_t *p_dec, block_t *p_block, mtime_t
        p_sys->i_late_frames++;
        if( p_sys->i_late_frames == 1 )
            p_sys->i_late_frames_start = current_time;
-       msg_Dbg( p_dec, "frame late %lld by %lld ms", i_pts, (current_time - i_display_date)/1000 );
+       msg_Dbg( p_dec, "frame %lld late by %lld ms", i_pts, (current_time - i_display_date)/1000 );
 
    }
    else if (p_sys->i_late_frames)
@@ -950,9 +951,14 @@ static picture_t *DecodeBlock( decoder_t *p_dec, block_t **pp_block, bool *error
     }
     if( !b_need_output_picture )
     {
-        p_context->skip_frame = __MAX( p_context->skip_frame,
-                                              AVDISCARD_NONREF );
-        msg_Dbg(p_dec, "upper skip mode to %d", p_context->skip_frame);
+        /* skip frame should be at least non-ref when discarding a packet */
+        if (p_context->skip_frame != __MAX( p_context->skip_frame,
+                                           AVDISCARD_NONREF ))
+        {
+            p_context->skip_frame = __MAX( p_context->skip_frame,
+                                                  AVDISCARD_NONREF );
+            msg_Dbg(p_dec, "upper skip mode to %d", p_context->skip_frame);
+        }
     }
 
     /*
@@ -1018,7 +1024,10 @@ static picture_t *DecodeBlock( decoder_t *p_dec, block_t **pp_block, bool *error
 
 #if LIBAVCODEC_VERSION_CHECK( 57, 0, 0xFFFFFFFFU, 64, 101 )
         if( !b_need_output_picture )
+        {
+            msg_Dbg(p_dec, "tell decoder to discard %lld", pkt.pts);
             pkt.flags |= AV_PKT_FLAG_DISCARD;
+        }
 #endif
 
         int ret = avcodec_send_packet(p_context, &pkt);
@@ -1046,7 +1055,7 @@ static picture_t *DecodeBlock( decoder_t *p_dec, block_t **pp_block, bool *error
         }
 
         ret = avcodec_receive_frame(p_context, frame);
-        msg_Dbg(p_dec," got %d frame %p buf[0] %p", ret, frame, frame->buf[0]);
+        //msg_Dbg(p_dec," got %d frame %p buf[0] %p", ret, frame, frame->buf[0]);
         if( ret != 0 && ret != AVERROR(EAGAIN) )
         {
             if (ret == AVERROR(ENOMEM) || ret == AVERROR(EINVAL))
@@ -1080,6 +1089,7 @@ static picture_t *DecodeBlock( decoder_t *p_dec, block_t **pp_block, bool *error
         /* Nothing to display */
         if( not_received_frame )
         {
+            msg_Err(p_dec, "frame not received");
             av_frame_free(&frame);
             if( i_used == 0 ) break;
             continue;
