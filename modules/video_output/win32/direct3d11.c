@@ -1250,15 +1250,13 @@ static void Prepare(vout_display_t *vd, picture_t *picture, subpicture_t *subpic
 {
     vout_display_sys_t *sys = vd->sys;
 
+#if defined(HAVE_ID3D11VIDEODECODER)
+    if( sys->context_lock != INVALID_HANDLE_VALUE )
+        WaitForSingleObjectEx( sys->context_lock, INFINITE, FALSE );
+#endif
     picture_sys_t *p_sys = ActivePictureSys(picture);
     if (p_sys->formatTexture == DXGI_FORMAT_UNKNOWN)
     {
-#if defined(HAVE_ID3D11VIDEODECODER)
-        if( sys->context_lock != INVALID_HANDLE_VALUE )
-        {
-            WaitForSingleObjectEx( sys->context_lock, INFINITE, FALSE );
-        }
-#endif
         Direct3D11UnlockDirectTexture(picture);
         for (int plane = 0; plane < D3D11_MAX_SHADER_VIEW; plane++)
         {
@@ -1287,21 +1285,9 @@ static void Prepare(vout_display_t *vd, picture_t *picture, subpicture_t *subpic
                                                       p_sys->resource[plane],
                                                       0, &box);
         }
-#if defined(HAVE_ID3D11VIDEODECODER)
-        if ( sys->context_lock != INVALID_HANDLE_VALUE)
-        {
-            ReleaseMutex( sys->context_lock );
-        }
-#endif
     }
     else if (!is_d3d11_opaque(picture->format.i_chroma) || sys->legacy_shader) {
         D3D11_TEXTURE2D_DESC texDesc;
-#if defined(HAVE_ID3D11VIDEODECODER)
-        if( sys->context_lock != INVALID_HANDLE_VALUE )
-        {
-            WaitForSingleObjectEx( sys->context_lock, INFINITE, FALSE );
-        }
-#endif
         if (!is_d3d11_opaque(picture->format.i_chroma))
             Direct3D11UnmapPoolTexture(picture);
         ID3D11Texture2D_GetDesc(sys->stagingSys.texture[0], &texDesc);
@@ -1325,12 +1311,6 @@ static void Prepare(vout_display_t *vd, picture_t *picture, subpicture_t *subpic
                                                   0, 0, 0, 0,
                                                   p_sys->resource[KNOWN_DXGI_INDEX],
                                                   p_sys->slice_index, &box);
-#if defined(HAVE_ID3D11VIDEODECODER)
-        if ( sys->context_lock != INVALID_HANDLE_VALUE)
-        {
-            ReleaseMutex( sys->context_lock );
-        }
-#endif
     }
     else
     {
@@ -3074,12 +3054,6 @@ static int Direct3D11MapSubpicture(vout_display_t *vd, int *subpicture_region_co
         return VLC_ENOMEM;
     *subpicture_region_count = count;
 
-#if defined(HAVE_ID3D11VIDEODECODER)
-    if( sys->context_lock != INVALID_HANDLE_VALUE )
-    {
-        WaitForSingleObjectEx( sys->context_lock, INFINITE, FALSE );
-    }
-#endif
     int i = 0;
     for (subpicture_region_t *r = subpicture->p_region; r; r = r->p_next, i++) {
         if (!r->fmt.i_width || !r->fmt.i_height)
@@ -3187,12 +3161,6 @@ static int Direct3D11MapSubpicture(vout_display_t *vd, int *subpicture_region_co
 
         UpdateQuadOpacity(vd, quad, r->i_alpha / 255.0f );
     }
-#if defined(HAVE_ID3D11VIDEODECODER)
-    if ( sys->context_lock != INVALID_HANDLE_VALUE)
-    {
-        ReleaseMutex( sys->context_lock );
-    }
-#endif
     return VLC_SUCCESS;
 }
 
