@@ -40,7 +40,7 @@
 #define COBJMACROS
 #include <initguid.h>
 #include <d3d11.h>
-#include <dxgi1_5.h>
+#include <dxgi1_6.h>
 #include <d3dcompiler.h>
 
 /* avoided until we can pass ISwapchainPanel without c++/cx mode
@@ -126,6 +126,7 @@ struct vout_display_sys_t
     struct { /* TODO may go in vout_display_info_t without DXGI */
         const dxgi_color_space   *colorspace;
         unsigned                 luminance_peak;
+        bool                     b_adjust_luminance;
     } display;
 
 #if !VLC_WINSTORE_APP
@@ -1529,6 +1530,7 @@ static void D3D11SetColorSpace(vout_display_t *vd)
     int best = -1;
     int score, best_score = 0;
     UINT support;
+    IDXGIOutput *dxgiOutput = NULL;
     IDXGISwapChain3 *dxgiswapChain3 = NULL;
     sys->display.colorspace = &color_spaces[0];
 
@@ -1602,9 +1604,39 @@ done:
     default:
         vlc_assert_unreachable();
     }
+    sys->display.b_adjust_luminance = true;
 
     if (dxgiswapChain3)
         IDXGISwapChain3_Release(dxgiswapChain3);
+
+#if 1
+    if (SUCCEEDED(IDXGISwapChain_GetContainingOutput( sys->dxgiswapChain, &dxgiOutput )))
+    {
+        IDXGIOutput6 *dxgiOutput6 = NULL;
+        if (SUCCEEDED(IDXGIOutput_QueryInterface( dxgiOutput, &IID_IDXGIOutput6, (void **)&dxgiOutput6 )))
+        {
+            DXGI_OUTPUT_DESC1 desc1;
+            if (SUCCEEDED(IDXGIOutput6_GetDesc1( dxgiOutput6, &desc1 )))
+            {
+                const dxgi_color_space *csp = NULL;
+                for (int i=0; color_spaces[i].name; ++i)
+                {
+                    if (color_spaces[i].dxgi == desc1.ColorSpace)
+                    {
+                        csp = &color_spaces[i];
+                        break;
+                    }
+                }
+
+                msg_Dbg(vd, "Output max luminance: %.1f, colorspace %s, bits per pixel %d", desc1.MaxFullFrameLuminance, csp?csp->name:"unknown", desc1.BitsPerColor);
+                sys->display.luminance_peak = desc1.MaxFullFrameLuminance;
+                sys->display.b_adjust_luminance = false;
+            }
+            IDXGIOutput6_Release( dxgiOutput6 );
+        }
+        IDXGIOutput_Release( dxgiOutput );
+    }
+#endif
 }
 
 static const d3d_format_t *GetDirectRenderingFormat(vout_display_t *vd, vlc_fourcc_t i_src_chroma)
