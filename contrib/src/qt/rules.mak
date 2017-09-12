@@ -32,7 +32,12 @@ QT_PLATFORM := -platform darwin-g++
 endif
 ifdef HAVE_WIN32
 QT_SPEC := win32-g++
-QT_PLATFORM := -xplatform win32-g++ -device-option CROSS_COMPILE=$(HOST)-
+ifdef HAVE_CROSS_COMPILE
+QT_PLATFORM := -xplatform win32-g++ CROSS_COMPILE=$(HOST)-
+else
+QT_PLATFORM := -platform win32-g++
+endif
+QT_PLATFORM += -device-option
 endif
 
 QT_CONFIG := -static -opensource -confirm-license -no-pkg-config \
@@ -55,7 +60,9 @@ endif
 	cd $</src && $(MAKE) sub-moc-install_subtargets sub-rcc-install_subtargets sub-uic-install_subtargets
 	# Install plugins
 	cd $</src/plugins && $(MAKE) sub-platforms-install_subtargets
+ifndef HAVE_WIN32
 	mv $(PREFIX)/plugins/platforms/libqwindows.a $(PREFIX)/lib/ && rm -rf $(PREFIX)/plugins
+endif
 	# Move includes to match what VLC expects
 	mkdir -p $(PREFIX)/include/QtGui/qpa
 	cp $(PREFIX)/include/QtGui/$(QT_VERSION)/QtGui/qpa/qplatformnativeinterface.h $(PREFIX)/include/QtGui/qpa
