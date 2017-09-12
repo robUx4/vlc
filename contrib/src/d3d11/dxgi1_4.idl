@@ -89,3 +89,21 @@ interface IDXGIOutput4 : IDXGIOutput3
         [out] UINT                  *pFlags
     );
 }
+
+[
+    object,
+    local,
+    uuid(1bc6ea02-ef36-464f-bf0c-21ca39e5168a)
+]
+interface IDXGIFactory4 : IDXGIFactory3
+{
+    HRESULT EnumAdapterByLuid(
+        [in]  LUID     AdapterLuid,
+        [in]  REFIID   riid,
+        [out] void     **ppvAdapter
+    );
+    HRESULT EnumWarpAdapter(
+        [in]  REFIID   riid,
+        [out] void     **ppvAdapter
+    );
+}
