@@ -2029,6 +2029,7 @@ static HRESULT CompilePixelShader(vout_display_t *vd, const d3d_format_t *format
             break;
     }
 
+#if 0
     if (transfer != sys->display.colorspace->transfer)
     {
         /* we need to go in linear mode */
@@ -2193,6 +2194,7 @@ static HRESULT CompilePixelShader(vout_display_t *vd, const d3d_format_t *format
             psz_adjust_range = psz_range;
         }
     }
+#endif
 
     char *shader = malloc(strlen(globPixelShaderDefault) + 32 + strlen(psz_sampler) +
                           strlen(psz_src_transform) + strlen(psz_display_transform) +
