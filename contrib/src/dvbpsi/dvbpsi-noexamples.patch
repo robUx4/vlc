@@ -1,11 +1,11 @@
---- libdvbpsi/Makefile.in	2013-11-10 14:17:53.000000000 +0200
-+++ dvbpsi.fix/Makefile.in	2014-02-15 17:25:31.184012648 +0200
-@@ -349,7 +349,7 @@
- top_builddir = @top_builddir@
- top_srcdir = @top_srcdir@
- ACLOCAL_AMFLAGS = -I m4
+--- libdvbpsi/Makefile.am	2015-06-04 10:54:36.000000000 +0200
++++ libdvbpsi/Makefile.am.examples	2016-07-08 15:29:20.155396000 +0200
+@@ -2,7 +2,7 @@
+ 
+ ACLOCAL_AMFLAGS=-I m4
+ 
 -SUBDIRS = src examples misc
 +SUBDIRS = src
  DIST_SUBDIRS = $(SUBDIRS) doc wince
+ 
  EXTRA_DIST = libdvbpsi.spec libdvbpsi.spec.in libdvbpsi.pc.in bootstrap
- pkgconfigdir = $(libdir)/pkgconfig

@@ -16,8 +16,14 @@ ifdef HAVE_WINSTORE
 endif
 endif
 	$(APPLY) $(SRC)/gpg-error/missing-unistd-include.patch
+	$(APPLY) $(SRC)/gpg-error/missing-file-h.patch
 	$(APPLY) $(SRC)/gpg-error/no-executable.patch
 	$(APPLY) $(SRC)/gpg-error/win32-unicode.patch
+ifdef HAVE_VISUALSTUDIO
+	$(APPLY) $(SRC)/gpg-error/win32-winsock.patch
+	$(APPLY) $(SRC)/gpg-error/msvc.patch
+	$(APPLY) $(SRC)/gpg-error/msvc-clang.patch
+endif
 	$(MOVE)
 ifdef HAVE_ANDROID
 ifeq ($(ARCH),aarch64)

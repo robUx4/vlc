@@ -27,7 +27,12 @@ ifdef HAVE_ANDROID
 endif
 	$(MOVE)
 
-DEPS_zvbi = pthreads png $(DEPS_png) iconv $(DEPS_iconv)
+DEPS_zvbi = png $(DEPS_png) iconv $(DEPS_iconv)
+ifdef HAVE_WIN32
+ifndef HAVE_VISUALSTUDIO
+DEPS_zvbi += pthreads $(DEPS_pthreads)
+endif
+endif
 
 ZVBI_CFLAGS := $(CFLAGS)
 ZVBICONF := \
@@ -48,7 +53,7 @@ endif
 	cd $< && rm -rf aclocal.m4 Makefile.in
 	$(RECONF)
 	cd $< && $(HOSTVARS) CFLAGS="$(ZVBI_CFLAGS)" ./configure $(ZVBICONF)
-	cd $</src && $(MAKE) install
+	cd $< && $(MAKE) -C src install
 	cd $< && $(MAKE) SUBDIRS=. install
 	sed -i.orig -e "s/\/[^ ]*libiconv.a/-liconv/" $(PREFIX)/lib/pkgconfig/zvbi-0.2.pc
 	touch $@

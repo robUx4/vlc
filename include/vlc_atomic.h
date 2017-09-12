@@ -37,7 +37,8 @@
 #  if (__STDC_VERSION__ >= 201112L) && !defined (__STDC_NO_ATOMICS__)
 /*** Native C11 atomics ***/
 #   include <stdatomic.h>
-
+#  elif defined(_MSC_VER)
+#   include <stdatomic.h>
 #  else
 /*** Intel/GCC atomics ***/
 
@@ -193,12 +194,19 @@ typedef         uintmax_t atomic_uintmax_t;
 
 typedef atomic_uint_least32_t vlc_atomic_float;
 
+#ifdef _MSC_VER
+#pragma warning(push)
+#pragma warning(disable:4127)
+#endif
 static inline void vlc_atomic_init_float(vlc_atomic_float *var, float f)
 {
     union { float f; uint32_t i; } u;
     u.f = f;
     atomic_init(var, u.i);
 }
+#ifdef _MSC_VER
+#pragma warning(pop)
+#endif
 
 /** Helper to retrieve a single precision from an atom. */
 static inline float vlc_atomic_load_float(vlc_atomic_float *atom)

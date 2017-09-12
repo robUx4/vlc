@@ -19,12 +19,27 @@ opus: opus-$(OPUS_VERSION).tar.gz .sum-opus
 	$(UPDATE_AUTOCONFIG)
 	$(MOVE)
 
+OPUS_CFLAGS=$(CFLAGS)
 OPUS_CONF= --disable-extra-programs --disable-doc
 ifndef HAVE_FPU
 OPUS_CONF += --enable-fixed-point
 endif
+ifeq ($(ARCH),arm)
+OPUS_CONF += --disable-asm
+OPUS_CFLAGS+= -fno-fast-math
+ifdef HAVE_VISUALSTUDIO
+OPUS_CONF += --disable-intrinsics
+endif
+endif
+ifdef HAVE_VISUALSTUDIO
+OPUS_CONF += --disable-rtcd
+endif
+
+ifdef HAVE_VISUALSTUDIO
+OPUS_CFLAGS+= -DUSE_ALLOCA
+endif
 
 .opus: opus
-	cd $< && $(HOSTVARS) ./configure $(HOSTCONF) $(OPUS_CONF)
+	cd $< && $(HOSTVARS) ./configure $(HOSTCONF) $(OPUS_CONF) CFLAGS="$(OPUS_CFLAGS)"
 	cd $< && $(MAKE) install
 	touch $@

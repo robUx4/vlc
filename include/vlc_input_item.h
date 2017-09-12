@@ -156,6 +156,10 @@ enum slave_priority
     "eac3",  "dtshd", "flac", \
     "pcm", "dts"
 
+#ifdef _MSC_VER
+#pragma warning(push)
+#pragma warning(disable:4200)
+#endif
 struct input_item_slave
 {
     enum slave_type     i_type;     /**< Slave type (spu, audio) */
@@ -163,6 +167,9 @@ struct input_item_slave
     bool                b_forced;   /**< Slave should be selected */
     char                psz_uri[];  /**< Slave mrl */
 };
+#ifdef _MSC_VER
+#pragma warning(pop)
+#endif
 
 struct input_item_node_t
 {

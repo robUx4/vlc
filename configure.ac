@@ -231,9 +231,9 @@ case "${host_os}" in
     AH_TOP([#if defined(_WIN32) && !defined(_WIN32_WINNT)])
     AH_TOP([# define _WIN32_WINNT 0x0502 /* Windows XP SP2 */])
     AH_TOP([#endif])
-    AC_DEFINE([_WIN32_IE], 0x0600, [Define to '0x0600' for IE 6.0 (and shell) APIs.])
-    AC_DEFINE([_UNICODE], [1], [Define to 1 for Unicode (Wide Chars) APIs.])
-    AC_DEFINE([UNICODE], [1], [Define to 1 for Unicode (Wide Chars) APIs.])
+    dnl AC_DEFINE([_WIN32_IE], 0x0600, [Define to '0x0600' for IE 6.0 (and shell) APIs.])
+    dnl AC_DEFINE([_UNICODE], [1], [Define to 1 for Unicode (Wide Chars) APIs.])
+    dnl AC_DEFINE([UNICODE], [1], [Define to 1 for Unicode (Wide Chars) APIs.])
     AC_DEFINE([_ISOC99_SOURCE], [1], [Extensions to ISO C89 from ISO C99.])
     AC_DEFINE([_ISOC11_SOURCE], [1], [Extensions to ISO C99 from ISO C11.])
     AC_DEFINE([_POSIX_SOURCE], [1], [IEEE Std 1003.1.])
@@ -345,6 +345,15 @@ AM_CONDITIONAL(HAVE_WIN32,   test "${SYS}" = "mingw32")
 AM_CONDITIONAL(HAVE_WIN64,   test "${HAVE_WIN64}" = "1") dnl Only used for the packaging
 AM_CONDITIONAL([HAVE_WINSTORE], [test "$vlc_winstore_app" = "1"])
 AM_CONDITIONAL([HAVE_WIN32_DESKTOP], [test "${SYS}" = "mingw32" -a "$vlc_winstore_app" = "0"])
+
+compiler_is_gcc=0
+AC_PREPROC_IFELSE([AC_LANG_SOURCE([
+#if defined(__clang__) || !defined(__GNUC__)
+# error Not compiling with GCC
+#endif
+    ])],
+        [compiler_is_gcc=1], [])
+AM_CONDITIONAL(IS_GCC_COMPILER,  test "$compiler_is_gcc" = "1")
 
 dnl
 dnl Sadly autoconf does not think about testing foo.exe when ask to test
@@ -2753,7 +2762,9 @@ AC_CHECK_HEADERS(png.h, [
   LDFLAGS="${LDFLAGS} -lz $LIBM"
   AC_CHECK_LIB(png, png_set_alpha_mode, [
     VLC_ADD_PLUGIN([png])
-  ], [], [-lz $LIBM])
+  ], [
+    PKG_CHECK_MODULES([png], [libpng], VLC_ADD_PLUGIN([png]))
+  ], [-lz $LIBM])
   VLC_RESTORE_FLAGS
   ])
 ])

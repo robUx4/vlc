@@ -2,12 +2,13 @@
 
 #Uncomment the one you want
 #USE_LIBAV ?= 1
-#USE_FFMPEG ?= 1
+USE_FFMPEG ?= 1
 
 ifdef USE_FFMPEG
 FFMPEG_HASH=a82468514048fb87d9bf38689866bc3b9aaccd02
 FFMPEG_SNAPURL := http://git.videolan.org/?p=ffmpeg.git;a=snapshot;h=$(FFMPEG_HASH);sf=tgz
 FFMPEG_GITURL := http://git.videolan.org/git/ffmpeg.git
+PATCH_SUFFIX =.ffmpeg
 else
 FFMPEG_HASH=825e463a170c7004c63030dc484b2b2de869227b
 FFMPEG_SNAPURL := http://git.libav.org/?p=libav.git;a=snapshot;h=$(FFMPEG_HASH);sf=tgz
@@ -95,6 +96,10 @@ endif
 ifdef HAVE_ARMV6
 FFMPEGCONF += --cpu=armv6 --disable-neon
 endif
+ifdef HAVE_VISUALSTUDIO
+FFMPEGCONF += --cpu=armv7-a --extra-cflags=' -D__ARM_PCS_VFP' --as=armasm
+FFMPEGCONF += --disable-decoder=mpegvideo
+endif
 endif
 
 # ARM64 stuff
@@ -169,12 +174,12 @@ endif
 ifdef HAVE_WIN32
 ifndef HAVE_VISUALSTUDIO
 DEPS_ffmpeg += d3d11
+FFMPEGCONF += --enable-w32threads
 ifndef HAVE_MINGW_W64
 DEPS_ffmpeg += directx
 endif
 endif
 FFMPEGCONF += --target-os=mingw32
-FFMPEGCONF += --enable-w32threads
 ifndef HAVE_WINSTORE
 FFMPEGCONF += --enable-dxva2
 else
@@ -191,6 +196,10 @@ ifdef HAVE_ARMV7A
 FFMPEGCONF+= --arch=arm
 endif
 endif
+endif
+
+ifdef HAVE_VISUALSTUDIO
+FFMPEGCONF += --toolchain=msvc --ld="$(LD)"
 endif
 
 else # !Windows
@@ -226,6 +235,10 @@ ffmpeg: ffmpeg-$(FFMPEG_BASENAME).tar.xz .sum-ffmpeg
 	tar xvJf "$<" --strip-components=1 -C $@-$(FFMPEG_BASENAME)
 ifdef USE_FFMPEG
 	$(APPLY) $(SRC)/ffmpeg/force-unicode.patch
+endif
+ifdef HAVE_VISUALSTUDIO
+	$(APPLY) $(SRC)/ffmpeg/msvc.patch$(PATCH_SUFFIX)
+	$(APPLY) $(SRC)/ffmpeg/near_field.patch$(PATCH_SUFFIX)
 endif
 	$(MOVE)
 

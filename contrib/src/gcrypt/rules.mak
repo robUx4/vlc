@@ -13,6 +13,8 @@ gcrypt: libgcrypt-$(GCRYPT_VERSION).tar.bz2 .sum-gcrypt
 	$(UNPACK)
 	$(APPLY) $(SRC)/gcrypt/disable-tests-compilation.patch
 	$(APPLY) $(SRC)/gcrypt/fix-pthread-detection.patch
+	$(APPLY) $(SRC)/gcrypt/gcrypt-clang.patch
+	$(APPLY) $(SRC)/gcrypt/test-sys-timeh.patch
 ifdef HAVE_WINSTORE
 	$(APPLY) $(SRC)/gcrypt/winrt.patch
 endif
@@ -23,6 +25,10 @@ ifeq ($(CC), clang)
 ifeq ($(ARCH),mips64el)
 	$(APPLY) $(SRC)/gcrypt/clang-mips64.patch
 endif
+endif
+ifdef HAVE_VISUALSTUDIO
+	$(APPLY) $(SRC)/gcrypt/alloca.patch
+	$(APPLY) $(SRC)/gcrypt/msvc.patch
 endif
 	$(MOVE)
 
@@ -36,6 +42,10 @@ GCRYPT_CONF = \
 
 ifdef HAVE_WIN64
 GCRYPT_CONF += --disable-asm --disable-padlock-support
+endif
+ifdef HAVE_VISUALSTUDIO
+GCRYPT_CONF += --disable-asm --disable-neon-support
+GCRYPT_CONF += gcry_cv_gcc_arm_platform_as_ok=no
 endif
 ifdef HAVE_IOS
 GCRYPT_EXTRA_CFLAGS = -fheinous-gnu-extensions

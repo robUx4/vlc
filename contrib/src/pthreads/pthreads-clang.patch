@@ -1,0 +1,44 @@
+--- pthreads/implement.h	2016-09-22 17:51:01.107908500 +0200
++++ pthreads/implement.h.clang	2016-09-22 17:50:04.877399300 +0200
+@@ -746,7 +746,7 @@ extern "C"
+  *
+  * The above aren't available in Mingw32 as of gcc 4.5.2 so define our own.
+  */
+-#if defined(__GNUC__)
++#if defined(__GNUC__) && !defined(_MSC_VER)
+ # if defined(_WIN64)
+ # define PTW32_INTERLOCKED_COMPARE_EXCHANGE_64(location, value, comparand)    \
+     ({                                                                     \
+--- pthreads/pthread.h	2016-09-22 17:52:40.370313500 +0200
++++ pthreads/pthread.h.clang	2016-09-22 17:47:38.190289600 +0200
+@@ -537,7 +537,7 @@ extern "C"
+ #define SEM_VALUE_MAX                           INT_MAX
+ 
+ 
+-#if defined(__GNUC__) && !defined(__declspec)
++#if defined(__GNUC__) && !defined(__declspec) && !defined(_MSC_VER)
+ # error Please upgrade your GNU compiler to one that supports __declspec.
+ #endif
+ 
+--- pthreads/sched.h	2016-09-22 17:51:13.658536900 +0200
++++ pthreads/sched.h.clang	2016-09-22 17:47:18.766507500 +0200
+@@ -66,7 +66,7 @@
+ #endif
+ 
+ 
+-#if defined(__GNUC__) && !defined(__declspec)
++#if defined(__GNUC__) && !defined(__declspec) && !defined(_MSC_VER)
+ # error Please upgrade your GNU compiler to one that supports __declspec.
+ #endif
+ 
+--- pthreads/semaphore.h	2016-09-22 17:53:16.777934200 +0200
++++ pthreads/semaphore.h.clang	2016-09-22 17:47:29.710093400 +0200
+@@ -65,7 +65,7 @@
+ /* Include everything */
+ #endif
+ 
+-#if defined(__GNUC__) && ! defined (__declspec)
++#if defined(__GNUC__) && ! defined (__declspec) && !defined(_MSC_VER)
+ # error Please upgrade your GNU compiler to one that supports __declspec.
+ #endif
+ 

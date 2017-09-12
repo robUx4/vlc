@@ -49,6 +49,9 @@ lua: lua-$(LUA_VERSION).tar.gz .sum-lua
 ifdef HAVE_WINSTORE
 	$(APPLY) $(SRC)/lua/lua-winrt.patch
 endif
+ifdef HAVE_VISUALSTUDIO
+	$(APPLY) $(SRC)/lua/msvc.patch
+endif
 ifdef HAVE_DARWIN_OS
 	(cd $(UNPACK_DIR) && \
 	sed -e 's%gcc%$(CC)%' \
@@ -77,15 +80,18 @@ LUACVARS=CPPFLAGS="-DLUA_DL_DLL"
 endif
 
 .lua: lua
-	cd $< && $(HOSTVARS_PIC) $(MAKE) $(LUA_TARGET)
+	cd $< && $(LUAVARS_PIC) $(MAKE) $(LUA_TARGET)
 ifdef HAVE_WIN32
-	cd $</src && $(HOSTVARS) $(MAKE) liblua.a
+	cd $< && $(LUAVARS) $(MAKE) -C src liblua.a
 endif
-	cd $< && $(HOSTVARS) $(MAKE) install INSTALL_TOP="$(PREFIX)"
+	cd $< && $(LUAVARS) $(MAKE) install INSTALL_TOP="$(PREFIX)"
 ifdef HAVE_WIN32
 	cd $< && $(RANLIB) "$(PREFIX)/lib/liblua.a"
 	mkdir -p -- "$(PREFIX)/lib/pkgconfig"
 	cp $</etc/lua.pc "$(PREFIX)/lib/pkgconfig/"
+endif
+ifdef HAVE_VISUALSTUDIO
+	cp $</src/liblua.a "$(PREFIX)/lib/lua.lib"
 endif
 	touch $@
 

@@ -26,6 +26,6 @@ libmpeg2: libmpeg2-$(LIBMPEG2_VERSION).tar.gz .sum-libmpeg2
 .libmpeg2: libmpeg2
 	$(RECONF)
 	cd $< && $(HOSTVARS) ./configure $(HOSTCONF) --without-x --disable-sdl
-	cd $</libmpeg2 && $(MAKE) && $(MAKE) install
-	cd $</include && $(MAKE) && $(MAKE) install
+	cd $< && $(MAKE) -C libmpeg2 && $(MAKE) -C libmpeg2 install
+	cd $< && $(MAKE) -C include && $(MAKE) -C include install
 	touch $@

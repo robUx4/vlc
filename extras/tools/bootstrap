@@ -114,7 +114,7 @@ esac
 
 cat > Makefile << EOF
 MAKEFLAGS += -j$CPUS
-CMAKEFLAGS += --parallel=$CPUS
+CMAKEFLAGS += --no-qt-gui --parallel=$CPUS
 PREFIX=\$(abspath ./build)
 
 all: $NEEDED

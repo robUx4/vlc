@@ -116,7 +116,11 @@
 #else
 # define likely(p)     (!!(p))
 # define unlikely(p)   (!!(p))
+# if defined(_MSC_VER) && !defined(__clang__)
+#  define unreachable()  __assume(0)
+# else
 # define unreachable() ((void)0)
+# endif
 #endif
 
 #define vlc_assert_unreachable() (assert(!"unreachable"), unreachable())
@@ -529,14 +533,14 @@ VLC_USED
 static inline uint8_t clip_uint8_vlc( int32_t a )
 {
     if( a&(~255) ) return (-a)>>31;
-    else           return a;
+    else           return (uint8_t) a;
 }
 
 /** Count leading zeroes */
 VLC_USED
 static inline unsigned (clz)(unsigned x)
 {
-#ifdef __GNUC__
+#if defined(__GNUC_) && !defined(_MSC_VER)
     return __builtin_clz (x);
 #else
     unsigned i = sizeof (x) * 8;
@@ -559,7 +563,7 @@ static inline unsigned (clz)(unsigned x)
 VLC_USED
 static inline unsigned (ctz)(unsigned x)
 {
-#ifdef __GNUC__
+#if defined(__GNUC_) && !defined(_MSC_VER)
     return __builtin_ctz (x);
 #else
     unsigned i = sizeof (x) * 8;
@@ -577,7 +581,7 @@ static inline unsigned (ctz)(unsigned x)
 VLC_USED
 static inline unsigned (popcount)(unsigned x)
 {
-#ifdef __GNUC__
+#if defined(__GNUC_) && !defined(_MSC_VER)
     return __builtin_popcount (x);
 #else
     unsigned count = 0;
@@ -594,7 +598,7 @@ static inline unsigned (popcount)(unsigned x)
 VLC_USED
 static inline int (popcountll)(unsigned long long x)
 {
-#ifdef __GNUC__
+#if defined(__GNUC_) && !defined(_MSC_VER)
     return __builtin_popcountll(x);
 #else
     int count = 0;
@@ -610,7 +614,7 @@ static inline int (popcountll)(unsigned long long x)
 VLC_USED
 static inline unsigned (parity)(unsigned x)
 {
-#ifdef __GNUC__
+#if defined(__GNUC_) && !defined(_MSC_VER)
     return __builtin_parity (x);
 #else
     for (unsigned i = 4 * sizeof (x); i > 0; i /= 2)
@@ -630,7 +634,7 @@ static inline uint16_t (bswap16)(uint16_t x)
 VLC_USED
 static inline uint32_t (bswap32)(uint32_t x)
 {
-#if defined (__GNUC__) || defined(__clang__)
+#if defined (__GNUC__) || (defined(__clang__) && !defined(_MSC_VER))
     return __builtin_bswap32 (x);
 #else
     return ((x & 0x000000FF) << 24)
@@ -644,7 +648,7 @@ static inline uint32_t (bswap32)(uint32_t x)
 VLC_USED
 static inline uint64_t (bswap64)(uint64_t x)
 {
-#if defined (__GNUC__) || defined(__clang__)
+#if defined (__GNUC__) || (defined(__clang__) && !defined(_MSC_VER))
     return __builtin_bswap64 (x);
 #elif !defined (__cplusplus)
     return ((x & 0x00000000000000FF) << 56)
@@ -815,7 +819,11 @@ static inline void SetQWLE (void *p, uint64_t qw)
 }
 
 /* */
+#if defined(_MSC_VER) && !defined(__clang__)
+#define VLC_UNUSED(x) UNREFERENCED_PARAMETER(x)
+#else
 #define VLC_UNUSED(x) (void)(x)
+#endif
 
 /* Stuff defined in src/extras/libc.c */
 

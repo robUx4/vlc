@@ -49,6 +49,12 @@
 #   ifndef IPV6_V6ONLY
 #       define IPV6_V6ONLY 27
 #   endif
+#   ifndef SHUT_RD
+/* Microsoft: same semantic, same value, different name... go figure */
+#     define SHUT_RD SD_RECEIVE
+#     define SHUT_WR SD_SEND
+#     define SHUT_RDWR SD_BOTH
+#   endif
 #else
 #   include <sys/socket.h>
 #   include <netinet/in.h>

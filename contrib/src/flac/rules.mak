@@ -15,6 +15,7 @@ $(TARBALLS)/flac-$(FLAC_VERSION).tar.xz:
 
 flac: flac-$(FLAC_VERSION).tar.xz .sum-flac
 	$(UNPACK)
+	$(APPLY) $(SRC)/flac/flac-clang.patch
 ifdef HAVE_WINSTORE
 	$(APPLY) $(SRC)/flac/console_write.patch
 	$(APPLY) $(SRC)/flac/remove_blocking_code_useless_flaclib.patch
@@ -29,6 +30,9 @@ ifeq ($(ANDROID_ABI), x86)
 	# defining USE_OBSOLETE_SIGCONTEXT_FLAVOR allows us to bypass that
 	cd $(UNPACK_DIR) && sed -i.orig -e s/"#  undef USE_OBSOLETE_SIGCONTEXT_FLAVOR"/"#define USE_OBSOLETE_SIGCONTEXT_FLAVOR"/g src/libFLAC/cpu.c
 endif
+endif
+ifdef HAVE_VISUALSTUDIO
+	$(APPLY) $(SRC)/flac/msvc-clang.patch
 endif
 	$(call pkg_static,"src/libFLAC/flac.pc.in")
 	$(UPDATE_AUTOCONFIG)

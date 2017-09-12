@@ -2566,8 +2566,8 @@ static void AVI_IndexLoad( demux_t *p_demux )
 
     /* Load indexes */
     assert( p_sys->i_track <= 100 );
-    avi_index_t p_idx_indx[p_sys->i_track];
-    avi_index_t p_idx_idx1[p_sys->i_track];
+    avi_index_t *p_idx_indx = alloca(p_sys->i_track * sizeof(*p_idx_indx));
+    avi_index_t *p_idx_idx1 = alloca(p_sys->i_track * sizeof(*p_idx_idx1));
     for( unsigned i = 0; i < p_sys->i_track; i++ )
     {
         avi_index_Init( &p_idx_indx[i] );

@@ -14,12 +14,23 @@ $(TARBALLS)/nettle-$(NETTLE_VERSION).tar.gz:
 
 nettle: nettle-$(NETTLE_VERSION).tar.gz .sum-nettle
 	$(UNPACK)
+	cd $(UNPACK_DIR) && sed -i.orig -e 's/libnettle.a/nettle.lib/' Makefile.in
+	cd $(UNPACK_DIR) && sed -i.orig -e 's/libhogweed.a/hogweed.lib/' Makefile.in
 	$(UPDATE_AUTOCONFIG)
 	$(MOVE)
 
 DEPS_nettle = gmp $(DEPS_gmp)
 
+ifdef HAVE_VISUALSTUDIO
+ifeq ($(ARCH),arm)
+NETTLECONF += --disable-assembler
+endif
+ifeq ($(ARCH),x86_64)
+NETTLECONF += --disable-assembler
+endif
+endif
+
 .nettle: nettle
-	cd $< && $(HOSTVARS) ./configure $(HOSTCONF)
+	cd $< && $(HOSTVARS) ./configure $(HOSTCONF) $(NETTLECONF)
 	cd $< && $(MAKE) install
 	touch $@

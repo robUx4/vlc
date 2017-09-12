@@ -1,0 +1,263 @@
+--- ffmpeg/libavcodec/jpegls.c	2016-06-08 18:40:10.000000000 +0200
++++ ffmpeg/libavcodec/jpegls.c._near	2016-06-08 18:58:04.189454000 +0200
+@@ -32,7 +32,7 @@ void ff_jpegls_init_state(JLSState *stat
+ {
+     int i;
+ 
+-    state->twonear = state->near * 2 + 1;
++    state->twonear = state->near_lossless * 2 + 1;
+     state->range   = (state->maxval + state->twonear - 1) / state->twonear + 1;
+ 
+     // QBPP = ceil(log2(RANGE))
+@@ -75,25 +75,25 @@ void ff_jpegls_reset_coding_parameters(J
+         factor = FFMIN(s->maxval, 4095) + 128 >> 8;
+ 
+         if (s->T1 == 0 || reset_all)
+-            s->T1 = iso_clip(factor * (basic_t1 - 2) + 2 + 3 * s->near,
+-                             s->near + 1, s->maxval);
++            s->T1 = iso_clip(factor * (basic_t1 - 2) + 2 + 3 * s->near_lossless,
++                             s->near_lossless + 1, s->maxval);
+         if (s->T2 == 0 || reset_all)
+-            s->T2 = iso_clip(factor * (basic_t2 - 3) + 3 + 5 * s->near,
++            s->T2 = iso_clip(factor * (basic_t2 - 3) + 3 + 5 * s->near_lossless,
+                              s->T1, s->maxval);
+         if (s->T3 == 0 || reset_all)
+-            s->T3 = iso_clip(factor * (basic_t3 - 4) + 4 + 7 * s->near,
++            s->T3 = iso_clip(factor * (basic_t3 - 4) + 4 + 7 * s->near_lossless,
+                              s->T2, s->maxval);
+     } else {
+         factor = 256 / (s->maxval + 1);
+ 
+         if (s->T1 == 0 || reset_all)
+-            s->T1 = iso_clip(FFMAX(2, basic_t1 / factor + 3 * s->near),
+-                             s->near + 1, s->maxval);
++            s->T1 = iso_clip(FFMAX(2, basic_t1 / factor + 3 * s->near_lossless),
++                             s->near_lossless + 1, s->maxval);
+         if (s->T2 == 0 || reset_all)
+-            s->T2 = iso_clip(FFMAX(3, basic_t2 / factor + 5 * s->near),
++            s->T2 = iso_clip(FFMAX(3, basic_t2 / factor + 5 * s->near_lossless),
+                              s->T1, s->maxval);
+         if (s->T3 == 0 || reset_all)
+-            s->T3 = iso_clip(FFMAX(4, basic_t3 / factor + 7 * s->near),
++            s->T3 = iso_clip(FFMAX(4, basic_t3 / factor + 7 * s->near_lossless),
+                              s->T2, s->maxval);
+     }
+ 
+--- ffmpeg/libavcodec/jpegls.h	2016-06-08 18:40:10.000000000 +0200
++++ ffmpeg/libavcodec/jpegls.h._near	2016-06-08 18:58:24.832230900 +0200
+@@ -39,7 +39,7 @@ typedef struct JLSState {
+     int T1, T2, T3;
+     int A[367], B[367], C[365], N[367];
+     int limit, reset, bpp, qbpp, maxval, range;
+-    int near, twonear;
++    int near_lossless, twonear;
+     int run_index[3];
+ } JLSState;
+ 
+@@ -64,11 +64,11 @@ static inline int ff_jpegls_quantize(JLS
+             return -3;
+         if (v <= -s->T1)
+             return -2;
+-        if (v < -s->near)
++        if (v < -s->near_lossless)
+             return -1;
+         return 0;
+     } else {
+-        if (v <= s->near)
++        if (v <= s->near_lossless)
+             return 0;
+         if (v < s->T1)
+             return 1;
+--- ffmpeg/libavcodec/jpeglsdec.c	2016-06-08 18:40:10.000000000 +0200
++++ ffmpeg/libavcodec/jpeglsdec.c._near	2016-06-08 18:58:56.429462500 +0200
+@@ -105,7 +105,7 @@ static inline int ls_get_code_regular(Ge
+         ret >>= 1;
+ 
+     /* for NEAR=0, k=0 and 2*B[Q] <= - N[Q] mapping is reversed */
+-    if (!state->near && !k && (2 * state->B[Q] <= -state->N[Q]))
++    if (!state->near_lossless && !k && (2 * state->B[Q] <= -state->N[Q]))
+         ret = -(ret + 1);
+ 
+     ret = ff_jpegls_update_state_regular(state, Q, ret);
+@@ -180,9 +180,9 @@ static inline void ls_decode_line(JLSSta
+         D1 = Rb - Rc;
+         D2 = Rc - Ra;
+         /* run mode */
+-        if ((FFABS(D0) <= state->near) &&
+-            (FFABS(D1) <= state->near) &&
+-            (FFABS(D2) <= state->near)) {
++        if ((FFABS(D0) <= state->near_lossless) &&
++            (FFABS(D1) <= state->near_lossless) &&
++            (FFABS(D2) <= state->near_lossless)) {
+             int r;
+             int RItype;
+ 
+@@ -215,13 +215,13 @@ static inline void ls_decode_line(JLSSta
+ 
+             /* decode run termination value */
+             Rb     = R(last, x);
+-            RItype = (FFABS(Ra - Rb) <= state->near) ? 1 : 0;
++            RItype = (FFABS(Ra - Rb) <= state->near_lossless) ? 1 : 0;
+             err    = ls_get_code_runterm(&s->gb, state, RItype,
+                                          ff_log2_run[state->run_index[comp]]);
+             if (state->run_index[comp])
+                 state->run_index[comp]--;
+ 
+-            if (state->near && RItype) {
++            if (state->near_lossless && RItype) {
+                 pred = Ra + err;
+             } else {
+                 if (Rb < Ra)
+@@ -252,13 +252,13 @@ static inline void ls_decode_line(JLSSta
+                 err  = ls_get_code_regular(&s->gb, state, context);
+             }
+ 
+-            /* we have to do something more for near-lossless coding */
++            /* we have to do something more for near_lossless-lossless coding */
+             pred += err;
+         }
+-        if (state->near) {
+-            if (pred < -state->near)
++        if (state->near_lossless) {
++            if (pred < -state->near_lossless)
+                 pred += state->range * state->twonear;
+-            else if (pred > state->maxval + state->near)
++            else if (pred > state->maxval + state->near_lossless)
+                 pred -= state->range * state->twonear;
+             pred = av_clip(pred, 0, state->maxval);
+         }
+@@ -269,7 +269,7 @@ static inline void ls_decode_line(JLSSta
+     }
+ }
+ 
+-int ff_jpegls_decode_picture(MJpegDecodeContext *s, int near,
++int ff_jpegls_decode_picture(MJpegDecodeContext *s, int near_lossless,
+                              int point_transform, int ilv)
+ {
+     int i, t = 0;
+@@ -289,7 +289,7 @@ int ff_jpegls_decode_picture(MJpegDecode
+         return AVERROR(ENOMEM);
+     }
+     /* initialize JPEG-LS state from JPEG parameters */
+-    state->near   = near;
++    state->near_lossless   = near_lossless;
+     state->bpp    = (s->bits < 2) ? 2 : s->bits;
+     state->maxval = s->maxval;
+     state->T1     = s->t1;
+@@ -307,7 +307,7 @@ int ff_jpegls_decode_picture(MJpegDecode
+     ff_dlog(s->avctx,
+             "JPEG-LS params: %ix%i NEAR=%i MV=%i T(%i,%i,%i) "
+             "RESET=%i, LIMIT=%i, qbpp=%i, RANGE=%i\n",
+-            s->width, s->height, state->near, state->maxval,
++            s->width, s->height, state->near_lossless, state->maxval,
+             state->T1, state->T2, state->T3,
+             state->reset, state->limit, state->qbpp, state->range);
+     ff_dlog(s->avctx, "JPEG params: ILV=%i Pt=%i BPP=%i, scan = %i\n",
+--- ffmpeg/libavcodec/jpeglsdec.h	2016-06-08 18:40:10.000000000 +0200
++++ ffmpeg/libavcodec/jpeglsdec.h._near	2016-06-08 18:58:59.564633500 +0200
+@@ -36,7 +36,7 @@
+  */
+ int ff_jpegls_decode_lse(MJpegDecodeContext *s);
+ 
+-int ff_jpegls_decode_picture(MJpegDecodeContext *s, int near,
++int ff_jpegls_decode_picture(MJpegDecodeContext *s, int near_lossless,
+                              int point_transform, int ilv);
+ 
+ #endif /* AVCODEC_JPEGLSDEC_H */
+--- ffmpeg/libavcodec/jpeglsenc.c	2016-06-08 18:40:10.000000000 +0200
++++ ffmpeg/libavcodec/jpeglsenc.c._near	2016-06-08 19:00:03.839600500 +0200
+@@ -53,7 +53,7 @@ static inline void ls_encode_regular(JLS
+     for (k = 0; (state->N[Q] << k) < state->A[Q]; k++)
+         ;
+ 
+-    map = !state->near && !k && (2 * state->B[Q] <= -state->N[Q]);
++    map = !state->near_lossless && !k && (2 * state->B[Q] <= -state->N[Q]);
+ 
+     if (err < 0)
+         err += state->range;
+@@ -147,14 +147,14 @@ static inline void ls_encode_line(JLSSta
+         D2 = Rc - Ra;
+ 
+         /* run mode */
+-        if ((FFABS(D0) <= state->near) &&
+-            (FFABS(D1) <= state->near) &&
+-            (FFABS(D2) <= state->near)) {
++        if ((FFABS(D0) <= state->near_lossless) &&
++            (FFABS(D1) <= state->near_lossless) &&
++            (FFABS(D2) <= state->near_lossless)) {
+             int RUNval, RItype, run;
+ 
+             run    = 0;
+             RUNval = Ra;
+-            while (x < w && (FFABS(R(cur, x) - RUNval) <= state->near)) {
++            while (x < w && (FFABS(R(cur, x) - RUNval) <= state->near_lossless)) {
+                 run++;
+                 W(cur, x, Ra);
+                 x += stride;
+@@ -163,18 +163,18 @@ static inline void ls_encode_line(JLSSta
+             if (x >= w)
+                 return;
+             Rb     = R(last, x);
+-            RItype = FFABS(Ra - Rb) <= state->near;
++            RItype = FFABS(Ra - Rb) <= state->near_lossless;
+             pred   = RItype ? Ra : Rb;
+             err    = R(cur, x) - pred;
+ 
+             if (!RItype && Ra > Rb)
+                 err = -err;
+ 
+-            if (state->near) {
++            if (state->near_lossless) {
+                 if (err > 0)
+-                    err =  (state->near + err) / state->twonear;
++                    err =  (state->near_lossless + err) / state->twonear;
+                 else
+-                    err = -(state->near - err) / state->twonear;
++                    err = -(state->near_lossless - err) / state->twonear;
+ 
+                 if (RItype || (Rb >= Ra))
+                     Ra = av_clip(pred + err * state->twonear, 0, state->maxval);
+@@ -211,11 +211,11 @@ static inline void ls_encode_line(JLSSta
+                 err  = R(cur, x) - pred;
+             }
+ 
+-            if (state->near) {
++            if (state->near_lossless) {
+                 if (err > 0)
+-                    err =  (state->near + err) / state->twonear;
++                    err =  (state->near_lossless + err) / state->twonear;
+                 else
+-                    err = -(state->near - err) / state->twonear;
++                    err = -(state->near_lossless - err) / state->twonear;
+                 if (!sign)
+                     Ra = av_clip(pred + err * state->twonear, 0, state->maxval);
+                 else
+@@ -234,7 +234,7 @@ static void ls_store_lse(JLSState *state
+     /* Test if we have default params and don't need to store LSE */
+     JLSState state2 = { 0 };
+     state2.bpp  = state->bpp;
+-    state2.near = state->near;
++    state2.near_lossless = state->near_lossless;
+     ff_jpegls_reset_coding_parameters(&state2, 1);
+     if (state->T1 == state2.T1 &&
+         state->T2 == state2.T2 &&
+@@ -323,7 +323,7 @@ FF_ENABLE_DEPRECATION_WARNINGS
+         goto memfail;
+ 
+     /* initialize JPEG-LS state from JPEG parameters */
+-    state->near = ctx->pred;
++    state->near_lossless = ctx->pred;
+     state->bpp  = (avctx->pix_fmt == AV_PIX_FMT_GRAY16) ? 16 : 8;
+     ff_jpegls_reset_coding_parameters(state, 0);
+     ff_jpegls_init_state(state);
+--- ffmpeg/libavcodec/mjpegdec.h	2016-06-08 20:08:56.859019500 +0200
++++ ffmpeg/libavcodec/mjpegdec.h._near	2016-06-08 20:09:42.905398000 +0200
+@@ -66,7 +66,7 @@ typedef struct MJpegDecodeContext {
+     int bits;           /* bits per component */
+ 
+     int maxval;
+-    int near;         ///< near lossless bound (si 0 for lossless)
++    int near_lossless;         ///< near lossless bound (si 0 for lossless)
+     int t1,t2,t3;
+     int reset;        ///< context halfing interval ?rename
+ 

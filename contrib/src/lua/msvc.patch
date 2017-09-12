@@ -1,0 +1,33 @@
+--- lua-5.1.4/src/Makefile	2016-08-05 17:38:23.002482400 +0200
++++ lua-5.1.4/src/Makefile.msvc	2016-08-05 17:46:53.655626100 +0200
+@@ -10,7 +10,7 @@ PLAT= none
+ CC= gcc
+ CFLAGS= -O2 -Wall $(MYCFLAGS)
+ AR= ar rcu
+-RANLIB= ranlib
++RANLIB= true
+ RM= rm -f
+ LIBS= -lm $(MYLIBS)
+ 
+@@ -52,10 +52,10 @@ $(LUA_A): $(CORE_O) $(LIB_O)
+ 	$(RANLIB) $@
+ 
+ $(LUA_T): $(LUA_O) $(LUA_A)
+-	$(CC) -o $@ $(MYLDFLAGS) $(LUA_O) $(LUA_A) $(LIBS)
++	$(CC) -o $@ $(MYLDFLAGS) $(LUA_O) $(LUA_IMP) $(LIBS)
+ 
+ $(LUAC_T): $(LUAC_O) $(LUA_A)
+-	$(CC) -o $@ $(MYLDFLAGS) $(LUAC_O) $(LUA_A) $(LIBS)
++	$(CC) -o $@ $(MYLDFLAGS) $(LUAC_O) liblua.a $(LIBS)
+ 
+ clean:
+ 	$(RM) $(ALL_T) $(ALL_O)
+@@ -108,7 +108,7 @@ macosx:
+ 
+ mingw:
+ 	$(MAKE) "LUA_A=lua51.dll" "LUA_T=lua.exe" \
+-	"AR=$(CC) -shared -o" "RANLIB=strip --strip-unneeded" \
++	"AR=$(CC) -shared -o" "LUA_IMP=lua51.lib" \
+ 	"MYCFLAGS=-DLUA_BUILD_AS_DLL" "MYLIBS=" "MYLDFLAGS=-s" lua.exe
+ 	$(MAKE) "LUAC_T=luac.exe" luac.exe
+ 

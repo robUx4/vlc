@@ -86,6 +86,9 @@ static const int PROF_HEVC_MAIN10[]  = { FF_PROFILE_HEVC_MAIN,
 #  include <dxva.h>
 # endif
 
+#elif _MSC_VER
+#  undef MS_GUID
+#  define MS_GUID DEFINE_GUID
 #endif /* __MINGW32__ */
 
 /* Codec capabilities GUID, sorted by codec */

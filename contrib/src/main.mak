@@ -209,7 +209,7 @@ PKG_CONFIG ?= pkg-config
 ifdef HAVE_CROSS_COMPILE
 # This inhibits .pc file from within the cross-compilation toolchain sysroot.
 # Hopefully, nobody ever needs that.
-PKG_CONFIG_PATH := /usr/share/pkgconfig
+#PKG_CONFIG_PATH := /usr/share/pkgconfig
 PKG_CONFIG_LIBDIR := /usr/$(HOST)/lib/pkgconfig
 export PKG_CONFIG_LIBDIR
 endif
@@ -281,7 +281,7 @@ HOSTCONF += --libdir="$(PREFIX)/lib"
 HOSTCONF += --build="$(BUILD)" --host="$(HOST)" --target="$(HOST)"
 HOSTCONF += --program-prefix=""
 # libtool stuff:
-HOSTCONF += --enable-static --disable-shared --disable-dependency-tracking
+HOSTCONF += --enable-static --disable-shared
 ifdef HAVE_WIN32
 HOSTCONF += --without-pic
 PIC :=
@@ -289,11 +289,23 @@ else
 HOSTCONF += --with-pic
 PIC := -fPIC
 endif
+ifdef WITH_OPTIMIZATION
+HOSTCONF += --disable-dependency-tracking
+else
+HOSTCONF += --enable-debug
+endif
 
 HOSTTOOLS := \
 	CC="$(CC)" CXX="$(CXX)" LD="$(LD)" \
 	AR="$(AR)" CCAS="$(CCAS)" RANLIB="$(RANLIB)" STRIP="$(STRIP)" \
 	PATH="$(PREFIX)/bin:$(PATH)"
+
+ifdef HAVE_VISUALSTUDIO
+HOSTTOOLS += ac_cv_func_getenv=yes ac_cv_func_putenv=yes ac_cv_func_getpid=yes ac_cv_have_decl_strdup=yes \
+	ac_cv_func_strnlen=yes ac_cv_have_decl_strnlen=yes ac_cv_func_timespec_get=yes ac_cv_func_strdup=yes \
+	ac_cv_c_restrict=no ac_cv_c_compiler_gnu=no
+endif
+
 HOSTVARS := $(HOSTTOOLS) \
 	CPPFLAGS="$(CPPFLAGS)" \
 	CFLAGS="$(CFLAGS)" \
@@ -352,7 +364,11 @@ UPDATE_AUTOCONFIG = for dir in $(AUTOMAKE_DATA_DIRS); do \
 ifdef HAVE_IOS
 AUTORECONF = AUTOPOINT=true autoreconf
 else
+ifdef HAVE_WIN32
+AUTORECONF = rm -rf aclocal.m4 Makefile.in && autoreconf
+else
 AUTORECONF = autoreconf
+endif
 endif
 RECONF = mkdir -p -- $(PREFIX)/share/aclocal && \
 	cd $< && $(AUTORECONF) -fiv $(ACLOCAL_AMFLAGS)
@@ -465,6 +481,11 @@ else
 	echo "set(CMAKE_SYSTEM_NAME Windows)" >> $@
 endif
 endif
+	echo "set(CMAKE_AR $(AR) CACHE FILEPATH Archiver)" >> $@
+	echo "set(CMAKE_C_ARCHIVE_CREATE \"sh.exe $(AR) qc <TARGET> <LINK_FLAGS> <OBJECTS>\")" >> $@
+	echo "set(CMAKE_C_ARCHIVE_APPEND \"sh.exe $(AR) q  <TARGET> <LINK_FLAGS> <OBJECTS>\")" >> $@
+	echo "set(CMAKE_CXX_ARCHIVE_CREATE \"sh.exe $(AR) qc <TARGET> <LINK_FLAGS> <OBJECTS>\")" >> $@
+	echo "set(CMAKE_CXX_ARCHIVE_APPEND \"sh.exe $(AR) q  <TARGET> <LINK_FLAGS> <OBJECTS>\")" >> $@
 ifndef WITH_OPTIMIZATION
 	echo "set(CMAKE_BUILD_TYPE Debug)" >> $@
 else

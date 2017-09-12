@@ -167,7 +167,7 @@ int WINAPI WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance,
     if (wargv == NULL)
         return 1;
 
-    char *argv[argc + 3];
+    char **argv = alloca((argc + 3) * sizeof(*argv));
     BOOL crash_handling = TRUE;
     int j = 0;
     char *lang = NULL;
@@ -248,8 +248,8 @@ int WINAPI WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance,
         libvlc_release (vlc);
     }
     else
-        MessageBox (NULL, TEXT("VLC media player could not start.\n"
-                    "Either the command line options were invalid or no plugins were found.\n"),
+        MessageBox (NULL, TEXT("VLC media player could not start.\n")
+                    TEXT("Either the command line options were invalid or no plugins were found.\n"),
                     TEXT("VLC media player"),
                     MB_OK|MB_ICONERROR);
 
@@ -276,8 +276,8 @@ static void check_crashdump(void)
         return;
     fclose( fd );
 
-    int answer = MessageBox( NULL, L"Ooops: VLC media player just crashed.\n" \
-    "Would you like to send a bug report to the developers team?",
+    int answer = MessageBox( NULL, L"Ooops: VLC media player just crashed.\n"
+    L"Would you like to send a bug report to the developers team?",
     L"VLC crash reporting", MB_YESNO);
 
     if(answer == IDYES)
@@ -380,7 +380,7 @@ LONG WINAPI vlc_exception_filter(struct _EXCEPTION_POINTERS *lpExceptionInfo)
         osvi.dwOSVersionInfoSize = sizeof( OSVERSIONINFO );
         GetVersionEx( &osvi );
 
-        fwprintf( fd, L"[version]\nOS=%d.%d.%d.%d.%ls\nVLC=" VERSION_MESSAGE,
+        fwprintf( fd, L"[version]\nOS=%d.%d.%d.%d.%ls\nVLC=" TEXT(VERSION_MESSAGE),
                 osvi.dwMajorVersion, osvi.dwMinorVersion, osvi.dwBuildNumber,
                 osvi.dwPlatformId, osvi.szCSDVersion);
 
@@ -396,11 +396,11 @@ LONG WINAPI vlc_exception_filter(struct _EXCEPTION_POINTERS *lpExceptionInfo)
             fwprintf( fd, L" | %p", pException->ExceptionInformation[i] );
 
 #ifdef _WIN64
-        fwprintf( fd, L"\n\n[context]\nRDI:%px\nRSI:%px\n" \
-                    "RBX:%px\nRDX:%px\nRCX:%px\nRAX:%px\n" \
-                    "RBP:%px\nRIP:%px\nRSP:%px\nR8:%px\n" \
-                    "R9:%px\nR10:%px\nR11:%px\nR12:%px\n" \
-                    "R13:%px\nR14:%px\nR15:%px\n",
+        fwprintf( fd, L"\n\n[context]\nRDI:%px\nRSI:%px\n"
+                    L"RBX:%px\nRDX:%px\nRCX:%px\nRAX:%px\n"
+                    L"RBP:%px\nRIP:%px\nRSP:%px\nR8:%px\n"
+                    L"R9:%px\nR10:%px\nR11:%px\nR12:%px\n"
+                    L"R13:%px\nR14:%px\nR15:%px\n",
                         pContext->Rdi,pContext->Rsi,pContext->Rbx,
                         pContext->Rdx,pContext->Rcx,pContext->Rax,
                         pContext->Rbp,pContext->Rip,pContext->Rsp,
@@ -408,9 +408,9 @@ LONG WINAPI vlc_exception_filter(struct _EXCEPTION_POINTERS *lpExceptionInfo)
                         pContext->R11,pContext->R12,pContext->R13,
                         pContext->R14,pContext->R15 );
 #else
-        fwprintf( fd, L"\n\n[context]\nEDI:%px\nESI:%px\n" \
-                    "EBX:%px\nEDX:%px\nECX:%px\nEAX:%px\n" \
-                    "EBP:%px\nEIP:%px\nESP:%px\n",
+        fwprintf( fd, L"\n\n[context]\nEDI:%px\nESI:%px\n"
+                    L"EBX:%px\nEDX:%px\nECX:%px\nEAX:%px\n"
+                    L"EBP:%px\nEIP:%px\nESP:%px\n",
                         pContext->Edi,pContext->Esi,pContext->Ebx,
                         pContext->Edx,pContext->Ecx,pContext->Eax,
                         pContext->Ebp,pContext->Eip,pContext->Esp );

@@ -533,7 +533,7 @@ static void *Run( void *data )
     {
         vlc_restorecancel (canc);
         unsigned n = p_sd->p_sys->i_fd;
-        struct pollfd ufd[n];
+        struct pollfd *ufd = alloca(n * sizeof(*ufd));
 
         for (unsigned i = 0; i < n; i++)
         {
@@ -1186,7 +1186,7 @@ static sdp_t *ParseSDP (vlc_object_t *p_obj, const char *psz_sdp)
         /* Extract one line */
         char *eol = strchr (psz_sdp, '\n');
         size_t linelen = eol ? (size_t)(eol - psz_sdp) : strlen (psz_sdp);
-        char line[linelen + 1];
+        char *line = alloca(linelen + 1);
         memcpy (line, psz_sdp, linelen);
         line[linelen] = '\0';
 

@@ -1,0 +1,40 @@
+--- libgsm_1.0.13/Makefile.orig	2016-03-01 13:14:45.886575000 +0100
++++ libgsm_1.0.13/Makefile	2016-03-01 13:21:30.757120800 +0100
+@@ -134,7 +134,7 @@ LFLAGS	= $(LDFLAGS) $(LDINC)
+ 
+ # Targets
+ 
+-LIBGSM	= $(LIB)/libgsm.a
++LIBGSM	= $(LIB)/gsm.lib
+ 
+ TOAST	= $(BIN)/toast
+ UNTOAST	= $(BIN)/untoast
+@@ -252,7 +252,7 @@ STUFF = 	ChangeLog			\
+ # Install targets
+ 
+ GSM_INSTALL_TARGETS =	\
+-		$(GSM_INSTALL_LIB)/libgsm.a		\
++		$(GSM_INSTALL_LIB)/gsm.lib		\
+ 		$(GSM_INSTALL_INC)/gsm.h		\
+ 		$(GSM_INSTALL_MAN)/gsm.3		\
+ 		$(GSM_INSTALL_MAN)/gsm_explode.3	\
+@@ -388,7 +388,7 @@ $(GSM_INSTALL_INC)/gsm.h:	$(INC)/gsm.h
+ 		cp $? $@
+ 		chmod 444 $@
+ 
+-$(GSM_INSTALL_LIB)/libgsm.a:	$(LIBGSM)
++$(GSM_INSTALL_LIB)/gsm.lib:	$(LIBGSM)
+ 		-rm $@
+ 		cp $? $@
+ 		chmod 444 $@
+--- gsm/Makefile	2016-06-20 11:15:16.755555700 +0200
++++ gsm/Makefile.o	2016-06-20 11:15:08.935661300 +0200
+@@ -269,7 +269,7 @@ TOAST_INSTALL_TARGETS =	\
+ # Default rules
+ 
+ .c.o:
+-		$(CC) $(CFLAGS) $?
++		$(CC) $(CFLAGS) $? -o $@
+ 		@-mv `$(BASENAME) $@` $@ > /dev/null 2>&1
+ 
+ # Target rules

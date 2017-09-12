@@ -16,11 +16,16 @@ nfs: libnfs-$(NFS_VERSION).tar.gz .sum-nfs
 	$(UNPACK)
 	mv libnfs-libnfs-$(NFS_VERSION) libnfs-$(NFS_VERSION)
 	$(APPLY) $(SRC)/nfs/win32.patch
+ifdef HAVE_VISUALSTUDIO
+	$(APPLY) $(SRC)/nfs/non-gcc.patch
+	$(APPLY) $(SRC)/nfs/msvc.patch
+endif
+	$(APPLY) $(SRC)/nfs/clang.patch
 	$(UPDATE_AUTOCONFIG)
 	$(MOVE)
 
 .nfs: nfs
 	cd $< && ./bootstrap
-	cd $< && $(HOSTVARS) ./configure --disable-examples --disable-utils --disable-werror $(HOSTCONF)
+	cd $< && $(HOSTVARS) ./configure --disable-examples --disable-utils --disable-werror $(HOSTCONF) --disable-dependency-tracking
 	cd $< && $(MAKE) install
 	touch $@

@@ -1,0 +1,58 @@
+--- libdsm/compat/clock_gettime.c	2017-06-15 16:34:24.843257200 +0200
++++ libdsm/compat/clock_gettime.c.systime	2017-06-15 16:11:07.817774100 +0200
+@@ -29,7 +29,9 @@
+ 
+ #ifndef _WIN32
+ 
++#ifdef HAVE_SYS_TIME_H
+ #include <sys/time.h>
++#endif
+ #include <sys/resource.h>
+ #include <mach/mach.h>
+ #include <mach/clock.h>
+--- libdsm/configure.ac	2017-06-15 16:36:19.844527000 +0200
++++ libdsm/configure.ac.systime	2017-06-15 16:36:15.873634500 +0200
+@@ -107,7 +107,7 @@ AC_REPLACE_FUNCS([strndup])
+ AC_REPLACE_FUNCS([clock_gettime])
+ AC_CHECK_FUNCS([pipe _pipe getifaddrs])
+ 
+-AC_CHECK_HEADERS([bsd/string.h langinfo.h alloca.h sys/queue.h arpa/inet.h sys/socket.h ifaddrs.h])
++AC_CHECK_HEADERS([bsd/string.h langinfo.h alloca.h sys/queue.h arpa/inet.h sys/socket.h sys/time.h ifaddrs.h])
+ 
+ ## Configure random device path
+ AC_ARG_WITH([urandom], 
+--- libdsm/src/netbios_ns.c	2017-06-15 16:34:52.377719700 +0200
++++ libdsm/src/netbios_ns.c.systime	2017-06-15 16:11:15.969940800 +0200
+@@ -36,7 +36,9 @@
+ #include <string.h>
+ #include <stdbool.h>
+ #include <pthread.h>
++#ifdef HAVE_SYS_TIME_H
+ #include <sys/time.h>
++#endif
+ 
+ #include <unistd.h>
+ #include <fcntl.h>
+--- libdsm/src/smb_ntlm.c	2017-06-15 16:34:55.682866600 +0200
++++ libdsm/src/smb_ntlm.c.systime	2017-06-15 16:11:23.489145700 +0200
+@@ -39,7 +39,9 @@
+ #include <wctype.h>
+ #include <stdlib.h>
+ #include <string.h>
++#ifdef HAVE_SYS_TIME_H
+ #include <sys/time.h>
++#endif
+ #include <unistd.h>
+ #include <fcntl.h>
+ 
+--- libdsm/libdsm.pc.in	2017-06-15 16:51:24.370714600 +0200
++++ libdsm/libdsm.pc.in.systime	2017-06-15 16:51:06.417079100 +0200
+@@ -5,7 +5,7 @@ includedir=${prefix}/include
+ 
+ Name: libdsm
+ Description: Minimalist and read-only smb client library
+-Version: @BDSM_PACKAGE_VERSION@
++Version: 0.2.7
+ Cflags: -I${includedir} @PTHREAD_CFLAGS@
+ Libs: -L${libdir} -ldsm
+ Libs.private: -liconv -ltasn1 @PTHREAD_LIBS@ @BDSM_LIB_LOG@ @SOCKET_LIBS@

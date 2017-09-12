@@ -8,6 +8,11 @@ ifeq ($(call need_pkg,"libdvbpsi >= 1.2.0"),)
 PKGS_FOUND += dvbpsi
 endif
 
+DVBPSI_CONF=$(HOSTCONF)
+ifdef HAVE_VISUALSTUDIO
+DVBPSI_CONF+= --disable-debug
+endif
+
 $(TARBALLS)/libdvbpsi-$(DVBPSI_VERSION).tar.bz2:
 	$(call download,$(DVBPSI_URL))
 
@@ -18,9 +23,12 @@ libdvbpsi: libdvbpsi-$(DVBPSI_VERSION).tar.bz2 .sum-dvbpsi
 	$(UPDATE_AUTOCONFIG) && cd $(UNPACK_DIR) && mv config.guess config.sub .auto
 	$(APPLY) $(SRC)/dvbpsi/dvbpsi-noexamples.patch
 	$(APPLY) $(SRC)/dvbpsi/dvbpsi-sys-types.patch
+ifdef HAVE_VISUALSTUDIO
+	$(APPLY) $(SRC)/dvbpsi/msvc.patch
+endif
 	$(MOVE)
 
 .dvbpsi: libdvbpsi
-	cd $< && $(HOSTVARS) ./configure $(HOSTCONF)
+	cd $< && $(HOSTVARS) ./configure $(DVBPSI_CONF)
 	cd $< && $(MAKE) install
 	touch $@

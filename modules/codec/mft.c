@@ -72,6 +72,10 @@ vlc_module_begin()
     set_callbacks(Open, Close)
 vlc_module_end()
 
+#ifdef VLC_WINSTORE_APP
+STDAPI MFTEnumEx (GUID guidCategory, UINT32 Flags, const MFT_REGISTER_TYPE_INFO *pInputType, const MFT_REGISTER_TYPE_INFO *pOutputType, IMFActivate ***pppMFTActivate, UINT32 *pnumMFTActivate);
+#endif
+
 typedef struct
 {
     HINSTANCE mfplat_dll;

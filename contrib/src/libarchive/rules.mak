@@ -9,6 +9,11 @@ endif
 
 DEPS_libarchive = zlib
 
+LIBARCHIVE_CFLAGS := $(CFLAGS) -DLIBARCHIVE_STATIC
+ifdef HAVE_WIN32
+LIBARCHIVE_CFLAGS += -DLIBARCHIVE_STATIC
+endif
+
 $(TARBALLS)/libarchive-$(LIBARCHIVE_VERSION).tar.gz:
 	$(call download_pkg,$(LIBARCHIVE_URL),libarchive)
 
@@ -25,11 +30,17 @@ ifdef HAVE_WINSTORE
 	$(APPLY) $(SRC)/libarchive/winrt.patch
 endif
 	$(APPLY) $(SRC)/libarchive/fix-types.patch
+ifdef HAVE_VISUALSTUDIO
+	$(APPLY) $(SRC)/libarchive/msvc.patch
+endif
 	$(call pkg_static,"build/pkgconfig/libarchive.pc.in")
 	$(MOVE)
 
 .libarchive: libarchive
-	cd $< && $(HOSTVARS) ./configure $(HOSTCONF) \
+ifdef HAVE_WINSTORE
+	$(RECONF)
+endif
+	cd $< && $(HOSTVARS) CFLAGS="$(LIBARCHIVE_CFLAGS)" ./configure $(HOSTCONF) \
 		--disable-bsdcpio --disable-bsdtar --disable-bsdcat \
 		--without-nettle \
 		--without-xml2 --without-lzma --without-iconv --without-expat

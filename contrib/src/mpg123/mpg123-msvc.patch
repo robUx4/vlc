@@ -1,0 +1,12 @@
+--- mpg123/src/compat/compat.h  2016-09-26 23:20:25.000000000 +0200
++++ mpg123/src/compat/compat.h.msvc     2017-05-30 20:13:59.702516300 +0200
+@@ -101,7 +101,7 @@
+
+ typedef unsigned char byte;
+
+-#ifdef _MSC_VER
++#if defined(_MSC_VER) && !defined(SIZEOF_SSIZE_T)
+ typedef long ssize_t;
+ #endif
+
+

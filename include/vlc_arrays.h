@@ -277,6 +277,11 @@ static inline const void *vlc_array_item_at_index( const vlc_array_t *ar,
 {
     return ar->pp_elems[idx];
 }
+#else /* C99 */
+static inline void *vlc_array_item_at_index( vlc_array_t *ar, size_t idx )
+{
+    return ar->pp_elems[idx];
+}
 #endif
 
 static inline ssize_t vlc_array_index_of_item( const vlc_array_t *ar,
@@ -291,6 +296,10 @@ static inline ssize_t vlc_array_index_of_item( const vlc_array_t *ar,
 }
 
 /* Write */
+#ifdef _MSC_VER
+#pragma warning(push)
+#pragma warning(disable:4127)
+#endif
 static inline void vlc_array_insert( vlc_array_t *ar, void *elem, int idx )
 {
     void **pp = (void **)realloc( ar->pp_elems,
@@ -306,6 +315,9 @@ static inline void vlc_array_insert( vlc_array_t *ar, void *elem, int idx )
     ar->i_count++;
     ar->pp_elems = pp;
 }
+#ifdef _MSC_VER
+#pragma warning(pop)
+#endif
 
 static inline void vlc_array_append( vlc_array_t *ar, void *elem )
 {
@@ -419,6 +431,10 @@ static inline void vlc_dictionary_clear( vlc_dictionary_t * p_dict,
     p_dict->i_size = 0;
 }
 
+#ifdef _MSC_VER
+#pragma warning(push)
+#pragma warning(disable:4242 4244)    /* possible loss of data */
+#endif /* _MSV_VER */
 static inline int
 vlc_dictionary_has_key( const vlc_dictionary_t * p_dict, const char * psz_key )
 {
@@ -593,6 +609,9 @@ vlc_dictionary_remove_value_for_key( const vlc_dictionary_t * p_dict, const char
 
     /* No key was found */
 }
+#ifdef _MSC_VER
+#pragma warning(pop)
+#endif /* _MSV_VER */
 
 #ifdef __cplusplus
 // C++ helpers

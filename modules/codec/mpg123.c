@@ -30,6 +30,10 @@
 
 #include <assert.h>
 
+#if defined(_MSC_VER)
+#undef _FILE_OFFSET_BITS
+#endif
+
 #include <mpg123.h>
 
 #include <vlc_common.h>

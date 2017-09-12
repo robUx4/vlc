@@ -13,15 +13,14 @@ $(TARBALLS)/libupnp-$(UPNP_VERSION).tar.bz2:
 
 ifdef HAVE_WIN32
 DEPS_upnp += pthreads $(DEPS_pthreads)
-LIBUPNP_ECFLAGS = -DPTW32_STATIC_LIB
+ifdef HAVE_VISUALSTUDIO
+LIBUPNP_ECFLAGS = -DPTW32_STATIC_LIB -DUPNP_USE_MSVCPP -DUPNP_INLINE=_inline
+endif
 endif
 ifdef HAVE_WINSTORE
 CONFIGURE_ARGS=--disable-ipv6 --enable-unspecified_server
 else
 CONFIGURE_ARGS=--enable-ipv6
-endif
-ifndef WITH_OPTIMIZATION
-CONFIGURE_ARGS += --enable-debug
 endif
 
 upnp: libupnp-$(UPNP_VERSION).tar.bz2 .sum-upnp
@@ -44,6 +43,7 @@ endif
 	$(APPLY) $(SRC)/upnp/fix_infinite_loop.patch
 	$(APPLY) $(SRC)/upnp/dont_use_down_intf.patch
 	$(APPLY) $(SRC)/upnp/upnp-no-debugfile.patch
+	$(APPLY) $(SRC)/upnp/msvc-snprintf.patch
 	$(APPLY) $(SRC)/upnp/use-unicode.patch
 	$(UPDATE_AUTOCONFIG) && cd $(UNPACK_DIR) && mv config.guess config.sub build-aux/
 	$(MOVE)

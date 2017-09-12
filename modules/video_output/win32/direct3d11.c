@@ -761,12 +761,12 @@ static picture_pool_t *Pool(vout_display_t *vd, unsigned pool_size)
     pool_size += 2;
 
     vout_display_sys_t *sys = vd->sys;
-    ID3D11Texture2D  *textures[pool_size * D3D11_MAX_SHADER_VIEW];
+    ID3D11Texture2D  **textures = alloca((pool_size * D3D11_MAX_SHADER_VIEW)*sizeof(*textures));
     picture_t **pictures = NULL;
     picture_t *picture;
     unsigned  plane;
     unsigned  picture_count = 0;
-    picture_pool_configuration_t pool_cfg = {};
+    picture_pool_configuration_t pool_cfg = {0};
 
     if (sys->sys.pool)
         return sys->sys.pool;
@@ -981,7 +981,7 @@ static HRESULT UpdateBackBuffer(vout_display_t *vd)
 }
 
 /* rotation around the Z axis */
-static void getZRotMatrix(float theta, FLOAT matrix[static 16])
+static void getZRotMatrix(float theta, FLOAT matrix[16])
 {
     float st, ct;
 
@@ -999,7 +999,7 @@ static void getZRotMatrix(float theta, FLOAT matrix[static 16])
 }
 
 /* rotation around the Y axis */
-static void getYRotMatrix(float theta, FLOAT matrix[static 16])
+static void getYRotMatrix(float theta, FLOAT matrix[16])
 {
     float st, ct;
 
@@ -1017,7 +1017,7 @@ static void getYRotMatrix(float theta, FLOAT matrix[static 16])
 }
 
 /* rotation around the X axis */
-static void getXRotMatrix(float phi, FLOAT matrix[static 16])
+static void getXRotMatrix(float phi, FLOAT matrix[16])
 {
     float sp, cp;
 
@@ -1034,7 +1034,7 @@ static void getXRotMatrix(float phi, FLOAT matrix[static 16])
     memcpy(matrix, m, sizeof(m));
 }
 
-static void getZoomMatrix(float zoom, FLOAT matrix[static 16]) {
+static void getZoomMatrix(float zoom, FLOAT matrix[16]) {
 
     const FLOAT m[] = {
         /* x   y     z     w */
@@ -1048,7 +1048,7 @@ static void getZoomMatrix(float zoom, FLOAT matrix[static 16]) {
 }
 
 /* perspective matrix see https://www.opengl.org/sdk/docs/man2/xhtml/gluPerspective.xml */
-static void getProjectionMatrix(float sar, float fovy, FLOAT matrix[static 16]) {
+static void getProjectionMatrix(float sar, float fovy, FLOAT matrix[16]) {
 
     float zFar  = 1000;
     float zNear = 0.01;
@@ -2500,7 +2500,7 @@ static void Direct3D11DestroyPool(vout_display_t *vd)
  * Vertex 0 should be assigned coordinates at index 2 from the
  * unrotated order and so on, thus yielding order: 2 3 0 1.
  */
-static void orientationVertexOrder(video_orientation_t orientation, int vertex_order[static 4])
+static void orientationVertexOrder(video_orientation_t orientation, int vertex_order[4])
 {
     switch (orientation) {
         case ORIENT_ROTATED_90:

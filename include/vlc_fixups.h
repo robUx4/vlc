@@ -107,6 +107,11 @@ typedef struct
 # include <sys/types.h> /* ssize_t, pid_t */
 #endif
 
+#if defined(_MSC_VER) && !defined(__clang__)
+#undef restrict
+#define restrict
+#endif
+
 #if !defined (HAVE_DIRFD) || \
     !defined (HAVE_FDOPENDIR)
 # include <dirent.h>
@@ -134,6 +139,9 @@ typedef struct {
   long long ll;
   long double ld;
 } max_align_t;
+#endif
+#ifdef _MSC_VER
+#define alignas(x)  __declspec(align( 32 ))
 #endif
 
 /* stdio.h */
@@ -172,7 +180,7 @@ int ffsll(long long);
 void *memrchr(const void *, int, size_t);
 #endif
 
-#ifndef HAVE_STRCASECMP
+#if !defined(HAVE_STRCASECMP) && !defined(strcasecmp)
 int strcasecmp (const char *, const char *);
 #endif
 
@@ -180,7 +188,9 @@ int strcasecmp (const char *, const char *);
 char *strcasestr (const char *, const char *);
 #endif
 
-#ifndef HAVE_STRDUP
+#if defined(_MSC_VER) && _MSC_VER >= 1900 && !defined(strdup)
+#define strdup(x) _strdup(x)
+#elif !defined(HAVE_STRDUP)
 char *strdup (const char *);
 #endif
 
@@ -228,7 +238,7 @@ lldiv_t lldiv (long long, long long);
 #endif
 
 #ifndef HAVE_STRTOF
-#ifndef __ANDROID__
+#if !defined(__ANDROID__) && defined(_MSC_VER) && _MSC_VER < 1900
 float strtof (const char *, char **);
 #endif
 #endif
@@ -349,8 +359,13 @@ static inline locale_t newlocale(int mask, const char * locale, locale_t base)
 #endif
 
 /* libintl support */
-#define _(str)            vlc_gettext (str)
-#define N_(str)           gettext_noop (str)
+#ifndef _
+#	define _(str)            vlc_gettext (str)
+#endif
+
+#ifndef N_
+# 	define N_(str)           gettext_noop (str)
+#endif
 #define gettext_noop(str) (str)
 
 #ifdef __cplusplus
@@ -459,6 +474,9 @@ ssize_t sendmsg(int, const struct msghdr *, int);
 #endif
 
 /* search.h */
+#ifdef _MSC_VER
+#undef HAVE_SEARCH_H // MSVC doesn't provide some of the stuff we're interested in
+#endif
 #ifndef HAVE_SEARCH_H
 typedef struct entry {
     char *key;
@@ -609,7 +627,7 @@ static const struct in6_addr in6addr_any =
 
 /* math.h */
 
-#ifndef HAVE_NANF
+#if !defined(HAVE_NANF) && defined(_MSC_VER) && _MSC_VER < 1900
 #define nanf(tagp) NAN
 #endif
 

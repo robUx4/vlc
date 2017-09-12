@@ -21,6 +21,9 @@ ifdef HAVE_ANDROID
 	$(APPLY) $(SRC)/vpx/libvpx-android.patch
 endif
 	$(APPLY) $(SRC)/vpx/windows-pthread.patch
+	$(APPLY) $(SRC)/vpx/libvpx-msvc.patch
+	$(APPLY) $(SRC)/vpx/msvc.patch
+	$(APPLY) $(SRC)/vpx/libvpx-clang.patch
 	$(MOVE)
 
 DEPS_vpx =
@@ -74,7 +77,11 @@ endif
 VPX_TARGET := generic-gnu
 ifdef VPX_ARCH
 ifdef VPX_OS
+ifdef HAVE_VISUALSTUDIO
+VPX_TARGET := $(VPX_ARCH)-$(VPX_OS)-vsgcc
+else
 VPX_TARGET := $(VPX_ARCH)-$(VPX_OS)-gcc
+endif
 endif
 endif
 
@@ -92,10 +99,17 @@ ifndef BUILD_ENCODERS
 VPX_CONF += --disable-vp8-encoder --disable-vp9-encoder
 endif
 
+ifdef HAVE_VISUALSTUDIO
+VPX_CONF += --disable-sse2 --disable-ssse3 --disable-avx2 --disable-neon
+endif
+
 ifndef HAVE_WIN32
 VPX_CONF += --enable-pic
 else
 VPX_CONF += --extra-cflags="-mstackrealign"
+endif
+ifdef HAVE_WIN64
+VPX_CONF += --as=yasm
 endif
 ifdef HAVE_MACOSX
 VPX_CONF += --sdk-path=$(MACOSX_SDK) --extra-cflags="$(EXTRA_CFLAGS)"
@@ -124,7 +138,7 @@ endif
 endif
 
 ifndef WITH_OPTIMIZATION
-VPX_CONF += --enable-debug --disable-optimizations
+VPX_CONF += --disable-optimizations
 endif
 
 .vpx: libvpx
@@ -133,4 +147,7 @@ endif
 	cd $< && $(MAKE)
 	cd $< && ../../../contrib/src/pkg-static.sh vpx.pc
 	cd $< && $(MAKE) install
+ifdef HAVE_VISUALSTUDIO
+	cd $< && cp "$(PREFIX)/lib/libvpx.a" "$(PREFIX)/lib/vpx.lib"
+endif
 	touch $@

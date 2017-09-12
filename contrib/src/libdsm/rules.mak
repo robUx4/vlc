@@ -21,6 +21,7 @@ endif
 libdsm: libdsm-$(LIBDSM_VERSION).tar.gz .sum-libdsm
 	$(UNPACK)
 	$(APPLY) $(SRC)/libdsm/winstore.patch
+	$(APPLY) $(SRC)/libdsm/sys-time.patch
 	$(MOVE)
 
 DEPS_libdsm = libtasn1 iconv
@@ -29,6 +30,7 @@ DEPS_libdsm += pthreads $(DEPS_pthreads)
 endif
 
 .libdsm: libdsm
+	$(RECONF)
 	cd $< && $(HOSTVARS) ./configure --disable-programs $(LIBDSM_CONF)
 	cd $< && $(MAKE) install
 	touch $@

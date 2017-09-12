@@ -168,7 +168,9 @@ char *vlc_path2uri (const char *path, const char *scheme)
                       path[0]) == -1)
             buf = NULL;
         path += 2;
+# ifndef _MSC_VER
 # warning Drive letter-relative path not implemented!
+#endif
         if (path[0] != DIR_SEP_CHAR)
         {
             errno = ENOTSUP;
