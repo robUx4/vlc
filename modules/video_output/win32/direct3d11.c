@@ -1710,8 +1710,6 @@ static int Direct3D11Open(vout_display_t *vd, video_format_t *fmt)
         scd.Format = DXGI_FORMAT_R8G8B8A8_UNORM; /* TODO: use DXGI_FORMAT_NV12 */
         break;
     }
-    //scd.Flags = 512; // DXGI_SWAP_CHAIN_FLAG_YUV_VIDEO;
-    scd.SwapEffect = DXGI_SWAP_EFFECT_FLIP_SEQUENTIAL;
 
     static const D3D_DRIVER_TYPE driverAttempts[] = {
         D3D_DRIVER_TYPE_HARDWARE,
@@ -1758,11 +1756,18 @@ static int Direct3D11Open(vout_display_t *vd, video_format_t *fmt)
        return VLC_EGENERIC;
     }
 
-    hr = IDXGIAdapter_GetParent(dxgiadapter, &IID_IDXGIFactory2, (void **)&dxgifactory);
-    IDXGIAdapter_Release(dxgiadapter);
-    if (FAILED(hr)) {
-       msg_Err(vd, "Could not get the DXGI Factory. (hr=0x%lX)", hr);
-       return VLC_EGENERIC;
+    hr = IDXGIAdapter_GetParent(dxgiadapter, &IID_IDXGIFactory4, (void **)&dxgifactory);
+    if (SUCCEEDED(hr)) {
+        IDXGIAdapter_Release(dxgiadapter);
+        scd.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
+    } else {
+        hr = IDXGIAdapter_GetParent(dxgiadapter, &IID_IDXGIFactory2, (void **)&dxgifactory);
+        IDXGIAdapter_Release(dxgiadapter);
+        if (FAILED(hr)) {
+           msg_Err(vd, "Could not get the DXGI Factory. (hr=0x%lX)", hr);
+           return VLC_EGENERIC;
+        }
+        scd.SwapEffect = DXGI_SWAP_EFFECT_FLIP_SEQUENTIAL;
     }
 
     hr = IDXGIFactory2_CreateSwapChainForHwnd(dxgifactory, (IUnknown *)sys->d3ddevice,
