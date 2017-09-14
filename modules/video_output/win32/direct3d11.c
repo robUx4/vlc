@@ -50,6 +50,8 @@
 
 #include "common.h"
 
+#define SWAPCHAIN_WAITABLE  1
+
 #if !VLC_WINSTORE_APP
 # define D3D11CreateDevice(args...)             sys->OurD3D11CreateDevice(args)
 # define D3DCompile(args...)                    sys->OurD3DCompile(args)
@@ -142,6 +144,10 @@ struct vout_display_sys_t
                                                   for hw decoding */
 #endif
     IDXGISwapChain1          *dxgiswapChain;   /* DXGI 1.2 swap chain */
+#if SWAPCHAIN_WAITABLE
+    IDXGISwapChain2          *dxgiswapChain2;  /* DXGI 1.3 for waitable */
+    HANDLE                   hSwapchainWaitable;
+#endif
     IDXGISwapChain4          *dxgiswapChain4;  /* DXGI 1.5 for HDR */
     ID3D11Device             *d3ddevice;       /* D3D device */
     ID3D11DeviceContext      *d3dcontext;      /* D3D context */
@@ -920,9 +926,15 @@ static HRESULT UpdateBackBuffer(vout_display_t *vd)
         sys->d3ddepthStencilView = NULL;
     }
 
+    UINT SwapChainFlags = 0;
+#if SWAPCHAIN_WAITABLE
+    if (sys->hSwapchainWaitable != INVALID_HANDLE_VALUE)
+        SwapChainFlags |= DXGI_SWAP_CHAIN_FLAG_FRAME_LATENCY_WAITABLE_OBJECT;
+#endif
     /* TODO detect is the size is the same as the output and switch to fullscreen mode */
     hr = IDXGISwapChain_ResizeBuffers(sys->dxgiswapChain, 0, i_width, i_height,
-        DXGI_FORMAT_UNKNOWN, 0);
+        DXGI_FORMAT_UNKNOWN,
+        SwapChainFlags);
     if (FAILED(hr)) {
        msg_Err(vd, "Failed to resize the backbuffer. (hr=0x%lX)", hr);
        return hr;
@@ -1401,6 +1413,19 @@ static void Prepare(vout_display_t *vd, picture_t *picture, subpicture_t *subpic
         IDXGISwapChain4_SetHDRMetaData(sys->dxgiswapChain4, DXGI_HDR_METADATA_TYPE_HDR10, sizeof(hdr10), &hdr10);
     }
 
+#if SWAPCHAIN_WAITABLE
+    if (sys->hSwapchainWaitable != INVALID_HANDLE_VALUE)
+    {
+        DWORD MaxWait;
+        if (picture->format.i_frame_rate_base && picture->format.i_frame_rate)
+            MaxWait = (picture->b_progressive ? 1000 : 2000) *
+                      picture->format.i_frame_rate_base / picture->format.i_frame_rate;
+        else
+            MaxWait = 40; /* 25fps */
+        WaitForSingleObjectEx(sys->hSwapchainWaitable, MaxWait, FALSE);
+    }
+#endif
+
     //ID3D11DeviceContext_Flush(sys->d3dcontext);
 }
 
@@ -1641,12 +1666,11 @@ static int Direct3D11Open(vout_display_t *vd, video_format_t *fmt)
 {
     vout_display_sys_t *sys = vd->sys;
     IDXGIFactory2 *dxgifactory;
+    HRESULT hr = S_OK;
 
 #if !VLC_WINSTORE_APP
 
     UINT creationFlags = 0;
-    HRESULT hr = S_OK;
-
 # if !defined(NDEBUG)
 #  if !VLC_WINSTORE_APP
     if (IsDebuggerPresent())
@@ -1739,6 +1763,9 @@ static int Direct3D11Open(vout_display_t *vd, video_format_t *fmt)
         }
         scd.SwapEffect = DXGI_SWAP_EFFECT_FLIP_SEQUENTIAL;
     }
+#if SWAPCHAIN_WAITABLE
+    scd.Flags |= DXGI_SWAP_CHAIN_FLAG_FRAME_LATENCY_WAITABLE_OBJECT;
+#endif
 
     hr = IDXGIFactory2_CreateSwapChainForHwnd(dxgifactory, (IUnknown *)sys->d3ddevice,
                                               sys->sys.hvideownd, &scd, NULL, NULL, &sys->dxgiswapChain);
@@ -1749,6 +1776,15 @@ static int Direct3D11Open(vout_display_t *vd, video_format_t *fmt)
     }
 #endif
 
+    sys->hSwapchainWaitable = INVALID_HANDLE_VALUE;
+#if SWAPCHAIN_WAITABLE
+    hr = IDXGISwapChain_QueryInterface( sys->dxgiswapChain, &IID_IDXGISwapChain2, (void **)&sys->dxgiswapChain2);
+    if (SUCCEEDED(hr))
+    {
+        if (SUCCEEDED(IDXGISwapChain2_SetMaximumFrameLatency(sys->dxgiswapChain2, 2)))
+            sys->hSwapchainWaitable = IDXGISwapChain2_GetFrameLatencyWaitableObject(sys->dxgiswapChain2);
+    }
+#endif
     IDXGISwapChain_QueryInterface( sys->dxgiswapChain, &IID_IDXGISwapChain4, (void **)&sys->dxgiswapChain4);
 
     D3D11SetColorSpace(vd);
@@ -1859,6 +1895,13 @@ static void Direct3D11Close(vout_display_t *vd)
         IDXGISwapChain_Release(sys->dxgiswapChain4);
         sys->dxgiswapChain4 = NULL;
     }
+#if SWAPCHAIN_WAITABLE
+    if (sys->dxgiswapChain2)
+    {
+        IDXGISwapChain_Release(sys->dxgiswapChain2);
+        sys->dxgiswapChain2 = NULL;
+    }
+#endif
     if (sys->dxgiswapChain)
     {
         IDXGISwapChain_Release(sys->dxgiswapChain);
