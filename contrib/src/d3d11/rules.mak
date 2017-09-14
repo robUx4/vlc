@@ -8,14 +8,17 @@ IDL_INC_PATH = /`echo $(MSYSTEM) | tr A-Z a-z`/$(BUILD)/include
 endif
 
 D3D11_COMMIT_ID := a0cd5afeb60be3be0860e9a203314c10485bb9b8
+DXGI_COMMIT_ID := 4143271759d986807a5cafbe78f67d11ac43892c
 DXGI12_COMMIT_ID := 790a6544347b53c314b9c6f1ea757a2d5504c67e
 DXGITYPE_COMMIT_ID := f4aba520d014ecfe3563e33860de001caf2804e2
 D3D11_IDL_URL := http://sourceforge.net/p/mingw-w64/mingw-w64/ci/$(D3D11_COMMIT_ID)/tree/mingw-w64-headers/direct-x/include/d3d11.idl?format=raw
+DXGI_IDL_URL := http://sourceforge.net/p/mingw-w64/mingw-w64/ci/$(DXGI_COMMIT_ID)/tree/mingw-w64-headers/direct-x/include/dxgi.idl?format=raw
 DXGI12_IDL_URL := http://sourceforge.net/p/mingw-w64/mingw-w64/ci/$(DXGI12_COMMIT_ID)/tree/mingw-w64-headers/direct-x/include/dxgi1_2.idl?format=raw
 DXGITYPE_H_URL := http://sourceforge.net/p/mingw-w64/mingw-w64/ci/$(DXGITYPE_COMMIT_ID)/tree/mingw-w64-headers/direct-x/include/dxgitype.h?format=raw
 DST_D3D11_H = $(PREFIX)/include/d3d11.h
 DST_DXGIDEBUG_H = $(PREFIX)/include/dxgidebug.h
 DST_DXGITYPE_H = $(PREFIX)/include/dxgitype.h
+DST_DXGI_H   = $(PREFIX)/include/dxgi.h
 DST_DXGI12_H = $(PREFIX)/include/dxgi1_2.h
 DST_DXGI13_H = $(PREFIX)/include/dxgi1_3.h
 DST_DXGI14_H = $(PREFIX)/include/dxgi1_4.h
@@ -35,17 +38,24 @@ $(TARBALLS)/d3d11.idl:
 $(TARBALLS)/dxgidebug.idl:
 	(cd $(TARBALLS) && patch -fp1) < $(SRC)/d3d11/dxgidebug.patch
 
+$(TARBALLS)/dxgi.idl:
+	$(call download,$(DXGI_IDL_URL))
+
 $(TARBALLS)/dxgi1_2.idl:
 	$(call download,$(DXGI12_IDL_URL))
 
 $(TARBALLS)/dxgitype.h:
 	$(call download,$(DXGITYPE_H_URL))
 
-.sum-d3d11: $(TARBALLS)/d3d11.idl $(TARBALLS)/dxgidebug.idl $(TARBALLS)/dxgi1_2.idl $(TARBALLS)/dxgitype.h
+.sum-d3d11: $(TARBALLS)/d3d11.idl $(TARBALLS)/dxgidebug.idl $(TARBALLS)/dxgi.idl $(TARBALLS)/dxgi1_2.idl $(TARBALLS)/dxgitype.h
 
 d3d11: .sum-d3d11
 	mkdir -p $@
 	cp $(TARBALLS)/d3d11.idl $@ && cd $@ && patch -fp1 < ../$(SRC)/d3d11/processor_format.patch
+
+dxgi: .sum-d3d11
+	mkdir -p $@
+	cp $(TARBALLS)/dxgi.idl $@ && cd $@ && patch -fp1 < ../$(SRC)/d3d11/dxgi.patch
 
 dxgi12: .sum-d3d11
 	mkdir -p $@
@@ -63,7 +73,11 @@ $(DST_DXGITYPE_H): $(TARBALLS)/dxgitype.h
 	mkdir -p -- "$(PREFIX)/include/"
 	cp $(TARBALLS)/dxgitype.h $@
 
-$(DST_DXGI12_H): dxgi12
+$(DST_DXGI_H): dxgi
+	mkdir -p -- "$(PREFIX)/include/"
+	$(WIDL) -DBOOL=WINBOOL -I$(IDL_INC_PATH) -h -o $@ $</dxgi.idl
+
+$(DST_DXGI12_H): dxgi12 $(DST_DXGI_H)
 	mkdir -p -- "$(PREFIX)/include/"
 	$(WIDL) -DBOOL=WINBOOL -I$(IDL_INC_PATH) -h -o $@ $</dxgi1_2.idl
 
@@ -86,7 +100,10 @@ $(DST_DXGI16_H): $(SRC)/d3d11/dxgi1_6.idl $(DST_DXGI15_H)
 .dxgitype: $(DST_DXGITYPE_H)
 	touch $@
 
-.dxgi12: .dxgitype $(DST_DXGI12_H)
+.dxgi: .dxgitype $(DST_DXGI_H)
+	touch $@
+
+.dxgi12: .dxgi $(DST_DXGI12_H)
 	touch $@
 
 .dxgi13: .dxgi12 $(DST_DXGI13_H)
