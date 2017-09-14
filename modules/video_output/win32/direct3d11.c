@@ -927,15 +927,15 @@ static HRESULT UpdateBackBuffer(vout_display_t *vd)
         sys->d3ddepthStencilView = NULL;
     }
 
+    UINT SwapChainFlags = 0;
+#if SWAPCHAIN_WAITABLE
+    if (sys->hSwapchainWaitable != INVALID_HANDLE_VALUE)
+        SwapChainFlags |= DXGI_SWAP_CHAIN_FLAG_FRAME_LATENCY_WAITABLE_OBJECT;
+#endif
     /* TODO detect is the size is the same as the output and switch to fullscreen mode */
     hr = IDXGISwapChain_ResizeBuffers(sys->dxgiswapChain, 0, i_width, i_height,
         DXGI_FORMAT_UNKNOWN,
-#if SWAPCHAIN_WAITABLE
-        DXGI_SWAP_CHAIN_FLAG_FRAME_LATENCY_WAITABLE_OBJECT
-#else
-        0
-#endif
-    );
+        SwapChainFlags);
     if (FAILED(hr)) {
        msg_Err(vd, "Failed to resize the backbuffer. (hr=0x%lX)", hr);
        return hr;
@@ -1671,12 +1671,11 @@ static int Direct3D11Open(vout_display_t *vd, video_format_t *fmt)
 {
     vout_display_sys_t *sys = vd->sys;
     IDXGIFactory2 *dxgifactory;
+    HRESULT hr = S_OK;
 
 #if !VLC_WINSTORE_APP
 
     UINT creationFlags = 0;
-    HRESULT hr = S_OK;
-
 # if !defined(NDEBUG)
 #  if !VLC_WINSTORE_APP
     if (IsDebuggerPresent())
@@ -1782,15 +1781,14 @@ static int Direct3D11Open(vout_display_t *vd, video_format_t *fmt)
     }
 #endif
 
+    sys->hSwapchainWaitable = INVALID_HANDLE_VALUE;
 #if SWAPCHAIN_WAITABLE
     hr = IDXGISwapChain_QueryInterface( sys->dxgiswapChain, &IID_IDXGISwapChain2, (void **)&sys->dxgiswapChain2);
     if (SUCCEEDED(hr))
     {
-        IDXGISwapChain2_SetMaximumFrameLatency(sys->dxgiswapChain2, 2);
-        sys->hSwapchainWaitable = IDXGISwapChain2_GetFrameLatencyWaitableObject(sys->dxgiswapChain2);
+        if (SUCCEEDED(IDXGISwapChain2_SetMaximumFrameLatency(sys->dxgiswapChain2, 2)))
+            sys->hSwapchainWaitable = IDXGISwapChain2_GetFrameLatencyWaitableObject(sys->dxgiswapChain2);
     }
-    else
-        sys->hSwapchainWaitable = INVALID_HANDLE_VALUE;
 #endif
     IDXGISwapChain_QueryInterface( sys->dxgiswapChain, &IID_IDXGISwapChain4, (void **)&sys->dxgiswapChain4);
 
