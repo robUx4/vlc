@@ -671,7 +671,7 @@ static block_t *qsv_synchronize_block(encoder_t *enc, QSVpacket *qsv_pkt)
     } while (sts == MFX_WRN_IN_EXECUTION);
     if (sts != MFX_ERR_NONE) {
         msg_Err(enc, "SyncOperation failed, outputting garbage data. "
-                "Updating your drivers and/or changing the encoding settings might resolve this");
+                "Updating your drivers and/or changing the encoding settings might resolve this, %d", sts);
         return NULL;
     }
     block_t *block = qsv_pkt->block;
