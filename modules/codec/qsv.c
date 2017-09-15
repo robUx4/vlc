@@ -455,12 +455,6 @@ static int Open(vlc_object_t *this)
     msg_Dbg(enc, "Using Intel QuickSync Video %s implementation",
         impl & MFX_IMPL_HARDWARE ? "hardware" : "software");
 
-    /* Vlc module configuration */
-    enc->p_sys                         = sys;
-    enc->fmt_in.i_codec                = VLC_CODEC_NV12; // Intel Media SDK requirement
-    enc->fmt_in.video.i_chroma         = VLC_CODEC_NV12;
-    enc->fmt_in.video.i_bits_per_pixel = 12;
-
     /* Input picture format description */
     sys->params.mfx.FrameInfo.FrameRateExtN = enc->fmt_in.video.i_frame_rate;
     sys->params.mfx.FrameInfo.FrameRateExtD = enc->fmt_in.video.i_frame_rate_base;
@@ -601,6 +595,12 @@ static int Open(vlc_object_t *this)
 
     sys->async_depth = sys->params.AsyncDepth;
     qsvpacket_fifo_Init(&sys->packets);
+
+    /* Vlc module configuration */
+    enc->p_sys                         = sys;
+    enc->fmt_in.i_codec                = VLC_CODEC_NV12; // Intel Media SDK requirement
+    enc->fmt_in.video.i_chroma         = VLC_CODEC_NV12;
+    enc->fmt_in.video.i_bits_per_pixel = 12;
 
     enc->pf_encode_video = Encode;
 
