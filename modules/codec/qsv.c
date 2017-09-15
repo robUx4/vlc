@@ -272,7 +272,7 @@ typedef struct _QSVFrame
     int               used;
 } QSVFrame;
 
-typedef struct QSVpacket
+typedef struct
 {
     fifo_item_t      fifo;
     mfxBitstream     bs;                  // Intel's bitstream structure.
