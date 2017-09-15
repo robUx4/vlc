@@ -827,7 +827,7 @@ static block_t *Encode(encoder_t *this, picture_t *pic)
     if (likely(qsv_pkt != NULL))
         qsvpacket_fifo_Put(&sys->packets, qsv_pkt);
 
-    if ( qsvpacket_fifo_GetCount(&sys->packets) == sys->async_depth ||
+    if ( qsvpacket_fifo_GetCount(&sys->packets) == (sys->async_depth + 1) ||
          (!pic && qsvpacket_fifo_GetCount(&sys->packets)))
     {
         assert(*qsvpacket_fifo_Show(&sys->packets)->syncp != 0);
