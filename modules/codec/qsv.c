@@ -293,6 +293,13 @@ struct encoder_sys_t
     fifo_t           packets;             // FIFO of queued packets
     mtime_t          offset_pts;          // The pts of the first frame, to avoid conversion overflow.
     mtime_t          last_dts;            // The dts of the last frame, to interpolate over buggy dts
+
+    mfxExtCodingOption co;
+#if QSV_HAVE_CO2
+    mfxExtCodingOption2 co2;
+#endif
+    mfxExtBuffer *init_params[2];
+    mfxFrameAllocRequest alloc_request;
 };
 
 static block_t *Encode(encoder_t *, picture_t *);
@@ -383,35 +390,10 @@ static int Open(vlc_object_t *this)
     encoder_sys_t *sys = NULL;
 
     mfxStatus sts = MFX_ERR_NONE;
-    mfxFrameAllocRequest alloc_request = { 0 };
     uint8_t sps_buf[128];
     uint8_t pps_buf[128];
     mfxExtCodingOptionSPSPPS headers;
-    mfxExtCodingOption co = {
-        .Header.BufferId = MFX_EXTBUFF_CODING_OPTION,
-        .Header.BufferSz = sizeof(co),
-        .PicTimingSEI = MFX_CODINGOPTION_ON,
-    };
-#if QSV_HAVE_CO2
-    mfxExtCodingOption2 co2 = {
-        .Header.BufferId = MFX_EXTBUFF_CODING_OPTION2,
-        .Header.BufferSz = sizeof(co2),
-    };
-#endif
-    mfxExtBuffer *init_params[] =
-    {
-        (mfxExtBuffer*)&co,
-#if QSV_HAVE_CO2
-        (mfxExtBuffer*)&co2,
-#endif
-    };
-    mfxExtBuffer *extended_params[] = {
-        (mfxExtBuffer*)&headers,
-        (mfxExtBuffer*)&co,
-#if QSV_HAVE_CO2
-        (mfxExtBuffer*)&co2,
-#endif
-    };
+
     mfxVersion    ver = { { 1, 1 } };
     mfxIMPL       impl;
     mfxVideoParam param_out = { 0 };
@@ -433,6 +415,31 @@ static int Open(vlc_object_t *this)
     sys = calloc(1, sizeof(encoder_sys_t));
     if (unlikely(!sys))
         return VLC_ENOMEM;
+
+    sys->co = (mfxExtCodingOption) {
+        .Header.BufferId = MFX_EXTBUFF_CODING_OPTION,
+        .Header.BufferSz = sizeof(sys->co),
+        .PicTimingSEI = MFX_CODINGOPTION_ON,
+    };
+#if QSV_HAVE_CO2
+     sys->co2 = (mfxExtCodingOption2) {
+        .Header.BufferId = MFX_EXTBUFF_CODING_OPTION2,
+        .Header.BufferSz = sizeof(sys->co2),
+    };
+#endif
+
+    sys->init_params[0] = (mfxExtBuffer*)&sys->co;
+#if QSV_HAVE_CO2
+    sys->init_params[1] = (mfxExtBuffer*)&sys->co2;
+#endif
+
+    mfxExtBuffer *extended_params[] = {
+        (mfxExtBuffer*)&headers,
+        (mfxExtBuffer*)&sys->co,
+#if QSV_HAVE_CO2
+        (mfxExtBuffer*)&sys->co2,
+#endif
+    };
 
     /* Initialize dispatcher, it will loads the actual SW/HW Implementation */
     sts = MFXInit(MFX_IMPL_AUTO_ANY, &ver, &sys->session);
@@ -549,13 +556,13 @@ static int Open(vlc_object_t *this)
     }
 
     /* Request number of surface needed and creating frame pool */
-    if (MFXVideoENCODE_QueryIOSurf(sys->session, &sys->params, &alloc_request)!= MFX_ERR_NONE)
+    if (MFXVideoENCODE_QueryIOSurf(sys->session, &sys->params, &sys->alloc_request)!= MFX_ERR_NONE)
     {
         msg_Err(enc, "Failed to query for allocation");
         goto error;
     }
 
-    sys->params.ExtParam    = (mfxExtBuffer**)&init_params;
+    sys->params.ExtParam    = (mfxExtBuffer**)&sys->init_params;
     sys->params.NumExtParam =
 #if QSV_HAVE_CO2
             2;
