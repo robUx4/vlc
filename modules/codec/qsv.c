@@ -747,6 +747,7 @@ static QSVpacket *encode_frame(encoder_t *enc, picture_t *pic)
     mfxStatus sts = MFX_ERR_MEMORY_ALLOC;
     QSVFrame *qsv_frame = NULL;
     mfxFrameSurface1 *surf = NULL;
+    mfxEncodeCtrl* enc_ctrl = NULL;
     QSVpacket *qsv_pkt = calloc(1, sizeof(*qsv_pkt));
     if (unlikely(qsv_pkt == NULL))
         goto done;
@@ -781,10 +782,11 @@ static QSVpacket *encode_frame(encoder_t *enc, picture_t *pic)
 
     if (qsv_frame) {
         surf = &qsv_frame->surface;
+        enc_ctrl = &qsv_frame->enc_ctrl;
     }
 
     for (;;) {
-        sts = MFXVideoENCODE_EncodeFrameAsync(sys->session, 0, surf, &qsv_pkt->bs, qsv_pkt->syncp);
+        sts = MFXVideoENCODE_EncodeFrameAsync(sys->session, enc_ctrl, surf, &qsv_pkt->bs, qsv_pkt->syncp);
         if (sts != MFX_WRN_DEVICE_BUSY && sts != MFX_WRN_IN_EXECUTION)
             break;
         if (sys->busy_warn_counter++ % 16 == 0)
