@@ -395,7 +395,7 @@ static int Open(vlc_object_t *this)
     mfxExtCodingOptionSPSPPS headers;
 
     mfxVersion    ver = { { 1, 1 } };
-    mfxIMPL       impl;
+    mfxIMPL       impl = MFX_IMPL_AUTO_ANY;
     mfxVideoParam param_out = { 0 };
 
     uint8_t *p_extra;
@@ -474,8 +474,8 @@ static int Open(vlc_object_t *this)
     sys->params.mfx.FrameInfo.CropW         = enc->fmt_in.video.i_visible_width;
     sys->params.mfx.FrameInfo.CropH         = enc->fmt_in.video.i_visible_height;
     sys->params.mfx.FrameInfo.PicStruct     = MFX_PICSTRUCT_PROGRESSIVE;
-    sys->params.mfx.FrameInfo.AspectRatioH  = enc->fmt_in.video.i_sar_num;
-    sys->params.mfx.FrameInfo.AspectRatioW  = enc->fmt_in.video.i_sar_den;
+    sys->params.mfx.FrameInfo.AspectRatioH  = 1; /* TODO enc->fmt_in.video.i_sar_num; */
+    sys->params.mfx.FrameInfo.AspectRatioW  = 1; /* TODO enc->fmt_in.video.i_sar_den; */
     sys->params.mfx.FrameInfo.BitDepthChroma = 8; /* for VLC_CODEC_NV12 */
     sys->params.mfx.FrameInfo.BitDepthLuma   = 8; /* for VLC_CODEC_NV12 */
 
@@ -589,6 +589,9 @@ static int Open(vlc_object_t *this)
     headers.SPSBufSize      = sizeof(sps_buf);
     headers.SPSBuffer       = sps_buf;
     headers.PPSBuffer       = pps_buf;
+
+    sys->co.PicTimingSEI = 0;
+
     sys->params.ExtParam    = (mfxExtBuffer **)&extended_params;
     sys->params.NumExtParam =
 #if QSV_HAVE_CO2
@@ -598,6 +601,8 @@ static int Open(vlc_object_t *this)
 #endif
 
     MFXVideoENCODE_GetVideoParam(sys->session, &sys->params);
+
+    sys->params.mfx.FrameInfo.AspectRatioW = 1;
 
     i_extra = headers.SPSBufSize + headers.PPSBufSize;
     p_extra = malloc(i_extra);
