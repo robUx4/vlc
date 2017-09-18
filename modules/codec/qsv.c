@@ -415,6 +415,7 @@ static int Open(vlc_object_t *this)
     mfxVersion    ver = { { 1, 1 } };
     mfxIMPL       impl;
     mfxVideoParam param_out = { 0 };
+    mfxSession    parent_session;
 
     uint8_t *p_extra;
     size_t i_extra;
@@ -434,27 +435,28 @@ static int Open(vlc_object_t *this)
     if (unlikely(!sys))
         return VLC_ENOMEM;
 
-    /* Initialize dispatcher, it will loads the actual SW/HW Implementation */
-    sts = MFXInit(MFX_IMPL_AUTO_ANY, &ver, &sys->session);
+    config_ChainParse(enc, SOUT_CFG_PREFIX, sout_options, enc->p_cfg);
 
+    /* Initialize dispatcher, it will loads the actual SW/HW Implementation */
+    impl = var_InheritBool(enc, SOUT_CFG_PREFIX "software") ? MFX_IMPL_AUTO_ANY : MFX_IMPL_HARDWARE_ANY;
+    sts = MFXInit(impl, &ver, &parent_session);
     if (sts != MFX_ERR_NONE) {
         msg_Err(enc, "Unable to find an Intel Media SDK implementation.");
         free(sys);
         return VLC_EGENERIC;
     }
 
-    config_ChainParse(enc, SOUT_CFG_PREFIX, sout_options, enc->p_cfg);
-
     /* Checking if we are on software and are allowing it */
-    MFXQueryIMPL(sys->session, &impl);
-    if (!var_InheritBool(enc, SOUT_CFG_PREFIX "software") && (impl & MFX_IMPL_SOFTWARE)) {
+    impl = MFX_IMPL_AUTO_ANY;
+    sts = MFXQueryIMPL(parent_session, &impl);
+    if ( unlikely(sts != MFX_ERR_NONE) ||
+         ((impl & MFX_IMPL_SOFTWARE) && !var_InheritBool(enc, SOUT_CFG_PREFIX "software")) )
+    {
         msg_Err(enc, "No hardware implementation found and software mode disabled");
+        MFXClose(parent_session);
         free(sys);
         return VLC_EGENERIC;
     }
-
-    msg_Dbg(enc, "Using Intel QuickSync Video %s implementation",
-        impl & MFX_IMPL_HARDWARE ? "hardware" : "software");
 
     /* Input picture format description */
     sys->params.mfx.FrameInfo.FrameRateExtN = enc->fmt_in.video.i_frame_rate;
@@ -534,25 +536,47 @@ static int Open(vlc_object_t *this)
             sys->params.mfx.MaxKbps = var_InheritInteger(enc, SOUT_CFG_PREFIX "bitrate-max");
     }
 
-    if ( MFXVideoENCODE_Query(sys->session, &sys->params, &param_out) < 0 ||
+    if ( MFXVideoENCODE_Query(parent_session, &sys->params, &param_out) < 0 ||
          sys->params.mfx.RateControlMethod != param_out.mfx.RateControlMethod )
     {
         msg_Err(enc, "Unsupported control method");
+        MFXClose(parent_session);
         goto error;
     }
 
-    if (MFXVideoENCODE_Query(sys->session, &sys->params, &sys->params) < 0)
+    if (MFXVideoENCODE_Query(parent_session, &sys->params, &sys->params) < 0)
     {
         msg_Err(enc, "Error querying encoder params");
+        MFXClose(parent_session);
         goto error;
     }
 
     /* Request number of surface needed and creating frame pool */
-    if (MFXVideoENCODE_QueryIOSurf(sys->session, &sys->params, &alloc_request)!= MFX_ERR_NONE)
+    if (MFXVideoENCODE_QueryIOSurf(parent_session, &sys->params, &alloc_request)!= MFX_ERR_NONE)
     {
         msg_Err(enc, "Failed to query for allocation");
+        MFXClose(parent_session);
         goto error;
     }
+
+    sts = MFXQueryVersion(parent_session, &ver);
+    if (unlikely(sts != MFX_ERR_NONE))
+    {
+        msg_Err(enc, "Failed to query the installed versions");
+        MFXClose(parent_session);
+        goto error;
+    }
+
+    MFXClose(parent_session);
+    sts = MFXInit(impl, &ver, &sys->session);
+
+    if (sts != MFX_ERR_NONE) {
+        msg_Err(enc, "Unable to find an Intel Media SDK implementation.");
+        free(sys);
+        return VLC_EGENERIC;
+    }
+    msg_Dbg(enc, "Using Intel QuickSync Video %s implementation (0x%04x)",
+        impl & MFX_IMPL_HARDWARE ? "hardware" : "software", impl);
 
     sys->params.ExtParam    = (mfxExtBuffer**)&init_params;
     sys->params.NumExtParam =
