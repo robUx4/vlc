@@ -41,6 +41,9 @@
 
 #define QSV_HAVE_CO2 (MFX_VERSION_MAJOR > 1 || (MFX_VERSION_MAJOR == 1 && MFX_VERSION_MINOR >= 6))
 
+//#define QSV_TS_OFFSET  171333759600U
+#define QSV_TS_OFFSET  32197327200U
+
 /* Default wait on libavcodec */
 #define QSV_SYNCPOINT_WAIT  (1000)
 /* Encoder input synchronization busy wait loop time */
@@ -307,12 +310,12 @@ static block_t *Encode(encoder_t *, picture_t *);
 
 static inline mtime_t qsv_timestamp_to_mtime(int64_t mfx_ts)
 {
-    return mfx_ts / INT64_C(9) * INT64_C(100);
+    return (mfx_ts - QSV_TS_OFFSET) / INT64_C(9) * INT64_C(100);
 }
 
 static inline uint64_t qsv_mtime_to_timestamp(mtime_t vlc_ts)
 {
-    return vlc_ts / UINT64_C(100) * UINT64_C(9);
+    return QSV_TS_OFFSET + (vlc_ts / UINT64_C(100) * UINT64_C(9));
 }
 
 static void clear_unused_frames(encoder_sys_t *sys)
