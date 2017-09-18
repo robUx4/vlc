@@ -692,6 +692,11 @@ static block_t *qsv_synchronize_block(encoder_t *enc, QSVpacket *qsv_pkt)
                 "Updating your drivers and/or changing the encoding settings might resolve this", sts);
         return NULL;
     }
+    if (qsv_pkt->bs.DataLength == 0)
+    {
+        msg_Dbg(enc, "Empty encoded block");
+        return NULL;
+    }
     block_t *block = qsv_pkt->block;
     block->i_buffer = qsv_pkt->bs.DataLength;
     block->p_buffer += qsv_pkt->bs.DataOffset;
