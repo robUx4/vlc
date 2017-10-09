@@ -1,0 +1,20 @@
+--- ssh2/src/agent.c	2017-07-12 09:51:38.985291600 +0200
++++ ssh2/src/agent.c.desktop	2017-10-09 16:56:11.722039700 +0200
+@@ -254,7 +254,7 @@ struct agent_ops agent_ops_unix = {
+ };
+ #endif  /* PF_UNIX */
+ 
+-#if defined(WIN32) && WINAPI_FAMILY_PARTITION(WINAPI_PARTITION_DESKTOP)
++#if defined(WIN32) && WINAPI_FAMILY_PARTITION(WINAPI_PARTITION_DESKTOP) && defined(FindWindow)
+ /* Code to talk to Pageant was taken from PuTTY.
+  *
+  * Portions copyright Robert de Bath, Joris van Rantwijk, Delian
+@@ -362,7 +362,7 @@ static struct {
+     const char *name;
+     struct agent_ops *ops;
+ } supported_backends[] = {
+-#if defined(WIN32) && WINAPI_FAMILY_PARTITION(WINAPI_PARTITION_DESKTOP)
++#if defined(WIN32) && WINAPI_FAMILY_PARTITION(WINAPI_PARTITION_DESKTOP) && defined(FindWindow)
+     {"Pageant", &agent_ops_pageant},
+ #endif  /* WIN32 */
+ #ifdef PF_UNIX
