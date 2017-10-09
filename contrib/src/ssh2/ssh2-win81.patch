@@ -1,0 +1,112 @@
+--- ssh2/acinclude.m4	2017-07-12 09:51:38.663292000 +0200
++++ ssh2/acinclude.m4.msvc81	2017-10-09 18:12:16.181590200 +0200
+@@ -219,6 +219,10 @@ dnl the code was bad, try a different pr
+ #endif
+ #include <windows.h>
+ #ifdef HAVE_WINSOCK2_H
++#if _WIN32_WINNT <= 0x603
++# undef WINAPI_FAMILY
++# define WINAPI_FAMILY WINAPI_FAMILY_DESKTOP_APP
++#endif
+ #include <winsock2.h>
+ #else
+ #ifdef HAVE_WINSOCK_H
+--- ssh2/configure.ac	2016-10-17 16:28:29.000000000 +0200
++++ ssh2/configure.ac.msvc81	2017-10-09 18:20:35.326285200 +0200
+@@ -329,6 +329,10 @@ if test "$ac_cv_func_select" != "yes"; t
+ #ifndef WIN32_LEAN_AND_MEAN
+ #define WIN32_LEAN_AND_MEAN
+ #endif
++#if _WIN32_WINNT <= 0x603
++# undef WINAPI_FAMILY
++# define WINAPI_FAMILY WINAPI_FAMILY_DESKTOP_APP
++#endif
+ #include <winsock2.h>
+ #endif
+     ],[
+--- ssh2/include/libssh2.h	2016-10-25 08:44:34.000000000 +0200
++++ ssh2/include/libssh2.h.msvc81	2017-10-09 18:19:36.359216400 +0200
+@@ -89,6 +89,10 @@ extern "C" {
+ #endif
+ #ifdef _WIN32
+ # include <basetsd.h>
++# if _WIN32_WINNT <= 0x603
++#  undef WINAPI_FAMILY
++#  define WINAPI_FAMILY WINAPI_FAMILY_DESKTOP_APP
++# endif
+ # include <winsock2.h>
+ #endif
+ 
+--- ssh2/src/libssh2_priv.h	2016-02-24 23:44:12.000000000 +0100
++++ ssh2/src/libssh2_priv.h.msvc81	2017-10-09 18:19:17.567034700 +0200
+@@ -52,6 +52,10 @@
+ #endif
+ 
+ #ifdef HAVE_WS2TCPIP_H
++# if _WIN32_WINNT <= 0x603
++#  undef WINAPI_FAMILY
++#  define WINAPI_FAMILY WINAPI_FAMILY_DESKTOP_APP
++# endif
+ #include <ws2tcpip.h>
+ #endif
+ 
+@@ -142,7 +146,6 @@ static inline int writev(int sock, struc
+ #ifdef HAVE_WINSOCK2_H
+ 
+ #include <winsock2.h>
+-#include <ws2tcpip.h>
+ 
+ #endif
+ 
+--- ssh2/tests/openssh_fixture.c	2016-09-04 00:44:34.000000000 +0200
++++ ssh2/tests/openssh_fixture.c.msvc81	2017-10-09 18:18:57.157406800 +0200
+@@ -39,6 +39,10 @@
+ #include "libssh2_config.h"
+ 
+ #ifdef HAVE_WINSOCK2_H
++# if _WIN32_WINNT <= 0x603
++#  undef WINAPI_FAMILY
++#  define WINAPI_FAMILY WINAPI_FAMILY_DESKTOP_APP
++# endif
+ #include <winsock2.h>
+ #endif
+ #ifdef HAVE_SYS_SOCKET_H
+--- ssh2/tests/session_fixture.c	2016-08-20 17:37:25.000000000 +0200
++++ ssh2/tests/session_fixture.c.msvc81	2017-10-09 18:18:45.190150900 +0200
+@@ -45,6 +45,10 @@
+ #include <windows.h>
+ #endif
+ #ifdef HAVE_WINSOCK2_H
++# if _WIN32_WINNT <= 0x603
++#  undef WINAPI_FAMILY
++#  define WINAPI_FAMILY WINAPI_FAMILY_DESKTOP_APP
++# endif
+ #include <winsock2.h>
+ #endif
+ #ifdef HAVE_SYS_SOCKET_H
+--- ssh2/tests/ssh2.c	2015-03-13 00:14:06.000000000 +0100
++++ ssh2/tests/ssh2.c.msvc81	2017-10-09 18:18:24.013516800 +0200
+@@ -8,6 +8,10 @@
+ # include <windows.h>
+ #endif
+ #ifdef HAVE_WINSOCK2_H
++# if _WIN32_WINNT <= 0x603
++#  undef WINAPI_FAMILY
++#  define WINAPI_FAMILY WINAPI_FAMILY_DESKTOP_APP
++# endif
+ # include <winsock2.h>
+ #endif
+ #ifdef HAVE_SYS_SOCKET_H
+--- ssh2/win32/libssh2_config.h	2016-04-09 00:55:37.000000000 +0200
++++ ssh2/win32/libssh2_config.h.msvc81	2017-10-09 18:11:50.087337300 +0200
+@@ -7,6 +7,10 @@
+ #ifndef _CRT_SECURE_NO_DEPRECATE
+ #define _CRT_SECURE_NO_DEPRECATE 1
+ #endif /* _CRT_SECURE_NO_DEPRECATE */
++#if _WIN32_WINNT <= 0x603
++# undef WINAPI_FAMILY
++# define WINAPI_FAMILY WINAPI_FAMILY_DESKTOP_APP
++#endif
+ #include <winsock2.h>
+ #include <mswsock.h>
+ #include <ws2tcpip.h>

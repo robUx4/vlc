@@ -29,6 +29,9 @@ ifdef HAVE_WINSTORE
 	$(APPLY) $(SRC)/ssh2/winrt-no-agent.patch
 	$(APPLY) $(SRC)/ssh2/ssh2-desktop.patch
 endif
+ifdef HAVE_VISUALSTUDIO
+	$(APPLY) $(SRC)/ssh2/ssh2-win81.patch
+endif
 	$(MOVE)
 
 DEPS_ssh2 = gcrypt $(DEPS_gcrypt)
