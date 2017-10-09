@@ -45,6 +45,9 @@ endif
 	$(APPLY) $(SRC)/upnp/upnp-no-debugfile.patch
 	$(APPLY) $(SRC)/upnp/msvc-snprintf.patch
 	$(APPLY) $(SRC)/upnp/use-unicode.patch
+ifdef HAVE_VISUALSTUDIO
+	$(APPLY) $(SRC)/upnp/upnp-win81.patch
+endif
 	$(UPDATE_AUTOCONFIG) && cd $(UNPACK_DIR) && mv config.guess config.sub build-aux/
 	$(MOVE)
 
