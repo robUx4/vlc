@@ -61,6 +61,7 @@ ifdef HAVE_ANDROID
 endif
 ifdef HAVE_VISUALSTUDIO
 	cd live && patch -lfp1 < ../../src/live555/msvc.patch
+	cd live && patch -lfp1 < ../../src/live555/live555-win81.patch
 	cd live && sed -e 's%-D__MINGW32__%%' -i.orig config.mingw
 endif
 	mv live live.$(LIVE555_VERSION)
