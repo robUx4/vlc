@@ -19,6 +19,7 @@ nfs: libnfs-$(NFS_VERSION).tar.gz .sum-nfs
 ifdef HAVE_VISUALSTUDIO
 	$(APPLY) $(SRC)/nfs/non-gcc.patch
 	$(APPLY) $(SRC)/nfs/msvc.patch
+	$(APPLY) $(SRC)/nfs/nfs-win81.patch
 endif
 	$(APPLY) $(SRC)/nfs/clang.patch
 	$(UPDATE_AUTOCONFIG)
