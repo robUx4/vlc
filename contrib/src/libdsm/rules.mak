@@ -25,6 +25,7 @@ libdsm: libdsm-$(LIBDSM_VERSION).tar.gz .sum-libdsm
 ifdef HAVE_VISUALSTUDIO
 	$(APPLY) $(SRC)/libdsm/libdsm-win81.patch
 endif
+	$(APPLY) $(SRC)/libdsm/libdsm-timespec.patch
 	$(MOVE)
 
 DEPS_libdsm = libtasn1 iconv
