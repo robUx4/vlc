@@ -19,6 +19,9 @@ sidplay-libs: sidplay-libs-$(SID_VERSION).tar.gz .sum-sidplay2
 	$(APPLY) $(SRC)/sidplay2/sidplay2-smartprt.patch
 	$(APPLY) $(SRC)/sidplay2/sidplay2-noutils.patch
 	$(APPLY) $(SRC)/sidplay2/sidplay2-string.patch
+ifdef HAVE_VISUALSTUDIO
+	$(APPLY) $(SRC)/sidplay2/sidplay2-msvc.patch
+endif
 	$(MOVE)
 
 SIDPLAY2_CONF := $(HOSTCONF)

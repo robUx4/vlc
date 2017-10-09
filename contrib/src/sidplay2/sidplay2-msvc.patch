@@ -1,0 +1,11 @@
+--- sidplay-libs/resid/sid.cc	2017-10-09 15:46:18.276018400 +0200
++++ sidplay-libs/resid/sid.cc.msvc	2017-10-09 15:44:59.606436900 +0200
+@@ -552,7 +552,7 @@ bool SID::set_sampling_parameters(double
+   // sample_offset a whole multiple of the filter table resolution.
+   int res = method == SAMPLE_RESAMPLE_INTERPOLATE ?
+     FIR_RES_INTERPOLATE : FIR_RES_FAST;
+-  int n = (int)ceil(log(res/f_cycles_per_sample)/log(2));
++  int n = (int)ceil(log(res/f_cycles_per_sample)/log(2.));
+   fir_RES = 1 << n;
+ 
+   // Allocate memory for FIR tables.
