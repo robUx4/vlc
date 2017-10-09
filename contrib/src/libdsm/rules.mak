@@ -22,6 +22,9 @@ libdsm: libdsm-$(LIBDSM_VERSION).tar.gz .sum-libdsm
 	$(UNPACK)
 	$(APPLY) $(SRC)/libdsm/winstore.patch
 	$(APPLY) $(SRC)/libdsm/sys-time.patch
+ifdef HAVE_VISUALSTUDIO
+	$(APPLY) $(SRC)/libdsm/libdsm-win81.patch
+endif
 	$(MOVE)
 
 DEPS_libdsm = libtasn1 iconv
