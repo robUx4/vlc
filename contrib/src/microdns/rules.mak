@@ -19,9 +19,13 @@ $(TARBALLS)/microdns-$(LIBMICRODNS_VERSION).tar.gz:
 
 microdns: microdns-$(LIBMICRODNS_VERSION).tar.gz .sum-microdns
 	$(UNPACK)
+ifdef HAVE_VISUALSTUDIO
+	$(APPLY) $(SRC)/microdns/microdns-win81.patch
+endif
 	$(MOVE)
 
 .microdns: microdns
+	$(RECONF)
 	cd $< && $(HOSTVARS) ./configure $(HOSTCONF)
 	cd $< && $(MAKE) install
 	touch $@
