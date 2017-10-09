@@ -45,6 +45,7 @@ ifdef HAVE_WINSTORE
 endif
 ifdef HAVE_VISUALSTUDIO
 	$(APPLY) $(SRC)/gnutls/msvc.patch
+	$(APPLY) $(SRC)/gnutls/gnutls-win81.patch
 endif
 	$(call pkg_static,"lib/gnutls.pc.in")
 	$(UPDATE_AUTOCONFIG)
