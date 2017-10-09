@@ -32,6 +32,7 @@ endif
 	$(APPLY) $(SRC)/libarchive/fix-types.patch
 ifdef HAVE_VISUALSTUDIO
 	$(APPLY) $(SRC)/libarchive/msvc.patch
+	$(APPLY) $(SRC)/libarchive/libarchive-win81.patch
 endif
 	$(call pkg_static,"build/pkgconfig/libarchive.pc.in")
 	$(MOVE)

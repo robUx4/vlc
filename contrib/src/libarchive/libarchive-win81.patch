@@ -1,0 +1,50 @@
+--- libarchive/libarchive/archive_cryptor_private.h	2017-10-09 14:23:22.898879100 +0200
++++ libarchive/libarchive/archive_cryptor_private.h.msvc81	2017-10-09 14:25:29.494362300 +0200
+@@ -64,6 +64,8 @@ typedef struct {
+ } archive_crypto_ctx;
+ 
+ #elif defined(_WIN32) && !defined(__CYGWIN__) && defined(HAVE_BCRYPT_H)
++#undef WINAPI_FAMILY
++#define WINAPI_FAMILY WINAPI_FAMILY_DESKTOP_APP
+ #include <Bcrypt.h>
+ 
+ /* Common in other bcrypt implementations, but missing from VS2008. */
+--- libarchive/libarchive/archive_hmac_private.h	2017-10-09 14:23:18.626938500 +0200
++++ libarchive/libarchive/archive_hmac_private.h.msvc81	2017-10-09 14:25:24.304346000 +0200
+@@ -54,6 +54,8 @@ int __libarchive_hmac_build_hack(void);
+ typedef	CCHmacContext archive_hmac_sha1_ctx;
+ 
+ #elif defined(_WIN32) && !defined(__CYGWIN__) && defined(HAVE_BCRYPT_H)
++#undef WINAPI_FAMILY
++#define WINAPI_FAMILY WINAPI_FAMILY_DESKTOP_APP
+ #include <bcrypt.h>
+ 
+ typedef struct {
+--- libarchive/libarchive/archive_read_support_format_zip.c	2017-10-09 14:32:02.450764700 +0200
++++ libarchive/libarchive/archive_read_support_format_zip.c.msvc81	2017-10-09 14:43:33.799493700 +0200
+@@ -55,10 +55,10 @@ __FBSDID("$FreeBSD: head/lib/libarchive/
+ 
+ #include "archive.h"
+ #include "archive_digest_private.h"
+-#include "archive_cryptor_private.h"
+ #include "archive_endian.h"
+ #include "archive_entry.h"
+ #include "archive_entry_locale.h"
++#include "archive_cryptor_private.h"
+ #include "archive_hmac_private.h"
+ #include "archive_private.h"
+ #include "archive_rb.h"
+--- libarchive/libarchive/archive_write_set_format_zip.c	2017-10-09 14:41:32.341081400 +0200
++++ libarchive/libarchive/archive_write_set_format_zip.c.msvc81	2017-10-09 14:44:18.423300400 +0200
+@@ -49,10 +49,10 @@ __FBSDID("$FreeBSD: head/lib/libarchive/
+ #endif
+ 
+ #include "archive.h"
+-#include "archive_cryptor_private.h"
+ #include "archive_endian.h"
+ #include "archive_entry.h"
+ #include "archive_entry_locale.h"
++#include "archive_cryptor_private.h"
+ #include "archive_hmac_private.h"
+ #include "archive_private.h"
+ #include "archive_random_private.h"
