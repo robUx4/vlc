@@ -39,6 +39,30 @@
 
 #define COBJMACROS
 #include <initguid.h>
+
+#ifdef _MSC_VER
+typedef BOOL WINBOOL;
+/* Special case nameless struct/union.  */
+#ifndef __C89_NAMELESS
+#  define __C89_NAMELESS
+#  define __C89_NAMELESSSTRUCTNAME
+#  define __C89_NAMELESSSTRUCTNAME1
+#  define __C89_NAMELESSSTRUCTNAME2
+#  define __C89_NAMELESSSTRUCTNAME3
+#  define __C89_NAMELESSSTRUCTNAME4
+#  define __C89_NAMELESSSTRUCTNAME5
+#  define __C89_NAMELESSUNIONNAME
+#  define __C89_NAMELESSUNIONNAME1
+#  define __C89_NAMELESSUNIONNAME2
+#  define __C89_NAMELESSUNIONNAME3
+#  define __C89_NAMELESSUNIONNAME4
+#  define __C89_NAMELESSUNIONNAME5
+#  define __C89_NAMELESSUNIONNAME6
+#  define __C89_NAMELESSUNIONNAME7
+#  define __C89_NAMELESSUNIONNAME8
+#endif
+#endif
+
 #include <d3d11.h>
 #include <dxgi1_6.h>
 #include <d3dcompiler.h>
@@ -1263,7 +1287,20 @@ static void Prepare(vout_display_t *vd, picture_t *picture, subpicture_t *subpic
 {
     vout_display_sys_t *sys = vd->sys;
 
-    picture_sys_t *p_sys = ActivePictureSys(picture);
+#if SWAPCHAIN_WAITABLE
+	if (sys->hSwapchainWaitable != INVALID_HANDLE_VALUE)
+	{
+		DWORD MaxWait;
+		if (picture->format.i_frame_rate_base && picture->format.i_frame_rate)
+			MaxWait = (picture->b_progressive ? 1000 : 2000) *
+			picture->format.i_frame_rate_base / picture->format.i_frame_rate;
+		else
+			MaxWait = 40; /* 25fps */
+		WaitForSingleObjectEx(sys->hSwapchainWaitable, MaxWait, FALSE);
+}
+#endif
+
+	picture_sys_t *p_sys = ActivePictureSys(picture);
 
 #if defined(HAVE_ID3D11VIDEODECODER)
     if (sys->context_lock != INVALID_HANDLE_VALUE && is_d3d11_opaque(picture->format.i_chroma))
@@ -1413,19 +1450,6 @@ static void Prepare(vout_display_t *vd, picture_t *picture, subpicture_t *subpic
         hdr10.MaxFrameAverageLightLevel = picture->format.lighting.MaxFALL;
         IDXGISwapChain4_SetHDRMetaData(sys->dxgiswapChain4, DXGI_HDR_METADATA_TYPE_HDR10, sizeof(hdr10), &hdr10);
     }
-
-#if SWAPCHAIN_WAITABLE
-    if (sys->hSwapchainWaitable != INVALID_HANDLE_VALUE)
-    {
-        DWORD MaxWait;
-        if (picture->format.i_frame_rate_base && picture->format.i_frame_rate)
-            MaxWait = (picture->b_progressive ? 1000 : 2000) *
-                      picture->format.i_frame_rate_base / picture->format.i_frame_rate;
-        else
-            MaxWait = 40; /* 25fps */
-        WaitForSingleObjectEx(sys->hSwapchainWaitable, MaxWait, FALSE);
-    }
-#endif
 
     //ID3D11DeviceContext_Flush(sys->d3dcontext);
 }
