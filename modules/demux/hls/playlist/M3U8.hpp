@@ -25,6 +25,11 @@
 #include <vlc_threads.h>
 #include <map>
 
+namespace std
+{
+    typedef unsigned char uint8_t;
+}
+
 namespace hls
 {
     namespace playlist
@@ -37,14 +42,14 @@ namespace hls
                 M3U8(vlc_object_t *);
                 virtual ~M3U8();
 
-                std::vector<std::uint8_t>       getEncryptionKey(const std::string &);
+                std::vector<uint8_t>       getEncryptionKey(const std::string &);
                 virtual bool                    isLive() const;
                 virtual void                    debug();
 
             private:
                 std::string data;
                 vlc_mutex_t keystore_lock;
-                std::map<std::string, std::vector<std::uint8_t>> keystore;
+                std::map<std::string, std::vector<uint8_t>> keystore;
         };
     }
 }
