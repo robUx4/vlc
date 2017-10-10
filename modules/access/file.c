@@ -47,7 +47,9 @@
 #if defined( _WIN32 )
 #   include <io.h>
 #   include <ctype.h>
-#   include <shlwapi.h>
+#   if !VLC_WINSTORE_APP
+#      include <shlwapi.h>
+#   endif
 #else
 #   include <unistd.h>
 #endif

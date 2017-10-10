@@ -37,7 +37,9 @@
 # include <w32api.h>
 #endif
 #include <direct.h>
-#include <shlobj.h>
+#if !VLC_WINSTORE_APP
+# include <shlobj.h>
+#endif
 
 #include "../libvlc.h"
 #include <vlc_charset.h>
