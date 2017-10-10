@@ -1,3 +1,14 @@
+--- libarchive/libarchive/archive_check_magic.c	2015-09-05 06:24:18.000000000 +0200
++++ libarchive/libarchive/archive_check_magic.c.msvc81	2017-10-10 10:37:46.370076600 +0200
+@@ -65,7 +65,7 @@ errmsg(const char *m)
+ static void
+ diediedie(void)
+ {
+-#if defined(_WIN32) && !defined(__CYGWIN__) && defined(_DEBUG)
++#if defined(_WIN32) && !defined(__CYGWIN__) && defined(_DEBUG) && WINAPI_FAMILY_PARTITION(WINAPI_PARTITION_DESKTOP)
+ 	/* Cause a breakpoint exception  */
+ 	DebugBreak();
+ #endif
 --- libarchive/libarchive/archive_cryptor_private.h	2017-10-09 14:23:22.898879100 +0200
 +++ libarchive/libarchive/archive_cryptor_private.h.msvc81	2017-10-09 14:25:29.494362300 +0200
 @@ -64,6 +64,8 @@ typedef struct {
