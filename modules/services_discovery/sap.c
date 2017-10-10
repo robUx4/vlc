@@ -54,8 +54,14 @@
 #   include <zlib.h>
 #endif
 
-#ifndef _WIN32
+#ifdef HAVE_NET_IF_H
 #   include <net/if.h>
+#else
+# if _WIN32_WINNT <= 0x603
+#  undef WINAPI_FAMILY
+#  define WINAPI_FAMILY WINAPI_FAMILY_DESKTOP_APP
+# endif
+# include <iphlpapi.h>
 #endif
 
 /************************************************************************

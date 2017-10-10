@@ -680,6 +680,7 @@ AC_CHECK_TYPES([max_align_t],,,
 dnl Checks for socket stuff
 VLC_SAVE_FLAGS
 SOCKET_LIBS=""
+NETIF_LIBS=""
 AC_SEARCH_LIBS(connect, [socket], [
   AS_IF([test "$ac_cv_search_connect" != "none required"], [
     SOCKET_LIBS="$ac_cv_search_connect"
@@ -687,6 +688,7 @@ AC_SEARCH_LIBS(connect, [socket], [
 ], [
   AS_IF([test "${SYS}" = "mingw32"], [
     SOCKET_LIBS="-lws2_32"
+    NETIF_LIBS="-liphlpapi"
   ])
 ])
 
@@ -714,9 +716,40 @@ AC_LINK_IFELSE([
         char dst[[sizeof(struct in_addr)]];
         inet_pton(AF_INET, "127.0.0.1", dst);
     ])],[AC_DEFINE([HAVE_INET_PTON],[1],[Define to 1 if you have inet_pton function])],[AC_LIBOBJ([inet_pton])])
-AC_CHECK_FUNCS([if_nameindex if_nametoindex])
+LIBS="${LIBS} ${NETIF_LIBS}"
+AC_LINK_IFELSE([
+    AC_LANG_PROGRAM([#ifdef _WIN32
+        # if _WIN32_WINNT < 0x600
+        #  error Needs vista+
+        # endif
+        # if _WIN32_WINNT <= 0x603
+        #  undef WINAPI_FAMILY
+        #  define WINAPI_FAMILY WINAPI_FAMILY_DESKTOP_APP
+        # endif
+        #include <iphlpapi.h>
+        #else
+        #include <net/if.h>
+        #endif], [
+        if_nametoindex(NULL);
+    ])],[AC_DEFINE([HAVE_IF_NAMETOINDEX],[1],[Define to 1 if you have if_nametoindex function])],[])
+AC_LINK_IFELSE([
+    AC_LANG_PROGRAM([#ifdef _WIN32
+        # if _WIN32_WINNT < 0x600
+        #  error Needs vista+
+        # endif
+        # if _WIN32_WINNT <= 0x603
+        #  undef WINAPI_FAMILY
+        #  define WINAPI_FAMILY WINAPI_FAMILY_DESKTOP_APP
+        # endif
+        #include <iphlpapi.h>
+        #else
+        #include <net/if.h>
+        #endif], [
+        if_nameindex(NULL);
+    ])],[AC_DEFINE([HAVE_IF_NAMEINDEX],[1],[Define to 1 if you have if_nameindex function])],[])
 VLC_RESTORE_FLAGS
 AC_SUBST(SOCKET_LIBS)
+AC_SUBST(NETIF_LIBS)
 
 dnl Check for socklen_t
 AH_TEMPLATE(socklen_t, [Define to `int' if <sys/socket.h> does not define.])
