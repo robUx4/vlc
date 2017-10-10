@@ -21,6 +21,14 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston MA 02110-1301, USA.
  *****************************************************************************/
 
+#ifdef _WIN32
+#define LIBARCHIVE_STATIC
+#endif
+
+#include <assert.h>
+#include <archive.h>
+#include <archive_entry.h>
+
 #ifdef HAVE_CONFIG_H
 #  include "config.h"
 #endif
@@ -31,14 +39,6 @@
 #include <vlc_stream_extractor.h>
 #include <vlc_dialog.h>
 #include <vlc_input_item.h>
-
-#ifdef _WIN32
-#define LIBARCHIVE_STATIC
-#endif
-
-#include <assert.h>
-#include <archive.h>
-#include <archive_entry.h>
 
 #if ARCHIVE_VERSION_NUMBER < 3002000
 typedef __LA_INT64_T la_int64_t;
