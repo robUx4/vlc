@@ -28,7 +28,9 @@
 #define _POSIX_TIMERS (-1)
 #endif
 #if (_POSIX_TIMERS <= 0)
-# include <sys/time.h> /* gettimeofday() */
+# ifdef HAVE_GETTIMEOFDAY
+#  include <sys/time.h> /* gettimeofday() */
+# endif
 #endif
 
 int timespec_get(struct timespec *ts, int base)
