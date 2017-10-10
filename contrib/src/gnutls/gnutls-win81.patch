@@ -69,17 +69,6 @@
                # include <winsock2.h>
                #endif
              ]],
---- gnutls/gl/sys/socket.h	2017-07-28 10:58:34.135238400 +0200
-+++ gnutls/gl/sys/socket.h.msvc81	2017-10-09 13:56:36.581217500 +0200
-@@ -472,6 +472,8 @@ struct sockaddr_storage
-    releases. */
- 
- # if 1
-+#  undef WINAPI_FAMILY
-+#  define WINAPI_FAMILY WINAPI_FAMILY_DESKTOP_APP
- #  include <winsock2.h>
- # endif
- # if 1
 --- gnutls/gl/sys_socket.in.h	2016-05-28 10:02:45.000000000 +0200
 +++ gnutls/gl/sys_socket.in.h.msvc81	2017-10-09 11:55:56.072728200 +0200
 @@ -160,6 +160,8 @@ struct sockaddr_storage
@@ -137,32 +126,6 @@
  
  #include <gnutls_int.h>
  #include <gnutls_errors.h>
---- gnutls/lib/system-keys-win.c	2017-10-09 14:13:56.567299000 +0200
-+++ gnutls/lib/system-keys-win.c.msvc81	2017-10-09 14:13:59.690915200 +0200
-@@ -25,6 +25,9 @@
- #define _WIN32_WINNT 0x600
- #endif
- 
-+#include <wincrypt.h>
-+#include <ncrypt.h>
-+
- 
- #include <gnutls_int.h>
- #include <gnutls_errors.h>
-@@ -41,13 +44,10 @@
- # error should not be included
- #endif
- 
--#include <wincrypt.h>
- #include <winbase.h>
- 
- #define DYN_NCRYPT
- 
--#include <ncrypt.h>
--
- // MinGW headers may not have these defines
- #ifndef NCRYPT_SHA1_ALGORITHM
- #define NCRYPT_SHA1_ALGORITHM           BCRYPT_SHA1_ALGORITHM
 --- gnutls/lib/system.c	2017-07-12 09:52:10.349255600 +0200
 +++ gnutls/lib/system.c.msvc81	2017-10-09 13:26:12.825712300 +0200
 @@ -20,6 +20,10 @@
