@@ -36,6 +36,10 @@
 #include <dirent.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#if _WIN32_WINNT <= 0x603
+# undef WINAPI_FAMILY
+# define WINAPI_FAMILY WINAPI_FAMILY_DESKTOP_APP
+#endif
 #include <winsock2.h>
 #include <direct.h>
 

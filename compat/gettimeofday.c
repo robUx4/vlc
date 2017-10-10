@@ -23,6 +23,10 @@
 #endif
 
 #ifdef _WIN32
+# if _WIN32_WINNT <= 0x603
+#  undef WINAPI_FAMILY
+#  define WINAPI_FAMILY WINAPI_FAMILY_DESKTOP_APP
+# endif
 #include <winsock2.h>
 
 /* FILETIME of Jan 1 1970 00:00:00. */
