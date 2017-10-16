@@ -1,10 +1,10 @@
 --- libdsm/compat/compat.h	2017-10-09 14:59:08.434762700 +0200
 +++ libdsm/compat/compat.h.pthread	2017-10-09 14:53:54.386526300 +0200
-@@ -79,7 +79,6 @@ struct timespec {
+@@ -79,6 +79,7 @@ struct timespec {
      time_t  tv_sec;   /* Seconds */
      long    tv_nsec;  /* Nanoseconds */
  };
--#define _TIMESPEC_DEFINED
++#define _TIMESPEC_DEFINED
  #endif /* HAVE_STRUCT_TIMESPEC */
  
  #endif
