@@ -28,6 +28,7 @@
 #include <windows.h>
 #include <wincrypt.h>
 
+#if !VLC_WINSTORE_APP || _WIN32_WINNT >= 0x0A00
 typedef BOOL (WINAPI *ProcessFunc)(DATA_BLOB*, LPCWSTR, DATA_BLOB*, PVOID,
                                    CRYPTPROTECT_PROMPTSTRUCT*, DWORD, DATA_BLOB*);
 
@@ -71,11 +72,16 @@ static size_t Encrypt( vlc_keystore *p_keystore, void *p_ctx, const uint8_t *p_s
     VLC_UNUSED( p_ctx );
     return Process( p_src, i_src_len, pp_dst, CryptProtectData );
 }
+#endif
 
 int CryptInit(vlc_keystore *p_keystore, struct crypt *p_crypt)
 {
     VLC_UNUSED( p_keystore );
+#if !VLC_WINSTORE_APP || _WIN32_WINNT >= 0x0A00
     p_crypt->pf_decrypt = Decrypt;
     p_crypt->pf_encrypt = Encrypt;
     return VLC_SUCCESS;
+#else
+    return VLC_EGENERIC;
+#endif
 }
