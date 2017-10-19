@@ -28,6 +28,7 @@ endif
 	$(MOVE)
 
 .dca: libdca
+	$(REQUIRE_GPL)
 	$(RECONF)
 	cd $< && $(HOSTVARS) CFLAGS="$(CFLAGS) -std=gnu89" ./configure $(HOSTCONF)
 	cd $< && $(MAKE) -C include install

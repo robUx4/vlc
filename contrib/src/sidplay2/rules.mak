@@ -30,6 +30,7 @@ SIDPLAY2_CONF += --with-namespace=SidPlay2
 endif
 
 .sidplay2: sidplay-libs
+	$(REQUIRE_GPL)
 	for d in . libsidplay builders resid builders/resid-builder \
 			builders/hardsid-builder libsidutils ; \
 	do \

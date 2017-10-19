@@ -30,15 +30,19 @@ GMP_ENV := $(HOSTVARS)
 
 ifdef HAVE_VISUALSTUDIO
 ifeq ($(ARCH),arm)
-GMPCONF += --disable-assembly
+GMP_CONF += --disable-assembly
 endif
 ifeq ($(ARCH),x86_64)
-GMPCONF += --disable-assembly
+GMP_CONF += --disable-assembly
 GMP_ENV += gmp_asm_syntax_testing=no
 endif
 endif
 
+# GMP requires either GPLv2 or LGPLv3
 .gmp: gmp
-	cd $< && $(GMP_ENV) ./configure $(HOSTCONF) $(GMPCONF)
+ifndef GPL
+	$(REQUIRE_GNUV3)
+endif
+	cd $< && $(GMP_ENV) ./configure $(HOSTCONF) $(GMP_CONF)
 	cd $< && $(MAKE) install
 	touch $@

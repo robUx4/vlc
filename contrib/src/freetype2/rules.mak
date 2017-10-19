@@ -28,6 +28,9 @@ endif
 endif
 
 .freetype2: freetype
+ifndef AD_CLAUSES
+	$(REQUIRE_GPL)
+endif
 	cd $< && cp builds/unix/install-sh .
 	sed -i.orig s/-ansi// $</builds/unix/configure
 	cd $< && GNUMAKE=$(MAKE) $(HOSTVARS) ./configure --with-harfbuzz=no --with-zlib=yes --without-png --with-bzip2=no $(HOSTCONF) CFLAGS="$(FREETYPE_CFLAGS)"

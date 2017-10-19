@@ -30,7 +30,11 @@ NETTLECONF += --disable-assembler
 endif
 endif
 
+# GMP requires either GPLv2 or LGPLv3
 .nettle: nettle
+ifndef GPL
+	$(REQUIRE_GNUV3)
+endif
 	cd $< && $(HOSTVARS) ./configure $(HOSTCONF) $(NETTLECONF)
 	cd $< && $(MAKE) install
 	touch $@

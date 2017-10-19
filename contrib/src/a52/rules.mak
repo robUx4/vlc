@@ -23,6 +23,7 @@ endif
 	$(MOVE)
 
 .a52: a52dec
+	$(REQUIRE_GPL)
 	$(RECONF)
 	cd $< && $(HOSTVARS) ./configure $(HOSTCONF)
 	cd $< && $(MAKE) -C liba52 install

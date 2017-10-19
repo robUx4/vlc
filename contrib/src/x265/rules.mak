@@ -34,6 +34,7 @@ endif
 	$(MOVE)
 
 .x265: x265 toolchain.cmake
+	$(REQUIRE_GPL)
 	cd $< && $(HOSTVARS_PIC) $(CMAKE) -C source -DENABLE_SHARED=OFF
 	cd $< && $(MAKE) -C source install
 	sed -e s/'[^ ]*clang_rt[^ ]*'//g -i.orig "$(PREFIX)/lib/pkgconfig/x265.pc"
