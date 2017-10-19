@@ -49,3 +49,21 @@
  # include <winsock2.h>
  #endif
  ])
+--- microdns.nok/src/mdns.c	2017-10-19 16:49:04.886317500 +0200
++++ microdns.nok/src/mdns.c.win81	2017-10-19 16:48:35.933273300 +0200
+@@ -156,6 +156,7 @@ mdns_list_interfaces(multicast_if** pp_i
+         size_t nb_intf = 0;
+ 
+         *p_nb_intf = 0;
++#if _WIN32_WINNT >= 0x0A00 || !WINAPI_FAMILY_PARTITION(WINAPI_PARTITION_APP)
+         /**
+          * https://msdn.microsoft.com/en-us/library/aa365915.aspx
+          *
+@@ -180,6 +181,7 @@ mdns_list_interfaces(multicast_if** pp_i
+                 free(res);
+                 return (MDNS_NETERR);
+         }
++#endif
+ 
+         for (current = res; current != NULL; current = current->Next) {
+                 if (!mdns_is_interface_valuable(current))
