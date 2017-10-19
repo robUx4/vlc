@@ -1373,6 +1373,7 @@ static IP_ADAPTER_ADDRESSES* ListAdapters()
     IP_ADAPTER_ADDRESSES* addresses = NULL;
     HRESULT hr;
 
+#if !VLC_WINSTORE_APP || _WIN32_WINNT >= 0x0A00
     /**
      * https://msdn.microsoft.com/en-us/library/aa365915.aspx
      *
@@ -1395,6 +1396,7 @@ static IP_ADAPTER_ADDRESSES* ListAdapters()
         free(addresses);
         return NULL;
     }
+#endif
     return addresses;
 }
 
