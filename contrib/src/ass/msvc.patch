@@ -1,5 +1,5 @@
---- libass-0.13.7/libass/ass_directwrite.c	2017-10-19 13:37:23.034455000 +0200
-+++ libass-0.13.7/libass/ass_directwrite.c.winstore	2017-10-19 13:38:24.762274300 +0200
+--- libass-0.13.4/libass/ass_directwrite.c	2016-12-14 16:29:11.856665600 +0100
++++ libass-0.13.4/libass/ass_directwrite.c.msvc	2016-12-14 16:28:53.418120800 +0100
 @@ -22,7 +22,6 @@
  
  #include <initguid.h>
