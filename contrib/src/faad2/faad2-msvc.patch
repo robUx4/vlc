@@ -1,0 +1,18 @@
+--- faad2/libfaad/common.h	2017-10-20 09:04:21.804392900 +0200
++++ faad2/libfaad/common.h.msvc	2017-10-20 09:00:23.698807100 +0200
+@@ -314,6 +314,7 @@ char *strchr(), *strrchr();
+ 
+ 
+   #if defined(_WIN32) && !defined(__MINGW32__)
++   #ifndef HAVE_LRINTF
+     #define HAS_LRINTF
+     static INLINE int lrintf(float f)
+     {
+@@ -325,6 +326,7 @@ char *strchr(), *strrchr();
+         }
+         return i;
+     }
++   #endif
+   #elif (defined(__i386__) && defined(__GNUC__) && \
+ 	!defined(__CYGWIN__) && !defined(__MINGW32__))
+     #ifndef HAVE_LRINTF
