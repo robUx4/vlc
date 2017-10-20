@@ -20,9 +20,6 @@ endif
 
 libdsm: libdsm-$(LIBDSM_VERSION).tar.gz .sum-libdsm
 	$(UNPACK)
-ifdef HAVE_VISUALSTUDIO
-	$(APPLY) $(SRC)/libdsm/libdsm-win81.patch
-endif
 	$(APPLY) $(SRC)/libdsm/libdsm-timespec.patch
 	$(APPLY) $(SRC)/libdsm/winstore.patch
 	$(MOVE)
