@@ -1,104 +1,104 @@
 --- libdsm/bin/discover.c	2017-10-09 14:46:20.635261900 +0200
 +++ libdsm/bin/discover.c.msvc81	2017-10-09 15:03:02.390576200 +0200
-@@ -36,6 +36,10 @@
+@@ -36,10 +36,6 @@
  #if !defined( _WIN32 )
  # include <arpa/inet.h>
  #else
-+# if defined(_WIN32_WINNT) && _WIN32_WINNT <= 0x603
-+#  undef WINAPI_FAMILY
-+#  define WINAPI_FAMILY WINAPI_FAMILY_DESKTOP_APP
-+# endif
+-# if defined(_WIN32_WINNT) && _WIN32_WINNT <= 0x603
+-#  undef WINAPI_FAMILY
+-#  define WINAPI_FAMILY WINAPI_FAMILY_DESKTOP_APP
+-# endif
  # include <winsock2.h>
  #endif
  
 --- libdsm/bin/dsm.c	2017-10-09 14:46:19.412000600 +0200
 +++ libdsm/bin/dsm.c.msvc81	2017-10-09 15:02:57.583000600 +0200
-@@ -44,6 +44,10 @@
+@@ -44,10 +44,6 @@
  # include <arpa/inet.h>
  # include <netinet/in.h>
  #else
-+# if defined(_WIN32_WINNT) && _WIN32_WINNT <= 0x603
-+#  undef WINAPI_FAMILY
-+#  define WINAPI_FAMILY WINAPI_FAMILY_DESKTOP_APP
-+# endif
+-# if defined(_WIN32_WINNT) && _WIN32_WINNT <= 0x603
+-#  undef WINAPI_FAMILY
+-#  define WINAPI_FAMILY WINAPI_FAMILY_DESKTOP_APP
+-# endif
  # include <winsock2.h>
  #endif
  
 --- libdsm/bin/inverse.c	2017-10-09 14:46:23.626855500 +0200
 +++ libdsm/bin/inverse.c.msvc81	2017-10-09 15:03:11.327418400 +0200
-@@ -36,6 +36,10 @@
+@@ -36,10 +36,6 @@
  #if !defined( _WIN32 )
  # include <arpa/inet.h>
  #else
-+# if defined(_WIN32_WINNT) && _WIN32_WINNT <= 0x603
-+#  undef WINAPI_FAMILY
-+#  define WINAPI_FAMILY WINAPI_FAMILY_DESKTOP_APP
-+# endif
+-# if defined(_WIN32_WINNT) && _WIN32_WINNT <= 0x603
+-#  undef WINAPI_FAMILY
+-#  define WINAPI_FAMILY WINAPI_FAMILY_DESKTOP_APP
+-# endif
  # include <winsock2.h>
  #endif
  
 --- libdsm/bin/lookup.c	2017-10-09 14:46:26.323060200 +0200
 +++ libdsm/bin/lookup.c.msvc81	2017-10-09 15:03:07.198905000 +0200
-@@ -36,6 +36,10 @@
+@@ -36,10 +36,6 @@
  #if !defined( _WIN32 )
  # include <arpa/inet.h>
  #else
-+# if defined(_WIN32_WINNT) && _WIN32_WINNT <= 0x603
-+#  undef WINAPI_FAMILY
-+#  define WINAPI_FAMILY WINAPI_FAMILY_DESKTOP_APP
-+# endif
+-# if defined(_WIN32_WINNT) && _WIN32_WINNT <= 0x603
+-#  undef WINAPI_FAMILY
+-#  define WINAPI_FAMILY WINAPI_FAMILY_DESKTOP_APP
+-# endif
  # include <winsock2.h>
  #endif
  
 --- libdsm/src/netbios_ns.c	2017-10-09 14:46:30.379009300 +0200
 +++ libdsm/src/netbios_ns.c.msvc81	2017-10-09 15:01:54.558764000 +0200
-@@ -54,6 +54,10 @@
+@@ -54,10 +54,6 @@
  # include <arpa/inet.h>
  #endif
  #ifdef _WIN32
-+# if defined(_WIN32_WINNT) && _WIN32_WINNT <= 0x603
-+#  undef WINAPI_FAMILY
-+#  define WINAPI_FAMILY WINAPI_FAMILY_DESKTOP_APP
-+# endif
+-# if defined(_WIN32_WINNT) && _WIN32_WINNT <= 0x603
+-#  undef WINAPI_FAMILY
+-#  define WINAPI_FAMILY WINAPI_FAMILY_DESKTOP_APP
+-# endif
  # include <winsock2.h>
  # include <ws2tcpip.h>
  #endif
 --- libdsm/src/netbios_query.c	2017-10-09 14:46:34.187105400 +0200
 +++ libdsm/src/netbios_query.c.msvc81	2017-10-09 15:01:40.894719700 +0200
-@@ -40,6 +40,10 @@
+@@ -40,10 +40,6 @@
  # include <arpa/inet.h>
  #endif
  #ifdef _WIN32
-+# if defined(_WIN32_WINNT) && _WIN32_WINNT <= 0x603
-+#  undef WINAPI_FAMILY
-+#  define WINAPI_FAMILY WINAPI_FAMILY_DESKTOP_APP
-+# endif
+-# if defined(_WIN32_WINNT) && _WIN32_WINNT <= 0x603
+-#  undef WINAPI_FAMILY
+-#  define WINAPI_FAMILY WINAPI_FAMILY_DESKTOP_APP
+-# endif
  # include <winsock2.h>
  #endif
  
 --- libdsm/src/netbios_session.h	2017-10-09 14:46:07.675006500 +0200
 +++ libdsm/src/netbios_session.h.msvc81	2017-10-09 15:01:30.183331300 +0200
-@@ -37,6 +37,10 @@
+@@ -37,10 +37,6 @@
  #if !defined _WIN32
  # include <netinet/in.h>
  #else
-+# if defined(_WIN32_WINNT) && _WIN32_WINNT <= 0x603
-+#  undef WINAPI_FAMILY
-+#  define WINAPI_FAMILY WINAPI_FAMILY_DESKTOP_APP
-+# endif
+-# if defined(_WIN32_WINNT) && _WIN32_WINNT <= 0x603
+-#  undef WINAPI_FAMILY
+-#  define WINAPI_FAMILY WINAPI_FAMILY_DESKTOP_APP
+-# endif
  # include <winsock2.h>
  #endif
  
 --- libdsm/src/smb_types.h	2017-10-09 14:46:11.523338700 +0200
 +++ libdsm/src/smb_types.h.msvc81	2017-10-09 15:01:25.663451800 +0200
-@@ -44,6 +44,10 @@
+@@ -44,10 +44,6 @@
  #if !defined _WIN32
  # include <netinet/ip.h>
  #else
-+# if defined(_WIN32_WINNT) && _WIN32_WINNT <= 0x603
-+#  undef WINAPI_FAMILY
-+#  define WINAPI_FAMILY WINAPI_FAMILY_DESKTOP_APP
-+# endif
+-# if defined(_WIN32_WINNT) && _WIN32_WINNT <= 0x603
+-#  undef WINAPI_FAMILY
+-#  define WINAPI_FAMILY WINAPI_FAMILY_DESKTOP_APP
+-# endif
  # include <winsock2.h>
  #endif
  
