@@ -29,10 +29,6 @@
 #ifdef _WIN32
 # include <errno.h>
 # include <stdlib.h>
-# if _WIN32_WINNT <= 0x603
-#  undef WINAPI_FAMILY
-#  define WINAPI_FAMILY WINAPI_FAMILY_DESKTOP_APP
-# endif
 # include <winsock2.h>
 
 ssize_t recvmsg(int fd, struct msghdr *msg, int flags)

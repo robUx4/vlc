@@ -42,10 +42,6 @@
 
 #if defined( _WIN32 )
 #   define _NO_OLDNAMES 1
-#   if _WIN32_WINNT <= 0x603
-#    undef WINAPI_FAMILY
-#    define WINAPI_FAMILY WINAPI_FAMILY_DESKTOP_APP
-#   endif
 #   include <winsock2.h>
 #   include <ws2tcpip.h>
 #   define net_errno (WSAGetLastError())
