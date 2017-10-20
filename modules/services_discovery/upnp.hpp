@@ -24,10 +24,6 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston MA 02110-1301, USA.
  *****************************************************************************/
 
-#if defined(_WIN32_WINNT) && _WIN32_WINNT <= 0x603
-# undef WINAPI_FAMILY
-# define WINAPI_FAMILY WINAPI_FAMILY_DESKTOP_APP
-#endif
 #define HAVE_IF_NAMETOINDEX /* FIXME DIRTY */
 
 #ifdef HAVE_CONFIG_H
