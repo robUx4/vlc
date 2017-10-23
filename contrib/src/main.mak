@@ -212,8 +212,10 @@ ifdef HAVE_CROSS_COMPILE
 #PKG_CONFIG_PATH := /usr/share/pkgconfig
 PKG_CONFIG_LIBDIR := /usr/$(HOST)/lib/pkgconfig
 export PKG_CONFIG_LIBDIR
-endif
+PKG_CONFIG_PATH := $(PREFIX)/lib/pkgconfig
+else
 PKG_CONFIG_PATH := $(PREFIX)/lib/pkgconfig:$(PKG_CONFIG_PATH)
+endif
 export PKG_CONFIG_PATH
 
 ifndef GIT
