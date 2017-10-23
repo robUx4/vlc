@@ -1,0 +1,42 @@
+--- tarballs/d3d11.idl	2017-10-23 16:23:45.668884700 +0200
++++ tarballs/d3d11.idl.mscver	2017-10-23 18:58:07.415372300 +0200
+@@ -17,6 +17,25 @@
+  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA
+  */
+ 
++cpp_quote("#if defined(_WIN32_WINNT) && _WIN32_WINNT <= 0x603")
++cpp_quote("# if WINAPI_FAMILY == WINAPI_FAMILY_PC_APP")
++cpp_quote("#  ifdef _INC_WINAPIFAMILY")
++cpp_quote("#   undef _INC_WINAPIFAMILY")
++cpp_quote("#  endif")
++cpp_quote("#  undef WINAPI_FAMILY")
++cpp_quote("#  define WINAPI_FAMILY WINAPI_FAMILY_DESKTOP_APP")
++cpp_quote("#  define WINAPI_FAMILY_OVERRIDE_PC")
++cpp_quote("# elif WINAPI_FAMILY == WINAPI_FAMILY_PHONE_APP")
++cpp_quote("#  ifdef _INC_WINAPIFAMILY")
++cpp_quote("#   undef _INC_WINAPIFAMILY")
++cpp_quote("#  endif")
++cpp_quote("#  undef WINAPI_FAMILY")
++cpp_quote("#  define WINAPI_FAMILY WINAPI_FAMILY_DESKTOP_APP")
++cpp_quote("#  define WINAPI_FAMILY_OVERRIDE_PHONE")
++cpp_quote("# endif")
++cpp_quote("#endif")
++
++
+ import "oaidl.idl";
+ import "ocidl.idl";
+ import "dxgi.idl";
+@@ -3224,3 +3243,13 @@ cpp_quote("    D3D_FEATURE_LEVEL*,ID3D11
+         HMODULE swrast, UINT flags, const D3D_FEATURE_LEVEL *feature_levels, UINT levels, UINT sdk_version,
+         const DXGI_SWAP_CHAIN_DESC *swapchain_desc, IDXGISwapChain **swapchain, ID3D11Device **device,
+         D3D_FEATURE_LEVEL *obtained_feature_level, ID3D11DeviceContext **immediate_context);
++
++cpp_quote("#if defined(WINAPI_FAMILY_OVERRIDE_PC)")
++cpp_quote("# undef _INC_WINAPIFAMILY")
++cpp_quote("# undef WINAPI_FAMILY")
++cpp_quote("# define WINAPI_FAMILY WINAPI_FAMILY_PC_APP")
++cpp_quote("# elif defined(WINAPI_FAMILY_OVERRIDE_PHONE)")
++cpp_quote("# undef _INC_WINAPIFAMILY")
++cpp_quote("# undef WINAPI_FAMILY")
++cpp_quote("# define WINAPI_FAMILY WINAPI_FAMILY_PHONE_APP")
++cpp_quote("#endif")

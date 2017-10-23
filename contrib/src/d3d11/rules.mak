@@ -49,7 +49,7 @@ $(TARBALLS)/dxgitype.h:
 
 d3d11: .sum-d3d11
 	mkdir -p $@
-	cp $(TARBALLS)/d3d11.idl $@ && cd $@ && patch -fp1 < ../$(SRC)/d3d11/processor_format.patch
+	cp $(TARBALLS)/d3d11.idl $@ && cd $@ && patch -fp1 < ../$(SRC)/d3d11/processor_format.patch && patch -fp1 < ../$(SRC)/d3d11/d3d11.patch
 
 dxgi: .sum-d3d11
 	mkdir -p $@
