@@ -1,0 +1,13 @@
+--- tarballs/dxgitype.h	2017-10-23 12:03:45.140603400 +0200
++++ tarballs/dxgitype.h.mscver	2017-10-23 14:09:19.847274000 +0200
+@@ -21,6 +21,10 @@
+ 
+ #include "dxgiformat.h"
+ 
++#ifdef _MSC_VER
++#define WINBOOL BOOL
++#endif /* _MSC_VER */
++
+ #ifndef D3DCOLORVALUE_DEFINED
+ typedef struct _D3DCOLORVALUE {
+     float r;

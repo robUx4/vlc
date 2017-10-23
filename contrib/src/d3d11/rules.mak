@@ -55,45 +55,49 @@ dxgi: .sum-d3d11
 	mkdir -p $@
 	cp $(TARBALLS)/dxgi.idl $@ && cd $@ && patch -fp1 < ../$(SRC)/d3d11/dxgi.patch
 
+dxgitype: .sum-d3d11
+	mkdir -p $@
+	cp $(TARBALLS)/dxgitype.h $@ && cd $@ && patch -fp1 < ../$(SRC)/d3d11/dxgitype.patch
+
 dxgi12: .sum-d3d11
 	mkdir -p $@
 	cp $(TARBALLS)/dxgi1_2.idl $@ && cd $@ && patch -fp1 < ../$(SRC)/d3d11/dxgi12.patch
 
 $(DST_D3D11_H): d3d11
 	mkdir -p -- "$(PREFIX)/include/"
-	$(WIDL) -DBOOL=WINBOOL -I$(IDL_INC_PATH) -h -o $@ $</d3d11.idl
+	$(WIDL) -I$(IDL_INC_PATH) -h -o $@ $</d3d11.idl
 
 $(DST_DXGIDEBUG_H): $(TARBALLS)/dxgidebug.idl
 	mkdir -p -- "$(PREFIX)/include/"
-	$(WIDL) -DBOOL=WINBOOL -I$(IDL_INC_PATH) -h -o $@ $<
+	$(WIDL) -I$(IDL_INC_PATH) -h -o $@ $<
 
-$(DST_DXGITYPE_H): $(TARBALLS)/dxgitype.h
+$(DST_DXGITYPE_H): dxgitype
 	mkdir -p -- "$(PREFIX)/include/"
-	cp $(TARBALLS)/dxgitype.h $@
+	cp dxgitype/dxgitype.h $@
 
 $(DST_DXGI_H): dxgi
 	mkdir -p -- "$(PREFIX)/include/"
-	$(WIDL) -DBOOL=WINBOOL -I$(IDL_INC_PATH) -h -o $@ $</dxgi.idl
+	$(WIDL) -I$(IDL_INC_PATH) -h -o $@ $</dxgi.idl
 
 $(DST_DXGI12_H): dxgi12 $(DST_DXGI_H)
 	mkdir -p -- "$(PREFIX)/include/"
-	$(WIDL) -DBOOL=WINBOOL -I$(IDL_INC_PATH) -h -o $@ $</dxgi1_2.idl
+	$(WIDL) -I$(IDL_INC_PATH) -h -o $@ $</dxgi1_2.idl
 
 $(DST_DXGI13_H): $(SRC)/d3d11/dxgi1_3.idl $(DST_DXGI12_H)
 	mkdir -p -- "$(PREFIX)/include/"
-	$(WIDL) -DBOOL=WINBOOL -Idxgi12 -I../src/d3d11 -I$(IDL_INC_PATH) -h -o $@ $<
+	$(WIDL) -Idxgi12 -I../src/d3d11 -I$(IDL_INC_PATH) -h -o $@ $<
 
 $(DST_DXGI14_H): $(SRC)/d3d11/dxgi1_4.idl $(DST_DXGI13_H)
 	mkdir -p -- "$(PREFIX)/include/"
-	$(WIDL) -DBOOL=WINBOOL -Idxgi12 -I../src/d3d11 -I$(IDL_INC_PATH) -h -o $@ $<
+	$(WIDL) -Idxgi12 -I../src/d3d11 -I$(IDL_INC_PATH) -h -o $@ $<
 
 $(DST_DXGI15_H): $(SRC)/d3d11/dxgi1_5.idl $(DST_DXGI14_H)
 	mkdir -p -- "$(PREFIX)/include/"
-	$(WIDL) -DBOOL=WINBOOL -Idxgi12 -I../src/d3d11 -I$(IDL_INC_PATH) -h -o $@ $<
+	$(WIDL) -Idxgi12 -I../src/d3d11 -I$(IDL_INC_PATH) -h -o $@ $<
 
 $(DST_DXGI16_H): $(SRC)/d3d11/dxgi1_6.idl $(DST_DXGI15_H)
 	mkdir -p -- "$(PREFIX)/include/"
-	$(WIDL) -DBOOL=WINBOOL -Idxgi12 -I../src/d3d11 -I$(IDL_INC_PATH) -h -o $@ $<
+	$(WIDL) -Idxgi12 -I../src/d3d11 -I$(IDL_INC_PATH) -h -o $@ $<
 
 .dxgitype: $(DST_DXGITYPE_H)
 	touch $@
