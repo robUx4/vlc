@@ -30,13 +30,6 @@
 #include <initguid.h>
 #include <d3d11.h>
 
-#ifdef _MSC_VER /* dirty hack as MIDL doesn't embed the IID */
-#include "d3d11.h_i.c"
-#include "dxgi.h_i.c"
-#include "dxgi1_4.h_i.c"
-#include "dxgi1_5.h_i.c"
-#endif
-
 #include "dxgi_fmt.h"
 
 typedef struct
