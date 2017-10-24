@@ -30,7 +30,6 @@ DEPS_libdsm += pthreads $(DEPS_pthreads)
 endif
 
 .libdsm: libdsm
-	$(RECONF)
 	cd $< && $(HOSTVARS) ./configure --disable-programs $(LIBDSM_CONF)
 	cd $< && $(MAKE) install
 	touch $@
