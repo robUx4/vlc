@@ -48,15 +48,6 @@
 
 #include "../codec/cc.h"
 
-#ifdef _MSC_VER /* dirty hack as MIDL doesn't embed the IID */
-#include "d3d11.h_i.c"
-#include "dxgi.h_i.c"
-#include "dxgidebug.h_i.c"
-#include "dxgi1_2.h_i.c"
-#include "dxgi1_4.h_i.c"
-#include "dxgi1_5.h_i.c"
-#endif
-
 /*****************************************************************************
  * decoder_sys_t : decoder descriptor
  *****************************************************************************/
@@ -351,19 +342,12 @@ static int lavc_CopyPicture(decoder_t *dec, picture_t *pic, AVFrame *frame)
 {
     decoder_sys_t *sys = dec->p_sys;
 
-    vlc_fourcc_t fourcc = FindVlcChroma(frame->format);
-    if (!fourcc)
+    if (!FindVlcChroma(sys->p_context->pix_fmt))
     {
-        const char *name = av_get_pix_fmt_name(frame->format);
+        const char *name = av_get_pix_fmt_name(sys->p_context->pix_fmt);
 
         msg_Err(dec, "Unsupported decoded output format %d (%s)",
                 sys->p_context->pix_fmt, (name != NULL) ? name : "unknown");
-        return VLC_EGENERIC;
-    } else if (fourcc != pic->format.i_chroma
-     || frame->width != (int) pic->format.i_visible_width
-     || frame->height != (int) pic->format.i_visible_height)
-    {
-        msg_Warn(dec, "dropping frame because the vout changed");
         return VLC_EGENERIC;
     }
 
@@ -513,6 +497,7 @@ int InitVideoDec( vlc_object_t *obj )
     else if( i_val == -1 ) p_sys->i_skip_frame = AVDISCARD_NONE;
     else p_sys->i_skip_frame = AVDISCARD_DEFAULT;
     p_context->skip_frame = p_sys->i_skip_frame;
+    msg_Dbg(p_dec, "init skip mode to %d", p_sys->i_skip_frame);
 
     i_val = var_CreateGetInteger( p_dec, "avcodec-skip-idct" );
     if( i_val >= 4 ) p_context->skip_idct = AVDISCARD_ALL;
@@ -640,6 +625,7 @@ static void Flush( decoder_t *p_dec )
 
     date_Set(&p_sys->pts, VLC_TS_INVALID); /* To make sure we recover properly */
     p_sys->i_late_frames = 0;
+    msg_Dbg( p_dec, "reset frame late 2");
     cc_Flush( &p_sys->cc );
 
     /* Abort pictures in order to unblock all avcodec workers threads waiting
@@ -677,8 +663,9 @@ static bool check_block_validity( decoder_sys_t *p_sys, block_t *block )
     return true;
 }
 
-static bool check_block_being_late( decoder_sys_t *p_sys, block_t *block, mtime_t current_time)
+static bool check_block_being_late( decoder_t *p_dec, block_t *block, mtime_t current_time)
 {
+    decoder_sys_t *p_sys = p_dec->p_sys;
     if( !block )
         return false;
     if( block->i_flags & BLOCK_FLAG_PREROLL )
@@ -687,6 +674,7 @@ static bool check_block_being_late( decoder_sys_t *p_sys, block_t *block, mtime_
          * TODO avoid decoding of non reference frame
          * (ie all B except for H264 where it depends only on nal_ref_idc) */
         p_sys->i_late_frames = 0;
+        msg_Dbg( p_dec, "reset frame late preroll");
         p_sys->b_from_preroll = true;
         p_sys->i_last_late_delay = INT64_MAX;
     }
@@ -696,6 +684,7 @@ static bool check_block_being_late( decoder_sys_t *p_sys, block_t *block, mtime_
 
     if( current_time - p_sys->i_late_frames_start > (5*CLOCK_FREQ))
     {
+        msg_Warn( p_dec, "frame way too late, dropping block");
         date_Set( &p_sys->pts, VLC_TS_INVALID ); /* To make sure we recover properly */
         block_Release( block );
         p_sys->i_late_frames--;
@@ -704,8 +693,9 @@ static bool check_block_being_late( decoder_sys_t *p_sys, block_t *block, mtime_
     return false;
 }
 
-static bool check_frame_should_be_dropped( decoder_sys_t *p_sys, AVCodecContext *p_context, bool *b_need_output_picture )
+static bool check_frame_should_be_dropped( decoder_t *p_dec, AVCodecContext *p_context, bool *b_need_output_picture )
 {
+    decoder_sys_t *p_sys = p_dec->p_sys;
     if( p_sys->i_late_frames <= 4)
         return false;
 
@@ -715,6 +705,7 @@ static bool check_frame_should_be_dropped( decoder_sys_t *p_sys, AVCodecContext 
         p_context->skip_frame =
                 (p_sys->i_skip_frame <= AVDISCARD_NONREF) ?
                 AVDISCARD_NONREF : p_sys->i_skip_frame;
+        msg_Dbg(p_dec, "set new skip mode to %d", p_context->skip_frame);
     }
     else
     {
@@ -767,11 +758,13 @@ static void update_late_frame_count( decoder_t *p_dec, block_t *p_block, mtime_t
        p_sys->i_late_frames++;
        if( p_sys->i_late_frames == 1 )
            p_sys->i_late_frames_start = current_time;
+       msg_Dbg( p_dec, "frame %lld late by %lld ms", i_pts, (current_time - i_display_date)/1000 );
 
    }
-   else
+   else if (p_sys->i_late_frames)
    {
        p_sys->i_late_frames = 0;
+       msg_Dbg( p_dec, "reset frame late 1");
    }
 }
 
@@ -863,7 +856,7 @@ static void DecodeSidedata( decoder_t *p_dec, const AVFrame *frame, picture_t *p
     if( p_avcc )
     {
         cc_Extract( &p_sys->cc, CC_PAYLOAD_RAW, true, p_avcc->data, p_avcc->size );
-        if( p_sys->cc.b_reorder || p_sys->cc.i_data )
+        if( p_sys->cc.i_data )
         {
             block_t *p_cc = block_Alloc( p_sys->cc.i_data );
             if( p_cc )
@@ -919,7 +912,7 @@ static picture_t *DecodeBlock( decoder_t *p_dec, block_t **pp_block, bool *error
         return NULL;
 
     current_time = mdate();
-    if( p_dec->b_frame_drop_allowed &&  check_block_being_late( p_sys, p_block, current_time) )
+    if( p_dec->b_frame_drop_allowed &&  check_block_being_late( p_dec, p_block, current_time) )
     {
         msg_Err( p_dec, "more than 5 seconds of late video -> "
                  "dropping frame (computer too slow ?)" );
@@ -939,12 +932,16 @@ static picture_t *DecodeBlock( decoder_t *p_dec, block_t **pp_block, bool *error
     /* Change skip_frame config only if hurry_up is enabled */
     if( p_sys->b_hurry_up )
     {
-        p_context->skip_frame = p_sys->i_skip_frame;
+        if (p_context->skip_frame != p_sys->i_skip_frame)
+        {
+            msg_Dbg(p_dec, "reset skip mode to %d", p_sys->i_skip_frame);
+            p_context->skip_frame = p_sys->i_skip_frame;
+        }
 
         /* Check also if we should/can drop the block and move to next block
             as trying to catchup the speed*/
         if( p_dec->b_frame_drop_allowed &&
-            check_frame_should_be_dropped( p_sys, p_context, &b_need_output_picture ) )
+            check_frame_should_be_dropped( p_dec, p_context, &b_need_output_picture ) )
         {
             if( p_block )
                 block_Release( p_block );
@@ -954,8 +951,14 @@ static picture_t *DecodeBlock( decoder_t *p_dec, block_t **pp_block, bool *error
     }
     if( !b_need_output_picture )
     {
-        p_context->skip_frame = __MAX( p_context->skip_frame,
-                                              AVDISCARD_NONREF );
+        /* skip frame should be at least non-ref when discarding a packet */
+        if (p_context->skip_frame != __MAX( p_context->skip_frame,
+                                           AVDISCARD_NONREF ))
+        {
+            p_context->skip_frame = __MAX( p_context->skip_frame,
+                                                  AVDISCARD_NONREF );
+            msg_Dbg(p_dec, "upper skip mode to %d", p_context->skip_frame);
+        }
     }
 
     /*
@@ -999,6 +1002,10 @@ static picture_t *DecodeBlock( decoder_t *p_dec, block_t **pp_block, bool *error
             pkt.size = 0;
         }
 
+        if (p_block)
+            msg_Dbg(p_dec,"queue pts %lld", p_block->i_pts);
+        else
+            msg_Warn(p_dec,"queue empty packet ?");
         if( !p_sys->palette_sent )
         {
             uint8_t *pal = av_packet_new_side_data(&pkt, AV_PKT_DATA_PALETTE, AVPALETTE_SIZE);
@@ -1017,7 +1024,10 @@ static picture_t *DecodeBlock( decoder_t *p_dec, block_t **pp_block, bool *error
 
 #if LIBAVCODEC_VERSION_CHECK( 57, 0, 0xFFFFFFFFU, 64, 101 )
         if( !b_need_output_picture )
+        {
+            msg_Dbg(p_dec, "tell decoder to discard %lld", pkt.pts);
             pkt.flags |= AV_PKT_FLAG_DISCARD;
+        }
 #endif
 
         int ret = avcodec_send_packet(p_context, &pkt);
@@ -1028,10 +1038,13 @@ static picture_t *DecodeBlock( decoder_t *p_dec, block_t **pp_block, bool *error
                 msg_Err(p_dec, "avcodec_send_packet critical error");
                 *error = true;
             }
+            else msg_Dbg(p_dec,"avcodec_send_packet error");
             av_packet_unref( &pkt );
             break;
         }
         i_used = ret != AVERROR(EAGAIN) ? pkt.size : 0;
+        if (ret == AVERROR(EAGAIN))
+            msg_Dbg(p_dec,"avcodec_send_packet EAGAIN");
         av_packet_unref( &pkt );
 
         AVFrame *frame = av_frame_alloc();
@@ -1042,6 +1055,7 @@ static picture_t *DecodeBlock( decoder_t *p_dec, block_t **pp_block, bool *error
         }
 
         ret = avcodec_receive_frame(p_context, frame);
+        //msg_Dbg(p_dec," got %d frame %p buf[0] %p", ret, frame, frame->buf[0]);
         if( ret != 0 && ret != AVERROR(EAGAIN) )
         {
             if (ret == AVERROR(ENOMEM) || ret == AVERROR(EINVAL))
@@ -1075,6 +1089,7 @@ static picture_t *DecodeBlock( decoder_t *p_dec, block_t **pp_block, bool *error
         /* Nothing to display */
         if( not_received_frame )
         {
+            msg_Err(p_dec, "frame not received");
             av_frame_free(&frame);
             if( i_used == 0 ) break;
             continue;
@@ -1098,12 +1113,14 @@ static picture_t *DecodeBlock( decoder_t *p_dec, block_t **pp_block, bool *error
 
         interpolate_next_pts( p_dec, frame );
 
+        msg_Dbg(p_dec, "dequeued pts %lld", i_pts);
         update_late_frame_count( p_dec, p_block, current_time, i_pts);
 
         if( ( !p_sys->p_va && !frame->linesize[0] ) ||
            ( p_dec->b_frame_drop_allowed && (frame->flags & AV_FRAME_FLAG_CORRUPT) &&
              !p_sys->b_show_corrupted ) )
         {
+            msg_Dbg(p_dec, "drop corrupted");
             av_frame_free(&frame);
             continue;
         }
@@ -1165,6 +1182,7 @@ static picture_t *DecodeBlock( decoder_t *p_dec, block_t **pp_block, bool *error
             /* Fill picture_t from AVFrame */
             if( lavc_CopyPicture( p_dec, p_pic, frame ) != VLC_SUCCESS )
             {
+                *error = true;
                 av_frame_free(&frame);
                 picture_Release( p_pic );
                 break;
