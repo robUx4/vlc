@@ -40,13 +40,6 @@
 
 #include "../../video_chroma/d3d11_fmt.h"
 
-#ifdef __MINGW32__
-#define D3D11_VIDEO_PROCESSOR_FILTER_CAPS_BRIGHTNESS   0x1
-#define D3D11_VIDEO_PROCESSOR_FILTER_CAPS_CONTRAST     0x2
-#define D3D11_VIDEO_PROCESSOR_FILTER_CAPS_HUE          0x4
-#define D3D11_VIDEO_PROCESSOR_FILTER_CAPS_SATURATION   0x8
-#endif
-
 #define PROCESSOR_SLICES 2
 
 struct filter_level
