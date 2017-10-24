@@ -40,29 +40,6 @@
 #define COBJMACROS
 #include <initguid.h>
 
-#ifdef _MSC_VER
-typedef BOOL WINBOOL;
-/* Special case nameless struct/union.  */
-#ifndef __C89_NAMELESS
-#  define __C89_NAMELESS
-#  define __C89_NAMELESSSTRUCTNAME
-#  define __C89_NAMELESSSTRUCTNAME1
-#  define __C89_NAMELESSSTRUCTNAME2
-#  define __C89_NAMELESSSTRUCTNAME3
-#  define __C89_NAMELESSSTRUCTNAME4
-#  define __C89_NAMELESSSTRUCTNAME5
-#  define __C89_NAMELESSUNIONNAME
-#  define __C89_NAMELESSUNIONNAME1
-#  define __C89_NAMELESSUNIONNAME2
-#  define __C89_NAMELESSUNIONNAME3
-#  define __C89_NAMELESSUNIONNAME4
-#  define __C89_NAMELESSUNIONNAME5
-#  define __C89_NAMELESSUNIONNAME6
-#  define __C89_NAMELESSUNIONNAME7
-#  define __C89_NAMELESSUNIONNAME8
-#endif
-#endif
-
 #include <d3d11.h>
 #include <dxgi1_6.h>
 #include <d3dcompiler.h>
