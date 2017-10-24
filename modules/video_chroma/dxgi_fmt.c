@@ -27,7 +27,6 @@
 #include <vlc_es.h>
 
 #define COBJMACROS
-#include <initguid.h>
 #include <d3d11.h>
 
 #include "dxgi_fmt.h"
